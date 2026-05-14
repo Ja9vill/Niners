@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Search, Filter, TrendingUp, BarChart3, PieChart, Info, UserPen, Target, Plus, ChevronRight, X, Shield, Edit2, Loader2 } from 'lucide-react';
+import { Search, Filter, TrendingUp, BarChart3, PieChart, Info, UserPen, Target, Plus, ChevronRight, X, Shield, Edit2, Loader2, Fingerprint } from 'lucide-react';
 import { Host, Tier, BaseSalaryTier, HostStatus, AnchorType, PerformanceGoal, Position, CommissionEntry } from '../types';
 import { Storage } from '../lib/storage';
 import { FirebaseService } from '../lib/firebaseService';
@@ -414,69 +414,83 @@ export const ProfilesTab = () => {
                              <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-cyan-500" /> <span className="text-[10px] text-white/50">Party: 5%</span></div>
                              <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-emerald-500" /> <span className="text-[10px] text-white/50">Other: 5%</span></div>
                           </div>
-                       </div>
-
-                        <div className="glass-card">
-                           <h5 className="text-xs font-bold uppercase tracking-widest text-white/30 mb-6">Agency Record</h5>
-                           <div className="space-y-4">
-                              {[
-                                { label: 'Position', value: selectedHost.position },
-                                { label: 'Team', value: selectedHost.team },
-                                { label: 'Manager', value: selectedHost.manager },
-                                { label: 'Anchor Type', value: selectedHost.anchor_type },
-                                { label: 'Salary Class', value: selectedHost.base_salary_category },
-                                { label: 'Current Status', value: selectedHost.status },
-                                { label: 'Poppo Level', value: selectedHost.level },
-                                { label: 'Onboarding', value: new Date(selectedHost.created_at).toLocaleDateString() },
-                                { label: 'Last Sync', value: new Date(selectedHost.updated_at).toLocaleDateString() },
-                              ].map((item, i) => (
-                                <div key={i} className="flex justify-between items-center py-2 border-b border-white/5 last:border-0 hover:bg-white/[0.02] px-2 rounded-lg transition-colors">
-                                   <span className="text-[9px] font-black text-white/20 uppercase tracking-widest">{item.label}</span>
-                                   <span className="text-xs font-bold text-white/60 tracking-tight">{item.value || 'N/A'}</span>
+                       </div>                        {/* Agency Record Section */}
+                        <section className="space-y-4">
+                          <div className="flex items-center gap-3 pb-2 border-b border-white/5">
+                            <div className="p-2 rounded-xl bg-indigo-500/10 text-indigo-400">
+                              <Fingerprint size={16} />
+                            </div>
+                            <h5 className="text-[10px] font-black uppercase tracking-[0.2em] text-white/80">Agency Record</h5>
+                          </div>
+                          <div className="glass-card !bg-white/[0.01] !p-6">
+                            <div className="space-y-3">
+                               {[
+                                 { label: 'Position', value: selectedHost.position },
+                                 { label: 'Team', value: selectedHost.team },
+                                 { label: 'Manager', value: selectedHost.manager },
+                                 { label: 'Anchor Type', value: selectedHost.anchor_type },
+                                 { label: 'Salary Class', value: selectedHost.base_salary_category },
+                                 { label: 'Current Status', value: selectedHost.status },
+                                 { label: 'Poppo Level', value: selectedHost.level },
+                                 { label: 'Onboarding', value: new Date(selectedHost.created_at).toLocaleDateString() },
+                                 { label: 'Last Sync', value: new Date(selectedHost.updated_at).toLocaleDateString() },
+                               ].map((item, i) => (
+                                 <div key={i} className="flex justify-between items-center py-2 border-b border-white/5 last:border-0 hover:bg-white/[0.02] px-2 rounded-lg transition-colors">
+                                    <span className="text-[9px] font-black text-white/20 uppercase tracking-widest">{item.label}</span>
+                                    <span className="text-xs font-bold text-white/60 tracking-tight">{item.value || 'N/A'}</span>
+                                 </div>
+                               ))}
+                            </div>
+                            {auth.role === 'Director' && (
+                              <button 
+                                onClick={() => { if (checkPassword('Director')) setIsEditingHost(true); }}
+                                className="w-full mt-6 border border-indigo-500/30 bg-indigo-500/5 hover:bg-indigo-500/10 text-indigo-400 py-3 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] flex items-center justify-center gap-2 transition-all active:scale-95"
+                              >
+                                 <UserPen size={14} />
+                                 Modify Profile
+                              </button>
+                            )}
+                          </div>
+                        </section>
+ 
+                        {/* Performance Goals Section */}
+                        <section className="space-y-4">
+                           <div className="flex items-center justify-between items-end pb-2 border-b border-white/5">
+                              <div className="flex items-center gap-3">
+                                <div className="p-2 rounded-xl bg-pink-500/10 text-pink-500">
+                                  <Target size={16} />
                                 </div>
-                              ))}
-                           </div>
-                           {auth.role === 'Director' && (
-                             <button 
-                               onClick={() => { if (checkPassword('Director')) setIsEditingHost(true); }}
-                               className="w-full mt-8 border border-indigo-500/30 bg-indigo-500/5 hover:bg-indigo-500/10 text-indigo-400 py-4 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] flex items-center justify-center gap-3 transition-all active:scale-95"
-                             >
-                                <UserPen size={14} />
-                                Modify Agency Record
-                             </button>
-                           )}
-                        </div>
-
-                        <div className="glass-card">
-                           <div className="flex items-center justify-between mb-4">
-                              <h5 className="text-xs font-bold uppercase tracking-widest text-white/30 flex items-center gap-2">
-                                <Target size={14} className="text-pink-500" />
-                                Performance Goals
-                              </h5>
+                                <h5 className="text-[10px] font-black uppercase tracking-[0.2em] text-white/80">Performance Goals</h5>
+                              </div>
                               {auth.role !== 'Talent' && (
-                                <button onClick={() => setIsManagingGoals(true)} className="text-[10px] font-bold text-indigo-400 hover:underline">Manage</button>
+                                <button onClick={() => setIsManagingGoals(true)} className="text-[10px] font-bold text-indigo-400 hover:underline mb-1">Manage</button>
                               )}
                            </div>
-                           <div className="space-y-4">
-                              {goals.map(goal => (
-                                <div key={goal.id} className="space-y-2">
-                                   <div className="flex justify-between text-[10px]">
-                                      <span className="text-white/50">{getLabel(goal.type)}</span>
-                                      <span className="font-bold text-white/80">{goal.current} / {goal.target}</span>
-                                   </div>
-                                   <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
-                                      <div 
-                                        className={cn("h-full transition-all duration-1000", getGoalColor(goal.type))} 
-                                        style={{ width: `${Math.min(100, (goal.current / goal.target) * 100)}%` }} 
-                                      />
-                                   </div>
-                                </div>
-                              ))}
-                              {goals.length === 0 && (
-                                <p className="text-[10px] text-white/20 italic text-center py-4">No goals set for this host.</p>
-                              )}
+                           <div className="glass-card !bg-white/[0.01] !p-6">
+                             <div className="space-y-5">
+                                {goals.map(goal => (
+                                  <div key={goal.id} className="space-y-2">
+                                     <div className="flex justify-between text-[10px]">
+                                        <span className="text-white/40 font-bold uppercase tracking-tight">{getLabel(goal.type)}</span>
+                                        <span className="font-mono font-bold text-white/80">{goal.current} / {goal.target}</span>
+                                     </div>
+                                     <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
+                                        <div 
+                                          className={cn("h-full transition-all duration-1000", getGoalColor(goal.type))} 
+                                          style={{ width: `${Math.min(100, (goal.current / goal.target) * 100)}%` }} 
+                                        />
+                                     </div>
+                                  </div>
+                                ))}
+                                {goals.length === 0 && (
+                                  <div className="flex flex-col items-center justify-center py-6 text-center">
+                                    <Target size={24} className="text-white/5 mb-2" />
+                                    <p className="text-[10px] text-white/20 italic font-medium uppercase tracking-widest">No Active Pursuits</p>
+                                  </div>
+                                )}
+                             </div>
                            </div>
-                        </div>
+                        </section>
 
                        <div className="glass-card">
                           <h5 className="text-xs font-bold uppercase tracking-widest text-white/30 mb-4">Description</h5>

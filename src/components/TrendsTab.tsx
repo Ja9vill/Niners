@@ -3,7 +3,7 @@ import { TrendingUp, Award, BarChart2, Star, Ghost, AlertTriangle, ArrowUpRight,
 import { Host, Tier, CommissionEntry } from '../types';
 import { Storage } from '../lib/storage';
 import { FirebaseService } from '../lib/firebaseService';
-import { cn, formatNumber, formatDate } from '../lib/utils';
+import { cn, formatNumber, formatDate, formatMonth } from '../lib/utils';
 import { motion } from 'motion/react';
 
 export const TrendsTab = () => {
@@ -119,7 +119,7 @@ export const TrendsTab = () => {
                 >
                   <option value="all">🏆 All-Time Record</option>
                   {availableMonths.map(month => (
-                    <option key={month} value={month}>{formatDate(month)}</option>
+                    <option key={month} value={month}>{formatMonth(month)}</option>
                   ))}
                 </select>
               </div>

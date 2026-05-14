@@ -1,8 +1,8 @@
-import React, { useState, useRef } from 'react';
-import { Shield, FileUp, Clipboard, CheckCircle2, History, Trash2, FolderPlus, ArrowRight, Zap, AlertCircle, FileText, Loader2, Activity } from 'lucide-react';
+import React, { useState, useRef, useMemo } from 'react';
+import { Shield, FileUp, Clipboard, CheckCircle2, History, Trash2, FolderPlus, ArrowRight, Zap, AlertCircle, FileText, Loader2, Activity, UserPlus, Edit2, X } from 'lucide-react';
 import { Storage } from '../lib/storage';
-import { FileEntry, Host, CommissionEntry, PKEntry, ExposureEntry } from '../types';
-import { cn, formatDate } from '../lib/utils';
+import { FileEntry, Host, CommissionEntry, PKEntry, ExposureEntry, Position, BaseSalaryTier, HostStatus, Tier, AnchorType } from '../types';
+import { cn, formatMonth, formatDate } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
@@ -11,16 +11,123 @@ import { FirebaseService } from '../lib/firebaseService';
 import { auth as fbAuth, signInWithGoogle } from '../lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 
+const HostEditModal = ({ host, onClose, onUpdate }: { host: Host, onClose: () => void, onUpdate: (h: Host) => void }) => {
+  const [formData, setFormData] = useState<Host>({ ...host });
+
+  const positions: Position[] = ['Talent', 'Manager', 'Admin', 'Head Admin', 'Director', 'Sub Agent', 'Police Admin'];
+  const tiers: Tier[] = ['S', 'A', 'B', 'C', 'X'];
+  const statuses: HostStatus[] = ['Active', 'Inconsistent', 'Released', 'Inactive'];
+  const anchorTypes: AnchorType[] = ['Nine Agency', 'Sub Agency', 'External'];
+  const salaryTiers: BaseSalaryTier[] = ['N/A', 'Rocket Host', 'Star Host', 'S idol', 'ESport Host'];
+
+  return (
+    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={onClose} />
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="relative w-full max-w-2xl glass-card !p-8 space-y-6"
+      >
+        <div className="flex items-center justify-between">
+          <h3 className="text-xl font-black flex items-center gap-2">
+            <Edit2 size={20} className="text-indigo-400" />
+            Edit Profile: {host.name}
+          </h3>
+          <button onClick={onClose} className="p-2 hover:bg-white/5 rounded-full text-white/40 hover:text-white"><X size={20}/></button>
+        </div>
+
+        <div className="grid grid-cols-2 gap-6">
+          <div className="space-y-2">
+            <label className="text-[10px] font-black uppercase text-white/30 tracking-widest">Display Name</label>
+            <input 
+              type="text" 
+              value={formData.name} 
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              className="w-full glass-input"
+            />
+          </div>
+          <div className="space-y-2">
+            <label className="text-[10px] font-black uppercase text-white/30 tracking-widest">Poppo ID (Locked)</label>
+            <input 
+              type="text" 
+              value={formData.id} 
+              readOnly
+              className="w-full glass-input opacity-50 cursor-not-allowed"
+            />
+          </div>
+          <div className="space-y-2">
+            <label className="text-[10px] font-black uppercase text-white/30 tracking-widest">Position</label>
+            <select 
+              value={formData.position} 
+              onChange={(e) => setFormData({ ...formData, position: e.target.value as Position, role: e.target.value as Position })}
+              className="w-full glass-input"
+            >
+              {positions.map(p => <option key={p} value={p}>{p}</option>)}
+            </select>
+          </div>
+          <div className="space-y-2">
+            <label className="text-[10px] font-black uppercase text-white/30 tracking-widest">Tier</label>
+            <select 
+              value={formData.tier} 
+              onChange={(e) => setFormData({ ...formData, tier: e.target.value as Tier })}
+              className="w-full glass-input"
+            >
+              {tiers.map(t => <option key={t} value={t}>{t}</option>)}
+            </select>
+          </div>
+          <div className="space-y-2">
+            <label className="text-[10px] font-black uppercase text-white/30 tracking-widest">Current Team</label>
+            <input 
+              type="text" 
+              value={formData.team} 
+              onChange={(e) => setFormData({ ...formData, team: e.target.value })}
+              className="w-full glass-input"
+            />
+          </div>
+          <div className="space-y-2">
+            <label className="text-[10px] font-black uppercase text-white/30 tracking-widest">Status</label>
+            <select 
+              value={formData.status} 
+              onChange={(e) => setFormData({ ...formData, status: e.target.value as HostStatus })}
+              className="w-full glass-input"
+            >
+              {statuses.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
+        </div>
+
+        <div className="pt-6 flex justify-end gap-3">
+          <button onClick={onClose} className="px-6 py-2 rounded-xl text-xs font-bold text-white/40 hover:bg-white/5">Cancel</button>
+          <button 
+            onClick={() => onUpdate(formData)}
+            className="px-8 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-xl text-xs font-bold text-white transition-all shadow-lg shadow-indigo-500/20"
+          >
+            Save Changes
+          </button>
+        </div>
+      </motion.div>
+    </div>
+  );
+};
+
 const RosterManualEditor = ({ hosts, onRefresh, activeCategory, isLoading }: { hosts: Host[], onRefresh: () => void, activeCategory: string, isLoading: boolean }) => {
-  const [isEditing, setIsEditing] = useState<string | null>(null);
+  const [isEditing, setIsEditing] = useState<Host | null>(null);
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
+
+  const tiers: Tier[] = ['S', 'A', 'B', 'C', 'X'];
+  const statuses: HostStatus[] = ['Active', 'Inconsistent', 'Released', 'Inactive'];
+  const anchorTypes: AnchorType[] = ['Nine Agency', 'Sub Agency', 'External'];
 
   const handleUpdate = async (host: Host) => {
+    setUpdatingId(host.id);
     try {
       await FirebaseService.updateHost(host);
       onRefresh();
       setIsEditing(null);
     } catch (err) {
       alert("Failed to update host: " + (err instanceof Error ? err.message : 'Unknown error'));
+    } finally {
+      setUpdatingId(null);
     }
   };
 
@@ -50,44 +157,103 @@ const RosterManualEditor = ({ hosts, onRefresh, activeCategory, isLoading }: { h
 
   return (
     <div className="overflow-x-auto">
-      <table className="w-full text-left text-xs">
+      <table className="w-full text-left text-[11px]">
         <thead>
-          <tr className="border-b border-white/10 text-[10px] font-black text-white/30 uppercase tracking-widest bg-white/2">
-            <th className="px-6 py-4">Poppo ID</th>
-            <th className="px-6 py-4">Name</th>
-            <th className="px-6 py-4">Temp PW</th>
-            <th className="px-6 py-4">Role</th>
-            <th className="px-6 py-4">Team</th>
-            <th className="px-6 py-4 text-right">Actions</th>
+          <tr className="border-b border-white/10 text-[9px] font-black text-white/30 uppercase tracking-widest bg-white/2">
+            <th className="px-4 py-4">Poppo ID</th>
+            <th className="px-4 py-4">Nickname</th>
+            <th className="px-2 py-4">Tier</th>
+            <th className="px-4 py-4">Team</th>
+            <th className="px-4 py-4">Status</th>
+            <th className="px-4 py-4">Anchor Type</th>
+            <th className="px-4 py-4 text-right">Actions</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-white/5">
           {hosts.map(h => (
-            <tr key={h.id} className="hover:bg-white/2 transition-colors">
-              <td className="px-6 py-4 font-mono font-bold text-indigo-400">{h.id}</td>
-              <td className="px-6 py-4 font-bold">{h.name}</td>
-              <td className="px-6 py-4">
-                <span className={cn(
-                  "px-2 py-0.5 rounded font-mono text-[10px]",
-                  h.is_temp_password ? "bg-amber-500/10 text-amber-500 border border-amber-500/20" : "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"
-                )}>{h.password}</span>
+            <tr key={h.id} className={cn(
+              "hover:bg-white/2 transition-colors",
+              updatingId === h.id && "bg-indigo-500/5 animate-pulse"
+            )}>
+              <td className="px-4 py-3 font-mono font-bold text-indigo-400">{h.id}</td>
+              <td className="px-4 py-3 min-w-[140px]">
+                <input 
+                  type="text"
+                  defaultValue={h.nickname || h.name}
+                  onBlur={(e) => {
+                    if (e.target.value !== (h.nickname || h.name)) {
+                      handleUpdate({ ...h, nickname: e.target.value, name: e.target.value });
+                    }
+                  }}
+                  className="bg-transparent border-none focus:ring-1 focus:ring-indigo-500/50 rounded-lg px-2 py-1 w-full font-bold text-white/80 hover:bg-white/5"
+                />
               </td>
-              <td className="px-6 py-4 text-white/40">{h.position}</td>
-              <td className="px-6 py-4 text-white/40">{h.team}</td>
-              <td className="px-6 py-4 text-right">
+              <td className="px-2 py-3">
+                <select 
+                  value={h.tier}
+                  onChange={(e) => handleUpdate({ ...h, tier: e.target.value as Tier })}
+                  className="bg-transparent border-none focus:ring-1 focus:ring-indigo-500/50 rounded-lg px-1 py-1 w-full font-bold text-cyan-400 hover:bg-white/5 cursor-pointer appearance-none text-center"
+                >
+                  {tiers.map(t => <option key={t} value={t} className="bg-[#0A0A0A]">{t}</option>)}
+                </select>
+              </td>
+              <td className="px-4 py-3 min-w-[120px]">
+                <input 
+                  type="text"
+                  defaultValue={h.team}
+                  onBlur={(e) => {
+                    if (e.target.value !== h.team) {
+                      handleUpdate({ ...h, team: e.target.value });
+                    }
+                  }}
+                  className="bg-transparent border-none focus:ring-1 focus:ring-indigo-500/50 rounded-lg px-2 py-1 w-full text-white/60 hover:bg-white/5"
+                />
+              </td>
+              <td className="px-4 py-3 min-w-[110px]">
+                <select 
+                  value={h.status}
+                  onChange={(e) => handleUpdate({ ...h, status: e.target.value as HostStatus })}
+                  className={cn(
+                    "bg-transparent border-none focus:ring-1 focus:ring-indigo-500/50 rounded-lg px-2 py-1 w-full font-bold hover:bg-white/5 cursor-pointer appearance-none",
+                    h.status === 'Active' ? 'text-emerald-400' : 'text-white/30'
+                  )}
+                >
+                  {statuses.map(s => <option key={s} value={s} className="bg-[#0A0A0A]">{s}</option>)}
+                </select>
+              </td>
+              <td className="px-4 py-3 min-w-[110px]">
+                <select 
+                  value={h.anchor_type}
+                  onChange={(e) => handleUpdate({ ...h, anchor_type: e.target.value as AnchorType })}
+                  className="bg-transparent border-none focus:ring-1 focus:ring-indigo-500/50 rounded-lg px-2 py-1 w-full font-medium text-white/40 hover:bg-white/5 cursor-pointer appearance-none"
+                >
+                  {anchorTypes.map(at => <option key={at} value={at} className="bg-[#0A0A0A]">{at}</option>)}
+                </select>
+              </td>
+              <td className="px-4 py-3 text-right">
                 <div className="flex justify-end gap-2 text-white/20">
-                  <button onClick={() => handleDelete(h.id)} className="hover:text-red-400 p-1"><Trash2 size={14}/></button>
+                  <button onClick={() => setIsEditing(h)} className="hover:text-indigo-400 p-1" title="Full Edit"><Edit2 size={13}/></button>
+                  <button onClick={() => handleDelete(h.id)} className="hover:text-red-400 p-1" title="Delete Profile"><Trash2 size={13}/></button>
                 </div>
               </td>
             </tr>
           ))}
           {hosts.length === 0 && (
             <tr>
-              <td colSpan={6} className="py-20 text-center text-white/20 italic">MasterSheet is currently empty. Upload or Paste data above to populate.</td>
+              <td colSpan={7} className="py-20 text-center text-white/20 italic text-xs">MasterSheet is currently empty. Upload or Paste data above to populate.</td>
             </tr>
           )}
         </tbody>
       </table>
+      <AnimatePresence>
+        {isEditing && (
+          <HostEditModal 
+            host={isEditing} 
+            onClose={() => setIsEditing(null)} 
+            onUpdate={handleUpdate} 
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 };
@@ -738,6 +904,71 @@ export const DirectorTab = () => {
     setFiles(updated);
   };
 
+  const [bulkPasteData, setBulkPasteData] = useState('');
+  const [isBulkProcessing, setIsBulkProcessing] = useState(false);
+
+  const handleBulkAdd = async () => {
+    if (!bulkPasteData.trim()) return;
+    setIsBulkProcessing(true);
+    setError(null);
+    
+    try {
+      const rows = bulkPasteData.trim().split('\n');
+      const newHosts: Host[] = [];
+      const currentHosts = await FirebaseService.getAllHosts();
+      const existingIds = new Set(currentHosts.map(h => h.id));
+
+      rows.forEach(line => {
+        // Support Tab, Comma, or multi-space delimiters
+        const parts = line.split(/[,\t]|\s{2,}/).map(p => p.trim());
+        if (parts.length < 2) return;
+
+        const id = parts[0];
+        const name = parts[1];
+        const position = (parts[2] as Position) || 'Talent';
+        const role = (parts[3] as Position) || position || 'Talent';
+
+        if (!id || isNaN(Number(id))) return;
+
+        if (existingIds.has(id)) return;
+
+        newHosts.push({
+          id,
+          name,
+          nickname: name,
+          position: position as Position,
+          role: role as Position,
+          team: 'Unassigned',
+          manager: 'Nine Management',
+          anchor_type: 'Nine Agency',
+          base_salary_category: 'N/A',
+          status: 'Active',
+          level: 1,
+          tier: 'X',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          password: '1212',
+          is_temp_password: true
+        });
+        existingIds.add(id);
+      });
+
+      if (newHosts.length > 0) {
+        await FirebaseService.saveHosts(newHosts);
+        Storage.addLog('System', `Bulk onboarded ${newHosts.length} new hosts via Direct Paste`, localAuth.name);
+        setProcessingSummary(`Successfully onboarded ${newHosts.length} new hosts.`);
+        setBulkPasteData('');
+        loadRoster();
+      } else {
+        setError("No new unique hosts detected. Ensure the Poppo ID is valid and not already registered.");
+      }
+    } catch (err) {
+      setError("Bulk Processing Failed: " + (err instanceof Error ? err.message : 'Unknown error'));
+    } finally {
+      setIsBulkProcessing(false);
+    }
+  };
+
   if (localAuth.role !== 'Director' && localAuth.role !== 'Head Admin') {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center space-y-4">
@@ -774,6 +1005,70 @@ export const DirectorTab = () => {
                  </ul>
               </div>
             ))}
+         </div>
+      </section>
+
+      {/* Bulk Host Onboarding */}
+      <section className="space-y-4">
+         <div className="flex items-center justify-between">
+            <h3 className="font-bold text-lg flex items-center gap-2">
+               <UserPlus size={18} className="text-indigo-400" />
+               Bulk Host Onboarding
+            </h3>
+            <p className="text-[10px] text-white/30 font-mono italic">ID, Name, Position, Role (Supports Tab/Comma)</p>
+         </div>
+         <div className="glass-card flex flex-col md:flex-row gap-6">
+            <div className="flex-1 space-y-4">
+               <div className="relative">
+                  <textarea 
+                    value={bulkPasteData}
+                    onChange={(e) => setBulkPasteData(e.target.value)}
+                    placeholder="1234567, Jane Doe, Talent, Manager&#10;8901234, John Smith, Manager, Admin"
+                    className="w-full h-40 glass-input font-mono text-[11px] leading-relaxed resize-none p-6"
+                  />
+                  {isBulkProcessing && (
+                    <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] rounded-2xl flex items-center justify-center">
+                       <Loader2 size={32} className="animate-spin text-indigo-400" />
+                    </div>
+                  )}
+               </div>
+               <div className="flex items-center justify-between gap-4">
+                  <p className="text-[10px] text-white/20 leading-tight">
+                    * Delimit with commas or tabs.<br/>
+                    * Skip header row. Existing IDs will be ignored.
+                  </p>
+                  <div className="flex items-center gap-3">
+                    <button 
+                      onClick={() => setBulkPasteData('')}
+                      className="px-4 py-3 border border-white/10 hover:bg-white/5 rounded-2xl text-[11px] font-bold text-white/40 transition-all"
+                    >
+                      Clear
+                    </button>
+                    <button 
+                      onClick={handleBulkAdd}
+                      disabled={isBulkProcessing || !bulkPasteData.trim()}
+                      className="px-8 py-3 bg-indigo-600 hover:bg-indigo-500 rounded-2xl text-[11px] font-black uppercase tracking-widest text-white transition-all shadow-xl shadow-indigo-500/20 active:scale-95 disabled:opacity-50"
+                    >
+                      Quick Add to Roster
+                    </button>
+                  </div>
+               </div>
+            </div>
+            <div className="w-full md:w-64 space-y-3">
+               <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5">
+                  <h4 className="text-[10px] font-black uppercase tracking-widest text-white/30 mb-2">Instructions</h4>
+                  <ol className="text-[10px] text-white/40 space-y-2 list-decimal list-inside">
+                     <li>Copy rows from Excel or Notepad</li>
+                     <li>Paste into the text area</li>
+                     <li>Verify ID and Name are present</li>
+                     <li>Click "Quick Add" to save to Cloud</li>
+                  </ol>
+               </div>
+               <div className="p-4 rounded-2xl bg-indigo-500/5 border border-indigo-500/10">
+                  <h4 className="text-[10px] font-black uppercase tracking-widest text-white/30 mb-1">Status</h4>
+                  <p className="text-[10px] font-bold text-white/60">Cloud Sync: Active</p>
+               </div>
+            </div>
          </div>
       </section>
 
@@ -952,12 +1247,32 @@ export const DirectorTab = () => {
          </div>
          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
             {Object.entries(cloudStats).sort((a,b) => b[0].localeCompare(a[0])).map(([month, count]) => (
-              <div key={month} className="glass-card !p-4 border-white/5 bg-white/[0.02]">
-                 <p className="text-[10px] font-black uppercase text-white/30 tracking-widest">{formatDate(month)}</p>
+              <div key={month} className="glass-card !p-4 border-white/5 bg-white/[0.02] relative group/audit">
+                 <p className="text-[10px] font-black uppercase text-white/30 tracking-widest">{formatMonth(month)}</p>
                  <div className="mt-2 flex items-baseline gap-2">
                     <span className="text-xl font-black text-white">{count}</span>
                     <span className="text-[10px] font-bold text-white/20">Records</span>
                  </div>
+                 <button 
+                   onClick={async () => {
+                     if (confirm(`CRITICAL: This will permanently delete all ${count} commission records for ${formatDate(month)}. This cannot be undone. Proceed?`)) {
+                       setIsStatsLoading(true);
+                       try {
+                         await FirebaseService.deleteCommissionsByMonth(month);
+                         Storage.addLog('System', `Director deleted all records for ${month}`, localAuth.name);
+                         loadCloudStats();
+                       } catch (err) {
+                         alert("Deletion failed");
+                       } finally {
+                         setIsStatsLoading(false);
+                       }
+                     }
+                   }}
+                   className="absolute top-2 right-2 p-1.5 bg-red-500/10 text-red-500 rounded-lg opacity-0 group-hover/audit:opacity-100 transition-opacity hover:bg-red-500 hover:text-white"
+                   title="Delete Month Data"
+                 >
+                   <Trash2 size={12} />
+                 </button>
               </div>
             ))}
             {Object.keys(cloudStats).length === 0 && !isStatsLoading && (

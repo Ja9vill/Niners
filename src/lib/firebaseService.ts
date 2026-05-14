@@ -120,6 +120,20 @@ export const FirebaseService = {
     }
   },
 
+  async deleteCommissionsByMonth(month: string) {
+    try {
+      const q = query(collection(db, 'commissions'), where('month', '==', month));
+      const snapshot = await getDocs(q);
+      const batch = writeBatch(db);
+      snapshot.docs.forEach(doc => {
+        batch.delete(doc.ref);
+      });
+      await batch.commit();
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, `commissions/${month}`);
+    }
+  },
+
   // Reporting management
   async savePKRecords(records: PKEntry[]) {
     try {

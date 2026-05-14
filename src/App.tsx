@@ -23,7 +23,7 @@ import { CommissionEntry, Host } from './types';
 import { auth, signInWithGoogle } from './lib/firebase';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { INITIAL_HOSTS, INITIAL_COMMISSION, TIMELINE_DATA } from './lib/constants';
-import { formatNumber, cn, formatDate } from './lib/utils';
+import { formatNumber, cn, formatDate, formatMonth } from './lib/utils';
 import {
   BarChart,
   Bar,
@@ -507,10 +507,16 @@ const OverviewTab = ({ commissions, hosts }: { commissions: CommissionEntry[], h
               Commission Timeline
               {auth.level < 2 && <Lock size={14} className="text-white/20 ml-2" />}
             </h3>
-            <div className="flex items-center gap-4 text-xs font-medium uppercase tracking-tighter text-white/30">
-              <span>Aug 2025</span>
-              <ChevronRight size={12} />
-              <span>Apr 2026</span>
+            <div className="flex items-center gap-4 text-xs font-bold uppercase tracking-tighter text-white/30">
+              {aggregatedData.length > 0 ? (
+                <>
+                  <span>{formatDate(aggregatedData[0].month)}</span>
+                  <ChevronRight size={12} />
+                  <span>{formatDate(aggregatedData[aggregatedData.length - 1].month)}</span>
+                </>
+              ) : (
+                <span>No Data Available</span>
+              )}
             </div>
           </div>
 
@@ -523,7 +529,7 @@ const OverviewTab = ({ commissions, hosts }: { commissions: CommissionEntry[], h
             ) : (
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={aggregatedData.map(c => ({
-                  month: formatDate(c.month),
+                  month: formatMonth(c.month),
                   value: c.value
                 }))}>
                   <Tooltip 
@@ -551,20 +557,12 @@ const OverviewTab = ({ commissions, hosts }: { commissions: CommissionEntry[], h
           </div>
 
           <div className="pt-4 border-t border-white/5">
-             <div className="flex items-center justify-between text-xs font-semibold text-white/30 uppercase tracking-widest mb-4">
-              <span>Growth Phase</span>
-              <span>2025 - 2026</span>
+             <div className="flex items-center justify-between text-[10px] font-black text-white/20 uppercase tracking-[0.2em] mb-4">
+              <span>Data Continuity Phase</span>
+              <span>Total Volume Analysis</span>
              </div>
-             <div className="relative h-2 bg-white/5 rounded-full flex items-center">
-                <div className="absolute left-0 w-[10%] h-full bg-slate-500 rounded-full" />
-                <div className="absolute left-[10%] w-[20%] h-full bg-purple-500 shadow-[0_0_15px_rgba(139,92,246,0.5)]" />
-                <div className="absolute left-[30%] w-[30%] h-full bg-cyan-500 shadow-[0_0_15px_rgba(6,182,212,0.5)]" />
-                <div className="absolute left-[60%] w-[40%] h-full bg-emerald-500 rounded-r-full" />
-
-                <div className="absolute top-4 left-0 text-[10px] text-white/40">Dormant (Jan-Jul)</div>
-                <div className="absolute top-4 left-[20%] text-[10px] text-white/40">Soft Launch (Aug)</div>
-                <div className="absolute top-4 left-[40%] text-[10px] text-cyan-400 font-bold">Explosive (Sep)</div>
-                <div className="absolute top-4 right-0 text-[10px] text-emerald-400">Stabilization</div>
+             <div className="relative h-2 bg-white/5 rounded-full overflow-hidden">
+                <div className="absolute inset-y-0 left-0 w-full bg-gradient-to-r from-indigo-500/20 via-purple-500/40 to-emerald-500/20" />
              </div>
           </div>
         </div>
@@ -618,7 +616,7 @@ const OverviewTab = ({ commissions, hosts }: { commissions: CommissionEntry[], h
               >
                 <option value="all">🏆 All-Time Record</option>
                 {availableMonths.map(month => (
-                  <option key={month} value={month}>{formatDate(month)}</option>
+                  <option key={month} value={month}>{formatDate(month).includes(',') ? formatDate(month) : formatMonth(month)}</option>
                 ))}
               </select>
             </div>
