@@ -1,0 +1,94 @@
+{
+  "entities": {
+    "Host": {
+      "title": "Host",
+      "description": "Talent/Host profile information",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "nickname": { "type": "string" },
+        "tier": { "type": "string" },
+        "position": { "type": "string" },
+        "team": { "type": "string" },
+        "manager": { "type": "string" },
+        "anchor_type": { "type": "string" },
+        "base_salary_category": { "type": "string" },
+        "status": { "type": "string" },
+        "level": { "type": "number" },
+        "photoUrl": { "type": "string" },
+        "description": { "type": "string" }
+      },
+      "required": ["id", "name", "position"]
+    },
+    "Commission": {
+      "title": "Commission",
+      "description": "Monthly commission data from MasterSheet",
+      "type": "object",
+      "properties": {
+        "poppo_id": { "type": "string" },
+        "poppo_name": { "type": "string" },
+        "month": { "type": "string" },
+        "live_duration": { "type": "number" },
+        "live_earnings": { "type": "number" },
+        "video_duration": { "type": "number" },
+        "video_earnings": { "type": "number" },
+        "agentweb_commission_rate": { "type": "number" },
+        "agentweb_commission_earning": { "type": "number" },
+        "total_points": { "type": "number" },
+        "total_earnings": { "type": "number" },
+        "my_commission": { "type": "number" }
+      },
+      "required": ["poppo_id", "month", "total_points"]
+    },
+    "PKRecord": {
+      "title": "PK Record",
+      "description": "Individual PK tournament performance",
+      "type": "object",
+      "properties": {
+        "poppo_id": { "type": "string" },
+        "start_date": { "type": "string" },
+        "end_date": { "type": "string" },
+        "win_percentage": { "type": "number" },
+        "pk_score": { "type": "number" },
+        "sessions": { "type": "number" },
+        "submitted_by": { "type": "string" },
+        "timestamp": { "type": "string" }
+      }
+    },
+    "Exposure": {
+      "title": "Exposure",
+      "description": "Visibility and event participation log",
+      "type": "object",
+      "properties": {
+        "poppo_id": { "type": "string" },
+        "event_type": { "type": "string" },
+        "event_date": { "type": "string" },
+        "description": { "type": "string" },
+        "submitted_by": { "type": "string" },
+        "timestamp": { "type": "string" }
+      }
+    },
+    "FanbaseHealth": {
+      "title": "Fanbase Health",
+      "description": "Engagement KPIs and group chat metrics",
+      "type": "object",
+      "properties": {
+        "hostId": { "type": "string" },
+        "subscribers": { "type": "number" },
+        "gcMembers": { "type": "number" },
+        "preStreamUpdate": { "type": "string" },
+        "postStreamUpdate": { "type": "string" },
+        "submittedBy": { "type": "string" },
+        "submittedAt": { "type": "string" }
+      }
+    }
+  },
+  "firestore": {
+    "hosts": { "schema": "Host", "description": "Global talent roster" },
+    "commissions": { "schema": "Commission", "description": "Monthly financials" },
+    "pk_records": { "schema": "PKRecord", "description": "PK performance history" },
+    "exposures": { "schema": "Exposure", "description": "Visibility logs" },
+    "fanbase_health": { "schema": "FanbaseHealth", "description": "Engagement history" }
+  }
+}

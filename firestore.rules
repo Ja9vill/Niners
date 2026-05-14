@@ -1,0 +1,101 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Default Deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isSignedIn() { return request.auth != null; }
+    function isVerified() { return isSignedIn() && (request.auth.token.email_verified == true || request.auth.token.firebase.sign_in_provider == 'google.com'); }
+    function isAdmin() { return isVerified() && (request.auth.token.email == "jwavpr@gmail.com" || exists(/databases/$(database)/documents/admins/$(request.auth.uid))); }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+    function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
+
+    // Commission Validation
+    function isValidCommission(data) {
+      return data.poppo_id is string && data.poppo_id.size() > 0 && data.poppo_id.size() <= 32
+          && data.poppo_name is string && data.poppo_name.size() <= 100
+          && data.month is string && data.month.matches('^\\d{4}-\\d{2}$')
+          && (data.live_duration is number || data.live_duration == null)
+          && (data.live_earnings is number || data.live_earnings == null)
+          && (data.video_duration is number || data.video_duration == null)
+          && (data.video_earnings is number || data.video_earnings == null)
+          && (data.agentweb_commission_rate is number || data.agentweb_commission_rate == null)
+          && (data.agentweb_commission_earning is number || data.agentweb_commission_earning == null)
+          && data.total_points is number
+          && (data.total_earnings is number || data.total_earnings == null)
+          && (data.my_commission is number || data.my_commission == null);
+    }
+
+    function isValidFanbaseHealth(data) {
+      return data.hostId is string && data.hostId.size() <= 128 &&
+             data.subscribers is number &&
+             data.gcMembers is number &&
+             data.preStreamUpdate is string && data.preStreamUpdate.size() <= 1000 &&
+             data.postStreamUpdate is string && data.postStreamUpdate.size() <= 2000 &&
+             data.submittedBy is string;
+    }
+
+    function isValidPKRecord(data) {
+      return data.poppo_id is string && data.poppo_id.size() <= 128 &&
+             data.start_date is string &&
+             data.end_date is string &&
+             data.win_percentage is number &&
+             data.pk_score is number &&
+             data.submitted_by is string;
+    }
+
+    function isValidExposure(data) {
+      return data.poppo_id is string && data.poppo_id.size() <= 128 &&
+             data.event_type is string &&
+             data.event_date is string &&
+             data.description is string && data.description.size() <= 1000 &&
+             data.submitted_by is string;
+    }
+
+    // 1. Commissions Collection
+    match /commissions/{commissionId} {
+      allow read: if true;
+      allow create: if isAdmin() && isValidCommission(incoming());
+      allow update: if isAdmin() && isValidCommission(incoming()) && incoming().poppo_id == existing().poppo_id;
+      allow delete: if isAdmin();
+    }
+
+    // 2. Admins Collection
+    match /admins/{adminId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // 3. Hosts Collection
+    match /hosts/{hostId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // 4. Reporting Collections
+    match /pk_records/{recordId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidPKRecord(incoming());
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    match /exposures/{exposureId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidExposure(incoming());
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    match /fanbase_health/{healthId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidFanbaseHealth(incoming());
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+  }
+}
