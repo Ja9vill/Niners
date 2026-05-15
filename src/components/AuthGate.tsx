@@ -62,7 +62,7 @@ export const AuthGate: React.FC<AuthGateProps> = ({ children, onAuthChange }) =>
   // Resolve any pending signInWithRedirect handoff before the auth listener
   // attaches, so a returning user lands signed in.
   useEffect(() => {
-    void completeRedirectSignIn();
+    completeRedirectSignIn().catch((err: any) => setError(err?.message || 'Google sign-in failed. Please try again.'));
   }, []);
 
   // Mirror Firebase auth state into the local session so members stay signed in
