@@ -10,6 +10,8 @@
 # Trigger: manual only (workflow_dispatch).
 #
 # Inputs:
+#   domain   - single domain (alias for the common case). Combined with
+#              `domains` if both are supplied.
 #   domains  - comma- or whitespace-separated list of domains to ensure
 #              present. Defaults to the live Cloud Run domain.
 #   dry_run  - "true" to fetch and diff but skip the PATCH.
@@ -41,6 +43,10 @@ name: Manage Firebase Auth Authorized Domains
 on:
   workflow_dispatch:
     inputs:
+      domain:
+        description: "Single domain to ensure present (alias for `domains` — combined if both supplied)"
+        required: false
+        default: ""
       domains:
         description: "Domains to ensure present (comma- or space-separated)"
         required: false
@@ -71,6 +77,6 @@ jobs:
         env:
           FIREBASE_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
           FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.GCP_SA_KEY }}
-          AUTHORIZED_DOMAINS: ${{ inputs.domains }}
+          AUTHORIZED_DOMAINS: ${{ inputs.domain }} ${{ inputs.domains }}
           DRY_RUN: ${{ inputs.dry_run == 'true' && '1' || '0' }}
         run: node scripts/manage-authorized-domains.mjs

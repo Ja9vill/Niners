@@ -38,10 +38,15 @@ const IDENTITY_TOOLKIT_BASE = 'https://identitytoolkit.googleapis.com/v2';
 
 function parseDomainsArg(raw) {
   if (!raw) return [];
-  return raw
-    .split(/[\s,]+/)
-    .map((d) => d.trim())
-    .filter(Boolean);
+  const seen = new Set();
+  const out = [];
+  for (const part of raw.split(/[\s,]+/)) {
+    const d = part.trim();
+    if (!d || seen.has(d)) continue;
+    seen.add(d);
+    out.push(d);
+  }
+  return out;
 }
 
 function buildAppOptions() {
