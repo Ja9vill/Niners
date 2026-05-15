@@ -8,9 +8,7 @@ dotenv.config();
 
 async function startServer() {
   const app = express();
-
-  // Cloud Run injects PORT; fall back to 8080 locally
-  const PORT = parseInt(process.env.PORT || "8080", 10);
+  const PORT = 3000;
 
   // JSON parsing for API requests
   app.use(express.json());
@@ -20,7 +18,7 @@ async function startServer() {
     res.json({ status: "ok" });
   });
 
-  // Gemini endpoint (server-side proxy to keep API key hidden)
+  // Example Gemini endpoint (proxying to server-side to hide the key)
   app.post("/api/chat", async (req, res) => {
     try {
       const { message } = req.body;
@@ -29,12 +27,11 @@ async function startServer() {
         return res.status(500).json({ error: "GEMINI_API_KEY is not configured" });
       }
 
-      const genAI = new GoogleGenAI({ apiKey });
-      const response = await genAI.models.generateContent({
-        model: "gemini-2.0-flash",
-        contents: message,
-      });
-      res.json({ text: response.text });
+      const genAI = new GoogleGenAI(apiKey);
+      const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+      const result = await model.generateContent(message);
+      const response = await result.response;
+      res.json({ text: response.text() });
     } catch (error: any) {
       console.error("Gemini API error:", error);
       res.status(500).json({ error: error.message });
@@ -57,7 +54,7 @@ async function startServer() {
   }
 
   app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://0.0.0.0:${PORT}`);
+    console.log(`Server running on http://localhost:${PORT}`);
   });
 }
 
