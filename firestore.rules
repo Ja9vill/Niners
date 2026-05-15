@@ -1,101 +1,456 @@
 rules_version = '2';
+
+// ============================================================================
+// NINERS - Agency NINE Talent Management
+// Firestore Security Rules
+//
+// Schema: 14-collection canonical schema (snake_case).
+// - roster:                primary roster, HostID = document ID
+// - monthly_commission:    append-only history
+// - pk_weekly:             append-only history
+// - pk_random:             append-only history
+// - events:                append-only history
+// - host_updates:          append-only history
+// - performance:           append-only history
+// - director_notes:        append-only, director-only writes
+// - newbie_pipeline:       append-only history
+// - inactive_released:     append-only history
+// - director_dashboard:    append-only, director-only writes
+// - file_manager:          append-only history
+// - fanclub_metrics_base:  append-only history
+// - fanclub_metrics_stream_growth: append-only history
+//
+// History collections: authenticated create only. No update/delete.
+// roster: authenticated read/write.
+// director_notes & director_dashboard: write restricted to role == 'director'.
+//
+// Backwards-compatible aliases for the existing live app collections
+// (hosts, commissions, pk_records, exposures, fanbase_health, admins)
+// are retained at the bottom so the deployed UI keeps working during
+// migration.
+// ============================================================================
+
 service cloud.firestore {
   match /databases/{database}/documents {
-    // 0. Default Deny
-    match /{document=**} {
-      allow read, write: if false;
+
+    // ---------------------------------------------------------------------
+    // Helper functions
+    // ---------------------------------------------------------------------
+    function isSignedIn() {
+      return request.auth != null;
     }
 
-    // Helper functions
-    function isSignedIn() { return request.auth != null; }
-    function isVerified() { return isSignedIn() && (request.auth.token.email_verified == true || request.auth.token.firebase.sign_in_provider == 'google.com'); }
-    function isAdmin() { return isVerified() && (request.auth.token.email == "jwavpr@gmail.com" || exists(/databases/$(database)/documents/admins/$(request.auth.uid))); }
+    function isVerified() {
+      return isSignedIn() && (
+        request.auth.token.email_verified == true ||
+        request.auth.token.firebase.sign_in_provider == 'google.com'
+      );
+    }
+
+    function isDirector() {
+      return isVerified() && (
+        request.auth.token.role == 'director' ||
+        request.auth.token.email == 'jwavpr@gmail.com' ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
     function incoming() { return request.resource.data; }
     function existing() { return resource.data; }
-    function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
 
-    // Commission Validation
-    function isValidCommission(data) {
-      return data.poppo_id is string && data.poppo_id.size() > 0 && data.poppo_id.size() <= 32
-          && data.poppo_name is string && data.poppo_name.size() <= 100
-          && data.month is string && data.month.matches('^\\d{4}-\\d{2}$')
-          && (data.live_duration is number || data.live_duration == null)
-          && (data.live_earnings is number || data.live_earnings == null)
-          && (data.video_duration is number || data.video_duration == null)
-          && (data.video_earnings is number || data.video_earnings == null)
-          && (data.agentweb_commission_rate is number || data.agentweb_commission_rate == null)
-          && (data.agentweb_commission_earning is number || data.agentweb_commission_earning == null)
-          && data.total_points is number
-          && (data.total_earnings is number || data.total_earnings == null)
-          && (data.my_commission is number || data.my_commission == null);
+    function isIsoString(v) {
+      return v is string && v.size() > 0 && v.size() <= 40;
     }
 
-    function isValidFanbaseHealth(data) {
-      return data.hostId is string && data.hostId.size() <= 128 &&
-             data.subscribers is number &&
-             data.gcMembers is number &&
-             data.preStreamUpdate is string && data.preStreamUpdate.size() <= 1000 &&
-             data.postStreamUpdate is string && data.postStreamUpdate.size() <= 2000 &&
-             data.submittedBy is string;
+    function isOptionalString(v) {
+      return v == null || v is string;
     }
 
-    function isValidPKRecord(data) {
-      return data.poppo_id is string && data.poppo_id.size() <= 128 &&
-             data.start_date is string &&
-             data.end_date is string &&
-             data.win_percentage is number &&
-             data.pk_score is number &&
-             data.submitted_by is string;
+    function rosterExists(hostId) {
+      return exists(/databases/$(database)/documents/roster/$(hostId));
     }
 
-    function isValidExposure(data) {
-      return data.poppo_id is string && data.poppo_id.size() <= 128 &&
-             data.event_type is string &&
-             data.event_date is string &&
-             data.description is string && data.description.size() <= 1000 &&
-             data.submitted_by is string;
+    // Append-only: doc must not already exist on create.
+    function isNewDoc() {
+      return resource == null;
     }
 
-    // 1. Commissions Collection
-    match /commissions/{commissionId} {
-      allow read: if true;
-      allow create: if isAdmin() && isValidCommission(incoming());
-      allow update: if isAdmin() && isValidCommission(incoming()) && incoming().poppo_id == existing().poppo_id;
-      allow delete: if isAdmin();
+    // ---------------------------------------------------------------------
+    // Validators - one per collection
+    // ---------------------------------------------------------------------
+
+    function isValidRoster(d) {
+      return d.HostID is string && d.HostID.size() > 0
+          && d.HostNickname is string
+          && d.FullName is string
+          && d.Position is string
+          && d.HostType is string
+          && d.Level is number
+          && d.BaseSalaryTier is string
+          && d.BaseSalaryAmount is string
+          && d.Status is string
+          && isIsoString(d.JoinDate)
+          && (d.ReleaseDate == null || isIsoString(d.ReleaseDate))
+          && d.ManagerAssigned is string
+          && d.AnchorAssigned is string
+          && d.TitlesTags is string
+          && d.ProfileBio is string
+          && d.ProfilePhotoURL is string
+          && isIsoString(d.LastUpdated)
+          && d.UpdatedBy is string;
     }
 
-    // 2. Admins Collection
+    function isValidMonthlyCommission(d) {
+      return d.ReportMonth is string
+          && d.HostID is string && rosterExists(d.HostID)
+          && d.HostNickname is string
+          && d.LiveDurationHrs is number
+          && d.PartyDurationHrs is number
+          && d.TotalEarningsPts is number
+          && d.AgentwebCommission is number
+          && d.LiveEarnings is number
+          && d.PartyEarnings is number
+          && d.PrivateChatEarnings is number
+          && d.Tips is number
+          && d.PlatformReward is number
+          && d.OtherEarnings is number
+          && d.PlatformHourlySalary is number
+          && d.SuperSalary is number
+          && d.SuperRank is string
+          && d.Level is number
+          && isIsoString(d.UploadTimestamp)
+          && d.UploadedBy is string;
+    }
+
+    function isValidPkWeekly(d) {
+      return d.HostID is string && rosterExists(d.HostID)
+          && d.HostNickname is string
+          && isIsoString(d.WeekStart)
+          && isIsoString(d.WeekEnd)
+          && d.WinPercent is string
+          && d.PKScore is number
+          && d.PKSessions is number
+          && isIsoString(d.Timestamp)
+          && d.SubmittedBy is string
+          && d.SubmitterRole is string;
+    }
+
+    function isValidPkRandom(d) {
+      return d.HostID is string && rosterExists(d.HostID)
+          && d.HostNickname is string
+          && d.WinPercent is string
+          && d.PKScore is number
+          && d.Sessions is number
+          && isIsoString(d.DateSubmitted)
+          && d.SubmittedBy is string
+          && d.Notes is string;
+    }
+
+    function isValidEvent(d) {
+      return d.HostID is string && rosterExists(d.HostID)
+          && d.HostNickname is string
+          && d.EventType is string
+          && isIsoString(d.EventDate)
+          && d.Notes is string
+          && d.SubmittedBy is string
+          && d.SubmitterRole is string
+          && isIsoString(d.Timestamp);
+    }
+
+    function isValidHostUpdate(d) {
+      return d.HostID is string && rosterExists(d.HostID)
+          && d.HostNickname is string
+          && d.UpdatedBio is string
+          && d.UpdatedPhotoURL is string
+          && d.UpdatedSocialLinks is string
+          && d.UpdatedSkills is string
+          && d.UpdatedSchedule is string
+          && d.UpdatedGoals is string
+          && d.UpdatedAvailability is string
+          && isIsoString(d.Timestamp);
+    }
+
+    function isValidPerformance(d) {
+      return d.HostID is string && rosterExists(d.HostID)
+          && d.HostNickname is string
+          && d.ReportingPeriod is string
+          && d.LastMonthEarnings is number
+          && d.LastWeekEarnings is number
+          && d.Last30DEarnings is number
+          && d.LiveEarnings is number
+          && d.PartyEarnings is number
+          && d.Tips is number
+          && d.PlatformReward is number
+          && d.LiveVsPartyRatio is string
+          && d.TipsRatio is string
+          && d.PlatformRewardPercent is string
+          && d.PtsPerHour is number
+          && d.MoMGrowthPercent is string
+          && d.HoursStreamed is number
+          && d.AvgDailyHours is number
+          && d.PeakHours is string
+          && d.PeakEarningsDay is string
+          && d.ConsistencyScore is string
+          && d.EngagementScore is string
+          && d.Trend is string;
+    }
+
+    function isValidDirectorNote(d) {
+      return d.HostID is string && rosterExists(d.HostID)
+          && d.HostNickname is string
+          && d.RiskLevel is string
+          && d.GrowthPotential is string
+          && d.BehavioralNotes is string
+          && d.AttendanceIssues is string
+          && d.SalaryConcerns is string
+          && d.PerformanceFlags is string
+          && d.ManagerFeedback is string
+          && d.DirectorStrategyNotes is string
+          && d.HostDevelopmentPlan is string
+          && isIsoString(d.LastUpdated);
+    }
+
+    function isValidNewbiePipeline(d) {
+      return d.HostID is string && rosterExists(d.HostID)
+          && d.HostNickname is string
+          && isIsoString(d.OnboardingDate)
+          && d.First30DPerformance is string
+          && d.FirstPKResults is string
+          && d.FirstEventParticipation is string
+          && d.FirstEarningsMilestone is string
+          && d.RedFlags is string
+          && d.Strengths is string
+          && d.TrainingPath is string
+          && d.AssignedMentor is string
+          && d.Week1Notes is string
+          && d.Week2Notes is string
+          && d.Week3Notes is string
+          && d.Week4Notes is string
+          && d.Status is string;
+    }
+
+    function isValidInactiveReleased(d) {
+      return d.HostID is string && rosterExists(d.HostID)
+          && d.HostNickname is string
+          && isIsoString(d.JoinDate)
+          && isIsoString(d.ReleaseDate)
+          && d.ReasonForRelease is string
+          && d.LastMonthPerformance is string
+          && d.LastPKData is string
+          && d.LastEventParticipation is string
+          && d.JourneyNotes is string
+          && d.ManagerAtRelease is string
+          && d.FinalStatus is string;
+    }
+
+    function isValidDirectorDashboard(d) {
+      return d.AgencyTotalEarnings is number
+          && d.ActiveHosts is number
+          && d.InactiveAlerts is string
+          && d.TopEarner is string
+          && d.ReportingMonth is string
+          && d.ActivityRate is string
+          && d.BurnoutRisk is string
+          && d.RevenueConcentration is string
+          && d.SalaryObligations is string;
+    }
+
+    function isValidFileManager(d) {
+      return d.EntryID is string
+          && isIsoString(d.Timestamp)
+          && isOptionalString(d.HostID)
+          && (d.HostID == null || rosterExists(d.HostID))
+          && isOptionalString(d.HostNickname)
+          && d.Category is string
+          && d.SubCategory is string
+          && d.FileLabel is string
+          && d.EntrySource is string
+          && d.SubmitterName is string
+          && d.SubmitterRole is string
+          && d.DeviceType is string
+          && isOptionalString(d.Notes);
+    }
+
+    function isValidFanclubBase(d) {
+      return d.HostID is string && rosterExists(d.HostID)
+          && d.HostNickname is string
+          && d.ReportingMonth is string
+          && d.FanclubGC is number
+          && d.FanclubSubscribers is number
+          && d.MoMGCChange is string
+          && d.MoMSubscriberChange is string
+          && d.Notes is string
+          && isIsoString(d.Timestamp)
+          && d.UpdatedBy is string;
+    }
+
+    function isValidFanclubStreamGrowth(d) {
+      return d.HostID is string && rosterExists(d.HostID)
+          && d.HostNickname is string
+          && d.StreamLabel is string
+          && d.PreStreamCount is number
+          && d.PostStreamCount is number
+          && d.FanGrowth is number
+          && d.FanGrowthPercent is string
+          && isIsoString(d.DateFrom)
+          && isIsoString(d.DateTo)
+          && d.DurationDays is number
+          && d.Notes is string
+          && d.SubmittedBy is string;
+    }
+
+    // ---------------------------------------------------------------------
+    // Collection rules - 14-collection canonical schema
+    // ---------------------------------------------------------------------
+
+    // 1. roster (primary, HostID = document ID, mutable)
+    match /roster/{hostId} {
+      allow read:   if isSignedIn();
+      allow create: if isSignedIn()
+                    && isValidRoster(incoming())
+                    && incoming().HostID == hostId;
+      allow update: if isSignedIn()
+                    && isValidRoster(incoming())
+                    && incoming().HostID == existing().HostID;
+      allow delete: if isDirector();
+    }
+
+    // 2. monthly_commission (append-only)
+    match /monthly_commission/{docId} {
+      allow read:   if isSignedIn();
+      allow create: if isSignedIn() && isNewDoc() && isValidMonthlyCommission(incoming());
+      allow update, delete: if false;
+    }
+
+    // 3. pk_weekly (append-only)
+    match /pk_weekly/{docId} {
+      allow read:   if isSignedIn();
+      allow create: if isSignedIn() && isNewDoc() && isValidPkWeekly(incoming());
+      allow update, delete: if false;
+    }
+
+    // 4. pk_random (append-only)
+    match /pk_random/{docId} {
+      allow read:   if isSignedIn();
+      allow create: if isSignedIn() && isNewDoc() && isValidPkRandom(incoming());
+      allow update, delete: if false;
+    }
+
+    // 5. events (append-only)
+    match /events/{docId} {
+      allow read:   if isSignedIn();
+      allow create: if isSignedIn() && isNewDoc() && isValidEvent(incoming());
+      allow update, delete: if false;
+    }
+
+    // 6. host_updates (append-only)
+    match /host_updates/{docId} {
+      allow read:   if isSignedIn();
+      allow create: if isSignedIn() && isNewDoc() && isValidHostUpdate(incoming());
+      allow update, delete: if false;
+    }
+
+    // 7. performance (append-only)
+    match /performance/{docId} {
+      allow read:   if isSignedIn();
+      allow create: if isSignedIn() && isNewDoc() && isValidPerformance(incoming());
+      allow update, delete: if false;
+    }
+
+    // 8. director_notes (append-only, director-only writes)
+    match /director_notes/{docId} {
+      allow read:   if isSignedIn();
+      allow create: if isDirector() && isNewDoc() && isValidDirectorNote(incoming());
+      allow update, delete: if false;
+    }
+
+    // 9. newbie_pipeline (append-only)
+    match /newbie_pipeline/{docId} {
+      allow read:   if isSignedIn();
+      allow create: if isSignedIn() && isNewDoc() && isValidNewbiePipeline(incoming());
+      allow update, delete: if false;
+    }
+
+    // 10. inactive_released (append-only)
+    match /inactive_released/{docId} {
+      allow read:   if isSignedIn();
+      allow create: if isSignedIn() && isNewDoc() && isValidInactiveReleased(incoming());
+      allow update, delete: if false;
+    }
+
+    // 11. director_dashboard (append-only, director-only writes, keyed by ReportingMonth)
+    match /director_dashboard/{reportingMonth} {
+      allow read:   if isSignedIn();
+      allow create: if isDirector() && isNewDoc() && isValidDirectorDashboard(incoming());
+      allow update, delete: if false;
+    }
+
+    // 12. file_manager (append-only, primary EntryID)
+    match /file_manager/{entryId} {
+      allow read:   if isSignedIn();
+      allow create: if isSignedIn() && isNewDoc() && isValidFileManager(incoming());
+      allow update, delete: if false;
+    }
+
+    // 13. fanclub_metrics_base (append-only)
+    match /fanclub_metrics_base/{docId} {
+      allow read:   if isSignedIn();
+      allow create: if isSignedIn() && isNewDoc() && isValidFanclubBase(incoming());
+      allow update, delete: if false;
+    }
+
+    // 14. fanclub_metrics_stream_growth (append-only)
+    match /fanclub_metrics_stream_growth/{docId} {
+      allow read:   if isSignedIn();
+      allow create: if isSignedIn() && isNewDoc() && isValidFanclubStreamGrowth(incoming());
+      allow update, delete: if false;
+    }
+
+    // ---------------------------------------------------------------------
+    // Admins collection (referenced by isDirector helper)
+    // ---------------------------------------------------------------------
     match /admins/{adminId} {
-      allow read: if true;
+      allow read:  if isSignedIn();
       allow write: if false;
     }
 
-    // 3. Hosts Collection
+    // ---------------------------------------------------------------------
+    // Legacy collections retained for the currently-deployed UI.
+    // These will be removed once the 14-collection migration is complete.
+    // ---------------------------------------------------------------------
     match /hosts/{hostId} {
-      allow read: if true;
-      allow write: if isAdmin();
+      allow read:  if isSignedIn();
+      allow write: if isDirector();
     }
 
-    // 4. Reporting Collections
+    match /commissions/{commissionId} {
+      allow read:   if isSignedIn();
+      allow write:  if isDirector();
+    }
+
     match /pk_records/{recordId} {
-      allow read: if isSignedIn();
-      allow create: if isSignedIn() && isValidPKRecord(incoming());
-      allow update: if isAdmin();
-      allow delete: if isAdmin();
+      allow read:   if isSignedIn();
+      allow create: if isSignedIn();
+      allow update, delete: if isDirector();
     }
 
     match /exposures/{exposureId} {
-      allow read: if isSignedIn();
-      allow create: if isSignedIn() && isValidExposure(incoming());
-      allow update: if isAdmin();
-      allow delete: if isAdmin();
+      allow read:   if isSignedIn();
+      allow create: if isSignedIn();
+      allow update, delete: if isDirector();
     }
 
     match /fanbase_health/{healthId} {
-      allow read: if isSignedIn();
-      allow create: if isSignedIn() && isValidFanbaseHealth(incoming());
-      allow update: if isAdmin();
-      allow delete: if isAdmin();
+      allow read:   if isSignedIn();
+      allow create: if isSignedIn();
+      allow update, delete: if isDirector();
+    }
+
+    // ---------------------------------------------------------------------
+    // Default deny - any collection not explicitly matched above.
+    // ---------------------------------------------------------------------
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }
