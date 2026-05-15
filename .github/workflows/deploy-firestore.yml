@@ -1,0 +1,60 @@
+# Deploys Firestore security rules and composite indexes to the
+# gen-lang-client-0222945352 project. Runs on:
+#   - manual dispatch (workflow_dispatch) — for ad-hoc redeploys
+#   - pushes to main that change firestore.rules, firestore.indexes.json,
+#     firebase.json, or .firebaserc
+#
+# Required GitHub secrets:
+#   GCP_SA_KEY      - JSON service account key (already used by deploy.yml)
+#   GCP_PROJECT_ID  - "gen-lang-client-0222945352"
+#
+# Required IAM roles on the GCP_SA_KEY service account:
+#   - roles/firebaserules.admin    (deploy security rules)
+#   - roles/datastore.indexAdmin   (manage Firestore indexes)
+#   - roles/iam.serviceAccountUser (for firebase-tools to act on the project)
+#
+# If any of these roles are missing the workflow step that calls
+# `firebase deploy` will fail with a PERMISSION_DENIED error. Grant the
+# roles in the GCP IAM console and re-run.
+name: Deploy Firestore Rules & Indexes
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "firestore.rules"
+      - "firestore.indexes.json"
+      - "firebase.json"
+      - ".firebaserc"
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up gcloud CLI
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+
+      - name: Install Firebase CLI
+        run: npm install -g firebase-tools@13
+
+      - name: Deploy Firestore rules and indexes
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ steps.auth.outputs.credentials_file_path }}
+        run: |
+          firebase deploy \
+            --only firestore:rules,firestore:indexes \
+            --project ${{ secrets.GCP_PROJECT_ID }} \
+            --non-interactive
