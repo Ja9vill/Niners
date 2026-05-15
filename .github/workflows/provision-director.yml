@@ -1,27 +1,31 @@
 # Provisions a Firebase Auth user as a NINERS director.
 #
-# Idempotent: sets the custom claim `role: 'director'` AND writes the
-# corresponding `admins/{uid}` Firestore document, so both branches of
-# the `isDirector()` helper in firestore.rules grant access.
+# Idempotent. Two steps:
+#   1. (REQUIRED) Set the custom claim `role: 'director'` on the auth user.
+#      firestore.rules grants director access on this claim alone.
+#   2. (BEST-EFFORT) Write a redundant `admins/{uid}` document as a fallback
+#      for the `exists(...)` branch of `isDirector()`. If the service account
+#      lacks roles/datastore.user on the named database, this step logs a
+#      warning and the workflow still succeeds. Set require_admin_doc=true
+#      to make the fallback fatal instead.
 #
 # Trigger: manual only (workflow_dispatch).
 #
 # Inputs:
-#   email - target user's email (default: jwavpr@gmail.com).
-#   uid   - target user's Firebase Auth uid (takes precedence over email).
-#   dry_run - set to "true" to print the actions without writing.
+#   email              - target user's email (default: jwavpr@gmail.com).
+#   uid                - target user's Firebase Auth uid (takes precedence over email).
+#   dry_run            - set to "true" to print the actions without writing.
+#   require_admin_doc  - set to "true" to fail the workflow if the
+#                        admins/{uid} fallback document write is denied.
 #
 # Required GitHub secrets:
 #   GCP_SA_KEY      - JSON service-account key (reused from deploy.yml).
 #   GCP_PROJECT_ID  - Firebase / GCP project id (e.g. gen-lang-client-0222945352).
 #
 # Required IAM roles on the service account behind GCP_SA_KEY:
-#   - roles/firebaseauth.admin   (set custom claims, look up users by email)
-#   - roles/datastore.user       (write admins/{uid})
-#
-# If either role is missing the script exits non-zero with a
-# PERMISSION_DENIED-style error. Grant the role in the GCP IAM console
-# and re-run the workflow.
+#   - roles/firebaseauth.admin   (REQUIRED — set custom claims, look up users)
+#   - roles/datastore.user       (OPTIONAL — only needed for the admins/{uid}
+#                                 fallback document on the named database)
 name: Provision Director
 
 on:
@@ -37,6 +41,10 @@ on:
         default: ""
       dry_run:
         description: "Print actions without writing (true/false)"
+        required: false
+        default: "false"
+      require_admin_doc:
+        description: "Fail the workflow if the admins/{uid} fallback document cannot be written (true/false). Default false — custom claim alone is sufficient for director access."
         required: false
         default: "false"
 
@@ -65,4 +73,5 @@ jobs:
           PROVISION_EMAIL: ${{ inputs.email }}
           PROVISION_UID: ${{ inputs.uid }}
           DRY_RUN: ${{ inputs.dry_run == 'true' && '1' || '0' }}
+          REQUIRE_ADMIN_DOC: ${{ inputs.require_admin_doc == 'true' && '1' || '0' }}
         run: node scripts/provision-director.mjs
