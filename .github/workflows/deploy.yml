@@ -6,7 +6,6 @@ on:
 
 env:
   PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
-  IMAGE: us-central1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/cloud-run-source-deploy/niners
   REGION: us-central1
   SERVICE: niners
 
@@ -31,16 +30,20 @@ jobs:
         run: gcloud auth configure-docker us-central1-docker.pkg.dev
 
       - name: Build Docker image
-        run: docker build --no-cache -t $IMAGE:latest .
+        run: |
+          docker build --no-cache \
+            -t us-central1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/cloud-run-source-deploy/niners:latest \
+            .
 
       - name: Push Docker image
-        run: docker push $IMAGE:latest
+        run: |
+          docker push us-central1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/cloud-run-source-deploy/niners:latest
 
       - name: Deploy to Cloud Run
         run: |
-          gcloud run deploy $SERVICE \
-            --image $IMAGE:latest \
-            --region $REGION \
+          gcloud run deploy niners \
+            --image us-central1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/cloud-run-source-deploy/niners:latest \
+            --region us-central1 \
             --allow-unauthenticated \
-            --service-account=niners-cloudrun@$PROJECT_ID.iam.gserviceaccount.com \
-            --project $PROJECT_ID
+            --service-account=niners-cloudrun@${{ secrets.GCP_PROJECT_ID }}.iam.gserviceaccount.com \
+            --project ${{ secrets.GCP_PROJECT_ID }}
