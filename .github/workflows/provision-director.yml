@@ -1,0 +1,68 @@
+# Provisions a Firebase Auth user as a NINERS director.
+#
+# Idempotent: sets the custom claim `role: 'director'` AND writes the
+# corresponding `admins/{uid}` Firestore document, so both branches of
+# the `isDirector()` helper in firestore.rules grant access.
+#
+# Trigger: manual only (workflow_dispatch).
+#
+# Inputs:
+#   email - target user's email (default: jwavpr@gmail.com).
+#   uid   - target user's Firebase Auth uid (takes precedence over email).
+#   dry_run - set to "true" to print the actions without writing.
+#
+# Required GitHub secrets:
+#   GCP_SA_KEY      - JSON service-account key (reused from deploy.yml).
+#   GCP_PROJECT_ID  - Firebase / GCP project id (e.g. gen-lang-client-0222945352).
+#
+# Required IAM roles on the service account behind GCP_SA_KEY:
+#   - roles/firebaseauth.admin   (set custom claims, look up users by email)
+#   - roles/datastore.user       (write admins/{uid})
+#
+# If either role is missing the script exits non-zero with a
+# PERMISSION_DENIED-style error. Grant the role in the GCP IAM console
+# and re-run the workflow.
+name: Provision Director
+
+on:
+  workflow_dispatch:
+    inputs:
+      email:
+        description: "Target user email (leave default unless provisioning someone else)"
+        required: false
+        default: "jwavpr@gmail.com"
+      uid:
+        description: "Target user Firebase Auth uid (overrides email if set)"
+        required: false
+        default: ""
+      dry_run:
+        description: "Print actions without writing (true/false)"
+        required: false
+        default: "false"
+
+jobs:
+  provision:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install firebase-admin
+        run: npm install --no-save firebase-admin@^12
+
+      - name: Run provisioning script
+        env:
+          FIREBASE_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+          FIREBASE_DATABASE_ID: ai-studio-f578d03a-99b3-4c41-84dd-9901137e8386
+          FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.GCP_SA_KEY }}
+          PROVISION_EMAIL: ${{ inputs.email }}
+          PROVISION_UID: ${{ inputs.uid }}
+          DRY_RUN: ${{ inputs.dry_run == 'true' && '1' || '0' }}
+        run: node scripts/provision-director.mjs
