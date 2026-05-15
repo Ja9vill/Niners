@@ -10,6 +10,7 @@ import {
   signInWithEmail,
   signOutFirebase,
   friendlyAuthError,
+  completeRedirectSignIn,
 } from '../lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 
@@ -57,6 +58,12 @@ export const AuthGate: React.FC<AuthGateProps> = ({ children, onAuthChange }) =>
   const [error, setError] = useState('');
   const [info, setInfo] = useState('');
   const [busy, setBusy] = useState(false);
+
+  // Resolve any pending signInWithRedirect handoff before the auth listener
+  // attaches, so a returning user lands signed in.
+  useEffect(() => {
+    void completeRedirectSignIn();
+  }, []);
 
   // Mirror Firebase auth state into the local session so members stay signed in
   // across reloads and the logout button truly logs them out.
@@ -153,8 +160,13 @@ export const AuthGate: React.FC<AuthGateProps> = ({ children, onAuthChange }) =>
     setInfo('');
     setBusy(true);
     try {
-      await signInWithGoogle();
-      // onAuthStateChanged handles the session update.
+      const result = await signInWithGoogle();
+      // result === null means the popup path failed and a full-page redirect
+      // is in progress; the page will navigate away momentarily.
+      if (result === null) {
+        setInfo('Redirecting to Google sign-in…');
+      }
+      // onAuthStateChanged handles the session update on success.
     } catch (err: any) {
       setError(err?.message || 'Google Sign-In failed.');
     } finally {
