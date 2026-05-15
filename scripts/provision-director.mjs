@@ -7,9 +7,14 @@
  *
  *   1. Sets the custom claim `role: 'director'` on the Firebase Auth user.
  *      Picked up by `request.auth.token.role == 'director'` in firestore.rules.
+ *      REQUIRED — failure here fails the script.
  *
  *   2. Writes/merges an `admins/{uid}` document.
  *      Picked up by `exists(/databases/$(database)/documents/admins/$(uid))`.
+ *      BEST-EFFORT — a PERMISSION_DENIED here is logged as a warning and the
+ *      script still exits 0, since the custom claim alone is sufficient for
+ *      director access under the current rules. Set REQUIRE_ADMIN_DOC=1 to
+ *      make this step fatal instead.
  *
  * Authentication:
  *   - Reads service-account credentials from GOOGLE_APPLICATION_CREDENTIALS
@@ -17,8 +22,8 @@
  *   - Falls back to Application Default Credentials.
  *
  * Required IAM roles on the service account used:
- *   - roles/firebaseauth.admin    (set custom claims, look up users)
- *   - roles/datastore.user        (write admins/{uid} document)
+ *   - roles/firebaseauth.admin    (set custom claims, look up users) — required
+ *   - roles/datastore.user        (write admins/{uid} document)      — optional
  *   - roles/iam.serviceAccountTokenCreator  (when running outside GCP)
  *
  * Usage:
@@ -32,6 +37,7 @@
  *   FIREBASE_SERVICE_ACCOUNT_JSON  raw JSON service-account key (optional)
  *   GOOGLE_APPLICATION_CREDENTIALS path to service-account JSON (optional)
  *   PROVISION_EMAIL / PROVISION_UID  alternative to --email / --uid
+ *   REQUIRE_ADMIN_DOC=1            treat admins/{uid} write failure as fatal
  *   DRY_RUN=1                      print actions without writing
  */
 
@@ -138,22 +144,40 @@ async function main() {
       ...existingClaims,
       role: 'director',
     });
-    process.stdout.write('set custom claim role=director\n');
+    process.stdout.write('SUCCESS: custom claim role=director set\n');
   } else {
-    process.stdout.write('custom claim role=director already present\n');
+    process.stdout.write('SUCCESS: custom claim role=director already present\n');
   }
-
-  const adminRef = db.collection('admins').doc(user.uid);
-  await adminRef.set(
-    {
-      email: user.email || null,
-      role: 'director',
-      provisionedAt: new Date().toISOString(),
-      provisionedBy: process.env.GITHUB_ACTOR || 'cli',
-    },
-    { merge: true },
+  process.stdout.write(
+    `ACTION REQUIRED: ${user.email || user.uid} must sign out and back in for the custom claim to refresh in their ID token. Director access is granted by the custom claim alone — the admins/{uid} document below is a redundant fallback.\n`,
   );
-  process.stdout.write(`upserted admins/${user.uid}\n`);
+
+  const requireAdminDoc = process.env.REQUIRE_ADMIN_DOC === '1';
+  const adminRef = db.collection('admins').doc(user.uid);
+  try {
+    await adminRef.set(
+      {
+        email: user.email || null,
+        role: 'director',
+        provisionedAt: new Date().toISOString(),
+        provisionedBy: process.env.GITHUB_ACTOR || 'cli',
+      },
+      { merge: true },
+    );
+    process.stdout.write(`upserted admins/${user.uid} (fallback document)\n`);
+  } catch (err) {
+    const msg = err && err.message ? err.message : String(err);
+    if (requireAdminDoc) {
+      process.stderr.write(
+        `FATAL: admins/${user.uid} write failed and REQUIRE_ADMIN_DOC=1: ${msg}\n`,
+      );
+      throw err;
+    }
+    process.stderr.write(
+      `WARNING: admins/${user.uid} write failed (non-fatal): ${msg}\n` +
+        'WARNING: the redundant admins/{uid} fallback document was NOT written. This is OK — the custom claim already grants director access under the current firestore.rules. To make this step fatal, set REQUIRE_ADMIN_DOC=1 (and grant roles/datastore.user on the named database).\n',
+    );
+  }
 
   process.stdout.write(
     'done. user must sign out and back in for the custom claim to refresh in their ID token.\n',
