@@ -24,10 +24,9 @@ rules_version = '2';
 // roster: authenticated read/write.
 // director_notes & director_dashboard: write restricted to role == 'director'.
 //
-// Backwards-compatible aliases for the existing live app collections
-// (hosts, commissions, pk_records, exposures, fanbase_health, admins)
-// are retained at the bottom so the deployed UI keeps working during
-// migration.
+// The `admins` collection is retained as a side-table used by the
+// isDirector() helper. All other (unknown) collections fall through to
+// default deny.
 // ============================================================================
 
 service cloud.firestore {
@@ -412,38 +411,6 @@ service cloud.firestore {
     match /admins/{adminId} {
       allow read:  if isSignedIn();
       allow write: if false;
-    }
-
-    // ---------------------------------------------------------------------
-    // Legacy collections retained for the currently-deployed UI.
-    // These will be removed once the 14-collection migration is complete.
-    // ---------------------------------------------------------------------
-    match /hosts/{hostId} {
-      allow read:  if isSignedIn();
-      allow write: if isDirector();
-    }
-
-    match /commissions/{commissionId} {
-      allow read:   if isSignedIn();
-      allow write:  if isDirector();
-    }
-
-    match /pk_records/{recordId} {
-      allow read:   if isSignedIn();
-      allow create: if isSignedIn();
-      allow update, delete: if isDirector();
-    }
-
-    match /exposures/{exposureId} {
-      allow read:   if isSignedIn();
-      allow create: if isSignedIn();
-      allow update, delete: if isDirector();
-    }
-
-    match /fanbase_health/{healthId} {
-      allow read:   if isSignedIn();
-      allow create: if isSignedIn();
-      allow update, delete: if isDirector();
     }
 
     // ---------------------------------------------------------------------
