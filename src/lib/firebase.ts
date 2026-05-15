@@ -84,7 +84,7 @@ const logAuthDiagnostic = (stage: string, error: any) => {
 
 export const signInWithGoogle = async () => {
   try {
-    return await signInWithPopup(auth, googleProvider, browserPopupRedirectResolver);
+    await signInWithRedirect(auth, googleProvider); return null;
   } catch (error: any) {
     const code: string = error?.code || '';
     if (code === 'auth/cancelled-popup-request') return null;
