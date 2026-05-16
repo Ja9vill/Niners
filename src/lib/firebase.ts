@@ -89,6 +89,40 @@ const logAuthDiagnostic = (stage: string, error: any) => {
   console.error('[Firebase Auth]', ctx);
 };
 
+// Marker key set just before signInWithRedirect navigates. If we come back to
+// this page and the marker is still set with no redirect result, we know the
+// navigation never happened (browser blocked it, cross-origin restriction,
+// etc.) and surface a visible error instead of failing silently.
+export const GOOGLE_REDIRECT_MARKER = 'niners.auth.google.redirect.pending';
+
+export const setRedirectMarker = () => {
+  if (typeof window === 'undefined') return;
+  try {
+    window.sessionStorage.setItem(GOOGLE_REDIRECT_MARKER, String(Date.now()));
+  } catch {
+    /* ignore */
+  }
+};
+
+export const clearRedirectMarker = () => {
+  if (typeof window === 'undefined') return;
+  try {
+    window.sessionStorage.removeItem(GOOGLE_REDIRECT_MARKER);
+  } catch {
+    /* ignore */
+  }
+};
+
+export const readRedirectMarker = (): number | null => {
+  if (typeof window === 'undefined') return null;
+  try {
+    const v = window.sessionStorage.getItem(GOOGLE_REDIRECT_MARKER);
+    return v ? Number(v) : null;
+  } catch {
+    return null;
+  }
+};
+
 export type GoogleSignInOutcome =
   | { kind: 'success'; user: any }
   | { kind: 'redirecting' }
@@ -109,7 +143,6 @@ export const signInWithGoogle = async (): Promise<GoogleSignInOutcome> => {
     } catch (error: any) {
       const code: string = error?.code || '';
       if (code === 'auth/cancelled-popup-request') {
-        // Another popup attempt superseded this one — treat as silent no-op.
         return { kind: 'redirecting' };
       }
       logAuthDiagnostic('popup-in-iframe', error);
@@ -117,12 +150,18 @@ export const signInWithGoogle = async (): Promise<GoogleSignInOutcome> => {
     }
   }
 
-  // Top-level page: redirect is the more reliable Cloud Run path.
+  // Top-level page: redirect is the more reliable Cloud Run path. Set a
+  // sessionStorage marker so that if the page never actually navigates (e.g.
+  // the browser silently blocks the cross-origin redirect), the caller can
+  // detect the failure with a timeout and surface a visible error.
+  setRedirectMarker();
   try {
     await signInWithRedirect(auth, googleProvider);
-    // signInWithRedirect should navigate away; we never reach here on success.
+    // signInWithRedirect should navigate away; if we reach here, navigation
+    // is presumed in-flight — the caller still arms a safety timeout.
     return { kind: 'redirecting' };
   } catch (error: any) {
+    clearRedirectMarker();
     const code: string = error?.code || '';
     logAuthDiagnostic('redirect', error);
 
@@ -151,8 +190,12 @@ export const signInWithGoogle = async (): Promise<GoogleSignInOutcome> => {
 export const completeRedirectSignIn = async () => {
   try {
     const result = await getRedirectResult(auth);
+    if (result?.user) {
+      clearRedirectMarker();
+    }
     return result?.user ?? null;
   } catch (error: any) {
+    clearRedirectMarker();
     logAuthDiagnostic('redirect-result', error);
     throw new Error(friendlyAuthError(error));
   }
