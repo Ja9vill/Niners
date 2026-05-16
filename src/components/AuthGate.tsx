@@ -44,9 +44,34 @@ const sessionForHost = (host: Host) => {
   };
 };
 
+const METHOD_STORAGE_KEY = 'niners.authgate.method';
+
+const readStoredMethod = (): AuthMethod => {
+  if (typeof window === 'undefined') return 'poppo';
+  try {
+    const v = window.sessionStorage.getItem(METHOD_STORAGE_KEY);
+    return v === 'email' ? 'email' : 'poppo';
+  } catch {
+    return 'poppo';
+  }
+};
+
+const writeStoredMethod = (m: AuthMethod) => {
+  if (typeof window === 'undefined') return;
+  try {
+    window.sessionStorage.setItem(METHOD_STORAGE_KEY, m);
+  } catch {
+    /* ignore */
+  }
+};
+
 export const AuthGate: React.FC<AuthGateProps> = ({ children, onAuthChange }) => {
   const [authState, setAuthState] = useState(Storage.getAuthState());
-  const [method, setMethod] = useState<AuthMethod>('poppo');
+  const [method, setMethodState] = useState<AuthMethod>(readStoredMethod);
+  const setMethod = (m: AuthMethod) => {
+    writeStoredMethod(m);
+    setMethodState(m);
+  };
   const [password, setPassword] = useState('');
   const [poppoId, setPoppoId] = useState('');
   const [email, setEmail] = useState('');
@@ -60,9 +85,14 @@ export const AuthGate: React.FC<AuthGateProps> = ({ children, onAuthChange }) =>
   const [busy, setBusy] = useState(false);
 
   // Resolve any pending signInWithRedirect handoff before the auth listener
-  // attaches, so a returning user lands signed in.
+  // attaches, so a returning user lands signed in. If the redirect itself
+  // failed, surface the message on the Member tab so the user sees it.
   useEffect(() => {
-    completeRedirectSignIn().catch((err: any) => setError(err?.message || 'Google sign-in failed. Please try again.'));
+    completeRedirectSignIn().catch((err: any) => {
+      setMethod('email');
+      setError(err?.message || 'Google sign-in failed. Please try again.');
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Mirror Firebase auth state into the local session so members stay signed in
@@ -155,19 +185,31 @@ export const AuthGate: React.FC<AuthGateProps> = ({ children, onAuthChange }) =>
     }
   };
 
-  const handleGoogleSignIn = async () => {
+  const handleGoogleSignIn = async (e?: React.MouseEvent<HTMLButtonElement>) => {
+    e?.preventDefault();
+    e?.stopPropagation();
+    // Keep the user on the Member tab no matter what happens on this click.
+    setMethod('email');
     setError('');
-    setInfo('');
+    setInfo('Starting Google sign-in…');
     setBusy(true);
     try {
-      const result = await signInWithGoogle();
-      // result === null means the popup path failed and a full-page redirect
-      // is in progress; the page will navigate away momentarily.
-      if (result === null) {
-        setInfo('Redirecting to Google sign-in…');
+      const outcome = await signInWithGoogle();
+      if (outcome.kind === 'redirecting') {
+        // Either the browser is mid-navigation (signInWithRedirect) or the
+        // popup is opening. Leave the indicator up; if the redirect actually
+        // navigates the page will replace before this message matters.
+        setInfo('Opening Google sign-in… If nothing happens, allow popups for this site and try again.');
+      } else if (outcome.kind === 'error') {
+        setInfo('');
+        setError(outcome.message);
       }
-      // onAuthStateChanged handles the session update on success.
+      // 'success' is handled by onAuthStateChanged below.
     } catch (err: any) {
+      // Defensive: signInWithGoogle is supposed to return an outcome, never
+      // throw. If something slips through, surface it instead of silently
+      // resetting the UI.
+      setInfo('');
       setError(err?.message || 'Google Sign-In failed.');
     } finally {
       setBusy(false);
@@ -371,8 +413,22 @@ export const AuthGate: React.FC<AuthGateProps> = ({ children, onAuthChange }) =>
                     <path fill="#FBBC05" d="M3.964 10.707A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.707V4.96H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.04l3.007-2.333z"/>
                     <path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.96L3.964 7.293C4.672 5.166 6.656 3.58 9 3.58z"/>
                   </svg>
-                  Continue with Google
+                  {busy ? 'Connecting to Google…' : 'Continue with Google'}
                 </button>
+
+                {(info || error) && (
+                  <div
+                    className={
+                      'rounded-xl px-3 py-2 text-[11px] text-center font-medium leading-relaxed border ' +
+                      (error
+                        ? 'bg-red-500/10 border-red-500/30 text-red-300'
+                        : 'bg-indigo-500/10 border-indigo-500/30 text-indigo-200')
+                    }
+                    role={error ? 'alert' : 'status'}
+                  >
+                    {error || info}
+                  </div>
+                )}
 
                 <p className="text-[10px] text-white/30 text-center leading-relaxed">
                   Email accounts must already exist in Firebase Auth. Contact a director if you need access.
