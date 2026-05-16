@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Lock, Mail, User } from 'lucide-react';
 import { Storage } from '../lib/storage';
 import { Host } from '../types';
@@ -11,8 +11,17 @@ import {
   signOutFirebase,
   friendlyAuthError,
   completeRedirectSignIn,
+  readRedirectMarker,
+  clearRedirectMarker,
+  isInIframe,
 } from '../lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
+
+// How long to wait after clicking Continue with Google before declaring the
+// flow stalled. signInWithRedirect should navigate away well within this
+// window; if we're still on the page with no popup, the browser silently
+// blocked the handoff and the user needs a visible error.
+const GOOGLE_SIGNIN_TIMEOUT_MS = 6000;
 
 const DIRECTOR_IDS = ['19157913', '031907'];
 const DIRECTOR_PASS = '031907';
@@ -84,14 +93,39 @@ export const AuthGate: React.FC<AuthGateProps> = ({ children, onAuthChange }) =>
   const [info, setInfo] = useState('');
   const [busy, setBusy] = useState(false);
 
+  // Tracks the in-flight Google sign-in safety timeout so we can cancel it on
+  // unmount or when auth state changes.
+  const googleTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // Resolve any pending signInWithRedirect handoff before the auth listener
   // attaches, so a returning user lands signed in. If the redirect itself
-  // failed, surface the message on the Member tab so the user sees it.
+  // failed, surface the message on the Member tab so the user sees it. If we
+  // set a redirect marker but came back with no user, the navigation never
+  // actually happened — show a visible diagnostic instead of failing silently.
   useEffect(() => {
-    completeRedirectSignIn().catch((err: any) => {
-      setMethod('email');
-      setError(err?.message || 'Google sign-in failed. Please try again.');
-    });
+    const pendingMarker = readRedirectMarker();
+    completeRedirectSignIn()
+      .then((user) => {
+        if (!user && pendingMarker) {
+          clearRedirectMarker();
+          setMethod('email');
+          setError(
+            'Google sign-in did not open. The browser may have blocked the redirect. ' +
+            'Allow popups and third-party cookies for this site, or open this app in a normal browser tab, then try again.',
+          );
+        }
+      })
+      .catch((err: any) => {
+        clearRedirectMarker();
+        setMethod('email');
+        setError(err?.message || 'Google sign-in failed. Please try again.');
+      });
+    return () => {
+      if (googleTimeoutRef.current) {
+        clearTimeout(googleTimeoutRef.current);
+        googleTimeoutRef.current = null;
+      }
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -101,6 +135,13 @@ export const AuthGate: React.FC<AuthGateProps> = ({ children, onAuthChange }) =>
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       const current = Storage.getAuthState();
       if (user) {
+        // A real auth state happened — cancel the safety timeout so the
+        // stalled-redirect error doesn't fire after a successful sign-in.
+        if (googleTimeoutRef.current) {
+          clearTimeout(googleTimeoutRef.current);
+          googleTimeoutRef.current = null;
+        }
+        clearRedirectMarker();
         if (current.level > 0) return;
         if (user.email && user.email.toLowerCase() === DIRECTOR_EMAIL) {
           const directorState = {
@@ -191,27 +232,54 @@ export const AuthGate: React.FC<AuthGateProps> = ({ children, onAuthChange }) =>
     // Keep the user on the Member tab no matter what happens on this click.
     setMethod('email');
     setError('');
-    setInfo('Starting Google sign-in…');
+    setInfo(
+      isInIframe()
+        ? 'Opening Google sign-in popup… If nothing appears, allow popups for this site and try again.'
+        : 'Redirecting to Google… If this page does not change shortly, allow popups and third-party cookies and try again.',
+    );
     setBusy(true);
+
+    // Arm a safety timeout: if nothing happens in ~6s — no navigation, no
+    // popup, no auth callback — surface a visible error so the user is never
+    // left staring at an idle Member tab. The timeout is cleared on
+    // navigation (page unloads), on successful auth (onAuthStateChanged), or
+    // on an explicit error returned below.
+    if (googleTimeoutRef.current) clearTimeout(googleTimeoutRef.current);
+    googleTimeoutRef.current = setTimeout(() => {
+      googleTimeoutRef.current = null;
+      clearRedirectMarker();
+      setBusy(false);
+      setInfo('');
+      setError(
+        'Google sign-in did not open. Please allow popups and third-party cookies for this site, ' +
+        'or open this app in a normal browser tab, then try again.',
+      );
+    }, GOOGLE_SIGNIN_TIMEOUT_MS);
+
     try {
       const outcome = await signInWithGoogle();
-      if (outcome.kind === 'redirecting') {
-        // Either the browser is mid-navigation (signInWithRedirect) or the
-        // popup is opening. Leave the indicator up; if the redirect actually
-        // navigates the page will replace before this message matters.
-        setInfo('Opening Google sign-in… If nothing happens, allow popups for this site and try again.');
-      } else if (outcome.kind === 'error') {
+      if (outcome.kind === 'error') {
+        if (googleTimeoutRef.current) {
+          clearTimeout(googleTimeoutRef.current);
+          googleTimeoutRef.current = null;
+        }
         setInfo('');
         setError(outcome.message);
+        setBusy(false);
       }
-      // 'success' is handled by onAuthStateChanged below.
+      // 'redirecting' leaves the timeout armed — either we navigate (timeout
+      // is irrelevant) or the timeout fires and surfaces the stall.
+      // 'success' is handled by onAuthStateChanged which clears the timeout.
     } catch (err: any) {
       // Defensive: signInWithGoogle is supposed to return an outcome, never
       // throw. If something slips through, surface it instead of silently
       // resetting the UI.
+      if (googleTimeoutRef.current) {
+        clearTimeout(googleTimeoutRef.current);
+        googleTimeoutRef.current = null;
+      }
       setInfo('');
       setError(err?.message || 'Google Sign-In failed.');
-    } finally {
       setBusy(false);
     }
   };
