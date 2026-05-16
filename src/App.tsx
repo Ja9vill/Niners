@@ -103,11 +103,13 @@ export default function App() {
   const handleGoogleSignIn = async () => {
     setIsSyncingCloud(true);
     try {
-      const result = await signInWithGoogle();
-      if (result && auth.currentUser?.email === 'jwavpr@gmail.com') {
+      const outcome = await signInWithGoogle();
+      if (outcome.kind === 'success' && auth.currentUser?.email === 'jwavpr@gmail.com') {
         const newState = { level: 2, role: 'Director', name: 'Director Miss Nine (Verified)', poppo_id: '19157913' };
         Storage.setAuthState(newState);
         setAuthState(newState);
+      } else if (outcome.kind === 'error') {
+        alert(outcome.message);
       }
     } catch (err: any) {
       alert(err.message || "Google Sign-In failed.");
