@@ -1,0 +1,95 @@
+# Verifies the committed Firebase web app config against the canonical
+# config from the Firebase Management API, and independently probes
+# Identity Toolkit with the committed API key. Run this whenever Google
+# sign-in fails in the deployed app with a 401 on
+# `/identitytoolkit/v3/relyingparty/createAuthUri` or a 404 on
+# `/__/firebase/init.json` — those are the symptoms of a stale, wrong-
+# project, or restricted API key.
+#
+# Inputs:
+#   strict   - fail the workflow if committed config differs from canonical (true/false).
+#   write    - rewrite firebase-applet-config.json with the canonical config (true/false).
+#              When `write` is true the workflow also opens a PR with the change.
+#
+# Required GitHub secrets:
+#   GCP_SA_KEY      - JSON service-account key (same as deploy.yml)
+#   GCP_PROJECT_ID  - e.g. gen-lang-client-0222945352
+#
+# Required IAM role on the service account:
+#   - roles/firebase.viewer       (firebase.apps.list / get / getConfig)
+#
+# Required APIs:
+#   - firebase.googleapis.com            (Firebase Management API)
+#   - identitytoolkit.googleapis.com     (Firebase Auth)
+#
+# Output is intentionally verbose: API keys, appIds, authDomains, and
+# storageBuckets are NOT secrets (they ship in every web client). No
+# tokens or service-account JSON are ever printed.
+name: Verify Firebase Web Config
+
+on:
+  workflow_dispatch:
+    inputs:
+      strict:
+        description: "Fail workflow if committed config differs from canonical (true/false)"
+        required: false
+        default: "true"
+      write:
+        description: "Rewrite firebase-applet-config.json and open a PR with the canonical config (true/false)"
+        required: false
+        default: "false"
+  push:
+    branches: [main]
+    paths:
+      - "firebase-applet-config.json"
+      - "scripts/verify-firebase-config.mjs"
+      - ".github/workflows/verify-firebase-config.yml"
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install google-auth-library
+        run: npm install --no-save google-auth-library@^9
+
+      - name: Verify config
+        env:
+          FIREBASE_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+          FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.GCP_SA_KEY }}
+          STRICT: ${{ (inputs.strict || 'true') == 'true' && '1' || '0' }}
+          WRITE: ${{ inputs.write == 'true' && '1' || '0' }}
+        run: node scripts/verify-firebase-config.mjs
+
+      - name: Open PR with refreshed config
+        if: inputs.write == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          if git diff --quiet -- firebase-applet-config.json; then
+            echo "No changes to firebase-applet-config.json — skipping PR."
+            exit 0
+          fi
+          BRANCH="auto/refresh-firebase-config-$(date -u +%Y%m%d%H%M%S)"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$BRANCH"
+          git add firebase-applet-config.json
+          git commit -m "chore(firebase): refresh web app config from Management API"
+          git push origin "$BRANCH"
+          gh pr create \
+            --title "chore(firebase): refresh web app config" \
+            --body "Auto-generated from Verify Firebase Web Config workflow. Replaces stale committed config with the canonical web app config from the Firebase Management API." \
+            --base main \
+            --head "$BRANCH"

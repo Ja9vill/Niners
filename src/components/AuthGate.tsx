@@ -11,6 +11,7 @@ import {
   signOutFirebase,
   friendlyAuthError,
   completeRedirectSignIn,
+  validateFirebaseAuthConfig,
 } from '../lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 
@@ -250,6 +251,19 @@ export const AuthGate: React.FC<AuthGateProps> = ({ children, onAuthChange }) =>
     }, 5000);
 
     try {
+      // Pre-flight: probe Identity Toolkit with the configured API key so we
+      // can surface a "key invalid / restricted / wrong project" diagnosis
+      // before the OAuth flow burns 5 seconds and falls back to a generic
+      // auth/internal-error message.
+      const preflight = await validateFirebaseAuthConfig();
+      if (preflight) {
+        clearGoogleWatchdog();
+        setGoogleStage('failed');
+        setInfo('');
+        setError(preflight);
+        setBusy(false);
+        return;
+      }
       const outcome = await signInWithGoogle();
       if (outcome.kind === 'redirecting') {
         // Either the browser is mid-navigation (signInWithRedirect) or the

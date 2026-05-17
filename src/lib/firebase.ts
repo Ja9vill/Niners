@@ -42,6 +42,18 @@ const isUnauthorizedDomain = (code: string) => code === 'auth/unauthorized-domai
 
 export const friendlyAuthError = (error: any): string => {
   const code: string = error?.code || '';
+  const message: string = error?.message || '';
+  // 401 / "API key not valid" / "invalid API key" surface from Identity Toolkit
+  // as auth/internal-error or auth/api-key-not-valid (Firebase v10+). The
+  // message text is the reliable signal.
+  const looksLikeBadApiKey =
+    code === 'auth/api-key-not-valid' ||
+    code === 'auth/api-key-not-valid.-please-pass-a-valid-api-key.' ||
+    /api[- ]?key/i.test(message) && /not valid|invalid/i.test(message) ||
+    /identitytoolkit/i.test(message) && /401|unauthor/i.test(message);
+  if (looksLikeBadApiKey) {
+    return `Firebase API key was rejected (HTTP 401 from Identity Toolkit). The deployed key may be invalid, restricted, or for the wrong project (${firebaseConfig.projectId}). A director must verify Firebase Console → Project Settings → Your apps → Web app config, and check Google Cloud Console → APIs & Services → Credentials → API key restrictions allow Identity Toolkit API and the app's referrer.`;
+  }
   switch (code) {
     case 'auth/popup-blocked':
       return 'Sign-in popup was blocked by the browser. Allow popups for this site and try again.';
@@ -68,7 +80,11 @@ export const friendlyAuthError = (error: any): string => {
     case 'auth/unauthorized-domain':
       return `This site (${typeof window !== 'undefined' ? window.location.hostname : 'unknown'}) is not on Firebase Authorized Domains. A director must add it under Firebase Console → Authentication → Settings → Authorized domains.`;
     case 'auth/internal-error':
-      return 'Google sign-in could not complete. Usually the app domain is not on Firebase Authorized Domains, or third-party cookies are blocked.';
+      // auth/internal-error is the generic bucket Firebase uses for almost
+      // everything that fails at the Identity Toolkit transport layer —
+      // including a rejected API key and a blocked domain. Mention both so
+      // the user/director can check the right thing.
+      return 'Google sign-in could not complete. Common causes: (1) Firebase API key is invalid or restricted (Identity Toolkit returned 401), (2) this domain is not on Firebase Authorized Domains, or (3) third-party cookies are blocked.';
     default:
       return error?.message || 'Sign-in failed. Please try again.';
   }
@@ -168,3 +184,51 @@ export const signInWithEmail = async (email: string, password: string) => {
 };
 
 export const signOutFirebase = () => signOut(auth);
+
+// Best-effort pre-flight probe against Identity Toolkit using the configured
+// API key. Detects the common "deployed key is invalid / restricted / from
+// the wrong project" failure mode that surfaces as a 401 on createAuthUri
+// before any OAuth window is opened. Returns null on success; otherwise a
+// human-readable diagnosis suitable for the AuthGate banner.
+//
+// Only the public web-app config (API key + authDomain + projectId) is sent.
+// No tokens or secrets are transmitted.
+export const validateFirebaseAuthConfig = async (): Promise<string | null> => {
+  if (typeof fetch === 'undefined') return null;
+  const apiKey = firebaseConfig.apiKey;
+  if (!apiKey) {
+    return `Firebase config is missing apiKey. Check firebase-applet-config.json or the deployment env.`;
+  }
+  const url = `https://identitytoolkit.googleapis.com/v1/accounts:createAuthUri?key=${encodeURIComponent(apiKey)}`;
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        identifier: 'preflight-check@example.invalid',
+        continueUri: typeof window !== 'undefined' ? window.location.origin : 'https://invalid.local',
+      }),
+    });
+    if (res.ok) return null;
+    let detail = '';
+    try {
+      const body = await res.json();
+      detail = body?.error?.message || '';
+    } catch {
+      /* ignore parse errors */
+    }
+    if (res.status === 400 && /INVALID_IDENTIFIER|MISSING_CONTINUE_URI|INVALID_EMAIL/i.test(detail)) {
+      // 400 here means the API key is accepted — server just rejected our
+      // synthetic identifier. That's the success signal for a preflight.
+      return null;
+    }
+    if (res.status === 401 || res.status === 403 || /API key|API_KEY/i.test(detail)) {
+      return `Firebase API key was rejected by Identity Toolkit (HTTP ${res.status}${detail ? `: ${detail}` : ''}). The deployed key may be invalid, restricted to other referrers, or for the wrong project (${firebaseConfig.projectId}). A director must (1) confirm the web app config in Firebase Console → Project Settings → Your apps matches this build, (2) ensure the Identity Toolkit API is enabled, and (3) check Google Cloud Console → APIs & Services → Credentials → API key restrictions allow this app's HTTP referrers.`;
+    }
+    return `Firebase Identity Toolkit preflight failed (HTTP ${res.status}${detail ? `: ${detail}` : ''}).`;
+  } catch (err: any) {
+    // Network-level failure — don't block sign-in on this; let the real flow surface the error.
+    console.warn('[Firebase Auth] preflight network error', err?.message || err);
+    return null;
+  }
+};
