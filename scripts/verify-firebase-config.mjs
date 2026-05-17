@@ -118,12 +118,21 @@ async function probeIdentityToolkit(apiKey) {
     /* ignore */
   }
   // 200 = success, 400 with INVALID_IDENTIFIER = key is good (server rejected
-  // our synthetic identifier). Anything else (401, 403, etc.) means the key
-  // is rejected — that's the failure mode we care about.
+  // our synthetic identifier). 401 with `Firebase App Check token is invalid`
+  // is App Check ENFORCEMENT — the API key is fine; the request was rejected
+  // because this bare fetch carries no App Check token. The real browser SDK
+  // attaches one. We surface this as a distinct, non-blocking signal.
+  // Anything else (other 401, 403) means the key itself is rejected.
   const looksAccepted =
     res.status === 200 ||
     (res.status === 400 && /INVALID_IDENTIFIER|INVALID_EMAIL|MISSING_CONTINUE_URI/i.test(detail));
-  return { ok: looksAccepted, status: res.status, message: detail };
+  const looksLikeAppCheckEnforcement = /app[- ]?check/i.test(detail);
+  return {
+    ok: looksAccepted,
+    appCheck: looksLikeAppCheckEnforcement,
+    status: res.status,
+    message: detail,
+  };
 }
 
 function normalizeFromManagementApi(cfg) {
@@ -182,6 +191,20 @@ async function main() {
   const probe = await probeIdentityToolkit(committed.apiKey);
   if (probe.ok) {
     console.log(`✓ Identity Toolkit accepts the committed API key (HTTP ${probe.status}).`);
+  } else if (probe.appCheck) {
+    // App Check enforcement is on. A bare fetch from CI cannot carry an
+    // App Check token (no reCAPTCHA / no browser). The committed API key is
+    // NOT the problem here — this rejection is expected from outside the
+    // browser. The real failure mode in the browser is a missing or failed
+    // App Check initialization, which is a client-side issue.
+    console.warn(`⚠ Identity Toolkit returned HTTP ${probe.status} with App Check enforcement: ${probe.message}`);
+    console.warn('  This means App Check enforcement is enabled on Firebase Auth for this project.');
+    console.warn('  The committed API key is fine — a bare HTTP probe from CI has no App Check token, so this rejection is EXPECTED here.');
+    console.warn('  In the browser, signInWithGoogle must run AFTER initializeAppCheck() with a valid reCAPTCHA Enterprise provider.');
+    console.warn('  If users see a 401 in the deployed app, verify:');
+    console.warn('   1. The web client calls initializeAppCheck() with the correct reCAPTCHA Enterprise site key BEFORE any auth call.');
+    console.warn('   2. The reCAPTCHA Enterprise site key is registered with App Check in Firebase Console → App Check.');
+    console.warn('   3. The deployed origin is on the reCAPTCHA Enterprise key allow-list.');
   } else {
     console.error(`✗ Identity Toolkit REJECTED the committed API key (HTTP ${probe.status}). Detail: ${probe.message}`);
     console.error('  This is the root cause of the in-browser 401 on /identitytoolkit/v3/relyingparty/createAuthUri.');
@@ -215,7 +238,10 @@ async function main() {
     const detail = err?.response?.data?.error?.message || err?.message || String(err);
     console.error(`Could not fetch canonical web config from Firebase Management API${status ? ` (HTTP ${status})` : ''}: ${detail}`);
     console.error('Ensure the service account has roles/firebase.viewer and the Firebase Management API is enabled.');
-    if (!probe.ok) process.exit(1);
+    // App Check enforcement is not a failure of the committed config — exit 0
+  // so the workflow doesn't block on a diagnostic that's *expected* outside
+  // the browser. Real bad-API-key rejections still fail the workflow.
+  if (!probe.ok && !probe.appCheck) process.exit(1);
     return;
   }
 
@@ -240,7 +266,10 @@ async function main() {
     }
   }
 
-  if (!probe.ok) process.exit(1);
+  // App Check enforcement is not a failure of the committed config — exit 0
+  // so the workflow doesn't block on a diagnostic that's *expected* outside
+  // the browser. Real bad-API-key rejections still fail the workflow.
+  if (!probe.ok && !probe.appCheck) process.exit(1);
 }
 
 main().catch((err) => {

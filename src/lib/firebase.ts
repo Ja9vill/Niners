@@ -1,5 +1,10 @@
 import { initializeApp } from 'firebase/app';
 import {
+  initializeAppCheck,
+  ReCaptchaEnterpriseProvider,
+  type AppCheck,
+} from 'firebase/app-check';
+import {
   getAuth,
   GoogleAuthProvider,
   signInWithPopup,
@@ -12,7 +17,37 @@ import {
 import { getFirestore } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 
+// Public reCAPTCHA Enterprise site key bound to the Firebase project
+// `gen-lang-client-0222945352` (key id: `ninedashrecapt`). Identity Platform
+// requires this when App Check enforcement is enabled on Firebase Auth — every
+// createAuthUri / signInWithIdp call must carry a valid App Check token or
+// Identity Toolkit returns HTTP 401 with `Firebase App Check token is invalid`.
+// Site keys are public values, safe to ship to the browser.
+const APP_CHECK_SITE_KEY = '6LfqX-wsAAAAAGeVHsRVuRvGgnT5e_ubHVNZQbvj';
+
 const app = initializeApp(firebaseConfig);
+
+// Initialise App Check *immediately* after initializeApp and *before* any auth
+// call. Browser-only — skip on the server build (SSR / esbuild bundle) where
+// `window` and `document` are undefined.
+let appCheck: AppCheck | null = null;
+let appCheckInitError: Error | null = null;
+if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+  try {
+    appCheck = initializeAppCheck(app, {
+      provider: new ReCaptchaEnterpriseProvider(APP_CHECK_SITE_KEY),
+      isTokenAutoRefreshEnabled: true,
+    });
+  } catch (err: any) {
+    // Don't crash the app — record the error so the auth flow can surface a
+    // helpful diagnosis instead of a generic auth/internal-error.
+    appCheckInitError = err instanceof Error ? err : new Error(String(err));
+    console.error('[Firebase App Check] initialization failed', appCheckInitError);
+  }
+}
+export { appCheck };
+export const getAppCheckInitError = (): Error | null => appCheckInitError;
+
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
@@ -43,6 +78,17 @@ const isUnauthorizedDomain = (code: string) => code === 'auth/unauthorized-domai
 export const friendlyAuthError = (error: any): string => {
   const code: string = error?.code || '';
   const message: string = error?.message || '';
+  // App Check enforcement on Identity Platform: Identity Toolkit returns HTTP
+  // 401 with detail `Firebase App Check token is invalid`. This is *not* a bad
+  // API key — the key is fine, but the request lacks (or carries an invalid)
+  // App Check token. Match before the API-key check so we surface the right
+  // diagnosis.
+  const looksLikeAppCheckRejection =
+    /app[- ]?check/i.test(message) ||
+    code === 'auth/firebase-app-check-token-is-invalid';
+  if (looksLikeAppCheckRejection) {
+    return `Firebase App Check token is invalid or missing (HTTP 401 from Identity Toolkit). The request reached Identity Toolkit but App Check enforcement rejected it. App Check must initialize successfully (reCAPTCHA Enterprise site key, browser context) before any auth call. Check: (1) the reCAPTCHA Enterprise site key is correct and registered with App Check for project ${firebaseConfig.projectId}, (2) this domain is on the reCAPTCHA Enterprise key's allow-list, (3) App Check initializeAppCheck() ran without error before signInWithGoogle.`;
+  }
   // 401 / "API key not valid" / "invalid API key" surface from Identity Toolkit
   // as auth/internal-error or auth/api-key-not-valid (Firebase v10+). The
   // message text is the reliable signal.
@@ -199,6 +245,12 @@ export const validateFirebaseAuthConfig = async (): Promise<string | null> => {
   if (!apiKey) {
     return `Firebase config is missing apiKey. Check firebase-applet-config.json or the deployment env.`;
   }
+  // Surface a clear App Check init failure before we probe Identity Toolkit —
+  // a missing/failed App Check setup is the most common cause of a 401 with
+  // detail `Firebase App Check token is invalid` even when apiKey is correct.
+  if (appCheckInitError) {
+    return `Firebase App Check failed to initialize: ${appCheckInitError.message}. App Check must initialize before any Firebase Auth call, or Identity Toolkit will reject requests with HTTP 401 "Firebase App Check token is invalid". Verify the reCAPTCHA Enterprise site key is correct, the site key is registered under App Check for project ${firebaseConfig.projectId}, and the current origin (${typeof window !== 'undefined' ? window.location.origin : 'unknown'}) is on the key's allow-list.`;
+  }
   const url = `https://identitytoolkit.googleapis.com/v1/accounts:createAuthUri?key=${encodeURIComponent(apiKey)}`;
   try {
     const res = await fetch(url, {
@@ -220,6 +272,18 @@ export const validateFirebaseAuthConfig = async (): Promise<string | null> => {
     if (res.status === 400 && /INVALID_IDENTIFIER|MISSING_CONTINUE_URI|INVALID_EMAIL/i.test(detail)) {
       // 400 here means the API key is accepted — server just rejected our
       // synthetic identifier. That's the success signal for a preflight.
+      return null;
+    }
+    // App Check enforcement: 401 with `Firebase App Check token is invalid`
+    // (or any mention of App Check). This is the live failure mode — the
+    // committed API key is fine; Identity Toolkit rejects because the
+    // unauthenticated preflight has no App Check token.
+    if (/app[- ]?check/i.test(detail)) {
+      // The Firebase SDK itself attaches an App Check token on real auth
+      // calls — a bare fetch() preflight cannot, so this rejection is
+      // *expected* and is NOT a blocker for real sign-in. Don't return an
+      // error; let the real signInWithGoogle proceed.
+      console.info('[Firebase Auth] preflight 401 from App Check enforcement (expected on bare fetch); real auth path attaches a token.');
       return null;
     }
     if (res.status === 401 || res.status === 403 || /API key|API_KEY/i.test(detail)) {
