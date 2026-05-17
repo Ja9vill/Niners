@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Lock, Mail, User } from 'lucide-react';
 import { Storage } from '../lib/storage';
 import { Host } from '../types';
@@ -83,6 +83,16 @@ export const AuthGate: React.FC<AuthGateProps> = ({ children, onAuthChange }) =>
   const [error, setError] = useState('');
   const [info, setInfo] = useState('');
   const [busy, setBusy] = useState(false);
+  const googleWatchdogRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearGoogleWatchdog = () => {
+    if (googleWatchdogRef.current) {
+      clearTimeout(googleWatchdogRef.current);
+      googleWatchdogRef.current = null;
+    }
+  };
+
+  useEffect(() => () => clearGoogleWatchdog(), []);
 
   // Resolve any pending signInWithRedirect handoff before the auth listener
   // attaches, so a returning user lands signed in. If the redirect itself
@@ -101,6 +111,7 @@ export const AuthGate: React.FC<AuthGateProps> = ({ children, onAuthChange }) =>
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       const current = Storage.getAuthState();
       if (user) {
+        clearGoogleWatchdog();
         if (current.level > 0) return;
         if (user.email && user.email.toLowerCase() === DIRECTOR_EMAIL) {
           const directorState = {
@@ -185,6 +196,9 @@ export const AuthGate: React.FC<AuthGateProps> = ({ children, onAuthChange }) =>
     }
   };
 
+  const SILENT_FAILURE_MESSAGE =
+    'Google sign-in did not open. Please allow popups or open the app in a normal browser tab, then try again.';
+
   const handleGoogleSignIn = async (e?: React.MouseEvent<HTMLButtonElement>) => {
     e?.preventDefault();
     e?.stopPropagation();
@@ -193,25 +207,44 @@ export const AuthGate: React.FC<AuthGateProps> = ({ children, onAuthChange }) =>
     setError('');
     setInfo('Starting Google sign-in…');
     setBusy(true);
+
+    // Watchdog: if after 5 seconds the page hasn't navigated and no user is
+    // signed in, the popup/redirect almost certainly failed silently (popup
+    // blocker, iframe sandbox, third-party cookies, etc.). Surface a
+    // persistent visible banner so the user can recover.
+    clearGoogleWatchdog();
+    googleWatchdogRef.current = setTimeout(() => {
+      googleWatchdogRef.current = null;
+      if (auth.currentUser) return;
+      setInfo('');
+      setError(SILENT_FAILURE_MESSAGE);
+      setBusy(false);
+    }, 5000);
+
     try {
       const outcome = await signInWithGoogle();
       if (outcome.kind === 'redirecting') {
         // Either the browser is mid-navigation (signInWithRedirect) or the
-        // popup is opening. Leave the indicator up; if the redirect actually
-        // navigates the page will replace before this message matters.
+        // popup is opening. Leave the indicator up; the watchdog will fire
+        // if nothing actually happens.
         setInfo('Opening Google sign-in… If nothing happens, allow popups for this site and try again.');
       } else if (outcome.kind === 'error') {
+        clearGoogleWatchdog();
         setInfo('');
-        setError(outcome.message);
+        setError(outcome.message || SILENT_FAILURE_MESSAGE);
+        setBusy(false);
+      } else {
+        clearGoogleWatchdog();
+        setInfo('');
+        setBusy(false);
       }
-      // 'success' is handled by onAuthStateChanged below.
     } catch (err: any) {
       // Defensive: signInWithGoogle is supposed to return an outcome, never
       // throw. If something slips through, surface it instead of silently
       // resetting the UI.
+      clearGoogleWatchdog();
       setInfo('');
-      setError(err?.message || 'Google Sign-In failed.');
-    } finally {
+      setError(err?.message || SILENT_FAILURE_MESSAGE);
       setBusy(false);
     }
   };
