@@ -73,3 +73,66 @@ FIREBASE_DATABASE_ID=ai-studio-f578d03a-99b3-4c41-84dd-9901137e8386 \
 npx --package=firebase-admin@^12 -- node scripts/provision-director.mjs \
   --email jwavpr@gmail.com
 ```
+
+## Troubleshooting Google sign-in (401 / 404 from Firebase Auth)
+
+If the deployed app surfaces `Google sign-in could not complete` and the
+browser DevTools network tab shows either of:
+
+- `HTTP 401` from
+  `https://www.googleapis.com/identitytoolkit/v3/relyingparty/createAuthUri?key=...`
+- `HTTP 404` from
+  `https://<project>.firebaseapp.com/__/firebase/init.json`
+
+…the root cause is almost always the deployed Firebase web app config in
+[`firebase-applet-config.json`](./firebase-applet-config.json) — either
+the API key has been rotated, restricted, or the file points at the
+wrong project.
+
+Run the **Verify Firebase Web Config** workflow
+(`.github/workflows/verify-firebase-config.yml`) to diagnose. It:
+
+1. Probes Identity Toolkit with the committed API key (this is the
+   exact call the browser makes). A 401/403 here is the failure.
+2. Fetches the canonical web app config via the Firebase Management API
+   and diffs it against the committed file.
+3. With `write=true`, opens a PR that replaces
+   `firebase-applet-config.json` with the canonical config (preserving
+   `firestoreDatabaseId`).
+
+### Required IAM for verification
+
+| Role                    | Why                                                        |
+| ----------------------- | ---------------------------------------------------------- |
+| `roles/firebase.viewer` | `firebase.apps.list / get / getConfig` (Management API)    |
+
+### Manual console steps if the workflow flags the key as rejected
+
+If the workflow reports `Identity Toolkit REJECTED the committed API
+key`, a director must check, in order:
+
+1. **Firebase Console → Project Settings → Your apps → Web app**: copy
+   the current SDK config and compare against
+   `firebase-applet-config.json`. If they differ, run the workflow with
+   `write=true` to open a refresh PR.
+2. **Google Cloud Console → APIs & Services → Library**: confirm the
+   **Identity Toolkit API** and **Token Service API** are *Enabled* on
+   project `gen-lang-client-0222945352`.
+3. **Google Cloud Console → APIs & Services → Credentials → the
+   browser API key**:
+   - Under **Application restrictions** ensure either *None* or that
+     the Cloud Run domain
+     (`niners-580294245942.us-central1.run.app`) and any custom domain
+     are listed as allowed HTTP referrers.
+   - Under **API restrictions** either choose *Don't restrict key* or
+     include **Identity Toolkit API**, **Token Service API**, and
+     **Firebase Installations API**.
+4. **Firebase Console → Authentication → Sign-in method**: confirm
+   **Google** is enabled.
+5. **Firebase Console → Authentication → Settings → Authorized
+   domains**: confirm the live Cloud Run domain is listed (use the
+   **Manage Firebase Auth Authorized Domains** workflow to add it).
+
+The web app config (apiKey, authDomain, projectId, appId,
+messagingSenderId, storageBucket) is **not** a secret — it is shipped
+in every web client and safe to commit and log.
