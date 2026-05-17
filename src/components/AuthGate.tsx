@@ -88,6 +88,10 @@ export const AuthGate: React.FC<AuthGateProps> = ({ children, onAuthChange }) =>
   // by the resolution of signInWithGoogle. This guarantees the user sees
   // *something* even if the OAuth promise hangs or the redirect is blocked.
   const [googleStage, setGoogleStage] = useState<'idle' | 'starting' | 'opening' | 'failed'>('idle');
+  // Undeniable, synchronous click acknowledgement. Set in the onClick handler
+  // itself (before any await) so the user sees something the instant they
+  // press the button — even if signInWithGoogle is missing or throws sync.
+  const [googleClickAck, setGoogleClickAck] = useState<string>('');
   const googleWatchdogRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const clearGoogleWatchdog = () => {
@@ -118,6 +122,7 @@ export const AuthGate: React.FC<AuthGateProps> = ({ children, onAuthChange }) =>
       if (user) {
         clearGoogleWatchdog();
         setGoogleStage('idle');
+        setGoogleClickAck('');
         if (current.level > 0) return;
         if (user.email && user.email.toLowerCase() === DIRECTOR_EMAIL) {
           const directorState = {
@@ -338,7 +343,7 @@ export const AuthGate: React.FC<AuthGateProps> = ({ children, onAuthChange }) =>
   const tabBtn = (id: AuthMethod, label: string) => (
     <button
       type="button"
-      onClick={() => { setMethod(id); setError(''); setInfo(''); setGoogleStage('idle'); clearGoogleWatchdog(); }}
+      onClick={() => { setMethod(id); setError(''); setInfo(''); setGoogleStage('idle'); setGoogleClickAck(''); clearGoogleWatchdog(); }}
       className={
         'flex-1 py-2.5 text-[10px] font-black uppercase tracking-[0.2em] rounded-xl transition-all ' +
         (method === id
@@ -462,7 +467,18 @@ export const AuthGate: React.FC<AuthGateProps> = ({ children, onAuthChange }) =>
 
                 <button
                   type="button"
-                  onClick={handleGoogleSignIn}
+                  data-testid="google-signin-button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    // Synchronous acknowledgement so the user sees feedback the
+                    // instant the click registers, before any async/Firebase work.
+                    setGoogleClickAck('Google button click received — opening Google chooser…');
+                    setError('');
+                    setInfo('');
+                    setGoogleStage('starting');
+                    void handleGoogleSignIn(e);
+                  }}
                   disabled={busy}
                   className="w-full flex items-center justify-center gap-3 py-3.5 rounded-2xl bg-white text-slate-900 font-bold text-sm hover:bg-white/90 transition-colors disabled:opacity-50 active:scale-95"
                 >
@@ -475,15 +491,15 @@ export const AuthGate: React.FC<AuthGateProps> = ({ children, onAuthChange }) =>
                   {busy ? 'Connecting to Google…' : 'Continue with Google'}
                 </button>
 
-                {(googleStage !== 'idle' || info || error) && (() => {
+                {(googleStage !== 'idle' || info || error || googleClickAck) && (() => {
                   const isError = googleStage === 'failed' || !!error;
                   const stageMessage =
                     googleStage === 'starting'
-                      ? 'Google sign-in check active — opening Google chooser…'
+                      ? (googleClickAck || 'Google sign-in check active — opening Google chooser…')
                       : googleStage === 'opening'
                         ? 'Opening Google sign-in… If nothing happens within a few seconds, allow popups for this site and try again.'
                         : '';
-                  const message = error || info || stageMessage;
+                  const message = error || info || stageMessage || googleClickAck;
                   return (
                     <div
                       data-testid="google-signin-banner"
@@ -540,7 +556,7 @@ export const AuthGate: React.FC<AuthGateProps> = ({ children, onAuthChange }) =>
           </form>
         )}
       </motion.div>
-      <div className="fixed bottom-8 text-[10px] font-black text-white/10 uppercase tracking-[0.3em]">NINE Dashboard v2.1.1 · google-signin-diag</div>
+      <div className="fixed bottom-8 text-[10px] font-black text-white/10 uppercase tracking-[0.3em]">NINE Dashboard v2.1.2 · google-click-wired</div>
     </div>
   );
 };
