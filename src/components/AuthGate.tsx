@@ -97,6 +97,12 @@ export const AuthGate: React.FC<AuthGateProps> = ({ children, onAuthChange }) =>
     }
   };
 
+  const clearImmediateClickBanner = () => {
+    if (typeof document === 'undefined') return;
+    const el = document.getElementById('google-click-receipt');
+    if (el && el.parentNode) el.parentNode.removeChild(el);
+  };
+
   useEffect(() => () => clearGoogleWatchdog(), []);
 
   // Resolve any pending signInWithRedirect handoff before the auth listener
@@ -117,6 +123,7 @@ export const AuthGate: React.FC<AuthGateProps> = ({ children, onAuthChange }) =>
       const current = Storage.getAuthState();
       if (user) {
         clearGoogleWatchdog();
+        clearImmediateClickBanner();
         setGoogleStage('idle');
         if (current.level > 0) return;
         if (user.email && user.email.toLowerCase() === DIRECTOR_EMAIL) {
@@ -205,9 +212,44 @@ export const AuthGate: React.FC<AuthGateProps> = ({ children, onAuthChange }) =>
   const SILENT_FAILURE_MESSAGE =
     'Google sign-in did not open. Please allow popups or open the app in a normal browser tab, then try again.';
 
+  // Same-frame DOM banner so the user sees a click was received even when
+  // signInWithRedirect navigates the page before React can commit a state
+  // update. Lives outside React's reconciler on purpose.
+  const showImmediateClickBanner = (message: string) => {
+    if (typeof document === 'undefined') return;
+    let el = document.getElementById('google-click-receipt');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'google-click-receipt';
+      el.setAttribute('role', 'status');
+      el.style.cssText = [
+        'position:fixed',
+        'top:16px',
+        'left:50%',
+        'transform:translateX(-50%)',
+        'z-index:2147483647',
+        'background:#4f46e5',
+        'color:#ffffff',
+        'padding:10px 16px',
+        'border-radius:12px',
+        'font:600 12px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif',
+        'box-shadow:0 10px 30px rgba(0,0,0,0.4)',
+        'max-width:90vw',
+        'text-align:center',
+        'pointer-events:none',
+      ].join(';');
+      document.body.appendChild(el);
+    }
+    el.textContent = message;
+  };
+
   const handleGoogleSignIn = async (e?: React.MouseEvent<HTMLButtonElement>) => {
     e?.preventDefault();
     e?.stopPropagation();
+    // STEP 1 (synchronous, before any await): inject a DOM banner so the
+    // user gets undeniable visible feedback that the click reached this
+    // handler. This survives React batching and even imminent page redirect.
+    showImmediateClickBanner('Google button click received — opening Google chooser…');
     // Browser-side breadcrumb so a tester can confirm the click handler is
     // wired up even if the OAuth flow itself never opens a window.
     try {
@@ -462,9 +504,11 @@ export const AuthGate: React.FC<AuthGateProps> = ({ children, onAuthChange }) =>
 
                 <button
                   type="button"
+                  data-testid="google-signin-button"
                   onClick={handleGoogleSignIn}
-                  disabled={busy}
-                  className="w-full flex items-center justify-center gap-3 py-3.5 rounded-2xl bg-white text-slate-900 font-bold text-sm hover:bg-white/90 transition-colors disabled:opacity-50 active:scale-95"
+                  aria-busy={busy}
+                  style={{ position: 'relative', zIndex: 1 }}
+                  className="w-full flex items-center justify-center gap-3 py-3.5 rounded-2xl bg-white text-slate-900 font-bold text-sm hover:bg-white/90 transition-colors active:scale-95 cursor-pointer"
                 >
                   <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
                     <path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615z"/>
@@ -479,7 +523,7 @@ export const AuthGate: React.FC<AuthGateProps> = ({ children, onAuthChange }) =>
                   const isError = googleStage === 'failed' || !!error;
                   const stageMessage =
                     googleStage === 'starting'
-                      ? 'Google sign-in check active — opening Google chooser…'
+                      ? 'Google button click received — opening Google chooser…'
                       : googleStage === 'opening'
                         ? 'Opening Google sign-in… If nothing happens within a few seconds, allow popups for this site and try again.'
                         : '';
@@ -540,7 +584,7 @@ export const AuthGate: React.FC<AuthGateProps> = ({ children, onAuthChange }) =>
           </form>
         )}
       </motion.div>
-      <div className="fixed bottom-8 text-[10px] font-black text-white/10 uppercase tracking-[0.3em]">NINE Dashboard v2.1.1 · google-signin-diag</div>
+      <div className="fixed bottom-8 text-[10px] font-black text-white/10 uppercase tracking-[0.3em]">NINE Dashboard v2.1.2 · google-click-wired</div>
     </div>
   );
 };
