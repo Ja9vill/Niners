@@ -83,6 +83,11 @@ export const AuthGate: React.FC<AuthGateProps> = ({ children, onAuthChange }) =>
   const [error, setError] = useState('');
   const [info, setInfo] = useState('');
   const [busy, setBusy] = useState(false);
+  // Sticky diagnostic banner for the Google flow. Set synchronously on click
+  // and only cleared on auth success, explicit error, or a fresh click — never
+  // by the resolution of signInWithGoogle. This guarantees the user sees
+  // *something* even if the OAuth promise hangs or the redirect is blocked.
+  const [googleStage, setGoogleStage] = useState<'idle' | 'starting' | 'opening' | 'failed'>('idle');
   const googleWatchdogRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const clearGoogleWatchdog = () => {
@@ -112,6 +117,7 @@ export const AuthGate: React.FC<AuthGateProps> = ({ children, onAuthChange }) =>
       const current = Storage.getAuthState();
       if (user) {
         clearGoogleWatchdog();
+        setGoogleStage('idle');
         if (current.level > 0) return;
         if (user.email && user.email.toLowerCase() === DIRECTOR_EMAIL) {
           const directorState = {
@@ -202,20 +208,37 @@ export const AuthGate: React.FC<AuthGateProps> = ({ children, onAuthChange }) =>
   const handleGoogleSignIn = async (e?: React.MouseEvent<HTMLButtonElement>) => {
     e?.preventDefault();
     e?.stopPropagation();
+    // Browser-side breadcrumb so a tester can confirm the click handler is
+    // wired up even if the OAuth flow itself never opens a window.
+    try {
+      console.info('[AuthGate] Google sign-in click — starting flow', {
+        origin: typeof window !== 'undefined' ? window.location.origin : 'unknown',
+        ts: new Date().toISOString(),
+      });
+    } catch {
+      /* ignore */
+    }
     // Keep the user on the Member tab no matter what happens on this click.
     setMethod('email');
     setError('');
-    setInfo('Starting Google sign-in…');
+    // Synchronous, sticky banner so the user sees that the click registered
+    // even if signInWithGoogle hangs, throws, or never returns. This banner
+    // is intentionally independent of the `info`/`busy` state, which the
+    // OAuth flow can reset.
+    setGoogleStage('starting');
+    setInfo('');
     setBusy(true);
 
-    // Watchdog: if after 5 seconds the page hasn't navigated and no user is
-    // signed in, the popup/redirect almost certainly failed silently (popup
-    // blocker, iframe sandbox, third-party cookies, etc.). Surface a
-    // persistent visible banner so the user can recover.
+    // Watchdog: if after 5 seconds we still haven't navigated to Google and
+    // no user is signed in, surface a persistent error banner. We force
+    // `busy=false` so the button is re-enabled, and we set `googleStage` to
+    // `'failed'` so the diagnostic banner switches to the red error variant
+    // independently of whatever state the awaited promise leaves us in.
     clearGoogleWatchdog();
     googleWatchdogRef.current = setTimeout(() => {
       googleWatchdogRef.current = null;
       if (auth.currentUser) return;
+      setGoogleStage('failed');
       setInfo('');
       setError(SILENT_FAILURE_MESSAGE);
       setBusy(false);
@@ -227,14 +250,16 @@ export const AuthGate: React.FC<AuthGateProps> = ({ children, onAuthChange }) =>
         // Either the browser is mid-navigation (signInWithRedirect) or the
         // popup is opening. Leave the indicator up; the watchdog will fire
         // if nothing actually happens.
-        setInfo('Opening Google sign-in… If nothing happens, allow popups for this site and try again.');
+        setGoogleStage('opening');
       } else if (outcome.kind === 'error') {
         clearGoogleWatchdog();
+        setGoogleStage('failed');
         setInfo('');
         setError(outcome.message || SILENT_FAILURE_MESSAGE);
         setBusy(false);
       } else {
         clearGoogleWatchdog();
+        setGoogleStage('idle');
         setInfo('');
         setBusy(false);
       }
@@ -243,6 +268,7 @@ export const AuthGate: React.FC<AuthGateProps> = ({ children, onAuthChange }) =>
       // throw. If something slips through, surface it instead of silently
       // resetting the UI.
       clearGoogleWatchdog();
+      setGoogleStage('failed');
       setInfo('');
       setError(err?.message || SILENT_FAILURE_MESSAGE);
       setBusy(false);
@@ -312,7 +338,7 @@ export const AuthGate: React.FC<AuthGateProps> = ({ children, onAuthChange }) =>
   const tabBtn = (id: AuthMethod, label: string) => (
     <button
       type="button"
-      onClick={() => { setMethod(id); setError(''); setInfo(''); }}
+      onClick={() => { setMethod(id); setError(''); setInfo(''); setGoogleStage('idle'); clearGoogleWatchdog(); }}
       className={
         'flex-1 py-2.5 text-[10px] font-black uppercase tracking-[0.2em] rounded-xl transition-all ' +
         (method === id
@@ -449,19 +475,30 @@ export const AuthGate: React.FC<AuthGateProps> = ({ children, onAuthChange }) =>
                   {busy ? 'Connecting to Google…' : 'Continue with Google'}
                 </button>
 
-                {(info || error) && (
-                  <div
-                    className={
-                      'rounded-xl px-3 py-2 text-[11px] text-center font-medium leading-relaxed border ' +
-                      (error
-                        ? 'bg-red-500/10 border-red-500/30 text-red-300'
-                        : 'bg-indigo-500/10 border-indigo-500/30 text-indigo-200')
-                    }
-                    role={error ? 'alert' : 'status'}
-                  >
-                    {error || info}
-                  </div>
-                )}
+                {(googleStage !== 'idle' || info || error) && (() => {
+                  const isError = googleStage === 'failed' || !!error;
+                  const stageMessage =
+                    googleStage === 'starting'
+                      ? 'Google sign-in check active — opening Google chooser…'
+                      : googleStage === 'opening'
+                        ? 'Opening Google sign-in… If nothing happens within a few seconds, allow popups for this site and try again.'
+                        : '';
+                  const message = error || info || stageMessage;
+                  return (
+                    <div
+                      data-testid="google-signin-banner"
+                      className={
+                        'rounded-xl px-3 py-2 text-[11px] text-center font-medium leading-relaxed border ' +
+                        (isError
+                          ? 'bg-red-500/10 border-red-500/30 text-red-300'
+                          : 'bg-indigo-500/10 border-indigo-500/30 text-indigo-200')
+                      }
+                      role={isError ? 'alert' : 'status'}
+                    >
+                      {message}
+                    </div>
+                  );
+                })()}
 
                 <p className="text-[10px] text-white/30 text-center leading-relaxed">
                   Email accounts must already exist in Firebase Auth. Contact a director if you need access.
@@ -503,7 +540,7 @@ export const AuthGate: React.FC<AuthGateProps> = ({ children, onAuthChange }) =>
           </form>
         )}
       </motion.div>
-      <div className="fixed bottom-8 text-[10px] font-black text-white/10 uppercase tracking-[0.3em]">NINE Dashboard v2.1.0</div>
+      <div className="fixed bottom-8 text-[10px] font-black text-white/10 uppercase tracking-[0.3em]">NINE Dashboard v2.1.1 · google-signin-diag</div>
     </div>
   );
 };
