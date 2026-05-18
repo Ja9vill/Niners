@@ -134,20 +134,21 @@ export const CalendarTab = () => {
       <div className="lg:col-span-3 space-y-6 order-1 lg:order-2">
          <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-               <h2 className="text-2xl font-black text-white/90">{format(currentDate, 'MMMM yyyy')}</h2>
+               <h2 className="text-xl sm:text-2xl font-black text-white/90 truncate">{format(currentDate, 'MMMM yyyy')}</h2>
                <div className="flex items-center gap-1">
                  <button onClick={() => setCurrentDate(subMonths(currentDate, 1))} className="p-1 hover:bg-white/5 rounded-full"><ChevronLeft size={20}/></button>
                  <button onClick={() => setCurrentDate(addMonths(currentDate, 1))} className="p-1 hover:bg-white/5 rounded-full"><ChevronRight size={20}/></button>
-                 <button onClick={() => setCurrentDate(new Date())} className="px-3 py-1 text-xs font-bold bg-white/5 rounded-full hover:bg-white/10 transition-colors">Today</button>
+                 <button onClick={() => setCurrentDate(new Date())} className="hidden xs:block px-3 py-1 text-xs font-bold bg-white/5 rounded-full hover:bg-white/10 transition-colors">Today</button>
                </div>
             </div>
-            <button onClick={() => setIsAdding(true)} className="btn-primary flex items-center gap-2">
+            <button onClick={() => setIsAdding(true)} className="btn-primary flex items-center gap-2 px-3 sm:px-6">
               <Plus size={18} />
               <span className="hidden sm:inline">Add Event</span>
             </button>
          </div>
 
-         <div className="glass rounded-3xl border border-white/5 overflow-hidden">
+         {/* Desktop Grid View */}
+         <div className="hidden sm:block glass rounded-3xl border border-white/5 overflow-hidden">
             <div className="grid grid-cols-7 border-b border-white/5 bg-white/2">
                {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => (
                  <div key={d} className="py-4 text-center text-[10px] font-black uppercase text-white/30 tracking-widest">{d}</div>
@@ -176,6 +177,45 @@ export const CalendarTab = () => {
                  );
                })}
             </div>
+         </div>
+
+         {/* Mobile Agenda View */}
+         <div className="sm:hidden space-y-4">
+            {days.filter(d => isSameMonth(d, currentDate)).map((day, i) => {
+              const dayEvents = getEventsForDay(day);
+              if (dayEvents.length === 0) return null;
+              return (
+                <div key={i} className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <span className={cn(
+                      "text-[10px] font-black uppercase tracking-widest",
+                      isSameDay(day, new Date()) ? "text-indigo-400" : "text-white/30"
+                    )}>{format(day, 'EEE, MMM d')}</span>
+                    <div className="h-px flex-1 bg-white/5" />
+                  </div>
+                  <div className="space-y-2">
+                    {dayEvents.map(e => (
+                      <div key={e.event_id} className="p-4 bg-white/5 rounded-xl border border-white/5 flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-bold text-white">{e.title}</p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <Clock size={10} className="text-white/20" />
+                            <span className="text-[10px] text-white/40">{e.time}</span>
+                          </div>
+                        </div>
+                        <div className={cn("w-2 h-2 rounded-full", EVENT_COLORS[e.visibility === 'Leadership' ? 'Collaboration' : 'Solo Livehouse']?.replace('bg-', '') || 'bg-indigo-500')} />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+            {days.filter(d => isSameMonth(d, currentDate)).every(d => getEventsForDay(d).length === 0) && (
+              <div className="py-20 text-center glass-card border-dashed">
+                <CalendarIcon size={32} className="mx-auto text-white/5 mb-2" />
+                <p className="text-xs text-white/20 italic">No events scheduled for this month</p>
+              </div>
+            )}
          </div>
       </div>
 

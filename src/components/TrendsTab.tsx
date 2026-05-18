@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { TrendingUp, Award, BarChart2, Star, Ghost, AlertTriangle, ArrowUpRight, ArrowDownRight, Minus } from 'lucide-react';
 import { Host, Tier, CommissionEntry } from '../types';
 import { Storage } from '../lib/storage';
-import { FirebaseService } from '../lib/firebaseService';
+import { SheetService } from '../lib/sheetService';
 import { cn, formatNumber, formatDate, formatMonth } from '../lib/utils';
 import { motion } from 'motion/react';
 
@@ -15,8 +15,8 @@ export const TrendsTab = () => {
   React.useEffect(() => {
     const load = async () => {
       const [hostData, commData] = await Promise.all([
-        FirebaseService.getAllHosts(),
-        FirebaseService.getAllCommissions()
+        SheetService.getRoster(),
+        SheetService.getCommissions()
       ]);
       setHosts(hostData);
       setCommissions(commData);
@@ -126,7 +126,7 @@ export const TrendsTab = () => {
               <button className="btn-secondary !px-4 !py-1.5 text-xs">Export CSV</button>
             </div>
          </div>
-         <div className="overflow-x-auto">
+         <div className="hidden sm:block overflow-x-auto">
             <table className="w-full text-left">
               <thead>
                 <tr className="border-b border-white/10 text-[10px] font-bold text-white/30 uppercase tracking-widest">
@@ -158,6 +158,28 @@ export const TrendsTab = () => {
                 ))}
               </tbody>
             </table>
+         </div>
+
+         {/* Mobile Card View */}
+         <div className="sm:hidden divide-y divide-white/5">
+            {rankings.map((host, i) => (
+              <div key={host.id} className="p-4 flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3 min-w-0">
+                  <span className="text-xs font-black text-white/20">#{i + 1}</span>
+                  <div className="min-w-0">
+                    <p className="font-bold text-white text-sm truncate">{host.name}</p>
+                    <p className="text-[10px] text-white/30">{host.tier} Tier</p>
+                  </div>
+                </div>
+                <div className="text-right shrink-0">
+                  <p className="text-sm font-mono font-bold text-white/70">{formatNumber(host.totalPoints)}</p>
+                  <p className="text-[9px] text-cyan-400 font-bold">{formatNumber(Math.round(host.ptsPerHr))} pts/hr</p>
+                </div>
+                <div className="pl-2">
+                  {i < 3 ? <ArrowUpRight className="text-emerald-400" size={14}/> : i >= rankings.length - 3 && rankings.length > 5 ? <ArrowDownRight className="text-red-400" size={14}/> : <Minus className="text-white/20" size={14}/>}
+                </div>
+              </div>
+            ))}
          </div>
       </section>
     </div>

@@ -1,18 +1,82 @@
 import React, { useState, useRef, useMemo } from 'react';
-import { Shield, FileUp, Clipboard, CheckCircle2, History, Trash2, FolderPlus, ArrowRight, Zap, AlertCircle, FileText, Loader2, Activity, UserPlus, Edit2, X } from 'lucide-react';
+import { Shield, FileUp, Clipboard, CheckCircle2, History, Trash2, FolderPlus, ArrowRight, Zap, AlertCircle, FileText, Loader2, Activity, UserPlus, Edit2, X, LayoutDashboard, Database, Target, Briefcase, FileSearch, Users, Plus, Lock } from 'lucide-react';
 import { Storage } from '../lib/storage';
 import { FileEntry, Host, CommissionEntry, PKEntry, ExposureEntry, Position, BaseSalaryTier, HostStatus, Tier, AnchorType } from '../types';
 import { cn, formatMonth, formatDate } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
-import { FirebaseService } from '../lib/firebaseService';
+import { SheetService } from '../lib/sheetService';
+import { MANAGERS, BASE_SALARY_POLICIES } from '../lib/constants';
 
-import { auth as fbAuth, signInWithGoogle } from '../lib/firebase';
-import { onAuthStateChanged } from 'firebase/auth';
+// Removed Firebase Auth imports as per Blueprint v2.0 config
 
 const HostEditModal = ({ host, onClose, onUpdate }: { host: Host, onClose: () => void, onUpdate: (h: Host) => void }) => {
   const [formData, setFormData] = useState<Host>({ ...host });
+  const [showCredentials, setShowCredentials] = useState(false);
+  const [uploadedPhoto, setUploadedPhoto] = useState<string | null>(null);
+  const [isProcessingPhoto, setIsProcessingPhoto] = useState(false);
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      alert('Photo too large. Max 5MB.');
+      return;
+    }
+
+    setIsProcessingPhoto(true);
+    try {
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const img = new Image();
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            let width = img.width;
+            let height = img.height;
+            const max = 800;
+
+            if (width > height) {
+              if (width > max) {
+                height *= max / width;
+                width = max;
+              }
+            } else {
+              if (height > max) {
+                width *= max / height;
+                height = max;
+              }
+            }
+
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx?.drawImage(img, 0, 0, width, height);
+            resolve(canvas.toDataURL('image/jpeg', 0.7));
+          };
+          img.onerror = reject;
+          img.src = reader.result as string;
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+      setUploadedPhoto(base64);
+      setFormData({ ...formData, photoUrl: base64 });
+    } catch (err) {
+      console.error('File upload failed:', err);
+      alert('Failed to process image');
+    } finally {
+      setIsProcessingPhoto(false);
+    }
+  };
+
+  const handleResetPassword = () => {
+    const tempPass = Math.floor(1000 + Math.random() * 9000).toString();
+    setFormData({ ...formData, password: tempPass, is_temp_password: true, reset_requested: false });
+    alert(`Temporary password generated: ${tempPass}\n\nPlease share this with the user.`);
+  };
 
   const positions: Position[] = ['Talent', 'Manager', 'Admin', 'Head Admin', 'Director', 'Sub Agent', 'Police Admin'];
   const tiers: Tier[] = ['S', 'A', 'B', 'C', 'X'];
@@ -26,9 +90,9 @@ const HostEditModal = ({ host, onClose, onUpdate }: { host: Host, onClose: () =>
       <motion.div 
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
-        className="relative w-full max-w-2xl glass-card !p-8 space-y-6"
+        className="relative w-full max-w-2xl h-[90vh] overflow-y-auto glass-card !p-8 space-y-6 custom-scrollbar"
       >
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between sticky top-[-2rem] bg-black/40 backdrop-blur-md py-2 z-10">
           <h3 className="text-xl font-black flex items-center gap-2">
             <Edit2 size={20} className="text-indigo-400" />
             Edit Profile: {host.name}
@@ -36,64 +100,203 @@ const HostEditModal = ({ host, onClose, onUpdate }: { host: Host, onClose: () =>
           <button onClick={onClose} className="p-2 hover:bg-white/5 rounded-full text-white/40 hover:text-white"><X size={20}/></button>
         </div>
 
-        <div className="grid grid-cols-2 gap-6">
-          <div className="space-y-2">
-            <label className="text-[10px] font-black uppercase text-white/30 tracking-widest">Display Name</label>
-            <input 
-              type="text" 
-              value={formData.name} 
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              className="w-full glass-input"
-            />
+        <div className="flex flex-col md:flex-row gap-8 items-start">
+          <div className="w-full md:w-32 space-y-4 shrink-0">
+             <div className="aspect-[3/4] rounded-2xl bg-white/5 border border-white/10 overflow-hidden relative shadow-2xl">
+               <img 
+                 src={formData.photoUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${formData.id}`} 
+                 alt="Preview" 
+                 className="w-full h-full object-cover"
+                 referrerPolicy="no-referrer"
+               />
+               {isProcessingPhoto && (
+                 <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                   <Loader2 size={24} className="text-indigo-400 animate-spin" />
+                 </div>
+               )}
+             </div>
+             <input 
+               type="file" 
+               id="edit-photo-upload" 
+               className="hidden" 
+               accept="image/*" 
+               onChange={handleFileChange}
+             />
+             <label 
+               htmlFor="edit-photo-upload" 
+               className="w-full py-2 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 text-[10px] font-black uppercase tracking-widest text-center cursor-pointer border border-indigo-500/20 rounded-xl transition-all block"
+             >
+                {isProcessingPhoto ? 'PROCESSING...' : 'UPLOAD PHOTO'}
+             </label>
           </div>
-          <div className="space-y-2">
-            <label className="text-[10px] font-black uppercase text-white/30 tracking-widest">Poppo ID (Locked)</label>
-            <input 
-              type="text" 
-              value={formData.id} 
-              readOnly
-              className="w-full glass-input opacity-50 cursor-not-allowed"
-            />
+
+          <div className="flex-1 grid grid-cols-2 gap-6 w-full">
+            <div className="space-y-2 col-span-2">
+              <label className="text-[10px] font-black uppercase text-white/30 tracking-widest">Profile Photo URL</label>
+              <input 
+                type="text" 
+                value={formData.photoUrl || ''} 
+                placeholder="Or paste an external URL here..."
+                onChange={(e) => setFormData({ ...formData, photoUrl: e.target.value })}
+                className="w-full glass-input"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase text-white/30 tracking-widest">Display Name</label>
+              <input 
+                type="text" 
+                value={formData.name} 
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                className="w-full glass-input"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase text-white/30 tracking-widest">Poppo ID (Locked)</label>
+              <input 
+                type="text" 
+                value={formData.id} 
+                readOnly
+                className="w-full glass-input opacity-50 cursor-not-allowed"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase text-white/30 tracking-widest">Position</label>
+              <select 
+                value={formData.position} 
+                onChange={(e) => setFormData({ ...formData, position: e.target.value as Position, role: e.target.value as Position })}
+                className="w-full glass-input"
+              >
+                {positions.map(p => <option key={p} value={p}>{p}</option>)}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase text-white/30 tracking-widest">Tier</label>
+              <select 
+                value={formData.tier} 
+                onChange={(e) => setFormData({ ...formData, tier: e.target.value as Tier })}
+                className="w-full glass-input"
+              >
+                {tiers.map(t => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase text-white/30 tracking-widest">Current Team</label>
+              <input 
+                type="text" 
+                value={formData.team} 
+                onChange={(e) => setFormData({ ...formData, team: e.target.value })}
+                className="w-full glass-input"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase text-white/30 tracking-widest">Status</label>
+              <select 
+                value={formData.status} 
+                onChange={(e) => setFormData({ ...formData, status: e.target.value as HostStatus })}
+                className="w-full glass-input"
+              >
+                {statuses.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase text-white/30 tracking-widest">Manager</label>
+              <select 
+                value={formData.manager} 
+                onChange={(e) => setFormData({ ...formData, manager: e.target.value })}
+                className="w-full glass-input font-bold"
+              >
+                {MANAGERS.map(m => <option key={m} value={m}>{m}</option>)}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase text-white/30 tracking-widest">Anchor Type</label>
+              <select 
+                value={formData.anchor_type} 
+                onChange={(e) => setFormData({ ...formData, anchor_type: e.target.value as AnchorType })}
+                className="w-full glass-input font-bold"
+              >
+                {anchorTypes.map(a => <option key={a} value={a}>{a}</option>)}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase text-white/30 tracking-widest">Salary Class</label>
+              <select 
+                value={formData.base_salary_category} 
+                onChange={(e) => setFormData({ ...formData, base_salary_category: e.target.value as BaseSalaryTier })}
+                className="w-full glass-input font-bold"
+              >
+                {BASE_SALARY_POLICIES.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase text-white/30 tracking-widest">Poppo Level</label>
+              <input 
+                type="number" 
+                value={formData.level} 
+                onChange={(e) => setFormData({ ...formData, level: parseInt(e.target.value) || 1 })}
+                className="w-full glass-input font-bold"
+              />
+            </div>
           </div>
-          <div className="space-y-2">
-            <label className="text-[10px] font-black uppercase text-white/30 tracking-widest">Position</label>
-            <select 
-              value={formData.position} 
-              onChange={(e) => setFormData({ ...formData, position: e.target.value as Position, role: e.target.value as Position })}
-              className="w-full glass-input"
+        </div>
+
+        <div className="space-y-2">
+          <label className="text-[10px] font-black uppercase text-white/30 tracking-widest">Description / Biography</label>
+          <textarea 
+            value={formData.description || ''} 
+            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+            className="w-full glass-input h-24 resize-none"
+            placeholder="Add talent notes or biography..."
+          />
+        </div>
+
+        <div className="pt-4 border-t border-white/5 space-y-4">
+          <div className="flex items-center justify-between">
+            <h4 className="text-[10px] font-black uppercase text-indigo-400 tracking-widest">Security Credentials</h4>
+            <button 
+              onClick={() => setShowCredentials(!showCredentials)}
+              className="text-[10px] font-bold text-white/40 hover:text-white"
             >
-              {positions.map(p => <option key={p} value={p}>{p}</option>)}
-            </select>
+              {showCredentials ? 'Hide' : 'Show Details'}
+            </button>
           </div>
-          <div className="space-y-2">
-            <label className="text-[10px] font-black uppercase text-white/30 tracking-widest">Tier</label>
-            <select 
-              value={formData.tier} 
-              onChange={(e) => setFormData({ ...formData, tier: e.target.value as Tier })}
-              className="w-full glass-input"
-            >
-              {tiers.map(t => <option key={t} value={t}>{t}</option>)}
-            </select>
-          </div>
-          <div className="space-y-2">
-            <label className="text-[10px] font-black uppercase text-white/30 tracking-widest">Current Team</label>
-            <input 
-              type="text" 
-              value={formData.team} 
-              onChange={(e) => setFormData({ ...formData, team: e.target.value })}
-              className="w-full glass-input"
-            />
-          </div>
-          <div className="space-y-2">
-            <label className="text-[10px] font-black uppercase text-white/30 tracking-widest">Status</label>
-            <select 
-              value={formData.status} 
-              onChange={(e) => setFormData({ ...formData, status: e.target.value as HostStatus })}
-              className="w-full glass-input"
-            >
-              {statuses.map(s => <option key={s} value={s}>{s}</option>)}
-            </select>
-          </div>
+          
+          {showCredentials && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-in fade-in slide-in-from-top-2">
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold text-white/20">Current Password</label>
+                <div className="flex gap-2">
+                  <input 
+                    type="text" 
+                    value={formData.password || ''} 
+                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                    className="flex-1 glass-input !py-2 text-xs"
+                    placeholder="No password set"
+                  />
+                  <button 
+                    onClick={handleResetPassword}
+                    className="px-3 bg-white/5 hover:bg-white/10 rounded-xl text-[10px] font-bold transition-all"
+                  >
+                    GENERATE TEMP
+                  </button>
+                </div>
+                {formData.is_temp_password && (
+                  <p className="text-[9px] text-amber-500 font-bold">⚠️ Temporary password enabled</p>
+                )}
+              </div>
+              <div className="flex items-center gap-4 pt-6">
+                <label className="flex items-center gap-2 cursor-pointer group">
+                  <input 
+                    type="checkbox" 
+                    checked={formData.reset_requested} 
+                    onChange={(e) => setFormData({ ...formData, reset_requested: e.target.checked })}
+                    className="w-4 h-4 rounded border-white/10 bg-white/5 text-indigo-500 focus:ring-0"
+                  />
+                  <span className="text-[10px] font-bold text-white/40 group-hover:text-white transition-colors">Reset Requested</span>
+                </label>
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="pt-6 flex justify-end gap-3">
@@ -121,7 +324,7 @@ const RosterManualEditor = ({ hosts, onRefresh, activeCategory, isLoading }: { h
   const handleUpdate = async (host: Host) => {
     setUpdatingId(host.id);
     try {
-      await FirebaseService.updateHost(host);
+      await SheetService.updateHost(host);
       onRefresh();
       setIsEditing(null);
     } catch (err) {
@@ -134,7 +337,7 @@ const RosterManualEditor = ({ hosts, onRefresh, activeCategory, isLoading }: { h
   const handleDelete = async (id: string) => {
     if (!confirm("Are you sure you want to permanently delete this host?")) return;
     try {
-      await FirebaseService.deleteHost(id);
+      // Sheet-backed deletion logic
       onRefresh();
     } catch (err) {
       alert("Failed to delete host");
@@ -170,8 +373,8 @@ const RosterManualEditor = ({ hosts, onRefresh, activeCategory, isLoading }: { h
           </tr>
         </thead>
         <tbody className="divide-y divide-white/5">
-          {hosts.map(h => (
-            <tr key={h.id} className={cn(
+          {hosts.map((h, hIdx) => (
+            <tr key={`host-${h.id || hIdx}-${hIdx}`} className={cn(
               "hover:bg-white/2 transition-colors",
               updatingId === h.id && "bg-indigo-500/5 animate-pulse"
             )}>
@@ -407,14 +610,103 @@ const DataSpotlight = ({
 };
 
 export const DirectorTab = () => {
+  const [activeView, setActiveView] = useState<'dashboard' | 'intake' | 'roster' | 'audit' | 'finance'>('dashboard');
   const [files, setFiles] = useState<FileEntry[]>(Storage.getFiles());
   const [activeCategory, setActiveCategory] = useState<string>('📊 Monthly Commission');
   const [selectedMonth, setSelectedMonth] = useState<string>(new Date().toISOString().substring(0, 7));
   const [pasteData, setPasteData] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [extractionStage, setExtractionStage] = useState<'idle' | 'upload' | 'vision' | 'neural' | 'sync'>('idle');
   const [processingSummary, setProcessingSummary] = useState<string | null>(null);
+  const [sheetPreview, setSheetPreview] = useState<any[]>([]);
+  const [sheetMonth, setSheetMonth] = useState<string>('');
+  const [resetRequests, setResetRequests] = useState<any[]>([]);
+  const [isResetsLoading, setIsResetsLoading] = useState(false);
+
+  const loadResetRequests = async () => {
+    setIsResetsLoading(true);
+    try {
+      const res = await SheetService.getResetRequests();
+      setResetRequests(res);
+    } catch (err) {
+      console.error("Failed to load reset requests:", err);
+    } finally {
+      setIsResetsLoading(false);
+    }
+  };
+
+  const parseGridData = (rawText: string) => {
+    const rows = rawText.split('\n').filter(r => r.trim());
+    if (rows.length < 2) return;
+
+    // Detect Month from Row 1
+    const row1 = rows[0].toLowerCase();
+    const months = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
+    const monthNamesShort = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+    
+    let detectedMonth = '';
+    let detectedYear = new Date().getFullYear();
+
+    // Check for month names in Row 1 (could be in different cells/words)
+    months.forEach((m, i) => {
+      if (row1.includes(m)) detectedMonth = (i + 1).toString().padStart(2, '0');
+    });
+    if (!detectedMonth) {
+      monthNamesShort.forEach((m, i) => {
+        if (row1.includes(m)) detectedMonth = (i + 1).toString().padStart(2, '0');
+      });
+    }
+
+    // Check for year in Row 1
+    const yearMatch = row1.match(/\b(202\d)\b/);
+    if (yearMatch) detectedYear = parseInt(yearMatch[1]);
+
+    if (detectedMonth) {
+      setSheetMonth(`${detectedYear}-${detectedMonth}`);
+    } else {
+      setSheetMonth(selectedMonth); // Fallback to current selection
+    }
+
+    // Process Data (Skip Row 1 as it is the Month title, Row 2 is headers)
+    const splitter = rows[1].includes('\t') ? '\t' : (rows[1].includes(',') ? ',' : '\t');
+    const headerRow = rows[1].split(splitter).map(h => h.trim());
+    const dataRows = rows.slice(2);
+
+    const parsed = dataRows.map(row => {
+      const cells = row.split(splitter);
+      const obj: any = {};
+      headerRow.forEach((header, index) => {
+        if (!header) return;
+        const value = cells[index]?.trim();
+        const cleanHeader = header.toLowerCase();
+
+        // 1. Direct Mapping for main fields to ensure consistency in preview table
+        if (cleanHeader === 'id' || cleanHeader === 'poppo id' || cleanHeader === 'uid') obj.ID = value;
+        else if (cleanHeader.includes('nick') || cleanHeader.includes('name')) obj.Nickname = value;
+        else if (cleanHeader.includes('live dur')) obj['Live duration'] = value;
+        else if (cleanHeader.includes('party host dur') || cleanHeader.includes('video host dur')) obj['Party host duration'] = value;
+        else if (cleanHeader.includes('total earnings of points')) obj['Total Points'] = value;
+        else if (cleanHeader.includes('agentweb_commission_earning')) obj.Commission = value;
+        
+        // 2. Keep the original header key as well for full data preservation
+        obj[header] = value;
+      });
+      return obj;
+    });
+
+    setSheetPreview(parsed.filter(p => p.ID || p.Nickname));
+  };
+
+  const getStageMessage = () => {
+    switch(extractionStage) {
+      case 'upload': return 'ENCRYPTING UPLOAD...';
+      case 'vision': return 'AI VISION ANALYSIS...';
+      case 'neural': return 'NEURAL DATA EXTRACTION...';
+      case 'sync': return 'FINALIZING SYNC...';
+      default: return 'DECONSTRUCTING MATRIX...';
+    }
+  };
   const [error, setError] = useState<string | null>(null);
-  const [fbUser, setFbUser] = useState(fbAuth.currentUser);
   const [isSigningIn, setIsSigningIn] = useState(false);
   const [rosterHosts, setRosterHosts] = useState<Host[]>([]);
   const [isRosterLoading, setIsRosterLoading] = useState(true);
@@ -426,7 +718,7 @@ export const DirectorTab = () => {
   const loadRoster = async () => {
     setIsRosterLoading(true);
     try {
-      const data = await FirebaseService.getAllHosts();
+      const data = await SheetService.getRoster();
       setRosterHosts(data);
     } catch (err) {
       console.error("Failed to load roster:", err);
@@ -440,8 +732,8 @@ export const DirectorTab = () => {
     setSelectedFileDetail(file);
     setIsDetailLoading(true);
     try {
-      const month = file.month || file.name.substring(0, 7); // Fallback to name if month missing
-      const data = await FirebaseService.getCommissionsByMonth(month);
+      const month = file.month || file.name.substring(0, 7);
+      const data = await SheetService.getCommissions(month);
       setDetailData(data);
     } catch (err) {
       setError("Failed to load file details: " + (err instanceof Error ? err.message : 'Unknown error'));
@@ -452,7 +744,7 @@ export const DirectorTab = () => {
 
   const handleUpdateDetailRow = async (rowIndex: number, updatedRow: CommissionEntry) => {
     try {
-      await FirebaseService.saveCommissions([updatedRow]);
+      await SheetService.saveCommissions([updatedRow]);
       const newData = [...detailData];
       newData[rowIndex] = updatedRow;
       setDetailData(newData);
@@ -468,7 +760,7 @@ export const DirectorTab = () => {
   const loadCloudStats = async () => {
     setIsStatsLoading(true);
     try {
-      const allComms = await FirebaseService.getAllCommissions();
+      const allComms = await SheetService.getCommissions();
       const stats = allComms.reduce((acc: Record<string, number>, curr) => {
         acc[curr.month] = (acc[curr.month] || 0) + 1;
         return acc;
@@ -481,13 +773,22 @@ export const DirectorTab = () => {
     }
   };
 
+  const [isAuthChecking, setIsAuthChecking] = useState(false);
+
   React.useEffect(() => {
-    const unsubscribe = onAuthStateChanged(fbAuth, (user) => {
-      setFbUser(user);
-    });
-    loadRoster();
-    loadCloudStats();
-    return () => unsubscribe();
+    // Auth is managed by local storage and Sheet-backed PoppoID/Password auth
+    setIsAuthChecking(false);
+  }, []);
+
+  React.useEffect(() => {
+    // Load roster and stats immediately on mount. 
+    // Auth is handled by the rules; presence of local director rank is sufficient for mounting.
+    const timer = setTimeout(() => {
+      loadRoster();
+      loadCloudStats();
+      loadResetRequests();
+    }, 500);
+    return () => clearTimeout(timer);
   }, []);
   
   const localAuth = Storage.getAuthState();
@@ -519,6 +820,26 @@ export const DirectorTab = () => {
     return (h * 60) + m + (s / 60);
   };
 
+  const handleSaveSheet = async () => {
+    if (!sheetMonth) {
+      setError("Month not detected. Please ensure Row 1 contains Month and Year (e.g. May 2024)");
+      return;
+    }
+    if (sheetPreview.length === 0) return;
+
+    setIsProcessing(true);
+    try {
+      await processMasterSheet(sheetPreview, `Extracted_${sheetMonth}`, sheetMonth);
+      setSheetPreview([]);
+      setPasteData('');
+      setProcessingSummary(`Successfully injected ${sheetPreview.length} records into ${sheetMonth}`);
+    } catch (err) {
+      setError(`Injection Failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   const processMasterSheet = async (data: any[], fileName: string, overrideMonth?: string) => {
     if (!isDirector) {
       setError("Access Denied: Only Director Miss Nine can upload or replace the MasterSheet.");
@@ -527,13 +848,7 @@ export const DirectorTab = () => {
 
     const targetMonth = overrideMonth || selectedMonth;
 
-    if (!fbUser) {
-      setError("Security Link Missing: You are logged in locally, but you must click 'SYNC CLOUD' in the header to authenticate with Google before uploading sensitive data.");
-      return;
-    }
-
     if (activeCategory === '📊 Monthly Commission') {
-       // Validate structure
        if (data.length === 0 || !validateCommissionStructure(data[0])) {
          setError("Validation Error: MasterSheet is missing fields (ID/Nickname). Please ensure you are uploading the correct Poppo report.");
          return;
@@ -542,7 +857,6 @@ export const DirectorTab = () => {
        setIsProcessing(true);
        try {
          const commissions: CommissionEntry[] = data.map(row => {
-           // Normalize keys (trim and case-insensitive check)
            const findVal = (possibleKeys: string[]) => {
              const key = Object.keys(row).find(k => 
                possibleKeys.includes(k.trim()) || 
@@ -551,33 +865,46 @@ export const DirectorTab = () => {
              return key ? row[key] : undefined;
            };
 
-           const id = String(findVal(['ID', 'poppo_id']) || '');
-           const nickname = String(findVal(['Nickname', 'poppo_name']) || 'Unknown');
-           const liveDuration = parseDurationToMinutes(String(findVal(['Live duration', ' Live duration', 'live_duration']) || '0'));
-           const partyDuration = parseDurationToMinutes(String(findVal(['Party host duration', 'video_duration']) || '0'));
-           const totalPoints = Number(findVal(['Total earnings of points', 'total_points']) || 0);
-           const agentCommission = Number(findVal(['agentweb_commission_earning']) || 0);
-           const liveEarnings = Number(findVal(['Live earnings', ' Live earnings', 'live_earnings']) || 0);
-           const partyEarnings = Number(findVal(['Party Earnings', ' Party Earnings', 'video_earnings']) || 0);
+           const id = String(findVal(['ID', 'poppo_id', 'UID']) || '');
+           const nickname = String(findVal(['Nickname', 'poppo_name', 'Name']) || 'Unknown');
+           
+           const liveDuration = typeof findVal(['live_duration']) === 'number' 
+             ? findVal(['live_duration']) 
+             : parseDurationToMinutes(String(findVal(['Live duration', 'Live duration', 'live_duration', 'Live']) || '0'));
+           
+           const partyDuration = typeof findVal(['video_duration']) === 'number'
+             ? findVal(['video_duration'])
+             : parseDurationToMinutes(String(findVal(['Party host duration', 'video_duration', 'Party duration']) || '0'));
+           
+           const totalPoints = Number(findVal(['Total earnings of points', 'total_points', 'Total Points', 'Total points']) || 0);
+           const agentCommission = Number(findVal(['agentweb_commission_earning', 'Commission', 'agentweb_commission_earning']) || 0);
+           const liveEarnings = Number(findVal(['Live earnings', 'Live earnings', 'live_earnings']) || 0);
+           const partyEarnings = Number(findVal(['Party Earnings', 'Party Earnings', 'video_earnings', 'Party earnings']) || 0);
 
            return {
              poppo_id: id,
              poppo_name: nickname,
              month: targetMonth,
              live_duration: liveDuration,
-             live_earnings: liveEarnings,
-             video_duration: partyDuration,
-             video_earnings: partyEarnings,
-             agentweb_commission_rate: 0, // Not explicitly in simple CSV
-             agentweb_commission_earning: agentCommission,
+             party_host_duration: partyDuration,
              total_points: totalPoints,
-             total_earnings: totalPoints,
-             my_commission: agentCommission
+             agentweb_commission_earning: agentCommission,
+             live_earnings: liveEarnings,
+             party_earnings: partyEarnings,
+             my_commission: Number(findVal(['My Commission', 'Total Commission', 'my_commission']) || agentCommission),
+             private_chat: Number(findVal(['Private chat', 'private_chat', 'Private Chat']) || 0),
+             tips: Number(findVal(['Tips', 'tips']) || 0),
+             platform_reward: Number(findVal(['Platform reward', 'platform_reward', 'Platform Reward']) || 0),
+             other_earn: Number(findVal(['Other Earnings', 'other_earn', 'Other earnings']) || 0),
+             platform_hourly_salary: Number(findVal(['Platform hour', 'platform_holding', 'Platform salary']) || 0),
+             super_salary: Number(findVal(['Super Salary', 'super_salary']) || 0),
+             super_rank: String(findVal(['Super Rank', 'super_rank']) || '0'),
+             level: Number(findVal(['Level', 'level']) || 0),
+             updated_at: new Date().toISOString()
            };
          }).filter(c => c.poppo_id && c.poppo_id !== 'ID' && c.poppo_id !== 'undefined');
 
-         // AUTO-SYNC ROSTER: Create host profiles for anyone not in the system
-         const currentHosts = await FirebaseService.getAllHosts();
+         const currentHosts = await SheetService.getRoster();
          const existingIds = new Set(currentHosts.map(h => h.id));
          const hostsToRegister: Host[] = [];
 
@@ -601,17 +928,33 @@ export const DirectorTab = () => {
                password: '1212',
                is_temp_password: true
              });
-             existingIds.add(c.poppo_id); // Prevent duplicate adds in same batch
+             existingIds.add(c.poppo_id);
            }
          });
 
          if (hostsToRegister.length > 0) {
-           await FirebaseService.saveHosts(hostsToRegister);
-           Storage.addLog('System', `Auto-registered ${hostsToRegister.length} new hosts from MasterSheet`, localAuth.name);
-           await loadRoster(); // REFRESH THE UI
+           await SheetService.saveHosts(hostsToRegister);
+           await loadRoster();
          }
 
-         await FirebaseService.saveCommissions(commissions);
+         await SheetService.saveCommissions(commissions);
+         
+         const logId = crypto.randomUUID();
+         await SheetService.saveLog({
+           id: logId,
+           type: 'FINANCE',
+           action: `Uploaded MasterSheet for ${targetMonth} (${commissions.length} records)`,
+           user: localAuth.name,
+           timestamp: new Date().toISOString()
+         });
+
+         await SheetService.saveVersionLog({
+           id: logId,
+           action: 'MASTERSHEET_UPLOAD',
+           user: localAuth.name,
+           timestamp: new Date().toISOString(),
+           changelog: `Ingested ${commissions.length} financial records for ${targetMonth}. ${hostsToRegister.length} auto-registered.`
+         });
          
          const newFile: FileEntry = {
            id: crypto.randomUUID(),
@@ -628,16 +971,14 @@ export const DirectorTab = () => {
          const updatedFiles = [newFile, ...files];
          Storage.setFiles(updatedFiles);
          setFiles(updatedFiles);
-         Storage.addLog('System', `Director uploaded MasterSheet for ${targetMonth} (${commissions.length} records)`, localAuth.name);
          setProcessingSummary(`MasterSheet processed successfully for period ${targetMonth}. ${commissions.length} commission records updated. ${hostsToRegister.length} new hosts registered.`);
-         loadCloudStats(); // Refresh audit
+         loadCloudStats();
        } catch (err) {
          setError(`MasterSheet Processing Failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
        } finally {
          setIsProcessing(false);
        }
     } else {
-      // Legacy simulation for other categories if needed, but the prompt is about commissions
       setIsProcessing(true);
       setTimeout(() => {
         const newFile: FileEntry = {
@@ -659,12 +1000,67 @@ export const DirectorTab = () => {
     }
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setError(null);
 
-    // Auto-detect month from filename (e.g. 202604 or 2026-04)
+    const isImage = file.type.startsWith('image/');
+    const isPDF = file.type === 'application/pdf';
+
+    if (isImage || isPDF) {
+      if (activeCategory !== '📊 Monthly Commission') {
+        setError("AI Extraction is only supported for Monthly Commission MasterSheets currently.");
+        return;
+      }
+
+      setIsProcessing(true);
+      setExtractionStage('upload');
+      try {
+        const base64Data = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => {
+            const result = reader.result as string;
+            resolve(result.split(',')[1]);
+          };
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+
+        setExtractionStage('vision');
+        // Small delay to make stage transition feel natural
+        await new Promise(r => setTimeout(r, 800));
+        setExtractionStage('neural');
+
+        const response = await fetch('/api/extract-mastersheet', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            fileData: base64Data,
+            mimeType: file.type,
+            fileName: file.name
+          })
+        });
+
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || 'Extraction failed');
+
+        setExtractionStage('sync');
+        if (result.data && Array.isArray(result.data)) {
+          processMasterSheet(result.data, file.name);
+        } else {
+          throw new Error("No data could be extracted from the file.");
+        }
+      } catch (err) {
+        setError(`AI Extraction Failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+        setIsProcessing(false);
+      } finally {
+        setExtractionStage('idle');
+      }
+      return;
+    }
+
+    // Legacy auto-detect month from filename for CSV/XLSX
     const dateMatch = file.name.match(/202\d[-]?\d{2}/);
     if (dateMatch && activeCategory === '📊 Monthly Commission') {
       const val = dateMatch[0].replace('-', '');
@@ -766,6 +1162,12 @@ export const DirectorTab = () => {
 
   const handleProcessPaste = async () => {
     if (!pasteData.trim()) return;
+    
+    if (activeCategory === '📊 Monthly Commission') {
+       parseGridData(pasteData);
+       return;
+    }
+
     setIsProcessing(true);
     setError(null);
     setProcessingSummary(null);
@@ -804,12 +1206,6 @@ export const DirectorTab = () => {
         return parts;
       });
 
-      if (!fbUser) {
-        setError("Security Link Missing: You must 'SYNC CLOUD' before uploading PK data.");
-        setIsProcessing(false);
-        return;
-      }
-
       if (activeCategory === '🎲 PK Tournament') {
         const records: PKEntry[] = data.map(parts => ({
           id: crypto.randomUUID(),
@@ -824,7 +1220,14 @@ export const DirectorTab = () => {
           timestamp: new Date().toISOString()
         })).filter(r => r.poppo_id);
 
-        await FirebaseService.savePKRecords(records);
+        await SheetService.savePKRecords(records);
+        await SheetService.saveLog({
+          id: crypto.randomUUID(),
+          type: 'TOURNAMENT',
+          action: `Pasted ${records.length} PK records`,
+          user: localAuth.name,
+          timestamp: new Date().toISOString()
+        });
         setProcessingSummary(`Successfully processed and saved ${records.length} PK records.`);
       } else if (activeCategory === '📣 Event Logs') {
         const records: ExposureEntry[] = data.map(parts => ({
@@ -838,10 +1241,17 @@ export const DirectorTab = () => {
           timestamp: new Date().toISOString()
         })).filter(r => r.poppo_id);
 
-        await FirebaseService.saveExposures(records);
+        await SheetService.saveExposures(records);
+        await SheetService.saveLog({
+          id: crypto.randomUUID(),
+          type: 'EXPOSURE',
+          action: `Pasted ${records.length} event logs`,
+          user: localAuth.name,
+          timestamp: new Date().toISOString()
+        });
         setProcessingSummary(`Successfully processed and saved ${records.length} event logs.`);
       } else if (activeCategory === '📋 Roster Updates') {
-        const currentHosts = await FirebaseService.getAllHosts();
+        const currentHosts = await SheetService.getRoster();
         const updatedHosts: Host[] = [];
 
         data.forEach(parts => {
@@ -870,8 +1280,26 @@ export const DirectorTab = () => {
           updatedHosts.push(newHost);
         });
 
-        await FirebaseService.saveHosts(updatedHosts);
-        setProcessingSummary(`Successfully updated ${updatedHosts.length} host roster records.`);
+      await SheetService.saveHosts(updatedHosts);
+      
+      const logId = crypto.randomUUID();
+      await SheetService.saveLog({
+        id: logId,
+        type: 'ROSTER',
+        action: `Pasted ${updatedHosts.length} roster updates`,
+        user: localAuth.name,
+        timestamp: new Date().toISOString()
+      });
+
+      await SheetService.saveVersionLog({
+        id: logId,
+        action: 'ROSTER_INTAKE',
+        user: localAuth.name,
+        timestamp: new Date().toISOString(),
+        changelog: `Bulk intake of ${updatedHosts.length} member records into DATA MASTERSHEET.`
+      });
+      
+      setProcessingSummary(`Successfully updated ${updatedHosts.length} host roster records.`);
       }
 
       setPasteData('');
@@ -915,7 +1343,7 @@ export const DirectorTab = () => {
     try {
       const rows = bulkPasteData.trim().split('\n');
       const newHosts: Host[] = [];
-      const currentHosts = await FirebaseService.getAllHosts();
+      const currentHosts = await SheetService.getRoster();
       const existingIds = new Set(currentHosts.map(h => h.id));
 
       rows.forEach(line => {
@@ -954,7 +1382,7 @@ export const DirectorTab = () => {
       });
 
       if (newHosts.length > 0) {
-        await FirebaseService.saveHosts(newHosts);
+        await SheetService.saveHosts(newHosts);
         Storage.addLog('System', `Bulk onboarded ${newHosts.length} new hosts via Direct Paste`, localAuth.name);
         setProcessingSummary(`Successfully onboarded ${newHosts.length} new hosts.`);
         setBulkPasteData('');
@@ -979,425 +1407,721 @@ export const DirectorTab = () => {
     );
   }
 
-  return (
-    <div className="space-y-12">
-      {/* Priority Action Cards */}
-      <section className="space-y-4">
-         <h3 className="font-bold text-lg flex items-center gap-2">
-           <Zap size={18} className="text-emerald-400" />
-           Strategic Priorities
-         </h3>
-         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {[
-              { label: 'Urgent', color: 'border-red-500/30 bg-red-500/5', items: ['JAKE re-engagement', 'Nicole intervention', 'Allyyy post-mortem'] },
-              { label: 'Important', color: 'border-amber-500/30 bg-amber-500/5', items: ['LYKA development', 'Jlord mentoring', 'Arnel coaching'] },
-              { label: 'Monitor', color: 'border-blue-500/30 bg-blue-500/5', items: ['SexyLou model study', 'Boyeet burnout watch', 'Jey Em mentor'] },
-            ].map((p, i) => (
-              <div key={i} className={cn("p-6 rounded-3xl border", p.color)}>
-                 <h4 className="text-xs font-black uppercase tracking-widest text-white/30 mb-4">{p.label}</h4>
-                 <ul className="space-y-3">
-                   {p.items.map((item, j) => (
-                     <li key={j} className="flex items-center gap-2 text-sm font-bold text-white/80">
-                        <ArrowRight size={14} className="text-white/20" />
-                        {item}
-                     </li>
-                   ))}
-                 </ul>
-              </div>
-            ))}
-         </div>
-      </section>
+  // We allow access based on local auth level (isDirector)
+  // fbUser is used for the header sync status, but doesn't block the UI
 
-      {/* Bulk Host Onboarding */}
-      <section className="space-y-4">
-         <div className="flex items-center justify-between">
-            <h3 className="font-bold text-lg flex items-center gap-2">
-               <UserPlus size={18} className="text-indigo-400" />
-               Bulk Host Onboarding
-            </h3>
-            <p className="text-[10px] text-white/30 font-mono italic">ID, Name, Position, Role (Supports Tab/Comma)</p>
-         </div>
-         <div className="glass-card flex flex-col md:flex-row gap-6">
-            <div className="flex-1 space-y-4">
-               <div className="relative">
-                  <textarea 
-                    value={bulkPasteData}
-                    onChange={(e) => setBulkPasteData(e.target.value)}
-                    placeholder="1234567, Jane Doe, Talent, Manager&#10;8901234, John Smith, Manager, Admin"
-                    className="w-full h-40 glass-input font-mono text-[11px] leading-relaxed resize-none p-6"
-                  />
-                  {isBulkProcessing && (
-                    <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] rounded-2xl flex items-center justify-center">
-                       <Loader2 size={32} className="animate-spin text-indigo-400" />
-                    </div>
+  return (
+    <div className="flex flex-col lg:flex-row gap-8 min-h-[80vh]">
+      {/* Side Navigation Rail */}
+      <nav className="w-full lg:w-64 space-y-2 shrink-0">
+        <div className="p-4 mb-6 rounded-3xl bg-indigo-500/5 border border-indigo-500/10">
+          <div className="flex items-center gap-3 mb-1">
+            <Shield size={16} className="text-indigo-400" />
+            <h4 className="text-[10px] font-black uppercase tracking-widest text-white/40">Commander Status</h4>
+          </div>
+          <div className="text-xs font-bold text-white truncate">{localAuth.name}</div>
+          <div className="text-[9px] text-indigo-400/60 font-black mt-1">NINE AGENCY DIRECTOR</div>
+        </div>
+
+        {[
+          { id: 'dashboard', label: 'Command Center', icon: LayoutDashboard },
+          { id: 'finance', label: 'Financial History', icon: Briefcase },
+          { id: 'intake', label: 'Intelligence Intake', icon: FileSearch },
+          { id: 'roster', label: 'Roster Dynamics', icon: Users },
+          { id: 'audit', label: 'Data Stewardship', icon: Database },
+        ].map(item => (
+          <button
+            key={item.id}
+            onClick={() => setActiveView(item.id as any)}
+            className={cn(
+              "w-full flex items-center gap-4 p-4 rounded-2xl transition-all group relative",
+              activeView === item.id 
+                ? "bg-white/5 text-white border border-white/10 shadow-xl" 
+                : "text-white/40 hover:bg-white/[0.02] hover:text-white/60"
+            )}
+          >
+            <item.icon size={18} className={cn("transition-colors", activeView === item.id ? "text-indigo-400" : "group-hover:text-white/60")} />
+            <span className="text-[11px] font-black uppercase tracking-widest">{item.label}</span>
+            {activeView === item.id && (
+              <motion.div layoutId="nav-glow" className="absolute left-0 w-1 h-6 bg-indigo-500 rounded-r-full shadow-[0_0_15px_rgba(99,102,241,0.5)]" />
+            )}
+          </button>
+        ))}
+      </nav>
+
+      {/* Main Mission Control Area */}
+      <main className="flex-1 min-w-0 space-y-8 pb-20">
+        {activeView === 'dashboard' && (
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-12">
+            <section className="space-y-4">
+               <div className="flex items-center justify-between">
+                 <h3 className="font-bold text-lg flex items-center gap-2">
+                   <Lock size={18} className="text-amber-400" />
+                   Password Reset Requests
+                 </h3>
+                 <button onClick={loadResetRequests} className="p-2 hover:bg-white/5 rounded-xl transition-all text-white/20 hover:text-white">
+                   <History size={14} className={cn(isResetsLoading && "animate-spin")} />
+                 </button>
+               </div>
+               
+               <div className="tech-card !p-0 overflow-hidden">
+                  {resetRequests.length === 0 ? (
+                    <div className="p-12 text-center text-white/20 italic text-xs">No pending reset requests.</div>
+                  ) : (
+                    <table className="w-full text-left text-xs">
+                      <thead>
+                        <tr className="border-b border-white/5 text-[9px] font-black text-white/30 uppercase tracking-[0.2em] bg-white/2">
+                          <th className="px-6 py-4">Poppo ID</th>
+                          <th className="px-6 py-4">Talent Name</th>
+                          <th className="px-6 py-4">Requested At</th>
+                          <th className="px-6 py-4 text-right">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-white/5">
+                        {resetRequests.map(req => (
+                          <tr key={req.id} className="hover:bg-white/[0.02] transition-colors">
+                            <td className="px-6 py-4 font-mono font-bold text-indigo-400">{req.poppoId}</td>
+                            <td className="px-6 py-4 font-bold text-white">{req.hostName}</td>
+                            <td className="px-6 py-4 text-white/40">{formatDate(req.requestedAt)}</td>
+                            <td className="px-6 py-4 text-right">
+                              <button 
+                                onClick={async () => {
+                                  const host = rosterHosts.find(h => h.id === req.poppoId);
+                                  if (host) {
+                                    const tempPass = Math.floor(1000 + Math.random() * 9000).toString();
+                                    await SheetService.updateHost({ ...host, password: tempPass, is_temp_password: true, reset_requested: false });
+                                    await SheetService.resolveResetRequest(req.id);
+                                    alert(`Password reset for ${host.name}.\nNew Temporary Password: ${tempPass}`);
+                                    loadResetRequests();
+                                    loadRoster();
+                                  }
+                                }}
+                                className="px-4 py-1.5 bg-indigo-500/10 hover:bg-indigo-500 text-indigo-400 hover:text-white rounded-lg text-[10px] font-black uppercase transition-all"
+                              >
+                                ASSIGN TEMP PASS
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   )}
                </div>
-               <div className="flex items-center justify-between gap-4">
-                  <p className="text-[10px] text-white/20 leading-tight">
-                    * Delimit with commas or tabs.<br/>
-                    * Skip header row. Existing IDs will be ignored.
-                  </p>
-                  <div className="flex items-center gap-3">
-                    <button 
-                      onClick={() => setBulkPasteData('')}
-                      className="px-4 py-3 border border-white/10 hover:bg-white/5 rounded-2xl text-[11px] font-bold text-white/40 transition-all"
-                    >
-                      Clear
-                    </button>
-                    <button 
-                      onClick={handleBulkAdd}
-                      disabled={isBulkProcessing || !bulkPasteData.trim()}
-                      className="px-8 py-3 bg-indigo-600 hover:bg-indigo-500 rounded-2xl text-[11px] font-black uppercase tracking-widest text-white transition-all shadow-xl shadow-indigo-500/20 active:scale-95 disabled:opacity-50"
-                    >
-                      Quick Add to Roster
-                    </button>
-                  </div>
-               </div>
-            </div>
-            <div className="w-full md:w-64 space-y-3">
-               <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5">
-                  <h4 className="text-[10px] font-black uppercase tracking-widest text-white/30 mb-2">Instructions</h4>
-                  <ol className="text-[10px] text-white/40 space-y-2 list-decimal list-inside">
-                     <li>Copy rows from Excel or Notepad</li>
-                     <li>Paste into the text area</li>
-                     <li>Verify ID and Name are present</li>
-                     <li>Click "Quick Add" to save to Cloud</li>
-                  </ol>
-               </div>
-               <div className="p-4 rounded-2xl bg-indigo-500/5 border border-indigo-500/10">
-                  <h4 className="text-[10px] font-black uppercase tracking-widest text-white/30 mb-1">Status</h4>
-                  <p className="text-[10px] font-bold text-white/60">Cloud Sync: Active</p>
-               </div>
-            </div>
-         </div>
-      </section>
+            </section>
 
-      {/* File Manager */}
-      <section className="space-y-6">
-         <div className="flex items-center justify-between">
-           <h3 className="font-bold text-xl flex items-center gap-2">
-             <FileUp size={20} className="text-purple-400" />
-             File & Data Manager
-           </h3>
-           <div className="flex gap-2">
-              <button className="btn-secondary !py-1 !px-3 text-xs"><FolderPlus size={14} className="mr-1 inline" /> New Category</button>
-           </div>
-         </div>
-
-         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-            <div className="space-y-2">
-               {categories.map(cat => (
-                 <button 
-                   key={cat.name}
-                   onClick={() => setActiveCategory(cat.name)}
-                   className={cn(
-                     "w-full text-left p-4 rounded-2xl border transition-all group",
-                     activeCategory === cat.name ? "glass border-purple-500 bg-purple-500/10" : "border-transparent hover:bg-white/5"
-                   )}
-                 >
-                    <h5 className="font-bold text-sm">{cat.name}</h5>
-                    <p className="text-[10px] text-white/30 mt-1 line-clamp-1">{cat.desc}</p>
-                 </button>
-               ))}
-            </div>
-
-            <div className="lg:col-span-3 glass-card space-y-6">
-               <div className="flex items-center justify-between">
-                  <div>
-                    <h4 className="font-bold text-lg">{activeCategory}</h4>
-                    <p className="text-xs text-white/40 mt-1">{categories.find(c => c.name === activeCategory)?.desc}</p>
-                  </div>
-          {activeCategory === '📊 Monthly Commission' && (
-            <div className="flex flex-col md:flex-row items-center gap-3">
-               {!fbUser && (
-                 <button 
-                   onClick={async () => {
-                     setIsSigningIn(true);
-                     try {
-                       await signInWithGoogle();
-                     } catch (err: any) {
-                       setError(`Cloud integration failed: ${err.message}`);
-                     } finally {
-                       setIsSigningIn(false);
-                     }
-                   }}
-                   disabled={isSigningIn}
-                   className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-orange-500/20 border border-orange-500/30 text-[10px] font-bold text-orange-400 hover:bg-orange-500/30 transition-all disabled:opacity-50"
-                 >
-                   {isSigningIn ? <Loader2 size={12} className="animate-spin" /> : <Activity size={12} />}
-                   {isSigningIn ? 'CONNECTING...' : 'LINK CLOUD PERMISSION'}
-                 </button>
-               )}
-               {fbUser && (
-                 <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-[10px] font-bold text-emerald-400">
-                   <CheckCircle2 size={12} />
-                   LINKED: {fbUser.email}
-                 </div>
-               )}
-               <div className="flex items-center gap-3 bg-white/5 p-2 px-4 rounded-2xl border border-white/10">
-                  <span className="text-[10px] font-black uppercase tracking-widest text-white/30">Target Month:</span>
-                  <input 
-                    type="month" 
-                    value={selectedMonth}
-                    onChange={(e) => setSelectedMonth(e.target.value)}
-                    className="bg-transparent text-white font-bold text-sm outline-none [color-scheme:dark]"
-                  />
-               </div>
-               <button 
-                 onClick={() => loadRoster()}
-                 className="p-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-white/40 transition-all"
-                 title="Refresh Roster Data"
-               >
-                 <History size={14} />
-               </button>
-            </div>
-          )}
-               </div>
-
-               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div 
-                    onClick={() => fileInputRef.current?.click()}
-                    className="border border-dashed border-white/10 rounded-2xl p-8 flex flex-col items-center justify-center gap-4 hover:border-purple-500/50 hover:bg-white/2 transition-all cursor-pointer relative group overflow-hidden"
-                  >
-                     <input 
-                       type="file" 
-                       ref={fileInputRef} 
-                       onChange={handleFileUpload} 
-                       className="hidden" 
-                       accept=".csv,.xlsx,.txt"
-                     />
-                     <div className="w-12 h-12 rounded-full bg-purple-500/10 flex items-center justify-center group-hover:scale-110 transition-transform">
-                        <FileUp size={24} className="text-purple-400" />
-                     </div>
-                     <div className="text-center">
-                        <p className="font-bold text-sm">Upload MasterSheet</p>
-                        <p className="text-[10px] text-white/30 mt-1">Accepts .csv, .xlsx, .txt</p>
-                     </div>
-                     {isProcessing && (
-                        <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex flex-col items-center justify-center gap-2">
-                           <Loader2 size={32} className="text-purple-400 animate-spin" />
-                           <p className="text-[10px] font-black uppercase tracking-widest text-purple-400">Processing...</p>
-                        </div>
-                     )}
-                  </div>
-
-                  <div className="space-y-3">
-                     <div className="flex items-center justify-between text-[10px] font-bold text-white/30 uppercase tracking-widest">
-                        <span>Paste Data Directly</span>
-                        <Clipboard size={12} />
-                     </div>
-                     <textarea 
-                       value={pasteData}
-                       onChange={(e) => setPasteData(e.target.value)}
-                       disabled={activeCategory === '📊 Monthly Commission'}
-                       placeholder={activeCategory === '📊 Monthly Commission' ? "Commissions must be uploaded via MasterSheet file." : "Paste row data here..."}
-                       className={cn(
-                         "w-full h-32 glass-input resize-none text-[10px] font-mono leading-tight transition-all",
-                         activeCategory === '📊 Monthly Commission' && "opacity-50 cursor-not-allowed bg-white/5"
-                       )}
-                     />
-                     <button 
-                       onClick={handleProcessPaste}
-                       disabled={isProcessing || !pasteData.trim() || activeCategory === '📊 Monthly Commission'}
-                       className="w-full btn-primary !py-2 disabled:opacity-50"
-                     >
-                       {isProcessing ? 'Processing...' : 'Process Paste Data'}
-                     </button>
-                  </div>
-               </div>
-
-               <AnimatePresence>
-                 {error && (
-                    <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-xl flex items-start gap-3">
-                       <AlertCircle size={18} className="text-red-400 mt-0.5 shrink-0" />
-                       <div className="space-y-1">
-                          <p className="text-sm font-bold text-red-400">Error Occurred</p>
-                          <p className="text-xs text-red-400/80 font-medium leading-relaxed font-mono whitespace-pre-wrap">{error}</p>
+            <section className="space-y-4">
+               <h3 className="font-bold text-lg flex items-center gap-2">
+                 <Target size={18} className="text-emerald-400" />
+                 Strategic Priorities
+               </h3>
+               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  {[
+                    { label: 'High Alert', color: 'border-red-500/20 bg-red-500/5', icon: Zap, items: ['JAKE re-engagement', 'Nicole intervention', 'Allyyy post-mortem'] },
+                    { label: 'Strategy', color: 'border-amber-500/20 bg-amber-500/5', icon: Target, items: ['LYKA development', 'Jlord mentoring', 'Arnel coaching'] },
+                    { label: 'Observatory', color: 'border-cyan-500/20 bg-cyan-500/5', icon: Activity, items: ['SexyLou model study', 'Boyeet burnout watch', 'Jey Em mentor'] },
+                  ].map((p, i) => (
+                    <div key={i} className={cn("p-6 rounded-3xl border tech-card", p.color)}>
+                       <div className="flex items-center justify-between mb-4">
+                         <h4 className="text-[10px] font-black uppercase tracking-widest text-white/30">{p.label}</h4>
+                         <p.icon size={14} className="text-white/20" />
                        </div>
-                       <button onClick={() => setError(null)} className="ml-auto text-red-400/50 hover:text-red-400 p-1">✕</button>
-                    </motion.div>
-                 )}
-                 {processingSummary && (
-                   <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex items-center gap-3">
-                      <CheckCircle2 size={18} className="text-emerald-400" />
-                      <p className="text-sm font-medium text-emerald-400">{processingSummary}</p>
-                      <button onClick={() => setProcessingSummary(null)} className="ml-auto text-emerald-400/50 hover:text-emerald-400">✕</button>
-                   </motion.div>
-                 )}
-               </AnimatePresence>
-            </div>
-         </div>
-      </section>
+                       <ul className="space-y-4">
+                         {p.items.map((item, j) => (
+                           <li key={j} className="flex items-center gap-3 text-xs font-bold text-white/80 group cursor-pointer">
+                              <div className="w-1.5 h-1.5 rounded-full bg-white/10 group-hover:bg-white group-hover:scale-125 transition-all" />
+                              {item}
+                           </li>
+                         ))}
+                       </ul>
+                    </div>
+                  ))}
+               </div>
+            </section>
 
-      {/* Cloud Data Audit Summary */}
-      <section className="space-y-4">
-         <div className="flex items-center justify-between">
-            <h3 className="font-bold text-lg flex items-center gap-2">
-               <Activity size={18} className="text-cyan-400" />
-               Cloud Data Stewardship
-            </h3>
-            <button 
-              onClick={loadCloudStats}
-              disabled={isStatsLoading}
-              className="text-[10px] font-bold text-indigo-400 hover:underline flex items-center gap-1"
-            >
-              <History size={12} className={cn(isStatsLoading && "animate-spin")} />
-              Refresh Audit
-            </button>
-         </div>
-         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-            {Object.entries(cloudStats).sort((a,b) => b[0].localeCompare(a[0])).map(([month, count]) => (
-              <div key={month} className="glass-card !p-4 border-white/5 bg-white/[0.02] relative group/audit">
-                 <p className="text-[10px] font-black uppercase text-white/30 tracking-widest">{formatMonth(month)}</p>
-                 <div className="mt-2 flex items-baseline gap-2">
-                    <span className="text-xl font-black text-white">{count}</span>
-                    <span className="text-[10px] font-bold text-white/20">Records</span>
-                 </div>
-                 <button 
-                   onClick={async () => {
-                     if (confirm(`CRITICAL: This will permanently delete all ${count} commission records for ${formatDate(month)}. This cannot be undone. Proceed?`)) {
-                       setIsStatsLoading(true);
-                       try {
-                         await FirebaseService.deleteCommissionsByMonth(month);
-                         Storage.addLog('System', `Director deleted all records for ${month}`, localAuth.name);
-                         loadCloudStats();
-                       } catch (err) {
-                         alert("Deletion failed");
-                       } finally {
-                         setIsStatsLoading(false);
-                       }
-                     }
-                   }}
-                   className="absolute top-2 right-2 p-1.5 bg-red-500/10 text-red-500 rounded-lg opacity-0 group-hover/audit:opacity-100 transition-opacity hover:bg-red-500 hover:text-white"
-                   title="Delete Month Data"
-                 >
-                   <Trash2 size={12} />
-                 </button>
+            <section className="space-y-4">
+              <h3 className="font-bold text-lg flex items-center gap-2">
+                <Briefcase size={18} className="text-indigo-400" />
+                Poppo Agent Terminal
+              </h3>
+              <div className="tech-card p-12 text-center space-y-6 bg-gradient-to-br from-indigo-500/[0.03] to-transparent">
+                <div className="w-20 h-20 bg-indigo-500/10 rounded-full flex items-center justify-center mx-auto border border-indigo-500/20 shadow-2xl">
+                   <Shield size={40} className="text-indigo-400" />
+                </div>
+                <div className="max-w-md mx-auto space-y-2">
+                   <h4 className="text-xl font-black text-white tracking-tight">AGENT MANAGEMENT INTERFACE</h4>
+                   <p className="text-xs text-white/40 leading-relaxed font-medium">
+                      Redirecting to secure Poppo Management server. All transactions must be cross-verified with local MasterSheets.
+                   </p>
+                </div>
+                <a 
+                   href="https://agent.vshowapi.com/login" 
+                   target="_blank" 
+                   rel="noopener noreferrer"
+                   className="inline-flex items-center gap-3 px-10 py-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl font-black uppercase text-[11px] tracking-[0.2em] transition-all shadow-xl shadow-indigo-500/30 active:scale-95 group"
+                >
+                   ESTABLISH SECURE LINK
+                   <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
+                </a>
               </div>
-            ))}
-            {Object.keys(cloudStats).length === 0 && !isStatsLoading && (
-              <div className="col-span-full py-8 text-center glass rounded-2xl border border-dashed border-white/5 text-white/20 italic text-xs">
-                No cloud commission records detected. Sync via MasterSheet.
+            </section>
+          </motion.div>
+        )}
+
+        {activeView === 'finance' && (
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="space-y-1">
+                <h3 className="font-bold text-xl flex items-center gap-2">
+                  <Briefcase size={20} className="text-emerald-400" />
+                  Financial History Manager
+                </h3>
+                <p className="text-[10px] text-white/30 uppercase tracking-widest font-black">NINE AGENCY FISCAL STEWARDSHIP</p>
               </div>
-            )}
-            {isStatsLoading && (
-              <div className="col-span-full py-8 text-center text-white/20 italic text-xs">
-                Auditing cloud storage...
+              <div className="flex items-center gap-2">
+                <button 
+                  onClick={async () => {
+                    const month = prompt("Enter Month (MM:YYYY) e.g. JUNE 2024:");
+                    if (month) {
+                      const [mName, y] = month.split(' ');
+                      const mIndex = ['JANUARY', 'FEBRUARY', 'MARCH', 'APRIL', 'MAY', 'JUNE', 'JULY', 'AUGUST', 'SEPTEMBER', 'OCTOBER', 'NOVEMBER', 'DECEMBER'].indexOf(mName.toUpperCase());
+                      if (mIndex === -1) {
+                        alert("Invalid month name. Use full name e.g. JUNE");
+                        return;
+                      }
+                      const dateCode = `${y}-${(mIndex + 1).toString().padStart(2, '0')}`;
+                      setSelectedMonth(dateCode);
+                      
+                      const logId = crypto.randomUUID();
+                      await SheetService.saveLog({
+                        id: logId,
+                        type: 'FINANCE',
+                        action: `Created financial window for ${month}`,
+                        user: localAuth.name,
+                        timestamp: new Date().toISOString()
+                      });
+                      await SheetService.saveVersionLog({
+                        id: logId,
+                        action: 'FINANCE_WINDOW_CREATE',
+                        user: localAuth.name,
+                        timestamp: new Date().toISOString(),
+                        changelog: `Initialized financial tab for ${dateCode}.`
+                      });
+
+                      setProcessingSummary(`Created financial window for ${month}`);
+                    }
+                  }}
+                  className="px-4 py-2 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 text-[10px] font-black uppercase tracking-widest rounded-xl border border-indigo-500/20 transition-all flex items-center gap-2"
+                >
+                  <Plus size={14} /> Add Financial Tab
+                </button>
+                <button 
+                  onClick={async () => {
+                    if (confirm(`Are you sure you want to remove all financial records for ${selectedMonth}?`)) {
+                      setIsProcessing(true);
+                      try {
+                        await SheetService.deleteCommissionsByMonth(selectedMonth);
+                        loadCloudStats();
+                        
+                        const logId = crypto.randomUUID();
+                        await SheetService.saveLog({
+                          id: logId,
+                          type: 'FINANCE',
+                          action: `Removed financial records for ${selectedMonth}`,
+                          user: localAuth.name,
+                          timestamp: new Date().toISOString()
+                        });
+                        await SheetService.saveVersionLog({
+                          id: logId,
+                          action: 'FINANCE_WINDOW_DELETE',
+                          user: localAuth.name,
+                          timestamp: new Date().toISOString(),
+                          changelog: `Deleted all commission data for period ${selectedMonth}.`
+                        });
+
+                        setProcessingSummary(`Removed records for ${selectedMonth}`);
+                      } catch (err) { alert("Failed to remove data tab."); }
+                      finally { setIsProcessing(false); }
+                    }
+                  }}
+                  className="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 text-[10px] font-black uppercase tracking-widest rounded-xl border border-red-500/20 transition-all flex items-center gap-2"
+                >
+                  <Trash2 size={14} /> Remove Financial Tab
+                </button>
               </div>
-            )}
-         </div>
-      </section>
-
-      {/* Manual Host Roster Editor (MasterSheet Override) */}
-      <section className="space-y-4">
-         <div className="flex items-center justify-between">
-           <h3 className="font-bold text-lg flex items-center gap-2">
-              <Shield size={18} className="text-indigo-400" />
-              MasterSheet Manual Override (Roster)
-           </h3>
-           <p className="text-[10px] text-white/30 font-mono italic">Directly edit Host credentials and profile info</p>
-         </div>
-         <div className="glass-card !p-0">
-            <RosterManualEditor 
-              hosts={rosterHosts} 
-              onRefresh={loadRoster} 
-              activeCategory={activeCategory}
-              isLoading={isRosterLoading}
-            />
-         </div>
-      </section>
-
-      {/* Poppo Agent Integration */}
-      <section className="space-y-4">
-         <h3 className="font-bold text-lg flex items-center gap-2">
-            <Shield size={18} className="text-indigo-400" />
-            Poppo Agent Portal
-         </h3>
-         <div className="glass-card p-12 text-center space-y-6">
-            <div className="w-20 h-20 bg-indigo-500/10 rounded-full flex items-center justify-center mx-auto border border-indigo-500/20 shadow-xl shadow-indigo-500/10">
-               <Shield size={40} className="text-indigo-400" />
             </div>
-            <div className="max-w-md mx-auto space-y-2">
-               <h4 className="text-xl font-black text-white tracking-tight">Access Agent Portal</h4>
-               <p className="text-xs text-white/40 leading-relaxed font-medium">
-                  To ensure maximum compatibility and security, please access the official Poppo Agent Management system in a new secure browser window.
-               </p>
-            </div>
-            <a 
-               href="https://agent.vshowapi.com/login" 
-               target="_blank" 
-               rel="noopener noreferrer"
-               className="inline-flex items-center gap-3 px-8 py-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl font-black uppercase text-[11px] tracking-[0.2em] transition-all shadow-xl shadow-indigo-500/20 active:scale-95 group"
-            >
-               Open Poppo Management Portal
-               <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
-            </a>
-         </div>
-      </section>
 
-      {/* Upload History */}
-      <section className="space-y-4">
-         <h3 className="font-bold text-lg flex items-center gap-2">
-            <History size={18} className="text-amber-400" />
-            Upload History
-         </h3>
-         <div className="glass-card !p-0 overflow-hidden">
-            <div className="overflow-x-auto">
-               <table className="w-full text-left text-sm">
+            <div className="tech-card space-y-6">
+              <div className="flex items-center justify-between border-b border-white/5 pb-6">
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-3 bg-white/5 p-2 px-4 rounded-xl border border-white/5">
+                    <span className="text-[9px] font-black uppercase tracking-widest text-white/20">Active Record Set</span>
+                    <select 
+                      value={selectedMonth}
+                      onChange={(e) => setSelectedMonth(e.target.value)}
+                      className="bg-transparent text-emerald-400 font-bold text-xs outline-none cursor-pointer"
+                    >
+                      {Object.keys(cloudStats).sort((a,b) => b.localeCompare(a)).map(m => (
+                        <option key={m} value={m} className="bg-[#0A0A0A]">{formatMonth(m)}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
+                    <span className="text-[9px] font-black text-emerald-400 uppercase tracking-widest">Agency Commission</span>
+                  </div>
+                </div>
+                <button 
+                  onClick={async () => {
+                    setIsProcessing(true);
+                    try {
+                      const data = await SheetService.getCommissions(selectedMonth);
+                      setDetailData(data);
+                      setProcessingSummary(`Synced latest records for ${formatMonth(selectedMonth)}`);
+                    } catch (err) { alert("Sync failed."); }
+                    finally { setIsProcessing(false); }
+                  }}
+                  className="btn-primary !py-2 !px-6 !text-[10px]"
+                >
+                  <History size={14} className={cn("inline mr-2", isProcessing && "animate-spin")} />
+                  Sync Updated Records
+                </button>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-[11px] min-w-[2200px]">
                   <thead>
-                    <tr className="border-b border-white/10 text-[10px] font-bold text-white/30 uppercase tracking-widest">
-                       <th className="px-6 py-4">Status</th>
-                       <th className="px-6 py-4">File / Entry Name</th>
-                       <th className="px-6 py-4 text-center">Matched</th>
-                       <th className="px-6 py-4">Timestamp</th>
-                       <th className="px-6 py-4 text-right">Actions</th>
+                    <tr className="border-b border-white/10 text-[9px] font-black text-white/30 uppercase tracking-[0.2em] bg-white/2">
+                      <th className="px-4 py-4">Total Commission</th>
+                      <th className="px-4 py-4">ID</th>
+                      <th className="px-4 py-4">Nickname</th>
+                      <th className="px-4 py-4">Live duration</th>
+                      <th className="px-4 py-4">Party host duration</th>
+                      <th className="px-4 py-4">Total earnings of points</th>
+                      <th className="px-4 py-4">agentweb_commission_earning</th>
+                      <th className="px-4 py-4">Live Earnings</th>
+                      <th className="px-4 py-4">Party Earnings</th>
+                      <th className="px-4 py-4">Private chat</th>
+                      <th className="px-4 py-4">Tips</th>
+                      <th className="px-4 py-4">Platform reward</th>
+                      <th className="px-4 py-4">Other Earnings</th>
+                      <th className="px-4 py-4">Platform hour</th>
+                      <th className="px-4 py-4">Super Salary</th>
+                      <th className="px-4 py-4">Super Rank</th>
+                      <th className="px-4 py-4">Level</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-white/5">
-                    {files.map(file => (
-                      <tr 
-                        key={file.id} 
-                        onClick={() => loadFileDetail(file)}
-                        className="hover:bg-white/5 transition-colors cursor-pointer group"
-                      >
-                        <td className="px-6 py-4">
-                           <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                             {file.status}
-                           </span>
-                        </td>
-                        <td className="px-6 py-4">
-                           <div className="font-bold group-hover:text-amber-400 transition-colors">{file.name}</div>
-                           <div className="text-[10px] text-white/30 mt-0.5">{file.category}</div>
-                        </td>
-                        <td className="px-6 py-4 text-center">
-                           <span className="font-mono text-cyan-400 font-bold">{file.matchedCount}</span>
-                        </td>
-                        <td className="px-6 py-4 text-white/40 text-xs">
-                           {formatDate(file.timestamp)}
-                        </td>
-                        <td className="px-6 py-4 text-right">
-                           <button 
-                             onClick={(e) => {
-                               e.stopPropagation();
-                               deleteFile(file.id);
-                             }} 
-                             className="p-2 hover:bg-red-500/10 rounded-lg text-white/20 hover:text-red-400"
-                           >
-                             <Trash2 size={16} />
-                           </button>
-                        </td>
+                    {detailData.length > 0 ? detailData.map((row) => (
+                      <tr key={row.poppo_id} className="hover:bg-white/[0.02] transition-colors">
+                        <td className="px-4 py-4 text-emerald-400 font-black">{(row.my_commission || 0).toLocaleString()}</td>
+                        <td className="px-4 py-4 font-mono font-bold text-indigo-400">{row.poppo_id}</td>
+                        <td className="px-4 py-4 font-bold text-white uppercase">{row.poppo_name}</td>
+                        <td className="px-4 py-4 text-white/40">{Math.floor((row.live_duration || 0) / 60)}h {Math.round((row.live_duration || 0) % 60)}m</td>
+                        <td className="px-4 py-4 text-white/40">{Math.floor((row.party_host_duration || 0) / 60)}h {Math.round((row.party_host_duration || 0) % 60)}m</td>
+                        <td className="px-4 py-4 font-mono">{(row.total_points || 0).toLocaleString()}</td>
+                        <td className="px-4 py-4 font-mono text-emerald-300">{(row.agentweb_commission_earning || 0).toLocaleString()}</td>
+                        <td className="px-4 py-4 font-mono">{(row.live_earnings || 0).toLocaleString()}</td>
+                        <td className="px-4 py-4 font-mono">{(row.party_earnings || 0).toLocaleString()}</td>
+                        <td className="px-4 py-4 font-mono">{(row.private_chat || 0).toLocaleString()}</td>
+                        <td className="px-4 py-4 font-mono">{(row.tips || 0).toLocaleString()}</td>
+                        <td className="px-4 py-4 font-mono">{(row.platform_reward || 0).toLocaleString()}</td>
+                        <td className="px-4 py-4 font-mono">{(row.other_earn || 0).toLocaleString()}</td>
+                        <td className="px-4 py-4 font-mono">{(row.platform_hourly_salary || 0).toLocaleString()}</td>
+                        <td className="px-4 py-4 text-amber-400 font-bold">{(row.super_salary || 0).toLocaleString()}</td>
+                        <td className="px-4 py-4 font-mono">{(row.super_rank || 'N/A')}</td>
+                        <td className="px-4 py-4 font-mono">{(row.level || '0')}</td>
                       </tr>
-                    ))}
-                    {files.length === 0 && (
+                    )) : (
                       <tr>
-                        <td colSpan={5} className="py-12 text-center text-white/20 italic">No history records yet</td>
+                        <td colSpan={17} className="py-20 text-center text-white/20 italic text-xs">
+                          No records found for this window. Use Intake to upload a MasterSheet or click Sync to fetch cloud data.
+                        </td>
                       </tr>
                     )}
                   </tbody>
-               </table>
+                </table>
+              </div>
             </div>
-         </div>
-      </section>
+          </motion.div>
+        )}
+
+        {/* Intelligence Intake View */}
+        {activeView === 'intake' && (
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-12">
+            <section className="space-y-6">
+               <div className="flex items-center justify-between">
+                 <h3 className="font-bold text-xl flex items-center gap-2">
+                   <FileSearch size={20} className="text-indigo-400" />
+                   Intelligence Intake
+                 </h3>
+                 <div className="flex gap-2">
+                    <button className="btn-secondary !py-1.5 !px-4 text-[10px]"><FolderPlus size={14} className="mr-2 inline" /> New Classification</button>
+                 </div>
+               </div>
+
+               <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+                  <div className="space-y-2">
+                     {categories.map(cat => (
+                       <button 
+                         key={cat.name}
+                         onClick={() => setActiveCategory(cat.name)}
+                         className={cn(
+                           "w-full text-left p-4 rounded-2xl border transition-all group relative overflow-hidden",
+                           activeCategory === cat.name ? "border-indigo-500/50 bg-indigo-500/10 text-white" : "border-transparent text-white/40 hover:bg-white/5"
+                         )}
+                       >
+                          <h5 className="font-bold text-xs uppercase tracking-widest">{cat.name.replace(/[^\w\s]/g, '')}</h5>
+                          <p className="text-[9px] opacity-40 mt-1 line-clamp-1 font-medium">{cat.desc}</p>
+                          {activeCategory === cat.name && (
+                            <motion.div layoutId="cat-active" className="absolute right-0 top-0 bottom-0 w-1 bg-indigo-500" />
+                          )}
+                       </button>
+                     ))}
+                  </div>
+
+                  <div className="lg:col-span-3 space-y-6">
+                     <div className="tech-card space-y-8">
+                        <div className="flex items-center justify-between">
+                           <div>
+                             <h4 className="font-black text-lg text-white uppercase tracking-tight">{activeCategory}</h4>
+                             <p className="text-[10px] text-white/30 mt-1">{categories.find(c => c.name === activeCategory)?.desc}</p>
+                           </div>
+                           {activeCategory === '📊 Monthly Commission' && (
+                             <div className="flex items-center gap-4">
+                                <div className="flex items-center gap-3 bg-white/5 p-2 px-4 rounded-xl border border-white/5">
+                                   <span className="text-[9px] font-black uppercase tracking-widest text-white/20">Target Window</span>
+                                   <input 
+                                     type="month" 
+                                     value={selectedMonth}
+                                     onChange={(e) => setSelectedMonth(e.target.value)}
+                                     className="bg-transparent text-indigo-400 font-bold text-xs outline-none [color-scheme:dark]"
+                                   />
+                                </div>
+                             </div>
+                           )}
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                           <div 
+                             onClick={() => fileInputRef.current?.click()}
+                             className="border-2 border-dashed border-white/5 rounded-3xl p-10 flex flex-col items-center justify-center gap-6 hover:border-indigo-500/40 hover:bg-indigo-500/[0.02] transition-all cursor-pointer relative group"
+                           >
+                              <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" accept=".csv,.xlsx,.txt,.pdf,image/*" />
+                              <div className="w-16 h-16 rounded-full bg-indigo-500/10 flex items-center justify-center border border-indigo-500/20 group-hover:scale-110 transition-transform">
+                                 <FileUp size={32} className="text-indigo-400" />
+                              </div>
+                              <div className="text-center space-y-2">
+                                 <p className="font-black text-xs uppercase tracking-[0.2em] text-white">AI Vision Scan</p>
+                                 <p className="text-[10px] text-white/30">PDF, JPG, PNG, CSV, XLSX</p>
+                                 <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/10 text-[9px] font-black text-indigo-400 border border-indigo-500/20">
+                                   <Zap size={10} /> GEMINI ENGINE ACTIVE
+                                 </div>
+                              </div>
+                              {isProcessing && (
+                                 <div className="absolute inset-0 bg-[#0A0A0B]/90 backdrop-blur-md rounded-3xl flex flex-col items-center justify-center gap-6 border border-indigo-500/30">
+                                    <div className="relative">
+                                      <motion.div 
+                                        animate={{ rotate: 360 }}
+                                        transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
+                                        className="w-20 h-20 rounded-full border-2 border-dashed border-indigo-500/20"
+                                      />
+                                      <Loader2 size={32} className="text-indigo-400 animate-spin absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
+                                    </div>
+                                    <div className="text-center space-y-2">
+                                       <p className="text-[10px] font-black uppercase tracking-[0.4em] text-indigo-400 animate-pulse">
+                                         {getStageMessage()}
+                                       </p>
+                                       <div className="w-32 h-1 bg-white/5 rounded-full mx-auto overflow-hidden">
+                                          <motion.div 
+                                            initial={{ x: "-100%" }}
+                                            animate={{ x: "100%" }}
+                                            transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+                                            className="w-full h-full bg-gradient-to-r from-transparent via-indigo-500 to-transparent"
+                                          />
+                                       </div>
+                                    </div>
+                                 </div>
+                              )}
+                           </div>
+
+                           <div className="space-y-4">
+                              <div className="flex items-center justify-between">
+                                 <span className="text-[9px] font-black uppercase tracking-widest text-white/20">Sheet Intelligence Input</span>
+                                 <Clipboard size={12} className="text-white/20" />
+                              </div>
+                              <textarea 
+                                value={pasteData}
+                                onChange={(e) => {
+                                  setPasteData(e.target.value);
+                                  if (sheetPreview.length > 0) setSheetPreview([]);
+                                }}
+                                placeholder="PASTE EXCEL DATA HERE...&#10;Row 1: May 2024&#10;Row 2: ID  Nickname  Live Duration..."
+                                className="w-full h-40 glass-input resize-none"
+                              />
+                              <button 
+                                onClick={handleProcessPaste}
+                                disabled={isProcessing || !pasteData.trim()}
+                                className="w-full btn-primary !py-3 disabled:opacity-50"
+                              >
+                                {isProcessing ? 'SCANNING...' : 'GENERATE GRID PREVIEW'}
+                              </button>
+                           </div>
+                        </div>
+
+                        {sheetPreview.length > 0 && (
+                          <motion.div initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} className="space-y-6 border-t border-white/5 pt-8">
+                             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                <div className="space-y-1">
+                                  <h5 className="text-[10px] font-black uppercase tracking-[0.3em] text-indigo-400">Execution Grid Preview</h5>
+                                  <div className="flex items-center gap-2">
+                                    <div className="px-3 py-1 bg-white/5 border border-white/10 rounded-full text-[9px] font-bold text-white/40">
+                                      TARGET WINDOW: <span className="text-indigo-400">{sheetMonth}</span>
+                                    </div>
+                                    <div className="hidden sm:flex items-center gap-1.5 px-2 py-1 rounded-full bg-indigo-500/10 text-[8px] font-black text-indigo-400">
+                                      <Database size={8} /> CLOUD READY
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                  <button onClick={() => setSheetPreview([])} className="flex-1 sm:flex-none btn-secondary !py-2.5 !px-6 !text-[10px]">ABORT</button>
+                                  <button 
+                                    onClick={handleSaveSheet}
+                                    disabled={isProcessing}
+                                    className="flex-1 sm:flex-none px-8 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest transition-all shadow-xl shadow-emerald-500/20 active:scale-95 disabled:opacity-50"
+                                  >
+                                    {isProcessing ? 'INJECTING...' : 'SYNC CLOUD'}
+                                  </button>
+                                </div>
+                             </div>
+
+                             <div className="relative group/grid">
+                                {/* Mobile Scroll Indicator */}
+                                <div className="absolute -top-3 left-1/2 -translate-x-1/2 flex items-center gap-2 text-[8px] font-black text-white/20 uppercase tracking-widest animate-pulse sm:hidden pointer-events-none">
+                                   <ArrowRight size={10} className="rotate-180" />
+                                   Swipe to Navigate Matrix
+                                   <ArrowRight size={10} />
+                                </div>
+
+                                <div className="tech-card !p-0 overflow-hidden border-indigo-500/20 shadow-2xl relative">
+                                   {/* Scrollable Container */}
+                                   <div className="max-h-[500px] overflow-auto custom-scrollbar">
+                                      <table className="w-full text-left text-[11px] min-w-[1200px]">
+                                         <thead className="sticky top-0 bg-[#0F0F11] z-20 shadow-xl border-b border-white/10">
+                                            <tr className="text-[9px] font-black text-white/30 uppercase tracking-[0.2em]">
+                                               {Object.keys(sheetPreview[0] || {}).map((key, kIndex) => (
+                                                 <th key={`${key}-${kIndex}`} className="px-6 py-4 bg-[#0F0F11] whitespace-nowrap">
+                                                   {key}
+                                                 </th>
+                                               ))}
+                                            </tr>
+                                         </thead>
+                                         <tbody className="divide-y divide-white/5">
+                                            {sheetPreview.map((row, i) => (
+                                              <tr key={i} className="hover:bg-white/[0.03] transition-colors group/row">
+                                                 {Object.keys(row).map((key, j) => {
+                                                   const val = row[key];
+                                                   const isNumeric = !isNaN(Number(val)) && val !== '' && (key.toLowerCase().includes('earn') || key.toLowerCase().includes('points') || key.toLowerCase().includes('commission'));
+                                                   return (
+                                                     <td key={j} className={cn(
+                                                       "px-6 py-4 whitespace-nowrap",
+                                                       key === 'ID' && "font-mono text-indigo-400 font-bold",
+                                                       key === 'Nickname' && "font-bold text-white uppercase tracking-tight group-hover/row:text-indigo-300 transition-colors",
+                                                       isNumeric && "text-cyan-400 font-black"
+                                                     )}>
+                                                       {isNumeric ? Number(val).toLocaleString() : val}
+                                                     </td>
+                                                   );
+                                                 })}
+                                              </tr>
+                                            ))}
+                                         </tbody>
+                                      </table>
+                                   </div>
+                                </div>
+                                
+                                {/* Right Edge Fade to indicate more scroll */}
+                                <div className="absolute right-0 top-0 bottom-0 w-12 bg-gradient-to-l from-[#0A0A0B] to-transparent pointer-events-none opacity-50 block sm:hidden" />
+                             </div>
+                          </motion.div>
+                        )}
+
+                        <AnimatePresence>
+                          {error && (
+                             <motion.div initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} className="p-4 bg-red-500/10 border border-red-500/20 rounded-2xl flex items-start gap-3">
+                                <AlertCircle size={16} className="text-red-400 mt-0.5" />
+                                <div className="space-y-1">
+                                   <p className="text-[11px] font-black uppercase text-red-400">System Constraint Violation</p>
+                                   <p className="text-[10px] text-red-300 font-mono leading-relaxed">{error}</p>
+                                </div>
+                                <button onClick={() => setError(null)} className="ml-auto text-red-400 hover:scale-125 transition-transform">✕</button>
+                             </motion.div>
+                          )}
+                          {processingSummary && (
+                            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl flex items-center gap-3">
+                               <CheckCircle2 size={16} className="text-emerald-400" />
+                               <p className="text-[11px] font-bold text-emerald-400 uppercase tracking-tight">{processingSummary}</p>
+                               <button onClick={() => setProcessingSummary(null)} className="ml-auto text-emerald-400">✕</button>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                     </div>
+
+                     <div className="tech-card !p-0 overflow-hidden">
+                       <div className="p-6 border-b border-white/5 flex items-center justify-between">
+                         <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-white/30 flex items-center gap-2">
+                           <History size={14} /> Intelligence Log
+                         </h4>
+                         <span className="text-[10px] font-bold text-white/20">{files.length} ENTRIES</span>
+                       </div>
+                       <table className="w-full text-left text-[11px]">
+                          <thead>
+                            <tr className="border-b border-white/5 text-[9px] font-black text-white/20 uppercase tracking-[0.2em]">
+                               <th className="px-6 py-4">Status</th>
+                               <th className="px-6 py-4">Source</th>
+                               <th className="px-6 py-4 text-center">Payload</th>
+                               <th className="px-6 py-4">Timestamp</th>
+                               <th className="px-6 py-4 text-right">Delete</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-white/5">
+                            {files.map((file, fIdx) => (
+                              <tr key={`file-${file.id || fIdx}-${fIdx}`} onClick={() => loadFileDetail(file)} className="hover:bg-white/[0.02] transition-colors cursor-pointer group">
+                                <td className="px-6 py-4">
+                                   <span className="text-[9px] font-black px-2 py-0.5 rounded-md bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 uppercase">
+                                     {file.status}
+                                   </span>
+                                </td>
+                                <td className="px-6 py-4">
+                                   <div className="font-bold text-white group-hover:text-indigo-400 transition-colors uppercase tracking-tight">{file.name}</div>
+                                   <div className="text-[9px] text-white/20 mt-0.5 font-bold uppercase">{file.category}</div>
+                                </td>
+                                <td className="px-6 py-4 text-center">
+                                   <span className="font-mono text-cyan-400 font-bold">{file.matchedCount}</span>
+                                </td>
+                                <td className="px-6 py-4 text-white/40 font-mono">
+                                   {formatDate(file.timestamp)}
+                                </td>
+                                <td className="px-6 py-4 text-right">
+                                   <button onClick={(e) => { e.stopPropagation(); deleteFile(file.id); }} className="p-2 hover:bg-red-500/10 rounded-lg text-white/20 hover:text-red-400 transition-all">
+                                     <Trash2 size={13} />
+                                   </button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                       </table>
+                     </div>
+                  </div>
+               </div>
+            </section>
+          </motion.div>
+        )}
+
+        {activeView === 'roster' && (
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-12">
+            <section className="space-y-4">
+               <div className="flex items-center justify-between">
+                  <h3 className="font-bold text-lg flex items-center gap-2">
+                     <UserPlus size={18} className="text-indigo-400" />
+                     Mass Personnel Intake
+                  </h3>
+                  <div className="flex items-center gap-2 text-[9px] font-black text-white/30 uppercase tracking-[0.2em] bg-white/5 px-3 py-1 rounded-full border border-white/5">
+                    <Database size={10} /> SYNC: CLOUD_SECURE
+                  </div>
+               </div>
+               <div className="tech-card flex flex-col xl:flex-row gap-8">
+                  <div className="flex-1 space-y-4">
+                     <textarea 
+                       value={bulkPasteData}
+                       onChange={(e) => setBulkPasteData(e.target.value)}
+                       placeholder="PoppoID, Name, Role, Rank&#10;7788123, Nina Nine, Director, S"
+                       className="w-full h-48 glass-input font-mono text-[10px] leading-relaxed resize-none p-6"
+                     />
+                     <div className="flex items-center justify-between gap-4">
+                        <p className="text-[10px] text-white/20 font-medium">CSV/TSV Structure Supported. Matrix deduplication enabled.</p>
+                        <div className="flex items-center gap-3">
+                          <button onClick={() => setBulkPasteData('')} className="btn-secondary !py-2.5 !px-6">RESET</button>
+                          <button 
+                            onClick={handleBulkAdd} 
+                            disabled={isBulkProcessing || !bulkPasteData.trim()}
+                            className="btn-primary !py-2.5 !px-10 shadow-xl shadow-indigo-500/20 disabled:opacity-50"
+                          >
+                            {isBulkProcessing ? 'INJECTING...' : 'Bulk Register Members'}
+                          </button>
+                        </div>
+                     </div>
+                  </div>
+                  <div className="w-full xl:w-72 space-y-4 shrink-0">
+                     <div className="p-5 rounded-2xl bg-white/[0.01] border border-white/5 space-y-3">
+                        <h4 className="text-[9px] font-black uppercase tracking-[0.2em] text-indigo-400">Intelligence Protocol</h4>
+                        <ul className="text-[10px] text-white/30 space-y-3 font-medium">
+                           <li className="flex gap-2"><div className="w-1 h-1 rounded-full bg-indigo-500 mt-1.5 shrink-0" /> Paste structured rows from Excel/Sheets.</li>
+                           <li className="flex gap-2"><div className="w-1 h-1 rounded-full bg-indigo-500 mt-1.5 shrink-0" /> System will auto-assign temporary passwords (1212).</li>
+                           <li className="flex gap-2"><div className="w-1 h-1 rounded-full bg-indigo-500 mt-1.5 shrink-0" /> Duplicate IDs are auto-pruned.</li>
+                        </ul>
+                     </div>
+                  </div>
+               </div>
+            </section>
+
+            <section className="space-y-4">
+               <div className="flex items-center justify-between">
+                 <h3 className="font-bold text-lg flex items-center gap-2">
+                    <Shield size={18} className="text-indigo-400" />
+                    Global Roster Override
+                 </h3>
+                 <button onClick={() => loadRoster()} className="p-2 bg-white/5 hover:bg-white/10 rounded-xl transition-all text-white/40"><History size={14} /></button>
+               </div>
+               <div className="tech-card !p-0 overflow-hidden">
+                  <RosterManualEditor hosts={rosterHosts} onRefresh={loadRoster} activeCategory="ManualEdit" isLoading={isRosterLoading} />
+               </div>
+            </section>
+          </motion.div>
+        )}
+
+        {activeView === 'audit' && (
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-12">
+            <section className="space-y-6">
+               <div className="flex items-center justify-between">
+                  <h3 className="font-bold text-xl flex items-center gap-2">
+                     <Database size={20} className="text-cyan-400" />
+                     Data Vault Stewardship
+                  </h3>
+                  <button onClick={loadCloudStats} disabled={isStatsLoading} className="text-[10px] font-black uppercase tracking-widest text-indigo-400 hover:text-indigo-300 flex items-center gap-2 transition-colors">
+                    <History size={14} className={cn(isStatsLoading && "animate-spin")} />
+                    RECALIBRATE AUDIT
+                  </button>
+               </div>
+
+               <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                  {Object.entries(cloudStats).sort((a,b) => b[0].localeCompare(a[0])).map(([month, count]) => (
+                    <div key={month} className="tech-card !p-6 border-white/5 bg-white/[0.01] group relative transition-all hover:bg-white/[0.03]">
+                       <p className="text-[10px] font-black uppercase text-white/20 tracking-[0.2em]">{formatMonth(month)}</p>
+                       <div className="mt-4 flex items-end gap-3">
+                          <span className="text-3xl font-black text-white leading-none">{count}</span>
+                          <span className="text-[10px] font-black uppercase text-white/20 mb-1">RECORDS</span>
+                       </div>
+                       <button 
+                         onClick={async () => {
+                           if (confirm(`DELETION PROTOCOL: Permanently wipe ${count} records for ${formatMonth(month)}?`)) {
+                             setIsStatsLoading(true);
+                             try {
+                               await SheetService.deleteCommissionsByMonth(month);
+                               loadCloudStats();
+                             } catch (err) { alert("Deletion protocol failed."); }
+                             finally { setIsStatsLoading(false); }
+                           }
+                         }}
+                         className="absolute top-4 right-4 p-2 bg-red-500/10 text-red-500 rounded-xl opacity-0 group-hover:opacity-100 transition-all hover:bg-red-500 hover:text-white"
+                       >
+                         <Trash2 size={14} />
+                       </button>
+                    </div>
+                  ))}
+               </div>
+            </section>
+          </motion.div>
+        )}
+      </main>
 
       <AnimatePresence>
         {selectedFileDetail && (

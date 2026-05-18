@@ -82,6 +82,74 @@
         "submittedBy": { "type": "string" },
         "submittedAt": { "type": "string" }
       }
+    },
+    "HostTask": {
+      "title": "Host Task",
+      "description": "Tasks assigned to hosts",
+      "type": "object",
+      "properties": {
+        "hostId": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "status": { "enum": ["To Do", "In Progress", "Completed"] },
+        "assignedBy": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "dueDate": { "type": "string" }
+      }
+    },
+    "PerformanceGoal": {
+      "title": "Performance Goal",
+      "description": "KPI targets for hosts",
+      "type": "object",
+      "properties": {
+        "hostId": { "type": "string" },
+        "type": { "enum": ["fanbase", "fanclub_gc", "hours", "pk", "song_requests"] },
+        "target": { "type": "number" },
+        "current": { "type": "number" },
+        "period": { "enum": ["Daily", "Weekly", "Monthly"] },
+        "deadline": { "type": "string" }
+      }
+    },
+    "CalendarEvent": {
+      "title": "Calendar Event",
+      "description": "Agency scheduled events",
+      "type": "object",
+      "properties": {
+        "poppo_id": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "date": { "type": "string" },
+        "time": { "type": "string" },
+        "created_by_name": { "type": "string" },
+        "created_by_role": { "type": "string" },
+        "visibility": { "enum": ["All", "Leadership", "Director Only"] },
+        "timestamp": { "type": "string" }
+      }
+    },
+    "PasswordResetRequest": {
+      "title": "Password Reset Request",
+      "description": "Requests from users who forgot their passwords",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "poppoId": { "type": "string" },
+        "hostName": { "type": "string" },
+        "status": { "enum": ["Pending", "Resolved"] },
+        "requestedAt": { "type": "string" },
+        "resolvedAt": { "type": "string" }
+      }
+    },
+    "DirectorNote": {
+      "title": "Director Note",
+      "description": "Manager and Director notes for talent management",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "hostId": { "type": "string" },
+        "type": { "enum": ["Note", "Task", "Feedback"] },
+        "content": { "type": "string" },
+        "createdAt": { "type": "string" }
+      }
     }
   },
   "firestore": {
@@ -89,6 +157,11 @@
     "commissions": { "schema": "Commission", "description": "Monthly financials" },
     "pk_records": { "schema": "PKRecord", "description": "PK performance history" },
     "exposures": { "schema": "Exposure", "description": "Visibility logs" },
-    "fanbase_health": { "schema": "FanbaseHealth", "description": "Engagement history" }
+    "fanbase_health": { "schema": "FanbaseHealth", "description": "Engagement history" },
+    "tasks": { "schema": "HostTask", "description": "Active assignments" },
+    "goals": { "schema": "PerformanceGoal", "description": "Set performance targets" },
+    "calendar": { "schema": "CalendarEvent", "description": "Scheduled activities" },
+    "reset_requests": { "schema": "PasswordResetRequest", "description": "Password reset queue" },
+    "notes": { "schema": "DirectorNote", "description": "Talent management logs" }
   }
 }

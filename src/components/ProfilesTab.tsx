@@ -1,8 +1,8 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Search, Filter, TrendingUp, BarChart3, PieChart, Info, UserPen, Target, Plus, ChevronRight, X, Shield, Edit2, Loader2, Fingerprint } from 'lucide-react';
-import { Host, Tier, BaseSalaryTier, HostStatus, AnchorType, PerformanceGoal, Position, CommissionEntry } from '../types';
+import { Host, Tier, BaseSalaryTier, HostStatus, AnchorType, PerformanceGoal, Position, CommissionEntry, DirectorNote, NoteType } from '../types';
 import { Storage } from '../lib/storage';
-import { FirebaseService } from '../lib/firebaseService';
+import { SheetService } from '../lib/sheetService';
 import { cn, formatNumber } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 import { MANAGERS, BASE_SALARY_POLICIES } from '../lib/constants';
@@ -31,7 +31,14 @@ export const ProfilesTab = () => {
   const [isManagingGoals, setIsManagingGoals] = useState(false);
   const [isEditingHost, setIsEditingHost] = useState(false);
   const [uploadedPhoto, setUploadedPhoto] = useState<string | null>(null);
+  const [isProcessingPhoto, setIsProcessingPhoto] = useState(false);
   
+  useEffect(() => {
+    if (!isEditingHost) {
+      setUploadedPhoto(null);
+    }
+  }, [isEditingHost]);
+
   // Filters
   const [tierFilter, setTierFilter] = useState<Tier[]>([]);
   const [salaryFilter, setSalaryFilter] = useState<BaseSalaryTier[]>([]);
@@ -42,7 +49,7 @@ export const ProfilesTab = () => {
     const load = async () => {
       setIsLoading(true);
       try {
-        const data = await FirebaseService.getAllHosts();
+        const data = await SheetService.getRoster();
         setHosts(data);
       } catch (err) {
         console.error("Failed to load profiles:", err);
@@ -84,18 +91,37 @@ export const ProfilesTab = () => {
   const goals = useMemo(() => selectedHost ? Storage.getGoals(selectedHost.id) : [], [selectedHost, selectedHostId]);
   const [commissions, setCommissions] = useState<CommissionEntry[]>([]);
   const [isLoadingCommissions, setIsLoadingCommissions] = useState(false);
+  const [hostNotes, setHostNotes] = useState<DirectorNote[]>([]);
+  const [isLoadingNotes, setIsLoadingNotes] = useState(false);
+  const [newNoteContent, setNewNoteContent] = useState('');
+  const [newNoteType, setNewNoteType] = useState<NoteType>('Note');
+  const [isAddingNote, setIsAddingNote] = useState(false);
+
+  const loadNotes = async (id: string) => {
+    setIsLoadingNotes(true);
+    try {
+      const data = await SheetService.getNotesByHost(id);
+      setHostNotes(data as DirectorNote[]);
+    } catch (err) {
+      console.error("Failed to load notes:", err);
+    } finally {
+      setIsLoadingNotes(false);
+    }
+  };
 
   useEffect(() => {
     if (selectedHostId) {
       setIsLoadingCommissions(true);
-      FirebaseService.getAllCommissions().then(all => {
+      SheetService.getCommissions().then(all => {
         const hostComms = all.filter(c => c.poppo_id === selectedHostId)
           .sort((a, b) => a.month.localeCompare(b.month));
         setCommissions(hostComms);
         setIsLoadingCommissions(false);
       });
+      loadNotes(selectedHostId);
     } else {
       setCommissions([]);
+      setHostNotes([]);
     }
   }, [selectedHostId]);
 
@@ -146,6 +172,31 @@ export const ProfilesTab = () => {
 
     setIsManagingGoals(false);
   };
+  
+  const handleAddNote = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedHost || !newNoteContent.trim()) return;
+    
+    setIsAddingNote(true);
+    const note: DirectorNote = {
+      id: crypto.randomUUID(),
+      hostId: selectedHost.id,
+      type: newNoteType,
+      content: newNoteContent,
+      createdAt: new Date().toISOString()
+    };
+    
+    try {
+      await SheetService.saveNote(note);
+      setNewNoteContent('');
+      loadNotes(selectedHost.id);
+      Storage.addLog('Profiles', `Added ${newNoteType} for ${selectedHost.name}`, auth.name);
+    } catch (err) {
+      alert("Failed to save note.");
+    } finally {
+      setIsAddingNote(false);
+    }
+  };
 
   const handleUpdateProfile = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -173,7 +224,7 @@ export const ProfilesTab = () => {
     };
 
     try {
-      await FirebaseService.updateHost(updatedHost);
+      await SheetService.updateHost(updatedHost);
       const updatedHosts = hosts.map(h => h.id === selectedHost.id ? updatedHost : h);
       setHosts(updatedHosts);
       Storage.addLog('Profiles', `Updated profile for ${updatedHost.name} (#${updatedHost.id})`, auth.name);
@@ -188,21 +239,53 @@ export const ProfilesTab = () => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 2 * 1024 * 1024) {
-      alert('Photo too large. Max 2MB.');
+    if (file.size > 5 * 1024 * 1024) {
+      alert('Photo too large. Max 5MB.');
       return;
     }
 
+    setIsProcessingPhoto(true);
     try {
       const base64 = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
+        reader.onload = () => {
+          const img = new Image();
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            let width = img.width;
+            let height = img.height;
+            const MAX_SIZE = 400;
+
+            if (width > height) {
+              if (width > MAX_SIZE) {
+                height *= MAX_SIZE / width;
+                width = MAX_SIZE;
+              }
+            } else {
+              if (height > MAX_SIZE) {
+                width *= MAX_SIZE / height;
+                height = MAX_SIZE;
+              }
+            }
+
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx?.drawImage(img, 0, 0, width, height);
+            resolve(canvas.toDataURL('image/jpeg', 0.7));
+          };
+          img.onerror = reject;
+          img.src = reader.result as string;
+        };
         reader.onerror = reject;
         reader.readAsDataURL(file);
       });
       setUploadedPhoto(base64);
     } catch (err) {
       console.error('File upload failed:', err);
+      alert('Failed to process image');
+    } finally {
+      setIsProcessingPhoto(false);
     }
   };
 
@@ -276,7 +359,7 @@ export const ProfilesTab = () => {
             >
               <div className="aspect-[3/4] bg-slate-800 relative">
                 {host.photoUrl ? (
-                  <img src={host.photoUrl} alt={host.name} className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all" referrerPolicy="no-referrer" />
+                  <img src={host.photoUrl || undefined} alt={host.name} className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all" referrerPolicy="no-referrer" />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center text-slate-700 font-bold text-3xl">
                     {host.name?.[0] || '?'}
@@ -322,7 +405,7 @@ export const ProfilesTab = () => {
                 <div className="flex items-center gap-4">
                   <div className="w-16 h-16 rounded-2xl bg-slate-800 overflow-hidden border border-white/10 shrink-0">
                     {selectedHost.photoUrl ? (
-                      <img src={selectedHost.photoUrl} alt={selectedHost.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                      <img src={selectedHost.photoUrl || undefined} alt={selectedHost.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center font-bold text-2xl text-slate-600">
                         {selectedHost.name?.[0] || '?'}
@@ -492,29 +575,102 @@ export const ProfilesTab = () => {
                            </div>
                         </section>
 
-                       <div className="glass-card">
-                          <h5 className="text-xs font-bold uppercase tracking-widest text-white/30 mb-4">Description</h5>
-                          <p className="text-sm text-white/60 leading-relaxed italic">
-                             {selectedHost.description || "No assessment description available for this host profile."}
-                          </p>
-                       </div>
-
-                       <div className="glass-card">
-                          <h5 className="text-xs font-bold uppercase tracking-widest text-white/30 mb-4">Manager Notes History</h5>
-                          <div className="space-y-3">
-                             {Storage.getNotes(selectedHost.id).map((note, idx) => (
-                               <div key={idx} className="p-3 bg-white/5 rounded-xl border border-white/5">
-                                  <div className="flex justify-between items-center mb-1">
-                                     <span className="text-[10px] font-bold text-indigo-400 uppercase">{note.type}</span>
-                                     <span className="text-[10px] text-white/20">{new Date(note.createdAt).toLocaleDateString()}</span>
-                                  </div>
-                                  <p className="text-xs text-white/70 leading-relaxed italic">"{note.content}"</p>
+                       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                         <div className="glass-card flex flex-col h-full border-indigo-500/10">
+                            <div className="flex items-center justify-between mb-6">
+                               <h5 className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-400">Description / Biography</h5>
+                               <button 
+                                 onClick={() => { if (checkPassword('Director')) setIsEditingHost(true); }}
+                                 className="p-1.5 hover:bg-white/5 rounded-lg text-white/20 hover:text-white transition-colors"
+                               >
+                                 <Edit2 size={12} />
+                               </button>
+                            </div>
+                            <div className="flex-1 bg-white/[0.02] rounded-2xl p-6 border border-white/5 relative group min-h-[160px]">
+                               <p className="text-sm text-white/60 leading-relaxed italic whitespace-pre-wrap">
+                                  {selectedHost.description || "No biography or talent assessment provided. Tap the edit icon to establish this record."}
+                               </p>
+                               <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <Info size={14} className="text-white/10" />
                                </div>
-                             ))}
-                             {Storage.getNotes(selectedHost.id).length === 0 && (
-                               <p className="text-[10px] text-white/20 italic">No historical notes recorded for this host.</p>
-                             )}
-                          </div>
+                            </div>
+                         </div>
+  
+                         <div className="glass-card flex flex-col h-full border-cyan-500/10">
+                            <div className="flex items-center justify-between mb-6">
+                               <h5 className="text-[10px] font-black uppercase tracking-[0.2em] text-cyan-400">Manager Notes History</h5>
+                               {auth.role === 'Director' && (
+                                 <button 
+                                   onClick={() => {
+                                     const content = prompt("Add a new strategic note:");
+                                     if (content) {
+                                       const note: DirectorNote = {
+                                         id: crypto.randomUUID(),
+                                         hostId: selectedHost.id,
+                                         type: 'Note',
+                                         content,
+                                         createdAt: new Date().toISOString()
+                                       };
+                                       SheetService.saveNote(note).then(() => loadNotes(selectedHost.id));
+                                     }
+                                   }}
+                                   className="p-1.5 bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500 hover:text-white rounded-lg transition-all"
+                                 >
+                                    <Plus size={12} />
+                                 </button>
+                               )}
+                            </div>
+                            
+                            <div className="flex-1 space-y-4 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+                               {isLoadingNotes ? (
+                                 <div className="py-12 flex flex-col items-center gap-3">
+                                   <Loader2 size={24} className="animate-spin text-cyan-500" />
+                                   <span className="text-[10px] font-black uppercase tracking-widest text-white/20">Syncing Notes...</span>
+                                 </div>
+                               ) : hostNotes.map((note) => (
+                                 <motion.div 
+                                   initial={{ opacity: 0, scale: 0.95 }}
+                                   animate={{ opacity: 1, scale: 1 }}
+                                   key={note.id} 
+                                   className="relative p-5 bg-white/[0.02] rounded-2xl border border-white/5 hover:border-cyan-500/20 transition-all group"
+                                 >
+                                    <div className="flex justify-between items-center mb-2">
+                                       <div className="flex items-center gap-2">
+                                          <span className={cn(
+                                            "text-[8px] font-black uppercase px-2 py-0.5 rounded-full border",
+                                            note.type === 'Feedback' ? "bg-pink-500/10 text-pink-500 border-pink-500/20" :
+                                            note.type === 'Task' ? "bg-amber-500/10 text-amber-500 border-amber-500/20" :
+                                            "bg-cyan-500/10 text-cyan-500 border-cyan-500/20"
+                                          )}>
+                                             {note.type}
+                                          </span>
+                                          <span className="text-[9px] font-mono text-white/20">{new Date(note.createdAt).toLocaleDateString()}</span>
+                                       </div>
+                                       {auth.role === 'Director' && (
+                                         <button 
+                                           onClick={async () => {
+                                              if (confirm("Delete this management note?")) {
+                                                await SheetService.deleteNote(note.id);
+                                                loadNotes(selectedHost.id);
+                                              }
+                                           }}
+                                           className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-500/10 text-red-400 rounded transition-all"
+                                         >
+                                            <X size={10} />
+                                         </button>
+                                       )}
+                                    </div>
+                                    <p className="text-xs text-white/70 leading-relaxed font-medium">"{note.content}"</p>
+                                 </motion.div>
+                               ))}
+                               {hostNotes.length === 0 && !isLoadingNotes && (
+                                 <div className="py-20 text-center space-y-4 border border-dashed border-white/5 rounded-2xl">
+                                    <UserPen size={32} className="mx-auto text-white/5" />
+                                    <p className="text-[10px] text-white/20 italic font-black uppercase tracking-widest">No strategic notes on file</p>
+                                 </div>
+                                )}
+                            </div>
+                         </div>
                        </div>
 
                        <div className="space-y-4">
@@ -775,7 +931,7 @@ export const ProfilesTab = () => {
                       </div>
                       <div className="w-20 h-20 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center overflow-hidden shrink-0 shadow-2xl">
                         <img 
-                          src={uploadedPhoto || selectedHost.photoUrl || ''} 
+                          src={uploadedPhoto || selectedHost.photoUrl || undefined} 
                           alt="Preview" 
                           className="w-full h-full object-cover" 
                           onError={(e) => {

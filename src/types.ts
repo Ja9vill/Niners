@@ -60,9 +60,19 @@ export interface Host {
   description?: string;
   password?: string;
   is_temp_password?: boolean;
+  reset_requested?: boolean;
   // Legacy fields for compatibility during transition
   anchor?: AnchorType;
   baseSalary?: BaseSalaryTier;
+}
+
+export interface PasswordResetRequest {
+  id: string;
+  poppoId: string;
+  hostName: string;
+  status: 'Pending' | 'Resolved';
+  requestedAt: string;
+  resolvedAt?: string;
 }
 
 export interface FanbaseHealthEntry {
@@ -77,18 +87,25 @@ export interface FanbaseHealthEntry {
 }
 
 export interface CommissionEntry {
-  poppo_id: string;
-  poppo_name: string;
-  month: string;
-  live_duration: number;
-  live_earnings: number;
-  video_duration: number;
-  video_earnings: number;
-  agentweb_commission_rate: number;
-  agentweb_commission_earning: number;
-  total_points: number;
-  total_earnings: number;
-  my_commission: number;
+  my_commission: number; // Total Commission
+  poppo_id: string; // ID
+  poppo_name: string; // Nickname
+  live_duration: number; // Live duration
+  party_host_duration?: number; // Party host duration
+  total_points: number; // Total earnings of points
+  agentweb_commission_earning: number; // agentweb_commission_earning
+  live_earnings: number; // Live earnings
+  party_earnings?: number; // Party Earnings
+  private_chat?: number; // Private chat
+  tips?: number; // Tips
+  platform_reward?: number; // Platform reward
+  other_earn?: number; // Other Earnings
+  platform_hourly_salary?: number; // Platform hourly salary
+  super_salary?: number; // Super Salary
+  super_rank?: string; // Super Rank
+  level?: number; // Level
+  month: string; // YYYY-MM
+  updated_at: string;
 }
 
 export interface PKEntry {
@@ -138,10 +155,18 @@ export interface CalendarEvent {
 
 export interface ActivityLog {
   id: string;
-  type: string;
+  type: 'AUTH' | 'FINANCE' | 'TOURNAMENT' | 'EXPOSURE' | 'ROSTER' | 'INTAKE' | 'PROFILE_UPDATE' | 'PK_SUBMISSION' | 'EXPOSURE_SUBMISSION' | 'NEW_MEMBER' | 'SUPPORTER_REVIEW' | 'DIRECTOR_ACTION' | 'SYSTEM_EVENT';
   action: string;
   user: string;
   timestamp: string;
+}
+
+export interface VersionLog {
+  id: string;
+  action: string;
+  user: string;
+  timestamp: string;
+  changelog: string;
 }
 
 export interface FileEntry {

@@ -14,14 +14,14 @@ import {
   ChevronRight,
   Bell,
   Trash2,
-  CheckCircle2
+  CheckCircle2,
+  Menu,
+  X
 } from 'lucide-react';
 import { AuthGate } from './components/AuthGate';
 import { Storage } from './lib/storage';
-import { FirebaseService } from './lib/firebaseService';
+import { SheetService } from './lib/sheetService';
 import { CommissionEntry, Host } from './types';
-import { auth, signInWithGoogle } from './lib/firebase';
-import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { INITIAL_HOSTS, INITIAL_COMMISSION, TIMELINE_DATA } from './lib/constants';
 import { formatNumber, cn, formatDate, formatMonth } from './lib/utils';
 import {
@@ -45,10 +45,13 @@ import { DirectorTab } from './components/DirectorTab';
 import { GlossaryTab } from './components/GlossaryTab';
 import { DataReportingTab } from './components/DataReportingTab';
 
-type Tab = 'overview' | 'roster' | 'profiles' | 'trends' | 'calendar' | 'dashboard' | 'reporting' | 'glossary';
+import { HomeTab } from './components/HomeTab';
+
+type Tab = 'home' | 'overview' | 'roster' | 'profiles' | 'trends' | 'calendar' | 'dashboard' | 'reporting' | 'glossary';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<Tab>('overview');
+  const [activeTab, setActiveTab] = useState<Tab>('home');
+  const [showLoginModal, setShowLoginModal] = useState(false);
   const [authState, setAuthState] = useState(Storage.getAuthState());
   const [hosts, setHosts] = useState<Host[]>([]);
   const [commission, setCommission] = useState<CommissionEntry[]>([]);
@@ -56,35 +59,36 @@ export default function App() {
   const [notifications, setNotifications] = useState(Storage.getNotifications());
   const [showNotifications, setShowNotifications] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [firebaseUser, setFirebaseUser] = useState(auth.currentUser);
   const [isSyncingCloud, setIsSyncingCloud] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setFirebaseUser(user);
-    });
-    return () => unsubscribe();
+    // Session persistent cleanup for Sheet-backed auth if needed
   }, []);
 
-  // Initialize data from Firebase
+  // Initialize data from Sheets
   useEffect(() => {
     const loadData = async () => {
       if (authState.level === 0) return;
       
       setIsLoading(true);
       try {
-        const [firebaseHosts, firebaseCommissions] = await Promise.all([
-          FirebaseService.getAllHosts(),
-          FirebaseService.getAllCommissions()
+        const [sheetHosts, sheetCommissions] = await Promise.all([
+          SheetService.getRoster(),
+          SheetService.getCommissions()
         ]);
         
-        Storage.setHosts(firebaseHosts);
-        Storage.setCommission(firebaseCommissions);
+        if (sheetHosts.length > 0) {
+          Storage.setHosts(sheetHosts);
+          setHosts(sheetHosts);
+        }
         
-        setHosts(firebaseHosts);
-        setCommission(firebaseCommissions);
+        if (sheetCommissions.length > 0) {
+          Storage.setCommission(sheetCommissions);
+          setCommission(sheetCommissions);
+        }
       } catch (err) {
-        console.warn("Could not sync with cloud database. Local storage will be used if available.", err);
+        console.warn("Could not sync with Google Sheets. Local storage or defaults will be used.", err);
       } finally {
         setIsLoading(false);
       }
@@ -94,38 +98,28 @@ export default function App() {
   }, [authState.level]);
 
   const handleLogout = async () => {
-    await signOut(auth);
-    const newState = { level: 0, role: '', name: '', poppo_id: '' };
+    const newState = { level: 0, role: '', name: '', poppo_id: '', team: '', manager: '' };
     Storage.setAuthState(newState);
     setAuthState(newState);
   };
 
   const handleGoogleSignIn = async () => {
-    setIsSyncingCloud(true);
-    try {
-      const outcome = await signInWithGoogle();
-      if (outcome.kind === 'success' && auth.currentUser?.email === 'jwavpr@gmail.com') {
-        const newState = { level: 2, role: 'Director', name: 'Director Miss Nine (Verified)', poppo_id: '19157913' };
-        Storage.setAuthState(newState);
-        setAuthState(newState);
-      } else if (outcome.kind === 'error') {
-        alert(outcome.message);
-      }
-    } catch (err: any) {
-      alert(err.message || "Google Sign-In failed.");
-    } finally {
-      setIsSyncingCloud(false);
-    }
+    // Feature disabled as per Blueprint v2.0
+    alert("Google Sign-In is disabled. Please use your Poppo ID and Password.");
   };
 
   const refreshState = async () => {
     setAuthState(Storage.getAuthState());
-    const [firebaseHosts, firebaseCommissions] = await Promise.all([
-      FirebaseService.getAllHosts(),
-      FirebaseService.getAllCommissions()
-    ]);
-    setHosts(firebaseHosts);
-    setCommission(firebaseCommissions);
+    try {
+      const [sheetHosts, sheetCommissions] = await Promise.all([
+        SheetService.getRoster(),
+        SheetService.getCommissions()
+      ]);
+      setHosts(sheetHosts);
+      setCommission(sheetCommissions);
+    } catch (err) {
+      console.error("Refresh failed:", err);
+    }
     setLogs(Storage.getLogs());
     setNotifications(Storage.getNotifications());
   };
@@ -144,13 +138,42 @@ export default function App() {
 
   const renderContent = () => {
     switch (activeTab) {
-      case 'overview': return <OverviewTab commissions={commission} hosts={hosts} />;
-      case 'roster': return <RosterTab />;
-      case 'profiles': return <ProfilesTab />;
-      case 'trends': return <TrendsTab />;
-      case 'calendar': return <CalendarTab />;
-      case 'dashboard': return <DirectorTab />;
-      case 'reporting': return <DataReportingTab />;
+      case 'home': return <HomeTab hosts={hosts} commissions={commission} onOpenLogin={() => setShowLoginModal(true)} />;
+      case 'overview': return (
+        <AuthGate onAuthChange={refreshState}>
+          <OverviewTab commissions={commission} hosts={hosts} />
+        </AuthGate>
+      );
+      case 'roster': return (
+        <AuthGate onAuthChange={refreshState}>
+          <RosterTab />
+        </AuthGate>
+      );
+      case 'profiles': return (
+        <AuthGate onAuthChange={refreshState}>
+          <ProfilesTab />
+        </AuthGate>
+      );
+      case 'trends': return (
+        <AuthGate onAuthChange={refreshState}>
+          <TrendsTab />
+        </AuthGate>
+      );
+      case 'calendar': return (
+        <AuthGate onAuthChange={refreshState}>
+          <CalendarTab />
+        </AuthGate>
+      );
+      case 'dashboard': return (
+        <AuthGate onAuthChange={refreshState}>
+          <DirectorTab />
+        </AuthGate>
+      );
+      case 'reporting': return (
+        <AuthGate onAuthChange={refreshState}>
+          <DataReportingTab />
+        </AuthGate>
+      );
       case 'glossary': return <GlossaryTab />;
       default: return (
         <div className="flex items-center justify-center h-64 text-white/30 italic">
@@ -161,128 +184,187 @@ export default function App() {
   };
 
   const navItems = [
-    { id: 'overview', label: 'Overview', icon: LayoutDashboard },
-    { id: 'roster', label: 'Roster', icon: Users },
-    { id: 'profiles', label: 'Profiles', icon: ArrowUpRight },
-    { id: 'trends', label: 'Trends', icon: TrendingUp },
-    { id: 'calendar', label: 'Events', icon: Calendar },
-    { id: 'reporting', label: 'Reporting', icon: Activity },
-    { id: 'dashboard', label: 'Director Hub', icon: Lock, protected: true },
+    { id: 'home', label: 'Dashboard', icon: LayoutDashboard },
+    { id: 'overview', label: 'Analytics', icon: Activity, protected: true },
+    { id: 'roster', label: 'Roster', icon: Users, protected: true },
+    { id: 'profiles', label: 'Profiles', icon: ArrowUpRight, protected: true },
+    { id: 'trends', label: 'Trends', icon: TrendingUp, protected: true },
+    { id: 'calendar', label: 'Events', icon: Calendar, protected: true },
+    { id: 'reporting', label: 'Reporting', icon: Activity, protected: true },
+    { id: 'dashboard', label: 'Admin Panel', icon: Lock, protected: true },
     { id: 'glossary', label: 'Glossary', icon: BookOpen },
   ];
 
   return (
-    <AuthGate onAuthChange={refreshState}>
+    <div className="flex flex-col h-screen overflow-hidden bg-mesh">
+      {/* Login Modal Overlay */}
+      <AnimatePresence>
+        {showLoginModal && (
+          <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowLoginModal(false)}
+              className="absolute inset-0 bg-black/80 backdrop-blur-md"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="relative w-full max-w-sm"
+            >
+              <AuthGate onAuthChange={() => {
+                refreshState();
+                setShowLoginModal(false);
+                setActiveTab('overview');
+              }}>
+                <div className="hidden" /> {/* Dummy child for AuthGate */}
+              </AuthGate>
+              <button 
+                onClick={() => setShowLoginModal(false)}
+                className="absolute top-4 right-4 p-2 text-white/20 hover:text-white"
+              >
+                <X size={20} />
+              </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       <div className="flex flex-col h-screen overflow-hidden">
         {/* Header */}
-        <header className="h-16 border-b border-slate-800 flex items-center justify-between px-8 shrink-0 bg-[#0F1117]">
+        <header className="h-16 border-b border-slate-800 flex items-center justify-between px-4 sm:px-8 shrink-0 bg-[#0F1117] relative z-[100]">
           <div className="flex items-center gap-4">
-            <div className="flex items-center gap-3 pr-6 border-r border-slate-800">
+            <button 
+              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+              className="p-2 -ml-2 rounded-lg hover:bg-white/5 text-slate-400 md:hidden"
+            >
+              {isSidebarOpen ? <X size={20} /> : <Menu size={20} />}
+            </button>
+            <div className="flex items-center gap-3 pr-4 sm:pr-6 border-r border-slate-800">
               <div className="w-8 h-8 bg-indigo-600 rounded flex items-center justify-center font-bold text-white shadow-lg shadow-indigo-500/20">9</div>
-              <h1 className="text-lg font-bold tracking-tight text-white hidden sm:block">NINE <span className="text-slate-500 font-normal">TALENT</span></h1>
+              <h1 className="text-lg font-bold tracking-tight text-white hidden xs:block">NINE <span className="text-slate-500 font-normal">TALENT</span></h1>
             </div>
-            <h2 className="text-sm font-black uppercase tracking-[0.2em] text-indigo-400">
+            <h2 className="text-xs sm:text-sm font-black uppercase tracking-[0.2em] text-indigo-400 truncate max-w-[120px] sm:max-w-none">
               {navItems.find(n => n.id === activeTab)?.label}
             </h2>
           </div>
-          <div className="flex items-center gap-6">
-            {!firebaseUser && authState.role === 'Director' && (
-              <button 
-                onClick={handleGoogleSignIn}
-                disabled={isSyncingCloud}
-                className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-[10px] font-bold text-indigo-400 hover:bg-indigo-500/20 transition-all disabled:opacity-50"
-              >
-                {isSyncingCloud ? <Loader2 size={12} className="animate-spin" /> : <Globe size={12} />}
-                {isSyncingCloud ? 'SYNCING...' : 'SYNC CLOUD'}
-              </button>
-            )}
-
-            {/* Notifications */}
-            <div className="relative">
-              <button 
-                onClick={() => setShowNotifications(!showNotifications)}
-                className="relative p-2 rounded-full hover:bg-white/5 transition-colors text-slate-400 hover:text-indigo-400"
-              >
-                <Bell size={20} />
-                {notifications.some(n => !n.read) && (
-                  <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border-2 border-[#0F1117] shadow-lg shadow-red-500/20" />
-                )}
-              </button>
-
-              <AnimatePresence>
-                {showNotifications && (
-                  <>
-                    <div className="fixed inset-0 z-[80]" onClick={() => setShowNotifications(false)} />
-                    <motion.div 
-                      initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                      className="absolute right-0 mt-3 w-80 glass-card z-[90] p-0 overflow-hidden border-white/10 shadow-2xl"
-                    >
-                      <div className="p-4 border-b border-white/5 flex items-center justify-between bg-white/5">
-                        <h3 className="text-xs font-bold uppercase tracking-widest text-white/50">Notifications</h3>
-                        <button onClick={markAllRead} className="text-[10px] text-indigo-400 font-bold hover:underline">Mark all read</button>
-                      </div>
-                      <div className="max-h-96 overflow-y-auto custom-scrollbar">
-                        {notifications.length > 0 ? (
-                          notifications.map((n) => (
-                            <div key={n.id} className={cn(
-                              "p-4 border-b border-white/5 hover:bg-white/5 transition-colors relative group",
-                              !n.read && "bg-indigo-500/5"
-                            )}>
-                              <div className="flex gap-3">
-                                <div className={cn(
-                                  "w-2 h-2 rounded-full mt-1.5 shrink-0",
-                                  n.type === 'success' ? "bg-emerald-500" : 
-                                  n.type === 'warning' ? "bg-amber-500" :
-                                  n.type === 'error' ? "bg-red-500" : "bg-indigo-400"
-                                )} />
-                                <div className="space-y-1 pr-6">
-                                  <p className="text-xs font-bold text-white/90">{n.title}</p>
-                                  <p className="text-[11px] text-white/50 leading-relaxed">{n.message}</p>
-                                  <p className="text-[9px] text-white/20 font-mono">{formatDate(n.timestamp)}</p>
-                                </div>
-                              </div>
-                              <button 
-                                onClick={() => deleteNotification(n.id)}
-                                className="absolute right-2 top-2 p-1 text-white/10 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all"
-                              >
-                                <Trash2 size={12} />
-                              </button>
-                            </div>
-                          ))
-                        ) : (
-                          <div className="p-12 text-center">
-                            <Bell size={24} className="mx-auto text-white/10 mb-2" />
-                            <p className="text-xs text-white/20 italic">No notifications yet</p>
+          <div className="flex items-center gap-3 sm:gap-6">
+            {authState.level === 0 ? (
+              <div className="flex items-center gap-2">
+                <button 
+                  onClick={() => setShowLoginModal(true)}
+                  className="px-4 py-2 rounded-xl bg-indigo-600 text-white text-[10px] font-black uppercase tracking-widest shadow-lg shadow-indigo-500/20 hover:bg-indigo-500 transition-all"
+                >
+                  Member Login
+                </button>
+              </div>
+            ) : (
+              <>
+                {/* Notifications */}
+                <div className="relative">
+                  <button 
+                    onClick={() => setShowNotifications(!showNotifications)}
+                    className="relative p-2 rounded-full hover:bg-white/5 transition-colors text-slate-400 hover:text-indigo-400"
+                  >
+                    <Bell size={20} />
+                    {notifications.some(n => !n.read) && (
+                      <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border-2 border-[#0F1117] shadow-lg shadow-red-500/20" />
+                    )}
+                  </button>
+                  <AnimatePresence>
+                    {showNotifications && (
+                      <>
+                        <div className="fixed inset-0 z-[80]" onClick={() => setShowNotifications(false)} />
+                        <motion.div 
+                          initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                          animate={{ opacity: 1, y: 0, scale: 1 }}
+                          exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                          className="absolute right-0 mt-3 w-80 glass-card z-[90] p-0 overflow-hidden border-white/10 shadow-2xl"
+                        >
+                          <div className="p-4 border-b border-white/5 flex items-center justify-between bg-white/5">
+                            <h3 className="text-xs font-bold uppercase tracking-widest text-white/50">Notifications</h3>
+                            <button onClick={markAllRead} className="text-[10px] text-indigo-400 font-bold hover:underline">Mark all read</button>
                           </div>
-                        )}
-                      </div>
-                    </motion.div>
-                  </>
-                )}
-              </AnimatePresence>
-            </div>
+                          <div className="max-h-96 overflow-y-auto custom-scrollbar">
+                            {notifications.length > 0 ? (
+                              notifications.map((n) => (
+                                <div key={n.id} className={cn(
+                                  "p-4 border-b border-white/5 hover:bg-white/5 transition-colors relative group",
+                                  !n.read && "bg-indigo-500/5"
+                                )}>
+                                  <div className="flex gap-3">
+                                    <div className={cn(
+                                      "w-2 h-2 rounded-full mt-1.5 shrink-0",
+                                      n.type === 'success' ? "bg-emerald-500" : 
+                                      n.type === 'warning' ? "bg-amber-500" :
+                                      n.type === 'error' ? "bg-red-500" : "bg-indigo-400"
+                                    )} />
+                                    <div className="space-y-1 pr-6">
+                                      <p className="text-xs font-bold text-white/90">{n.title}</p>
+                                      <p className="text-[11px] text-white/50 leading-relaxed">{n.message}</p>
+                                      <p className="text-[9px] text-white/20 font-mono">{formatDate(n.timestamp)}</p>
+                                    </div>
+                                  </div>
+                                  <button 
+                                    onClick={() => deleteNotification(n.id)}
+                                    className="absolute right-2 top-2 p-1 text-white/10 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all"
+                                  >
+                                    <Trash2 size={12} />
+                                  </button>
+                                </div>
+                              ))
+                            ) : (
+                              <div className="p-12 text-center">
+                                <Bell size={24} className="mx-auto text-white/10 mb-2" />
+                                <p className="text-xs text-white/20 italic">No notifications yet</p>
+                              </div>
+                            )}
+                          </div>
+                        </motion.div>
+                      </>
+                    )}
+                  </AnimatePresence>
+                </div>
 
-            <div className="hidden sm:flex flex-col items-end">
-              <span className="text-[10px] font-semibold text-indigo-400 uppercase tracking-widest leading-none mb-1">
-                {authState.role}
-              </span>
-              <span className="text-xs text-slate-100">{authState.name}</span>
-            </div>
-            
-            <button 
-              onClick={handleLogout}
-              className="p-2 hover:bg-white/5 rounded-full transition-all text-white/30 hover:text-red-400"
-            >
-              <LogOut size={18} />
-            </button>
+                <div className="hidden lg:flex flex-col items-end">
+                  <span className="text-[10px] font-semibold text-indigo-400 uppercase tracking-widest leading-none mb-1">
+                    {authState.role}
+                  </span>
+                  <span className="text-xs text-slate-100">{authState.name}</span>
+                </div>
+                
+                <button 
+                  onClick={handleLogout}
+                  className="p-2 hover:bg-white/5 rounded-full transition-all text-white/30 hover:text-red-400"
+                >
+                  <LogOut size={18} />
+                </button>
+              </>
+            )}
           </div>
         </header>
 
-        <div className="flex flex-1 overflow-hidden">
+        <div className="flex flex-1 overflow-hidden relative">
+          {/* Overlay for mobile sidebar */}
+          <AnimatePresence>
+            {isSidebarOpen && (
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setIsSidebarOpen(false)}
+                className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[80] md:hidden"
+              />
+            )}
+          </AnimatePresence>
+
           {/* Vertical Sidebar */}
-          <nav className="w-64 border-r border-slate-800 flex flex-col p-4 gap-1 bg-[#0F1117] shrink-0">
+          <nav className={cn(
+            "fixed inset-y-0 left-0 z-[90] w-64 border-r border-slate-800 flex flex-col p-4 gap-1 bg-[#0F1117] transition-transform duration-300 md:relative md:translate-x-0",
+            isSidebarOpen ? "translate-x-0" : "-translate-x-full"
+          )}>
             <div className="text-[10px] font-black text-slate-600 uppercase tracking-[0.2em] px-3 mb-2 mt-4">Command Center</div>
             {navItems.map(item => {
               const Icon = item.icon;
@@ -290,10 +372,15 @@ export default function App() {
               return (
                 <button
                   key={item.id}
-                  onClick={() => !isProtected && setActiveTab(item.id as Tab)}
+                  onClick={() => {
+                    if (!isProtected) {
+                      setActiveTab(item.id as Tab);
+                      setIsSidebarOpen(false);
+                    }
+                  }}
                   disabled={isProtected}
                   className={cn(
-                    "flex items-center gap-3 px-3 py-2.5 rounded text-sm transition-all relative whitespace-nowrap text-left",
+                    "flex items-center gap-3 px-3 py-2.5 rounded text-sm transition-all relative whitespace-nowrap text-left w-full",
                     activeTab === item.id 
                       ? "nav-item-active" 
                       : "nav-item-inactive",
@@ -316,7 +403,7 @@ export default function App() {
           </nav>
 
           {/* Main Content Area */}
-          <main className="flex-1 overflow-y-auto bg-[#0A0B0E] p-8 custom-scrollbar relative">
+          <main className="flex-1 overflow-y-auto bg-[#0A0B0E] p-4 sm:p-8 custom-scrollbar relative">
             <AnimatePresence mode="wait">
               {isLoading ? (
                 <motion.div 
@@ -354,7 +441,7 @@ export default function App() {
           <div>© 2026 NINE Talent Mgmt — Leadership Access Only</div>
         </footer>
       </div>
-    </AuthGate>
+    </div>
   );
 }
 
@@ -582,7 +669,9 @@ const OverviewTab = ({ commissions, hosts }: { commissions: CommissionEntry[], h
             {logs.slice(0, 15).map((log, i) => (
               <div key={log.id} className="flex gap-3 text-sm border-b border-white/5 pb-3">
                 <div className="shrink-0 w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-xs">
-                  {log.type === 'Auth' ? '🔐' : '📝'}
+                  {log.type === 'AUTH' ? '🔐' : 
+                   log.type === 'FINANCE' ? '💰' : 
+                   log.type === 'ROSTER' ? '📋' : '📝'}
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-white/80 line-clamp-2 leading-snug">{log.action}</p>
@@ -623,59 +712,86 @@ const OverviewTab = ({ commissions, hosts }: { commissions: CommissionEntry[], h
               </select>
             </div>
          </div>
-         {auth.level < 2 ? (
+          {auth.level < 2 ? (
             <div className="py-20 flex flex-col items-center justify-center gap-4 text-white/20">
                <Lock size={40} strokeWidth={1} />
                <p className="text-white/40">Authenticated access required to view ranking data</p>
             </div>
          ) : (
-           <div className="overflow-x-auto">
-             <table className="w-full text-left">
-               <thead>
-                 <tr className="border-b border-white/10 text-[10px] font-bold text-white/30 uppercase tracking-widest">
-                   <th className="px-4 py-3 cursor-pointer group hover:text-white transition-colors" onClick={() => requestSort('rank')}>
-                     Rank <SortIcon column="rank" />
-                   </th>
-                   <th className="px-4 py-3 cursor-pointer group hover:text-white transition-colors" onClick={() => requestSort('id')}>
-                     POPPO ID <SortIcon column="id" />
-                   </th>
-                   <th className="px-4 py-3 cursor-pointer group hover:text-white transition-colors" onClick={() => requestSort('name')}>
-                     Name <SortIcon column="name" />
-                   </th>
-                   <th className="px-4 py-3 text-right cursor-pointer group hover:text-white transition-colors" onClick={() => requestSort('totalPoints')}>
-                     Points <SortIcon column="totalPoints" />
-                   </th>
-                   <th className="px-4 py-3 text-right cursor-pointer group hover:text-white transition-colors" onClick={() => requestSort('commission')}>
-                     Rate <SortIcon column="commission" />
-                   </th>
-                   <th className="px-4 py-3 text-center cursor-pointer group hover:text-white transition-colors" onClick={() => requestSort('monthsActive')}>
-                     Freq <SortIcon column="monthsActive" />
-                   </th>
-                 </tr>
-               </thead>
-               <tbody className="divide-y divide-white/5">
-                 {sortedHosts.map((host, i) => (
-                    <tr key={host.id} className="hover:bg-white/5 transition-colors group">
-                      <td className="px-4 py-4 font-bold text-white/50 text-base">#{hostRankings.indexOf(host) + 1}</td>
-                      <td className="px-4 py-4 font-mono text-xs text-cyan-400/60">{host.id}</td>
-                      <td className="px-4 py-4 font-bold text-white/90">{host.name}</td>
-                      <td className="px-4 py-4 text-right font-mono text-sm text-emerald-400">
-                        {formatNumber(host.totalPoints)} pts
-                      </td>
-                      <td className="px-4 py-4 text-right font-medium text-[10px] text-white/40">{host.base_salary_category}</td>
-                      <td className="px-4 py-4 text-center">
-                        <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-white/5 border border-white/10 text-[10px] font-bold">{host.monthsActive}</span>
-                      </td>
-                    </tr>
-                 ))}
-                 {sortedHosts.length === 0 && (
-                   <tr>
-                     <td colSpan={6} className="py-20 text-center text-white/20 italic">No rankings available for this period</td>
+           <>
+             {/* Desktop Table View */}
+             <div className="hidden md:block overflow-x-auto">
+               <table className="w-full text-left">
+                 <thead>
+                   <tr className="border-b border-white/10 text-[10px] font-bold text-white/30 uppercase tracking-widest">
+                     <th className="px-4 py-3 cursor-pointer group hover:text-white transition-colors" onClick={() => requestSort('rank')}>
+                       Rank <SortIcon column="rank" />
+                     </th>
+                     <th className="px-4 py-3 cursor-pointer group hover:text-white transition-colors" onClick={() => requestSort('id')}>
+                       POPPO ID <SortIcon column="id" />
+                     </th>
+                     <th className="px-4 py-3 cursor-pointer group hover:text-white transition-colors" onClick={() => requestSort('name')}>
+                       Name <SortIcon column="name" />
+                     </th>
+                     <th className="px-4 py-3 text-right cursor-pointer group hover:text-white transition-colors" onClick={() => requestSort('totalPoints')}>
+                       Points <SortIcon column="totalPoints" />
+                     </th>
+                     <th className="px-4 py-3 text-right cursor-pointer group hover:text-white transition-colors" onClick={() => requestSort('commission')}>
+                       Rate <SortIcon column="commission" />
+                     </th>
+                     <th className="px-4 py-3 text-center cursor-pointer group hover:text-white transition-colors" onClick={() => requestSort('monthsActive')}>
+                       Freq <SortIcon column="monthsActive" />
+                     </th>
                    </tr>
-                 )}
-               </tbody>
-             </table>
-           </div>
+                 </thead>
+                 <tbody className="divide-y divide-white/5">
+                   {sortedHosts.map((host, i) => (
+                      <tr key={host.id} className="hover:bg-white/5 transition-colors group">
+                        <td className="px-4 py-4 font-bold text-white/50 text-base">#{hostRankings.indexOf(host) + 1}</td>
+                        <td className="px-4 py-4 font-mono text-xs text-cyan-400/60">{host.id}</td>
+                        <td className="px-4 py-4 font-bold text-white/90">{host.name}</td>
+                        <td className="px-4 py-4 text-right font-mono text-sm text-emerald-400">
+                          {formatNumber(host.totalPoints)} pts
+                        </td>
+                        <td className="px-4 py-4 text-right font-medium text-[10px] text-white/40">{host.base_salary_category}</td>
+                        <td className="px-4 py-4 text-center">
+                          <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-white/5 border border-white/10 text-[10px] font-bold">{host.monthsActive}</span>
+                        </td>
+                      </tr>
+                   ))}
+                 </tbody>
+               </table>
+             </div>
+
+             {/* Mobile Card View */}
+             <div className="md:hidden space-y-4">
+               {sortedHosts.map((host, i) => (
+                 <div key={host.id} className="p-4 bg-white/5 rounded-xl border border-white/5 space-y-3">
+                   <div className="flex justify-between items-start">
+                     <div className="flex items-center gap-3">
+                       <span className="text-lg font-black text-white/20">#{hostRankings.indexOf(host) + 1}</span>
+                       <div>
+                         <p className="font-bold text-white text-sm tracking-tight">{host.name}</p>
+                         <p className="text-[10px] font-mono text-white/20">ID: {host.id}</p>
+                       </div>
+                     </div>
+                     <div className="text-right">
+                       <p className="text-sm font-bold text-emerald-400 font-mono">{formatNumber(host.totalPoints)} pts</p>
+                       <p className="text-[10px] font-medium text-white/40 uppercase">{host.base_salary_category}</p>
+                     </div>
+                   </div>
+                   <div className="pt-2 border-t border-white/5 flex justify-between items-center text-[10px]">
+                     <span className="text-white/30 uppercase tracking-widest font-bold">Frequency</span>
+                     <span className="px-2 py-0.5 rounded bg-white/5 border border-white/10 font-bold">{host.monthsActive} Months</span>
+                   </div>
+                 </div>
+               ))}
+             </div>
+
+             {sortedHosts.length === 0 && (
+               <div className="py-20 text-center text-white/20 italic">No rankings available for this period</div>
+             )}
+           </>
          )}
       </div>
     </div>
