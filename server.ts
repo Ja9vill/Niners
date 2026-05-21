@@ -4,8 +4,6 @@ import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
 
-import * as SheetsBackend from "./src/server/sheetsBackend";
-
 dotenv.config();
 
 async function startServer() {
@@ -18,85 +16,6 @@ async function startServer() {
   // API routes
   app.get("/api/health", (req, res) => {
     res.json({ status: "ok" });
-  });
-
-  // --- SHEET-BACKED AUTH ---
-  app.post("/api/sheets/auth", async (req, res) => {
-    const result = await SheetsBackend.handleAuthRoute(req);
-    res.status(result.status).json(result.data);
-  });
-
-  // --- ROSTER MANAGEMENT ---
-  app.get("/api/sheets/roster", async (req, res) => {
-    const result = await SheetsBackend.handleRosterRoute();
-    res.status(result.status).json(result.data);
-  });
-
-  // --- LOGS (FEEDS & VERSION CONTROL) ---
-  app.post("/api/sheets/logs/activity", async (req, res) => {
-    const result = await SheetsBackend.handleActivityLogRoute(req);
-    res.status(result.status).json(result.data);
-  });
-
-  app.get("/api/sheets/logs/activity", async (req, res) => {
-    const result = await SheetsBackend.handleGetActivityLogsRoute();
-    res.status(result.status).json(result.data);
-  });
-
-  app.post("/api/sheets/logs/version", async (req, res) => {
-    const result = await SheetsBackend.handleVersionLogRoute(req);
-    res.status(result.status).json(result.data);
-  });
-
-  // --- FINANCIAL DATA MANAGEMENT ---
-  app.get("/api/sheets/commissions", async (req, res) => {
-    const result = await SheetsBackend.handleCommissionsRoute(req);
-    res.status(result.status).json(result.data);
-  });
-
-  app.post("/api/sheets/commissions/save", async (req, res) => {
-    const result = await SheetsBackend.handleSaveCommissionsRoute(req);
-    res.status(result.status).json(result.data);
-  });
-
-  app.delete("/api/sheets/commissions/delete", async (req, res) => {
-    const result = await SheetsBackend.handleDeleteCommissionsRoute(req);
-    res.status(result.status).json(result.data);
-  });
-
-  app.post("/api/sheets/roster/save", async (req, res) => {
-    const result = await SheetsBackend.handleSaveRosterRoute(req);
-    res.status(result.status).json(result.data);
-  });
-
-  app.post("/api/sheets/roster/update", async (req, res) => {
-    const result = await SheetsBackend.handleUpdateHostRoute(req);
-    res.status(result.status).json(result.data);
-  });
-
-  app.get("/api/sheets/notes", async (req, res) => {
-    const result = await SheetsBackend.handleGetNotesRoute(req);
-    res.status(result.status).json(result.data);
-  });
-
-  app.post("/api/sheets/notes/save", async (req, res) => {
-    const result = await SheetsBackend.handleSaveNoteRoute(req);
-    res.status(result.status).json(result.data);
-  });
-
-  app.get("/api/sheets/resets", async (req, res) => {
-    const result = await SheetsBackend.handleGetResetsRoute();
-    res.status(result.status).json(result.data);
-  });
-
-  app.post("/api/sheets/resets/create", async (req, res) => {
-    const result = await SheetsBackend.handleCreateResetRequestRoute(req);
-    res.status(result.status).json(result.data);
-  });
-
-  app.post("/api/sheets/resets/resolve", async (req, res) => {
-    const result = await SheetsBackend.handleResolveResetRequestRoute(req);
-    res.status(result.status).json(result.data);
   });
 
   app.post("/api/extract-mastersheet", async (req, res) => {

@@ -36,10 +36,9 @@ export const Storage = {
   getLogs: (): ActivityLog[] => JSON.parse(localStorage.getItem(`${PREFIX}activity_log`) || '[]'),
   addLog: (type: string, action: string, user: string) => {
     const logs = Storage.getLogs();
-    const normalizedType = type.toUpperCase() as any;
     const newLog: ActivityLog = {
       id: crypto.randomUUID(),
-      type: normalizedType,
+      type,
       action,
       user,
       timestamp: new Date().toISOString(),
@@ -72,9 +71,9 @@ export const Storage = {
   // Auth State (session only)
   getAuthState: () => {
     const state = sessionStorage.getItem(`${PREFIX}auth`);
-    return state ? JSON.parse(state) : { level: 0, role: '', name: '', poppo_id: '', team: '', manager: '' };
+    return state ? JSON.parse(state) : { level: 0, role: '', name: '' };
   },
-  setAuthState: (state: { level: number; role: string; name: string; poppo_id: string; team: string; manager: string }) => {
+  setAuthState: (state: { level: number; role: string; name: string }) => {
     sessionStorage.setItem(`${PREFIX}auth`, JSON.stringify(state));
   }
 };

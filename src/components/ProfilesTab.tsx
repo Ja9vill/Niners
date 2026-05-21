@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { Search, Filter, TrendingUp, BarChart3, PieChart, Info, UserPen, Target, Plus, ChevronRight, X, Shield, Edit2, Loader2, Fingerprint } from 'lucide-react';
 import { Host, Tier, BaseSalaryTier, HostStatus, AnchorType, PerformanceGoal, Position, CommissionEntry, DirectorNote, NoteType } from '../types';
 import { Storage } from '../lib/storage';
-import { SheetService } from '../lib/sheetService';
+import { FirebaseService } from '../lib/firebaseService';
 import { cn, formatNumber } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 import { MANAGERS, BASE_SALARY_POLICIES } from '../lib/constants';
@@ -49,7 +49,7 @@ export const ProfilesTab = () => {
     const load = async () => {
       setIsLoading(true);
       try {
-        const data = await SheetService.getRoster();
+        const data = await FirebaseService.getAllHosts();
         setHosts(data);
       } catch (err) {
         console.error("Failed to load profiles:", err);
@@ -100,7 +100,7 @@ export const ProfilesTab = () => {
   const loadNotes = async (id: string) => {
     setIsLoadingNotes(true);
     try {
-      const data = await SheetService.getNotesByHost(id);
+      const data = await FirebaseService.getNotesByHost(id);
       setHostNotes(data as DirectorNote[]);
     } catch (err) {
       console.error("Failed to load notes:", err);
@@ -112,7 +112,7 @@ export const ProfilesTab = () => {
   useEffect(() => {
     if (selectedHostId) {
       setIsLoadingCommissions(true);
-      SheetService.getCommissions().then(all => {
+      FirebaseService.getAllCommissions().then(all => {
         const hostComms = all.filter(c => c.poppo_id === selectedHostId)
           .sort((a, b) => a.month.localeCompare(b.month));
         setCommissions(hostComms);
@@ -187,7 +187,7 @@ export const ProfilesTab = () => {
     };
     
     try {
-      await SheetService.saveNote(note);
+      await FirebaseService.saveNote(note);
       setNewNoteContent('');
       loadNotes(selectedHost.id);
       Storage.addLog('Profiles', `Added ${newNoteType} for ${selectedHost.name}`, auth.name);
@@ -224,7 +224,7 @@ export const ProfilesTab = () => {
     };
 
     try {
-      await SheetService.updateHost(updatedHost);
+      await FirebaseService.updateHost(updatedHost);
       const updatedHosts = hosts.map(h => h.id === selectedHost.id ? updatedHost : h);
       setHosts(updatedHosts);
       Storage.addLog('Profiles', `Updated profile for ${updatedHost.name} (#${updatedHost.id})`, auth.name);
@@ -359,7 +359,7 @@ export const ProfilesTab = () => {
             >
               <div className="aspect-[3/4] bg-slate-800 relative">
                 {host.photoUrl ? (
-                  <img src={host.photoUrl || undefined} alt={host.name} className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all" referrerPolicy="no-referrer" />
+                  <img src={host.photoUrl} alt={host.name} className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all" referrerPolicy="no-referrer" />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center text-slate-700 font-bold text-3xl">
                     {host.name?.[0] || '?'}
@@ -405,7 +405,7 @@ export const ProfilesTab = () => {
                 <div className="flex items-center gap-4">
                   <div className="w-16 h-16 rounded-2xl bg-slate-800 overflow-hidden border border-white/10 shrink-0">
                     {selectedHost.photoUrl ? (
-                      <img src={selectedHost.photoUrl || undefined} alt={selectedHost.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                      <img src={selectedHost.photoUrl} alt={selectedHost.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center font-bold text-2xl text-slate-600">
                         {selectedHost.name?.[0] || '?'}
@@ -611,7 +611,7 @@ export const ProfilesTab = () => {
                                          content,
                                          createdAt: new Date().toISOString()
                                        };
-                                       SheetService.saveNote(note).then(() => loadNotes(selectedHost.id));
+                                       FirebaseService.saveNote(note).then(() => loadNotes(selectedHost.id));
                                      }
                                    }}
                                    className="p-1.5 bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500 hover:text-white rounded-lg transition-all"
@@ -650,7 +650,7 @@ export const ProfilesTab = () => {
                                          <button 
                                            onClick={async () => {
                                               if (confirm("Delete this management note?")) {
-                                                await SheetService.deleteNote(note.id);
+                                                await FirebaseService.deleteNote(note.id);
                                                 loadNotes(selectedHost.id);
                                               }
                                            }}
@@ -931,7 +931,7 @@ export const ProfilesTab = () => {
                       </div>
                       <div className="w-20 h-20 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center overflow-hidden shrink-0 shadow-2xl">
                         <img 
-                          src={uploadedPhoto || selectedHost.photoUrl || undefined} 
+                          src={uploadedPhoto || selectedHost.photoUrl || ''} 
                           alt="Preview" 
                           className="w-full h-full object-cover" 
                           onError={(e) => {

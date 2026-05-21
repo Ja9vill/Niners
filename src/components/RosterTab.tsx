@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Search, Plus, Edit2, Trash2, Shield, MessageSquare, X, ListTodo, CheckCircle, TrendingUp, Users, Loader2 } from 'lucide-react';
 import { Host, Position, BaseSalaryTier, HostStatus, AnchorType, TaskStatus, Tier, DirectorNote } from '../types';
 import { Storage } from '../lib/storage';
-import { SheetService } from '../lib/sheetService';
+import { FirebaseService } from '../lib/firebaseService';
 import { cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -38,7 +38,7 @@ export const RosterTab = () => {
   const loadNotes = async (id: string) => {
     setIsLoadingNotes(true);
     try {
-      const data = await SheetService.getNotesByHost(id);
+      const data = await FirebaseService.getNotesByHost(id);
       setHostNotes(data as DirectorNote[]);
     } catch (err) {
       console.error("Failed to load notes:", err);
@@ -61,7 +61,7 @@ export const RosterTab = () => {
     const load = async () => {
       setIsLoading(true);
       try {
-        const data = await SheetService.getRoster();
+        const data = await FirebaseService.getAllHosts();
         setHosts(data);
       } catch (err) {
         console.error("Failed to load roster:", err);
@@ -98,7 +98,7 @@ export const RosterTab = () => {
       if (editingNoteId) {
         const note = hostNotes.find(n => n.id === editingNoteId);
         if (note) {
-          await SheetService.saveNote({ ...note, content });
+          await FirebaseService.saveNote({ ...note, content });
           Storage.addLog('Roster', `Updated note for host #${viewingNotes}`, auth.name);
         }
         setEditingNoteId(null);
@@ -112,7 +112,7 @@ export const RosterTab = () => {
           createdAt: new Date().toISOString()
         };
         
-        await SheetService.saveNote(newNote);
+        await FirebaseService.saveNote(newNote);
         Storage.addLog('Roster', `Added note to host #${viewingNotes}`, auth.name);
       }
       loadNotes(viewingNotes);
@@ -125,7 +125,7 @@ export const RosterTab = () => {
   const handleDeleteNote = async (noteId: string) => {
     if (!viewingNotes || !confirm('Delete this note?')) return;
     try {
-      await SheetService.deleteNote(noteId);
+      await FirebaseService.deleteNote(noteId);
       Storage.addLog('Roster', `Deleted note from host #${viewingNotes}`, auth.name);
       loadNotes(viewingNotes);
     } catch (err) {
@@ -249,7 +249,7 @@ export const RosterTab = () => {
     let updated;
     try {
       if (editingHost) {
-        await SheetService.updateHost(newHost);
+        await FirebaseService.updateHost(newHost);
         updated = hosts.map(h => h.id === editingHost.id ? newHost : h);
         Storage.addLog('Roster', `Updated member ${newHost.name} (#${newHost.id})`, auth.name);
       } else {
@@ -257,7 +257,7 @@ export const RosterTab = () => {
           alert('Poppo ID already exists in Roster');
           return;
         }
-        await SheetService.saveHosts([newHost]);
+        await FirebaseService.saveHosts([newHost]);
         updated = [...hosts, newHost];
         Storage.addLog('Roster', `Provisioned new member ${newHost.name} (#${newHost.id})`, auth.name);
       }
@@ -326,13 +326,11 @@ export const RosterTab = () => {
   const handleDelete = async (id: string) => {
     if (!confirm('Are you sure you want to remove this member?')) return;
     try {
+      await FirebaseService.deleteHost(id);
       const h = hosts.find(x => x.id === id);
-      if (h) {
-        await SheetService.updateHost({ ...h, status: 'Released' });
-        const updated = hosts.filter(host => host.id !== id);
-        setHosts(updated);
-        Storage.addLog('Roster', `Released member ${h.name} (#${id})`, auth.name);
-      }
+      const updated = hosts.filter(h => h.id !== id);
+      setHosts(updated);
+      Storage.addLog('Roster', `Deleted member ${h?.name} (#${id})`, auth.name);
     } catch (err) {
       alert("Delete failed");
     }
@@ -353,7 +351,7 @@ export const RosterTab = () => {
               <div key={m.id} className="glass-card !p-4 flex items-center gap-4 group bg-[#0F1117]">
                 <div className="w-10 h-10 rounded bg-slate-800 flex items-center justify-center font-bold text-slate-500 overflow-hidden shrink-0 border border-white/5">
                   {m.photoUrl ? (
-                    <img src={m.photoUrl || undefined} alt={m.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                    <img src={m.photoUrl} alt={m.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                   ) : (
                     m.name?.[0] || '?'
                   )}
@@ -419,7 +417,7 @@ export const RosterTab = () => {
                     <div className="flex items-center gap-4">
                       <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center font-black text-white/20 overflow-hidden shrink-0 border border-white/5 shadow-inner">
                         {host.photoUrl ? (
-                          <img src={host.photoUrl || undefined} alt={host.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                          <img src={host.photoUrl} alt={host.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                         ) : (
                           host.nickname?.[0] || '?'
                         )}
@@ -471,7 +469,7 @@ export const RosterTab = () => {
                 <div className="flex items-center gap-3">
                   <div className="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center font-black text-white/20 overflow-hidden border border-white/5 shadow-inner">
                     {host.photoUrl ? (
-                      <img src={host.photoUrl || undefined} alt={host.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                      <img src={host.photoUrl} alt={host.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                     ) : (
                       host.nickname?.[0] || '?'
                     )}
@@ -643,9 +641,9 @@ export const RosterTab = () => {
         {isAdding && (
           <div className="fixed inset-0 z-[60] flex items-center justify-center p-6">
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => { setIsAdding(false); setEditingHost(null); }} className="absolute inset-0 bg-navy/80 backdrop-blur-sm" />
-            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="relative w-full max-w-lg glass rounded-3xl overflow-hidden border border-white/10 flex flex-col max-h-[90vh]">
-              <div className="p-6 border-b border-white/5 flex items-center justify-between shrink-0"><h3 className="font-bold">{editingHost ? 'Edit' : 'Add'} Member</h3></div>
-              <form onSubmit={handleSave} className="p-6 space-y-6 overflow-y-auto custom-scrollbar">
+            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="relative w-full max-w-lg glass rounded-3xl overflow-hidden border border-white/10">
+              <div className="p-6 border-b border-white/5 flex items-center justify-between"><h3 className="font-bold">{editingHost ? 'Edit' : 'Add'} Member</h3></div>
+              <form onSubmit={handleSave} className="p-6 space-y-6">
                 <div className="grid grid-cols-2 gap-6">
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">Poppo ID</label>
@@ -745,7 +743,7 @@ export const RosterTab = () => {
                       </div>
                       <div className="w-20 h-20 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center overflow-hidden shrink-0 shadow-2xl relative group">
                         <img 
-                          src={uploadedPhoto || editingHost?.photoUrl || undefined} 
+                          src={uploadedPhoto || editingHost?.photoUrl || ''} 
                           alt="Preview" 
                           className="w-full h-full object-cover" 
                           onError={(e) => {
@@ -765,9 +763,9 @@ export const RosterTab = () => {
                     <textarea name="description" defaultValue={editingHost?.description} className="w-full glass-input h-24 resize-none" placeholder="Details about host background..." />
                   </div>
                 </div>
-                <div className="pt-4 flex gap-4 shrink-0">
+                <div className="pt-4 flex gap-4">
                    <button type="button" onClick={() => { setIsAdding(false); setEditingHost(null); }} className="flex-1 px-6 py-4 rounded-2xl bg-white/5 text-white/40 font-black uppercase text-[10px] tracking-widest border border-white/5">Cancel</button>
-                   <button type="submit" className="flex-[2] btn-primary py-4 text-[10px] font-black uppercase tracking-[0.2em] shadow-xl shadow-indigo-500/20">{editingHost ? 'Commit Changes' : 'Add Member'}</button>
+                   <button type="submit" className="flex-[2] btn-primary py-4 text-[10px] font-black uppercase tracking-[0.2em] shadow-xl shadow-indigo-500/20">{editingHost ? 'Commit Changes' : 'Provision Member'}</button>
                 </div>
               </form>
             </motion.div>

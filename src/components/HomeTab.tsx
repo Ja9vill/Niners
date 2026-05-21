@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
   TrendingUp, 
   Trophy, 
@@ -16,9 +16,8 @@ import {
   List,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Host, CommissionEntry, ActivityLog } from '../types';
+import { Host, CommissionEntry } from '../types';
 import { formatNumber, cn, formatDate, formatMonth } from '../lib/utils';
-import { SheetService } from '../lib/sheetService';
 import { Storage } from '../lib/storage';
 
 interface HomeTabProps {
@@ -29,58 +28,26 @@ interface HomeTabProps {
 
 export const HomeTab: React.FC<HomeTabProps> = ({ hosts, commissions, onOpenLogin }) => {
   const [activeSubTab, setActiveSubTab] = useState<'niners' | 'feeds' | 'calendar' | 'roster'>('niners');
-  const [selectedYear, setSelectedYear] = useState<string>('all');
   const [selectedMonth, setSelectedMonth] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
-  const [feeds, setFeeds] = useState<ActivityLog[]>([]);
-
-  const years = useMemo(() => {
-    const y = Array.from(new Set(commissions.map(c => c.month.split('-')[0]))).sort().reverse();
-    return y;
-  }, [commissions]);
 
   const months = useMemo(() => {
-    const filtered = selectedYear === 'all' ? commissions : commissions.filter(c => c.month.startsWith(selectedYear));
-    const m = Array.from(new Set(filtered.map(c => c.month))).sort().reverse();
+    const m = Array.from(new Set(commissions.map(c => c.month))).sort().reverse();
     return m;
-  }, [commissions, selectedYear]);
-
-  useEffect(() => {
-    const loadFeeds = async () => {
-      try {
-        const logs = await SheetService.getAllLogs();
-        setFeeds(logs);
-      } catch (err) {
-        console.error('Failed to load feeds:', err);
-      }
-    };
-    if (activeSubTab === 'feeds') {
-      loadFeeds();
-    }
-  }, [activeSubTab]);
+  }, [commissions]);
 
   const topNiners = useMemo(() => {
-    let filtered = commissions;
-    if (selectedYear !== 'all') {
-      filtered = filtered.filter(c => c.month.startsWith(selectedYear));
-    }
-    if (selectedMonth !== 'all') {
-      filtered = filtered.filter(c => c.month === selectedMonth);
-    }
-    
+    const filtered = selectedMonth === 'all' ? commissions : commissions.filter(c => c.month === selectedMonth);
     const hostPoints = hosts.map(host => {
-      const hostCommissions = filtered.filter(c => c.poppo_id === host.id);
-      const totalPoints = hostCommissions.reduce((sum, c) => sum + (c.total_points || 0), 0);
-      const hostAgencyCommission = hostCommissions.reduce((sum, c) => sum + (c.agentweb_commission_earning || 0), 0);
-      
-      const totalAgencyCommissions = filtered.reduce((sum, c) => sum + (c.agentweb_commission_earning || 0), 0);
-      const contribution = totalAgencyCommissions > 0 ? (hostAgencyCommission / totalAgencyCommissions) * 100 : 0;
-      
-      return { ...host, totalPoints, contribution, hostAgencyCommission };
+      const pts = filtered
+        .filter(c => c.poppo_id === host.id)
+        .reduce((sum, c) => sum + (c.total_points || 0), 0);
+      const totalAgencyPts = filtered.reduce((sum, c) => sum + (c.total_points || 0), 0);
+      const contribution = totalAgencyPts > 0 ? (pts / totalAgencyPts) * 100 : 0;
+      return { ...host, totalPoints: pts, contribution };
     });
-
-    return hostPoints.sort((a, b) => b.hostAgencyCommission - a.hostAgencyCommission).slice(0, 10);
-  }, [hosts, commissions, selectedMonth, selectedYear]);
+    return hostPoints.sort((a, b) => b.totalPoints - a.totalPoints).slice(0, 10);
+  }, [hosts, commissions, selectedMonth]);
 
   const renderRankingTable = () => (
     <div className="glass-card mt-8">
@@ -94,17 +61,6 @@ export const HomeTab: React.FC<HomeTabProps> = ({ hosts, commissions, onOpenLogi
         </div>
         <div className="flex items-center gap-2">
           <Filter size={14} className="text-white/20" />
-          <select 
-            value={selectedYear}
-            onChange={(e) => {
-              setSelectedYear(e.target.value);
-              setSelectedMonth('all');
-            }}
-            className="bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-xs font-bold text-white outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all"
-          >
-            <option value="all">📅 All Years</option>
-            {years.map(y => <option key={y} value={y}>{y}</option>)}
-          </select>
           <select 
             value={selectedMonth}
             onChange={(e) => setSelectedMonth(e.target.value)}
@@ -124,7 +80,7 @@ export const HomeTab: React.FC<HomeTabProps> = ({ hosts, commissions, onOpenLogi
               <th className="px-4 py-2">Host Profile</th>
               <th className="px-4 py-2">Poppo ID</th>
               <th className="px-4 py-2 text-right">Contribution</th>
-              <th className="px-4 py-2 text-right">Commission Earned</th>
+              <th className="px-4 py-2 text-right">Points</th>
             </tr>
           </thead>
           <tbody>
@@ -174,7 +130,7 @@ export const HomeTab: React.FC<HomeTabProps> = ({ hosts, commissions, onOpenLogi
                   </div>
                 </td>
                 <td className="px-4 py-4 text-right">
-                  <span className="font-mono text-sm font-black text-white/90">{formatNumber(host.hostAgencyCommission)}</span>
+                  <span className="font-mono text-sm font-black text-white/90">{formatNumber(host.totalPoints)}</span>
                 </td>
               </tr>
             ))}
@@ -252,31 +208,24 @@ export const HomeTab: React.FC<HomeTabProps> = ({ hosts, commissions, onOpenLogi
             </button>
          </div>
          <div className="space-y-6">
-            {feeds.length > 0 ? (
-              feeds.slice(0, 20).map((log) => (
-                <div key={log.id} className="flex gap-4 p-4 rounded-3xl bg-white/[0.02] border border-white/5 hover:border-white/10 transition-all">
-                  <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 flex items-center justify-center shrink-0">
-                    <Activity className="text-indigo-400" size={20} />
+            {Storage.getLogs().slice(0, 10).map((log) => (
+              <div key={log.id} className="flex gap-4 p-4 rounded-3xl bg-white/[0.02] border border-white/5 hover:border-white/10 transition-all">
+                <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 flex items-center justify-center shrink-0">
+                  <Activity className="text-indigo-400" size={20} />
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-black uppercase tracking-widest text-indigo-400">{log.type}</p>
+                    <span className="text-[10px] font-mono text-white/10">{formatDate(log.timestamp)}</span>
                   </div>
-                  <div className="flex-1">
-                    <div className="flex items-center justify-between">
-                      <p className="text-xs font-black uppercase tracking-widest text-indigo-400">{log.type}</p>
-                      <span className="text-[10px] font-mono text-white/10">{formatDate(log.timestamp)}</span>
-                    </div>
-                    <p className="text-sm text-white/80 mt-1 leading-relaxed">{log.action}</p>
-                    <div className="mt-3 flex items-center gap-2">
-                      <div className="w-5 h-5 rounded-full bg-white/10" />
-                      <span className="text-[10px] font-bold text-white/30 uppercase tracking-widest">{log.user}</span>
-                    </div>
+                  <p className="text-sm text-white/80 mt-1 leading-relaxed">{log.action}</p>
+                  <div className="mt-3 flex items-center gap-2">
+                    <div className="w-5 h-5 rounded-full bg-white/10" />
+                    <span className="text-[10px] font-bold text-white/30 uppercase tracking-widest">{log.user}</span>
                   </div>
                 </div>
-              ))
-            ) : (
-              <div className="p-20 text-center border-2 border-dashed border-white/5 rounded-3xl opacity-20">
-                <Activity size={32} className="mx-auto mb-4" />
-                <p className="text-sm italic">The Agency Feed is currently silent...</p>
               </div>
-            )}
+            ))}
          </div>
       </div>
     </div>

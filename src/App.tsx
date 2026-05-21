@@ -20,8 +20,10 @@ import {
 } from 'lucide-react';
 import { AuthGate } from './components/AuthGate';
 import { Storage } from './lib/storage';
-import { SheetService } from './lib/sheetService';
+import { FirebaseService } from './lib/firebaseService';
 import { CommissionEntry, Host } from './types';
+import { auth, signInWithGoogle } from './lib/firebase';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { INITIAL_HOSTS, INITIAL_COMMISSION, TIMELINE_DATA } from './lib/constants';
 import { formatNumber, cn, formatDate, formatMonth } from './lib/utils';
 import {
@@ -59,36 +61,54 @@ export default function App() {
   const [notifications, setNotifications] = useState(Storage.getNotifications());
   const [showNotifications, setShowNotifications] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [firebaseUser, setFirebaseUser] = useState(auth.currentUser);
   const [isSyncingCloud, setIsSyncingCloud] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   useEffect(() => {
-    // Session persistent cleanup for Sheet-backed auth if needed
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setFirebaseUser(user);
+      // Automatically upgrade local storage session if Firebase reports verified admin
+      if (user?.email === 'jwavpr@gmail.com') {
+        const currentAuth = Storage.getAuthState();
+        if (currentAuth.role !== 'Director' || currentAuth.level < 2) {
+          const newState = { 
+            level: 2, 
+            role: 'Director', 
+            name: user.displayName || 'Director Miss Nine', 
+            poppo_id: '19157913' 
+          };
+          Storage.setAuthState(newState);
+          setAuthState(newState);
+        }
+      }
+    });
+    return () => unsubscribe();
   }, []);
 
-  // Initialize data from Sheets
+  // Initialize data from Firebase
   useEffect(() => {
     const loadData = async () => {
       if (authState.level === 0) return;
       
       setIsLoading(true);
       try {
-        const [sheetHosts, sheetCommissions] = await Promise.all([
-          SheetService.getRoster(),
-          SheetService.getCommissions()
+        const [firebaseHosts, firebaseCommissions] = await Promise.all([
+          FirebaseService.getAllHosts(),
+          FirebaseService.getAllCommissions()
         ]);
         
-        if (sheetHosts.length > 0) {
-          Storage.setHosts(sheetHosts);
-          setHosts(sheetHosts);
+        if (firebaseHosts.length > 0) {
+          Storage.setHosts(firebaseHosts);
+          setHosts(firebaseHosts);
         }
         
-        if (sheetCommissions.length > 0) {
-          Storage.setCommission(sheetCommissions);
-          setCommission(sheetCommissions);
+        if (firebaseCommissions.length > 0) {
+          Storage.setCommission(firebaseCommissions);
+          setCommission(firebaseCommissions);
         }
       } catch (err) {
-        console.warn("Could not sync with Google Sheets. Local storage or defaults will be used.", err);
+        console.warn("Could not sync with cloud database. Local storage will be used if available.", err);
       } finally {
         setIsLoading(false);
       }
@@ -98,28 +118,37 @@ export default function App() {
   }, [authState.level]);
 
   const handleLogout = async () => {
-    const newState = { level: 0, role: '', name: '', poppo_id: '', team: '', manager: '' };
+    try {
+      await signOut(auth);
+    } catch (err) {
+      console.error("Sign out error:", err);
+    }
+    const newState = { level: 0, role: '', name: '', poppo_id: '' };
     Storage.setAuthState(newState);
     setAuthState(newState);
   };
 
   const handleGoogleSignIn = async () => {
-    // Feature disabled as per Blueprint v2.0
-    alert("Google Sign-In is disabled. Please use your Poppo ID and Password.");
+    setIsSyncingCloud(true);
+    try {
+      await signInWithGoogle();
+      // Level elevation handled by the useEffect onAuthStateChanged
+    } catch (err: any) {
+      console.error("Sync Error:", err);
+      alert(err.message || "Google Sign-In failed.");
+    } finally {
+      setIsSyncingCloud(false);
+    }
   };
 
   const refreshState = async () => {
     setAuthState(Storage.getAuthState());
-    try {
-      const [sheetHosts, sheetCommissions] = await Promise.all([
-        SheetService.getRoster(),
-        SheetService.getCommissions()
-      ]);
-      setHosts(sheetHosts);
-      setCommission(sheetCommissions);
-    } catch (err) {
-      console.error("Refresh failed:", err);
-    }
+    const [firebaseHosts, firebaseCommissions] = await Promise.all([
+      FirebaseService.getAllHosts(),
+      FirebaseService.getAllCommissions()
+    ]);
+    setHosts(firebaseHosts);
+    setCommission(firebaseCommissions);
     setLogs(Storage.getLogs());
     setNotifications(Storage.getNotifications());
   };
@@ -262,6 +291,17 @@ export default function App() {
               </div>
             ) : (
               <>
+                {!firebaseUser && authState.role === 'Director' && (
+                  <button 
+                    onClick={handleGoogleSignIn}
+                    disabled={isSyncingCloud}
+                    className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-[10px] font-bold text-indigo-400 hover:bg-indigo-500/20 transition-all disabled:opacity-50"
+                  >
+                    {isSyncingCloud ? <Loader2 size={12} className="animate-spin" /> : <Globe size={12} />}
+                    {isSyncingCloud ? 'SYNCING...' : 'SYNC CLOUD'}
+                  </button>
+                )}
+
                 {/* Notifications */}
                 <div className="relative">
                   <button 
@@ -669,9 +709,7 @@ const OverviewTab = ({ commissions, hosts }: { commissions: CommissionEntry[], h
             {logs.slice(0, 15).map((log, i) => (
               <div key={log.id} className="flex gap-3 text-sm border-b border-white/5 pb-3">
                 <div className="shrink-0 w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-xs">
-                  {log.type === 'AUTH' ? '🔐' : 
-                   log.type === 'FINANCE' ? '💰' : 
-                   log.type === 'ROSTER' ? '📋' : '📝'}
+                  {log.type === 'Auth' ? '🔐' : '📝'}
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-white/80 line-clamp-2 leading-snug">{log.action}</p>

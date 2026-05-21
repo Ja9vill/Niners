@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { TrendingUp, Award, BarChart2, Star, Ghost, AlertTriangle, ArrowUpRight, ArrowDownRight, Minus } from 'lucide-react';
 import { Host, Tier, CommissionEntry } from '../types';
 import { Storage } from '../lib/storage';
-import { SheetService } from '../lib/sheetService';
+import { FirebaseService } from '../lib/firebaseService';
 import { cn, formatNumber, formatDate, formatMonth } from '../lib/utils';
 import { motion } from 'motion/react';
 
@@ -15,8 +15,8 @@ export const TrendsTab = () => {
   React.useEffect(() => {
     const load = async () => {
       const [hostData, commData] = await Promise.all([
-        SheetService.getRoster(),
-        SheetService.getCommissions()
+        FirebaseService.getAllHosts(),
+        FirebaseService.getAllCommissions()
       ]);
       setHosts(hostData);
       setCommissions(commData);

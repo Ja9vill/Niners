@@ -2,9 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { Lock, Unlock, LogOut, ChevronRight, User, Globe, CheckCircle2, Loader2 } from 'lucide-react';
 import { Storage } from '../lib/storage';
 import { Host } from '../types';
-import { SheetService } from '../lib/sheetService';
+import { FirebaseService } from '../lib/firebaseService';
 import { cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
+import { auth, signInWithGoogle } from '../lib/firebase';
+import { onAuthStateChanged, signOut, getRedirectResult } from 'firebase/auth';
 
 const DIRECTOR_IDS = ['19157913', '031907'];
 const DIRECTOR_PASS = '031907';
@@ -25,71 +27,111 @@ export const AuthGate: React.FC<AuthGateProps> = ({ children, onAuthChange }) =>
   const [userToUpdate, setUserToUpdate] = useState<Host | null>(null);
   const [resetRequested, setResetRequested] = useState(false);
   const [error, setError] = useState('');
-  const [initializing, setInitializing] = useState(false); // No Firebase to init
+  const [firebaseUser, setFirebaseUser] = useState(auth.currentUser);
+  const [initializing, setInitializing] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleLogin = async (e: React.FormEvent) => {
+  useEffect(() => {
+    // Process redirect results for Google Sign-In
+    getRedirectResult(auth).catch((err: any) => {
+      console.error('Redirect result error:', err);
+      if (err.code === 'auth/internal-error') {
+        setError('Authentication error. If you are in an iframe, try opening in a new tab.');
+      } else {
+        setError(err.message || 'Google Sign-In failed.');
+      }
+    });
+
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setFirebaseUser(user);
+      
+      // Automatically elevate session if verified admin email matches
+      if (user?.email === 'jwavpr@gmail.com') {
+        const current = Storage.getAuthState();
+        if (current.role !== 'Director' || current.level !== 2) {
+          const newState = { 
+            level: 2, 
+            role: 'Director', 
+            name: user.displayName || 'Director Miss Nine', 
+            poppo_id: '19157913' 
+          };
+          Storage.setAuthState(newState);
+          setAuthState(newState);
+          Storage.addLog('Auth', 'Auto-logged in via Google', 'Director Miss Nine');
+          onAuthChange();
+        }
+      }
+      setInitializing(false);
+    });
+    return () => unsubscribe();
+  }, [onAuthChange]);
+
+  const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    setIsSubmitting(true);
 
-    try {
-      // 1. Director Master Login (Bypass for testing if Sheet not set)
-      if ((DIRECTOR_IDS.includes(poppoId) || poppoId.toLowerCase() === 'director') && password === DIRECTOR_PASS) {
+    // 1. Director Master Login
+    if ((DIRECTOR_IDS.includes(poppoId) || poppoId.toLowerCase() === 'director') && password === DIRECTOR_PASS) {
+      const newState = { level: 2, role: 'Director', name: 'Director Miss Nine', poppo_id: '19157913' };
+      Storage.setAuthState(newState);
+      setAuthState(newState);
+      Storage.addLog('Auth', 'Logged in as Director (Bypass)', 'Director Miss Nine');
+      onAuthChange();
+      return;
+    }
+
+    // 2. Lookup in Roster
+    const hosts = Storage.getHosts();
+    const user = hosts.find(h => h.id === poppoId);
+
+    if (!user) {
+      setError('Invalid POPPO ID or Password');
+      return;
+    }
+
+    if (user.password === password) {
+      if (user.is_temp_password) {
+        setUserToUpdate(user);
+        setStep('change_pass');
+      } else {
+        const level = ['Director', 'Head Admin', 'Admin', 'Manager'].includes(user.position) ? 1 : 0.5;
         const newState = { 
-          level: 2, 
-          role: 'Director', 
-          name: 'Director Miss Nine', 
-          poppo_id: '19157913',
-          team: 'Nine Management',
-          manager: 'Nine Management',
-          anchor_type: 'Nine Agency' as any
+          level, 
+          role: user.position, 
+          name: user.name, 
+          poppo_id: user.id,
+          team: user.team,
+          manager: user.manager,
+          anchor_type: user.anchor_type
         };
         Storage.setAuthState(newState);
         setAuthState(newState);
+        Storage.addLog('Auth', `Logged in as ${user.position}`, user.name);
         onAuthChange();
-        return;
       }
+    } else {
+      setError('Invalid POPPO ID or Password');
+    }
+  };
 
-      // 2. Validate against Sheet
-      const user = await SheetService.validateLogin(poppoId, password);
-
-      if (!user) {
-        setError('Invalid POPPO ID or Password');
-        return;
-      }
-
-      const level = ['Director', 'Head Admin', 'Admin', 'Manager'].includes(user.position) ? 1 : 0.5;
-      const newState = { 
-        level, 
-        role: user.position, 
-        name: user.name, 
-        poppo_id: user.id,
-        team: user.team,
-        manager: user.manager,
-        anchor_type: user.anchor_type
-      };
-      Storage.setAuthState(newState);
-      setAuthState(newState);
-      
-      await SheetService.saveLog({
-        id: crypto.randomUUID(),
-        type: 'SYSTEM_EVENT',
-        action: `User ${user.id} logged in`,
-        user: user.name,
-        timestamp: new Date().toISOString()
-      });
-      
-      onAuthChange();
+  const handleGoogleSignIn = async () => {
+    try {
+      setError('');
+      await signInWithGoogle();
+      // Elevation is handled by the useEffect onAuthStateChanged
     } catch (err: any) {
-      setError(err.message || 'Login failed. Please check your credentials.');
-    } finally {
-      setIsSubmitting(false);
+      console.error('Google Sign-In Error:', err);
+      if (err.message?.includes('auth/internal-error')) {
+        setError('Authentication service error. Please try again or use ID/Password.');
+      } else {
+        setError(err.message || 'Google Sign-In failed.');
+      }
     }
   };
 
   const logout = () => {
-    const newState = { level: 0, role: '', name: '', poppo_id: '', team: '', manager: '' };
+    signOut(auth);
+    const newState = { level: 0, role: '', name: '', poppo_id: '' };
     Storage.setAuthState(newState);
     setAuthState(newState);
     onAuthChange();
@@ -159,7 +201,7 @@ export const AuthGate: React.FC<AuthGateProps> = ({ children, onAuthChange }) =>
         updated_at: new Date().toISOString()
       };
 
-      await SheetService.updateHost(finalUser);
+      await FirebaseService.updateHost(finalUser);
       
       const level = ['Director', 'Head Admin', 'Admin', 'Manager'].includes(finalUser.position) ? 1 : 0.5;
       const newState = { 
@@ -194,7 +236,7 @@ export const AuthGate: React.FC<AuthGateProps> = ({ children, onAuthChange }) =>
     setIsSubmitting(true);
     
     try {
-      const hosts = await SheetService.getRoster();
+      const hosts = await FirebaseService.getAllHosts();
       const user = hosts.find(h => h.id === poppoId);
       
       if (!user) {
@@ -202,7 +244,7 @@ export const AuthGate: React.FC<AuthGateProps> = ({ children, onAuthChange }) =>
         return;
       }
 
-      await SheetService.createResetRequest({
+      await FirebaseService.createResetRequest({
         id: crypto.randomUUID(),
         poppoId: user.id,
         hostName: user.name,
@@ -210,7 +252,7 @@ export const AuthGate: React.FC<AuthGateProps> = ({ children, onAuthChange }) =>
         requestedAt: new Date().toISOString()
       });
 
-      await SheetService.updateHost({
+      await FirebaseService.updateHost({
         ...user,
         reset_requested: true
       });
@@ -306,8 +348,17 @@ export const AuthGate: React.FC<AuthGateProps> = ({ children, onAuthChange }) =>
             
             <div className="relative my-6">
               <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-white/5"></div></div>
-              <div className="relative flex justify-center text-[10px] font-black uppercase tracking-widest"><span className="bg-[#12141C] px-4 text-white/20">Secure Data Protocol</span></div>
+              <div className="relative flex justify-center text-[10px] font-black uppercase tracking-widest"><span className="bg-[#12141C] px-4 text-white/20">Director Portal</span></div>
             </div>
+
+            <button 
+              type="button" 
+              onClick={handleGoogleSignIn}
+              className="w-full glass py-3 rounded-2xl flex items-center justify-center gap-3 hover:bg-white/5 transition-all group"
+            >
+              <Globe size={18} className="text-white/40 group-hover:text-cyan-400 transition-colors" />
+              <span className="text-xs font-bold text-white/60 group-hover:text-white transition-colors">Verified Google Access</span>
+            </button>
           </form>
         ) : step === 'change_pass' ? (
           <form onSubmit={handleChangePassword} className="space-y-6 animate-in slide-in-from-right-4 duration-500">

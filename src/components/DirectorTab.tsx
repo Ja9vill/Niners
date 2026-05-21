@@ -6,10 +6,11 @@ import { cn, formatMonth, formatDate } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
-import { SheetService } from '../lib/sheetService';
+import { FirebaseService } from '../lib/firebaseService';
 import { MANAGERS, BASE_SALARY_POLICIES } from '../lib/constants';
 
-// Removed Firebase Auth imports as per Blueprint v2.0 config
+import { auth as fbAuth, signInWithGoogle } from '../lib/firebase';
+import { onAuthStateChanged } from 'firebase/auth';
 
 const HostEditModal = ({ host, onClose, onUpdate }: { host: Host, onClose: () => void, onUpdate: (h: Host) => void }) => {
   const [formData, setFormData] = useState<Host>({ ...host });
@@ -324,7 +325,7 @@ const RosterManualEditor = ({ hosts, onRefresh, activeCategory, isLoading }: { h
   const handleUpdate = async (host: Host) => {
     setUpdatingId(host.id);
     try {
-      await SheetService.updateHost(host);
+      await FirebaseService.updateHost(host);
       onRefresh();
       setIsEditing(null);
     } catch (err) {
@@ -337,7 +338,7 @@ const RosterManualEditor = ({ hosts, onRefresh, activeCategory, isLoading }: { h
   const handleDelete = async (id: string) => {
     if (!confirm("Are you sure you want to permanently delete this host?")) return;
     try {
-      // Sheet-backed deletion logic
+      await FirebaseService.deleteHost(id);
       onRefresh();
     } catch (err) {
       alert("Failed to delete host");
@@ -626,7 +627,7 @@ export const DirectorTab = () => {
   const loadResetRequests = async () => {
     setIsResetsLoading(true);
     try {
-      const res = await SheetService.getResetRequests();
+      const res = await FirebaseService.getResetRequests();
       setResetRequests(res);
     } catch (err) {
       console.error("Failed to load reset requests:", err);
@@ -707,6 +708,7 @@ export const DirectorTab = () => {
     }
   };
   const [error, setError] = useState<string | null>(null);
+  const [fbUser, setFbUser] = useState(fbAuth.currentUser);
   const [isSigningIn, setIsSigningIn] = useState(false);
   const [rosterHosts, setRosterHosts] = useState<Host[]>([]);
   const [isRosterLoading, setIsRosterLoading] = useState(true);
@@ -718,7 +720,7 @@ export const DirectorTab = () => {
   const loadRoster = async () => {
     setIsRosterLoading(true);
     try {
-      const data = await SheetService.getRoster();
+      const data = await FirebaseService.getAllHosts();
       setRosterHosts(data);
     } catch (err) {
       console.error("Failed to load roster:", err);
@@ -732,8 +734,8 @@ export const DirectorTab = () => {
     setSelectedFileDetail(file);
     setIsDetailLoading(true);
     try {
-      const month = file.month || file.name.substring(0, 7);
-      const data = await SheetService.getCommissions(month);
+      const month = file.month || file.name.substring(0, 7); // Fallback to name if month missing
+      const data = await FirebaseService.getCommissionsByMonth(month);
       setDetailData(data);
     } catch (err) {
       setError("Failed to load file details: " + (err instanceof Error ? err.message : 'Unknown error'));
@@ -744,7 +746,7 @@ export const DirectorTab = () => {
 
   const handleUpdateDetailRow = async (rowIndex: number, updatedRow: CommissionEntry) => {
     try {
-      await SheetService.saveCommissions([updatedRow]);
+      await FirebaseService.saveCommissions([updatedRow]);
       const newData = [...detailData];
       newData[rowIndex] = updatedRow;
       setDetailData(newData);
@@ -760,7 +762,7 @@ export const DirectorTab = () => {
   const loadCloudStats = async () => {
     setIsStatsLoading(true);
     try {
-      const allComms = await SheetService.getCommissions();
+      const allComms = await FirebaseService.getAllCommissions();
       const stats = allComms.reduce((acc: Record<string, number>, curr) => {
         acc[curr.month] = (acc[curr.month] || 0) + 1;
         return acc;
@@ -773,11 +775,15 @@ export const DirectorTab = () => {
     }
   };
 
-  const [isAuthChecking, setIsAuthChecking] = useState(false);
+  const [isAuthChecking, setIsAuthChecking] = useState(true);
 
   React.useEffect(() => {
-    // Auth is managed by local storage and Sheet-backed PoppoID/Password auth
-    setIsAuthChecking(false);
+    const unsubscribe = onAuthStateChanged(fbAuth, (user) => {
+      console.log('DirectorTab: Auth state change', user?.uid);
+      setFbUser(user);
+      setIsAuthChecking(false);
+    });
+    return () => unsubscribe();
   }, []);
 
   React.useEffect(() => {
@@ -849,6 +855,7 @@ export const DirectorTab = () => {
     const targetMonth = overrideMonth || selectedMonth;
 
     if (activeCategory === '📊 Monthly Commission') {
+       // Validate structure
        if (data.length === 0 || !validateCommissionStructure(data[0])) {
          setError("Validation Error: MasterSheet is missing fields (ID/Nickname). Please ensure you are uploading the correct Poppo report.");
          return;
@@ -857,6 +864,7 @@ export const DirectorTab = () => {
        setIsProcessing(true);
        try {
          const commissions: CommissionEntry[] = data.map(row => {
+           // Normalize keys (trim and case-insensitive check)
            const findVal = (possibleKeys: string[]) => {
              const key = Object.keys(row).find(k => 
                possibleKeys.includes(k.trim()) || 
@@ -886,25 +894,28 @@ export const DirectorTab = () => {
              poppo_name: nickname,
              month: targetMonth,
              live_duration: liveDuration,
-             party_host_duration: partyDuration,
-             total_points: totalPoints,
-             agentweb_commission_earning: agentCommission,
              live_earnings: liveEarnings,
-             party_earnings: partyEarnings,
-             my_commission: Number(findVal(['My Commission', 'Total Commission', 'my_commission']) || agentCommission),
+             video_duration: partyDuration,
+             video_earnings: partyEarnings,
+             agentweb_commission_rate: 0, 
+             agentweb_commission_earning: agentCommission,
+             total_points: totalPoints,
+             total_earnings: totalPoints,
+             my_commission: agentCommission,
+             // Extra AI fields from expanded Poppo report
              private_chat: Number(findVal(['Private chat', 'private_chat', 'Private Chat']) || 0),
              tips: Number(findVal(['Tips', 'tips']) || 0),
              platform_reward: Number(findVal(['Platform reward', 'platform_reward', 'Platform Reward']) || 0),
              other_earn: Number(findVal(['Other Earnings', 'other_earn', 'Other earnings']) || 0),
-             platform_hourly_salary: Number(findVal(['Platform hour', 'platform_holding', 'Platform salary']) || 0),
+             platform_holding: Number(findVal(['Platform hourly salary', 'platform_holding', 'Platform salary']) || 0),
              super_salary: Number(findVal(['Super Salary', 'super_salary']) || 0),
-             super_rank: String(findVal(['Super Rank', 'super_rank']) || '0'),
+             super_rank: Number(findVal(['Super Rank', 'super_rank']) || 0),
              level: Number(findVal(['Level', 'level']) || 0),
-             updated_at: new Date().toISOString()
            };
          }).filter(c => c.poppo_id && c.poppo_id !== 'ID' && c.poppo_id !== 'undefined');
 
-         const currentHosts = await SheetService.getRoster();
+         // AUTO-SYNC ROSTER: Create host profiles for anyone not in the system
+         const currentHosts = await FirebaseService.getAllHosts();
          const existingIds = new Set(currentHosts.map(h => h.id));
          const hostsToRegister: Host[] = [];
 
@@ -928,33 +939,17 @@ export const DirectorTab = () => {
                password: '1212',
                is_temp_password: true
              });
-             existingIds.add(c.poppo_id);
+             existingIds.add(c.poppo_id); // Prevent duplicate adds in same batch
            }
          });
 
          if (hostsToRegister.length > 0) {
-           await SheetService.saveHosts(hostsToRegister);
-           await loadRoster();
+           await FirebaseService.saveHosts(hostsToRegister);
+           Storage.addLog('System', `Auto-registered ${hostsToRegister.length} new hosts from MasterSheet`, localAuth.name);
+           await loadRoster(); // REFRESH THE UI
          }
 
-         await SheetService.saveCommissions(commissions);
-         
-         const logId = crypto.randomUUID();
-         await SheetService.saveLog({
-           id: logId,
-           type: 'FINANCE',
-           action: `Uploaded MasterSheet for ${targetMonth} (${commissions.length} records)`,
-           user: localAuth.name,
-           timestamp: new Date().toISOString()
-         });
-
-         await SheetService.saveVersionLog({
-           id: logId,
-           action: 'MASTERSHEET_UPLOAD',
-           user: localAuth.name,
-           timestamp: new Date().toISOString(),
-           changelog: `Ingested ${commissions.length} financial records for ${targetMonth}. ${hostsToRegister.length} auto-registered.`
-         });
+         await FirebaseService.saveCommissions(commissions);
          
          const newFile: FileEntry = {
            id: crypto.randomUUID(),
@@ -971,14 +966,16 @@ export const DirectorTab = () => {
          const updatedFiles = [newFile, ...files];
          Storage.setFiles(updatedFiles);
          setFiles(updatedFiles);
+         Storage.addLog('System', `Director uploaded MasterSheet for ${targetMonth} (${commissions.length} records)`, localAuth.name);
          setProcessingSummary(`MasterSheet processed successfully for period ${targetMonth}. ${commissions.length} commission records updated. ${hostsToRegister.length} new hosts registered.`);
-         loadCloudStats();
+         loadCloudStats(); // Refresh audit
        } catch (err) {
          setError(`MasterSheet Processing Failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
        } finally {
          setIsProcessing(false);
        }
     } else {
+      // Legacy simulation for other categories if needed, but the prompt is about commissions
       setIsProcessing(true);
       setTimeout(() => {
         const newFile: FileEntry = {
@@ -1220,14 +1217,7 @@ export const DirectorTab = () => {
           timestamp: new Date().toISOString()
         })).filter(r => r.poppo_id);
 
-        await SheetService.savePKRecords(records);
-        await SheetService.saveLog({
-          id: crypto.randomUUID(),
-          type: 'TOURNAMENT',
-          action: `Pasted ${records.length} PK records`,
-          user: localAuth.name,
-          timestamp: new Date().toISOString()
-        });
+        await FirebaseService.savePKRecords(records);
         setProcessingSummary(`Successfully processed and saved ${records.length} PK records.`);
       } else if (activeCategory === '📣 Event Logs') {
         const records: ExposureEntry[] = data.map(parts => ({
@@ -1241,17 +1231,10 @@ export const DirectorTab = () => {
           timestamp: new Date().toISOString()
         })).filter(r => r.poppo_id);
 
-        await SheetService.saveExposures(records);
-        await SheetService.saveLog({
-          id: crypto.randomUUID(),
-          type: 'EXPOSURE',
-          action: `Pasted ${records.length} event logs`,
-          user: localAuth.name,
-          timestamp: new Date().toISOString()
-        });
+        await FirebaseService.saveExposures(records);
         setProcessingSummary(`Successfully processed and saved ${records.length} event logs.`);
       } else if (activeCategory === '📋 Roster Updates') {
-        const currentHosts = await SheetService.getRoster();
+        const currentHosts = await FirebaseService.getAllHosts();
         const updatedHosts: Host[] = [];
 
         data.forEach(parts => {
@@ -1280,26 +1263,8 @@ export const DirectorTab = () => {
           updatedHosts.push(newHost);
         });
 
-      await SheetService.saveHosts(updatedHosts);
-      
-      const logId = crypto.randomUUID();
-      await SheetService.saveLog({
-        id: logId,
-        type: 'ROSTER',
-        action: `Pasted ${updatedHosts.length} roster updates`,
-        user: localAuth.name,
-        timestamp: new Date().toISOString()
-      });
-
-      await SheetService.saveVersionLog({
-        id: logId,
-        action: 'ROSTER_INTAKE',
-        user: localAuth.name,
-        timestamp: new Date().toISOString(),
-        changelog: `Bulk intake of ${updatedHosts.length} member records into DATA MASTERSHEET.`
-      });
-      
-      setProcessingSummary(`Successfully updated ${updatedHosts.length} host roster records.`);
+        await FirebaseService.saveHosts(updatedHosts);
+        setProcessingSummary(`Successfully updated ${updatedHosts.length} host roster records.`);
       }
 
       setPasteData('');
@@ -1343,7 +1308,7 @@ export const DirectorTab = () => {
     try {
       const rows = bulkPasteData.trim().split('\n');
       const newHosts: Host[] = [];
-      const currentHosts = await SheetService.getRoster();
+      const currentHosts = await FirebaseService.getAllHosts();
       const existingIds = new Set(currentHosts.map(h => h.id));
 
       rows.forEach(line => {
@@ -1382,7 +1347,7 @@ export const DirectorTab = () => {
       });
 
       if (newHosts.length > 0) {
-        await SheetService.saveHosts(newHosts);
+        await FirebaseService.saveHosts(newHosts);
         Storage.addLog('System', `Bulk onboarded ${newHosts.length} new hosts via Direct Paste`, localAuth.name);
         setProcessingSummary(`Successfully onboarded ${newHosts.length} new hosts.`);
         setBulkPasteData('');
@@ -1489,8 +1454,8 @@ export const DirectorTab = () => {
                                   const host = rosterHosts.find(h => h.id === req.poppoId);
                                   if (host) {
                                     const tempPass = Math.floor(1000 + Math.random() * 9000).toString();
-                                    await SheetService.updateHost({ ...host, password: tempPass, is_temp_password: true, reset_requested: false });
-                                    await SheetService.resolveResetRequest(req.id);
+                                    await FirebaseService.updateHost({ ...host, password: tempPass, is_temp_password: true, reset_requested: false });
+                                    await FirebaseService.resolveResetRequest(req.id);
                                     alert(`Password reset for ${host.name}.\nNew Temporary Password: ${tempPass}`);
                                     loadResetRequests();
                                     loadRoster();
@@ -1579,7 +1544,7 @@ export const DirectorTab = () => {
               </div>
               <div className="flex items-center gap-2">
                 <button 
-                  onClick={async () => {
+                  onClick={() => {
                     const month = prompt("Enter Month (MM:YYYY) e.g. JUNE 2024:");
                     if (month) {
                       const [mName, y] = month.split(' ');
@@ -1590,23 +1555,6 @@ export const DirectorTab = () => {
                       }
                       const dateCode = `${y}-${(mIndex + 1).toString().padStart(2, '0')}`;
                       setSelectedMonth(dateCode);
-                      
-                      const logId = crypto.randomUUID();
-                      await SheetService.saveLog({
-                        id: logId,
-                        type: 'FINANCE',
-                        action: `Created financial window for ${month}`,
-                        user: localAuth.name,
-                        timestamp: new Date().toISOString()
-                      });
-                      await SheetService.saveVersionLog({
-                        id: logId,
-                        action: 'FINANCE_WINDOW_CREATE',
-                        user: localAuth.name,
-                        timestamp: new Date().toISOString(),
-                        changelog: `Initialized financial tab for ${dateCode}.`
-                      });
-
                       setProcessingSummary(`Created financial window for ${month}`);
                     }
                   }}
@@ -1619,25 +1567,8 @@ export const DirectorTab = () => {
                     if (confirm(`Are you sure you want to remove all financial records for ${selectedMonth}?`)) {
                       setIsProcessing(true);
                       try {
-                        await SheetService.deleteCommissionsByMonth(selectedMonth);
+                        await FirebaseService.deleteCommissionsByMonth(selectedMonth);
                         loadCloudStats();
-                        
-                        const logId = crypto.randomUUID();
-                        await SheetService.saveLog({
-                          id: logId,
-                          type: 'FINANCE',
-                          action: `Removed financial records for ${selectedMonth}`,
-                          user: localAuth.name,
-                          timestamp: new Date().toISOString()
-                        });
-                        await SheetService.saveVersionLog({
-                          id: logId,
-                          action: 'FINANCE_WINDOW_DELETE',
-                          user: localAuth.name,
-                          timestamp: new Date().toISOString(),
-                          changelog: `Deleted all commission data for period ${selectedMonth}.`
-                        });
-
                         setProcessingSummary(`Removed records for ${selectedMonth}`);
                       } catch (err) { alert("Failed to remove data tab."); }
                       finally { setIsProcessing(false); }
@@ -1665,15 +1596,12 @@ export const DirectorTab = () => {
                       ))}
                     </select>
                   </div>
-                  <div className="px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
-                    <span className="text-[9px] font-black text-emerald-400 uppercase tracking-widest">Agency Commission</span>
-                  </div>
                 </div>
                 <button 
                   onClick={async () => {
                     setIsProcessing(true);
                     try {
-                      const data = await SheetService.getCommissions(selectedMonth);
+                      const data = await FirebaseService.getCommissionsByMonth(selectedMonth);
                       setDetailData(data);
                       setProcessingSummary(`Synced latest records for ${formatMonth(selectedMonth)}`);
                     } catch (err) { alert("Sync failed."); }
@@ -1687,7 +1615,7 @@ export const DirectorTab = () => {
               </div>
 
               <div className="overflow-x-auto">
-                <table className="w-full text-left text-[11px] min-w-[2200px]">
+                <table className="w-full text-left text-[11px] min-w-[2000px]">
                   <thead>
                     <tr className="border-b border-white/10 text-[9px] font-black text-white/30 uppercase tracking-[0.2em] bg-white/2">
                       <th className="px-4 py-4">Total Commission</th>
@@ -1697,16 +1625,13 @@ export const DirectorTab = () => {
                       <th className="px-4 py-4">Party host duration</th>
                       <th className="px-4 py-4">Total earnings of points</th>
                       <th className="px-4 py-4">agentweb_commission_earning</th>
-                      <th className="px-4 py-4">Live Earnings</th>
+                      <th className="px-4 py-4">Live earnings</th>
                       <th className="px-4 py-4">Party Earnings</th>
                       <th className="px-4 py-4">Private chat</th>
                       <th className="px-4 py-4">Tips</th>
                       <th className="px-4 py-4">Platform reward</th>
                       <th className="px-4 py-4">Other Earnings</th>
                       <th className="px-4 py-4">Platform hour</th>
-                      <th className="px-4 py-4">Super Salary</th>
-                      <th className="px-4 py-4">Super Rank</th>
-                      <th className="px-4 py-4">Level</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-white/5">
@@ -1716,23 +1641,20 @@ export const DirectorTab = () => {
                         <td className="px-4 py-4 font-mono font-bold text-indigo-400">{row.poppo_id}</td>
                         <td className="px-4 py-4 font-bold text-white uppercase">{row.poppo_name}</td>
                         <td className="px-4 py-4 text-white/40">{Math.floor((row.live_duration || 0) / 60)}h {Math.round((row.live_duration || 0) % 60)}m</td>
-                        <td className="px-4 py-4 text-white/40">{Math.floor((row.party_host_duration || 0) / 60)}h {Math.round((row.party_host_duration || 0) % 60)}m</td>
+                        <td className="px-4 py-4 text-white/40">{Math.floor((row.video_duration || 0) / 60)}h {Math.round((row.video_duration || 0) % 60)}m</td>
                         <td className="px-4 py-4 font-mono">{(row.total_points || 0).toLocaleString()}</td>
-                        <td className="px-4 py-4 font-mono text-emerald-300">{(row.agentweb_commission_earning || 0).toLocaleString()}</td>
+                        <td className="px-4 py-4 font-mono">{(row.agentweb_commission_earning || 0).toLocaleString()}</td>
                         <td className="px-4 py-4 font-mono">{(row.live_earnings || 0).toLocaleString()}</td>
-                        <td className="px-4 py-4 font-mono">{(row.party_earnings || 0).toLocaleString()}</td>
+                        <td className="px-4 py-4 font-mono">{(row.video_earnings || 0).toLocaleString()}</td>
                         <td className="px-4 py-4 font-mono">{(row.private_chat || 0).toLocaleString()}</td>
                         <td className="px-4 py-4 font-mono">{(row.tips || 0).toLocaleString()}</td>
                         <td className="px-4 py-4 font-mono">{(row.platform_reward || 0).toLocaleString()}</td>
                         <td className="px-4 py-4 font-mono">{(row.other_earn || 0).toLocaleString()}</td>
                         <td className="px-4 py-4 font-mono">{(row.platform_hourly_salary || 0).toLocaleString()}</td>
-                        <td className="px-4 py-4 text-amber-400 font-bold">{(row.super_salary || 0).toLocaleString()}</td>
-                        <td className="px-4 py-4 font-mono">{(row.super_rank || 'N/A')}</td>
-                        <td className="px-4 py-4 font-mono">{(row.level || '0')}</td>
                       </tr>
                     )) : (
                       <tr>
-                        <td colSpan={17} className="py-20 text-center text-white/20 italic text-xs">
+                        <td colSpan={14} className="py-20 text-center text-white/20 italic text-xs">
                           No records found for this window. Use Intake to upload a MasterSheet or click Sync to fetch cloud data.
                         </td>
                       </tr>
@@ -2045,7 +1967,7 @@ export const DirectorTab = () => {
                             disabled={isBulkProcessing || !bulkPasteData.trim()}
                             className="btn-primary !py-2.5 !px-10 shadow-xl shadow-indigo-500/20 disabled:opacity-50"
                           >
-                            {isBulkProcessing ? 'INJECTING...' : 'Bulk Register Members'}
+                            {isBulkProcessing ? 'INJECTING...' : 'ONSITE REGISTRATION'}
                           </button>
                         </div>
                      </div>
@@ -2105,7 +2027,7 @@ export const DirectorTab = () => {
                            if (confirm(`DELETION PROTOCOL: Permanently wipe ${count} records for ${formatMonth(month)}?`)) {
                              setIsStatsLoading(true);
                              try {
-                               await SheetService.deleteCommissionsByMonth(month);
+                               await FirebaseService.deleteCommissionsByMonth(month);
                                loadCloudStats();
                              } catch (err) { alert("Deletion protocol failed."); }
                              finally { setIsStatsLoading(false); }
