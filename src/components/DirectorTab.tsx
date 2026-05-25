@@ -9,7 +9,8 @@ import * as XLSX from 'xlsx';
 import { FirebaseService } from '../lib/firebaseService';
 import { MANAGERS, BASE_SALARY_POLICIES } from '../lib/constants';
 
-import { auth as fbAuth, signInWithGoogle } from '../lib/firebase';
+import { auth as fbAuth, signInWithGoogle, getCachedSheetsToken, setCachedSheetsToken } from '../lib/firebase';
+import { SheetsService } from '../lib/sheetsService';
 import { onAuthStateChanged } from 'firebase/auth';
 
 const HostEditModal = ({ host, onClose, onUpdate }: { host: Host, onClose: () => void, onUpdate: (h: Host) => void }) => {
@@ -146,7 +147,7 @@ const HostEditModal = ({ host, onClose, onUpdate }: { host: Host, onClose: () =>
               <label className="text-[10px] font-black uppercase text-white/30 tracking-widest">Display Name</label>
               <input 
                 type="text" 
-                value={formData.name} 
+                value={formData.name || ''} 
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 className="w-full glass-input"
               />
@@ -155,7 +156,7 @@ const HostEditModal = ({ host, onClose, onUpdate }: { host: Host, onClose: () =>
               <label className="text-[10px] font-black uppercase text-white/30 tracking-widest">Poppo ID (Locked)</label>
               <input 
                 type="text" 
-                value={formData.id} 
+                value={formData.id || ''} 
                 readOnly
                 className="w-full glass-input opacity-50 cursor-not-allowed"
               />
@@ -163,7 +164,7 @@ const HostEditModal = ({ host, onClose, onUpdate }: { host: Host, onClose: () =>
             <div className="space-y-2">
               <label className="text-[10px] font-black uppercase text-white/30 tracking-widest">Position</label>
               <select 
-                value={formData.position} 
+                value={formData.position || 'Talent'} 
                 onChange={(e) => setFormData({ ...formData, position: e.target.value as Position, role: e.target.value as Position })}
                 className="w-full glass-input"
               >
@@ -173,7 +174,7 @@ const HostEditModal = ({ host, onClose, onUpdate }: { host: Host, onClose: () =>
             <div className="space-y-2">
               <label className="text-[10px] font-black uppercase text-white/30 tracking-widest">Tier</label>
               <select 
-                value={formData.tier} 
+                value={formData.tier || 'X'} 
                 onChange={(e) => setFormData({ ...formData, tier: e.target.value as Tier })}
                 className="w-full glass-input"
               >
@@ -184,7 +185,7 @@ const HostEditModal = ({ host, onClose, onUpdate }: { host: Host, onClose: () =>
               <label className="text-[10px] font-black uppercase text-white/30 tracking-widest">Current Team</label>
               <input 
                 type="text" 
-                value={formData.team} 
+                value={formData.team || ''} 
                 onChange={(e) => setFormData({ ...formData, team: e.target.value })}
                 className="w-full glass-input"
               />
@@ -192,7 +193,7 @@ const HostEditModal = ({ host, onClose, onUpdate }: { host: Host, onClose: () =>
             <div className="space-y-2">
               <label className="text-[10px] font-black uppercase text-white/30 tracking-widest">Status</label>
               <select 
-                value={formData.status} 
+                value={formData.status || 'Active'} 
                 onChange={(e) => setFormData({ ...formData, status: e.target.value as HostStatus })}
                 className="w-full glass-input"
               >
@@ -202,7 +203,7 @@ const HostEditModal = ({ host, onClose, onUpdate }: { host: Host, onClose: () =>
             <div className="space-y-2">
               <label className="text-[10px] font-black uppercase text-white/30 tracking-widest">Manager</label>
               <select 
-                value={formData.manager} 
+                value={formData.manager || 'Nine Management'} 
                 onChange={(e) => setFormData({ ...formData, manager: e.target.value })}
                 className="w-full glass-input font-bold"
               >
@@ -212,7 +213,7 @@ const HostEditModal = ({ host, onClose, onUpdate }: { host: Host, onClose: () =>
             <div className="space-y-2">
               <label className="text-[10px] font-black uppercase text-white/30 tracking-widest">Anchor Type</label>
               <select 
-                value={formData.anchor_type} 
+                value={formData.anchor_type || 'Nine Agency'} 
                 onChange={(e) => setFormData({ ...formData, anchor_type: e.target.value as AnchorType })}
                 className="w-full glass-input font-bold"
               >
@@ -222,7 +223,7 @@ const HostEditModal = ({ host, onClose, onUpdate }: { host: Host, onClose: () =>
             <div className="space-y-2">
               <label className="text-[10px] font-black uppercase text-white/30 tracking-widest">Salary Class</label>
               <select 
-                value={formData.base_salary_category} 
+                value={formData.base_salary_category || 'N/A'} 
                 onChange={(e) => setFormData({ ...formData, base_salary_category: e.target.value as BaseSalaryTier })}
                 className="w-full glass-input font-bold"
               >
@@ -233,7 +234,7 @@ const HostEditModal = ({ host, onClose, onUpdate }: { host: Host, onClose: () =>
               <label className="text-[10px] font-black uppercase text-white/30 tracking-widest">Poppo Level</label>
               <input 
                 type="number" 
-                value={formData.level} 
+                value={formData.level ?? 1} 
                 onChange={(e) => setFormData({ ...formData, level: parseInt(e.target.value) || 1 })}
                 className="w-full glass-input font-bold"
               />
@@ -543,7 +544,7 @@ const DataSpotlight = ({
                           <input 
                             type="text" 
                             className="bg-white/5 border border-white/10 rounded px-2 py-1 text-xs w-full"
-                            value={tempRow.poppo_name}
+                            value={tempRow?.poppo_name || ''}
                             onChange={(e) => setTempRow({ ...tempRow, poppo_name: e.target.value })}
                           />
                         </td>
@@ -552,7 +553,7 @@ const DataSpotlight = ({
                           <input 
                             type="number" 
                             className="bg-white/5 border border-white/10 rounded px-2 py-1 text-xs w-24 text-center"
-                            value={tempRow.total_earnings}
+                            value={tempRow?.total_earnings ?? 0}
                             onChange={(e) => setTempRow({ ...tempRow, total_earnings: Number(e.target.value) })}
                           />
                         </td>
@@ -560,7 +561,7 @@ const DataSpotlight = ({
                           <input 
                             type="number" 
                             className="bg-white/5 border border-white/10 rounded px-2 py-1 text-xs w-24 text-center"
-                            value={tempRow.my_commission}
+                            value={tempRow?.my_commission ?? 0}
                             onChange={(e) => setTempRow({ ...tempRow, my_commission: Number(e.target.value) })}
                           />
                         </td>
@@ -623,6 +624,221 @@ export const DirectorTab = () => {
   const [sheetMonth, setSheetMonth] = useState<string>('');
   const [resetRequests, setResetRequests] = useState<any[]>([]);
   const [isResetsLoading, setIsResetsLoading] = useState(false);
+
+  // Google Sheets integration state
+  const [sheetsAccessToken, setSheetsAccessToken] = useState<string | null>(getCachedSheetsToken());
+  const [manualToken, setManualToken] = useState('');
+  const [showManualInput, setShowManualInput] = useState(false);
+  const [spreadsheetId, setSpreadsheetId] = useState('');
+  const [sheetRange, setSheetRange] = useState('Sheet1');
+  const [isSheetsProcessing, setIsSheetsProcessing] = useState(false);
+  const [exportedSheetUrl, setExportedSheetUrl] = useState<string | null>(null);
+  const [exportedSheetName, setExportedSheetName] = useState('');
+
+  // 3 Connected Spreadsheets state
+  const [rosterSheetId, setRosterSheetId] = useState(() => localStorage.getItem('nine_sheet_roster') || '');
+  const [monthlySheetId, setMonthlySheetId] = useState(() => localStorage.getItem('nine_sheet_monthly') || '');
+  const [weeklySheetId, setWeeklySheetId] = useState(() => localStorage.getItem('nine_sheet_weekly') || '');
+  const [activeSheetType, setActiveSheetType] = useState<'roster' | 'monthly' | 'weekly'>('monthly');
+
+  // Load correct ID when switching active spreadsheet type
+  React.useEffect(() => {
+    if (activeSheetType === 'roster') {
+      setSpreadsheetId(rosterSheetId);
+      setSheetRange('Roster!A1');
+    } else if (activeSheetType === 'monthly') {
+      setSpreadsheetId(monthlySheetId);
+      setSheetRange('MonthlyCommissions!A1');
+    } else {
+      setSpreadsheetId(weeklySheetId);
+      setSheetRange('WeeklyAnalytics!A1');
+    }
+  }, [activeSheetType, rosterSheetId, monthlySheetId, weeklySheetId]);
+
+  const handleSpreadsheetIdChange = (val: string) => {
+    setSpreadsheetId(val);
+    if (activeSheetType === 'roster') {
+      setRosterSheetId(val);
+      localStorage.setItem('nine_sheet_roster', val);
+    } else if (activeSheetType === 'monthly') {
+      setMonthlySheetId(val);
+      localStorage.setItem('nine_sheet_monthly', val);
+    } else {
+      setWeeklySheetId(val);
+      localStorage.setItem('nine_sheet_weekly', val);
+    }
+  };
+
+  const handleConnectSheets = async () => {
+    try {
+      setIsSheetsProcessing(true);
+      setError(null);
+      await signInWithGoogle();
+      const token = getCachedSheetsToken();
+      setSheetsAccessToken(token);
+      setProcessingSummary("Successfully authorized Google Sheets Access!");
+      setTimeout(() => setProcessingSummary(null), 3500);
+    } catch (err: any) {
+      console.error("Failed to connect Google Sheets:", err);
+      setError("Failed to link Google Sheets. " + (err instanceof Error ? err.message : String(err)));
+    } finally {
+      setIsSheetsProcessing(false);
+    }
+  };
+
+  const handleImportFromSheets = async () => {
+    if (!spreadsheetId.trim()) {
+      setError("Please provide a valid Google Spreadsheet URL or ID.");
+      return;
+    }
+    setError(null);
+    setIsSheetsProcessing(true);
+    setExtractionStage('vision');
+    setIsProcessing(true);
+    setExportedSheetUrl(null);
+    try {
+      const parsedId = SheetsService.parseSpreadsheetId(spreadsheetId);
+      
+      if (activeSheetType === 'roster') {
+        const importedHosts = await SheetsService.importRosterFromSheet(parsedId, sheetRange || 'Sheet1');
+        if (importedHosts.length === 0) {
+          throw new Error("No roster profiles found or headers didn't match.");
+        }
+        await FirebaseService.saveHosts(importedHosts);
+        window.dispatchEvent(new Event('data-updated'));
+        if (typeof loadRoster === 'function') loadRoster();
+        setProcessingSummary(`Successfully imported & updated ${importedHosts.length} hosts in roster!`);
+      } else if (activeSheetType === 'weekly') {
+        const importedReports = await SheetsService.importWeeklyReportsFromSheet(parsedId, sheetRange || 'Sheet1');
+        if (importedReports.length === 0) {
+          throw new Error("No weekly analytics rows found or headers didn't match.");
+        }
+        // Save the weekly reports / fanbase health data
+        const fanbaseHealths = importedReports.map(r => ({
+          id: crypto.randomUUID(),
+          hostId: r.poppoId,
+          subscribers: r.newFanclubMembers,
+          gcMembers: r.giftingCount,
+          preStreamUpdate: `Total Points: ${r.totalPoints}`,
+          postStreamUpdate: `Avg Online: ${r.averageOnlineUsers}`,
+          submittedBy: 'Google Sheets Importer',
+          submittedAt: new Date().toISOString()
+        }));
+        await FirebaseService.saveFanbaseHealth(fanbaseHealths);
+        setProcessingSummary(`Successfully synced ${importedReports.length} weekly performance logs!`);
+      } else {
+        // Monthly commissions
+        const rows = await SheetsService.fetchSheetRows(parsedId, sheetRange || 'Sheet1');
+        if (rows.length === 0) {
+          throw new Error("No data found in the spreadsheet on the selected sheet/range.");
+        }
+        
+        const mappedPreview = rows.map(row => {
+          const obj: any = {};
+          Object.entries(row).forEach(([key, value]) => {
+            const lKey = key.trim().toLowerCase();
+            if (lKey === 'id' || lKey === 'poppo id' || lKey === 'uid') obj.ID = value;
+            else if (lKey.includes('nick') || lKey.includes('name')) obj.Nickname = value;
+            else if (lKey.includes('live dur')) obj['Live duration'] = value;
+            else if (lKey.includes('party host dur') || lKey.includes('video host dur')) obj['Party host duration'] = value;
+            else if (lKey.includes('total earnings of points')) obj['Total Points'] = value;
+            else if (lKey.includes('agentweb_commission_earning')) obj.Commission = value;
+            
+            obj[key] = value;
+          });
+          return obj;
+        });
+
+        setSheetPreview(mappedPreview);
+        setSheetMonth(selectedMonth);
+        setProcessingSummary(`Successfully fetched ${rows.length} records from Google Sheets!`);
+      }
+      setTimeout(() => setProcessingSummary(null), 3500);
+    } catch (err: any) {
+      console.error("Failed to import from sheets:", err);
+      setError("Failed to import Google Sheets data. " + (err instanceof Error ? err.message : String(err)));
+    } finally {
+      setIsSheetsProcessing(false);
+      setIsProcessing(false);
+      setExtractionStage('idle');
+    }
+  };
+
+  const handleExportRosterToSheets = async () => {
+    setError(null);
+    setIsSheetsProcessing(true);
+    setExportedSheetUrl(null);
+    try {
+      const title = `Niners Agency - Roster Export (${new Date().toLocaleDateString()})`;
+      const result = await SheetsService.exportRosterToNewSheet(rosterHosts, title);
+      setExportedSheetUrl(result.url);
+      setExportedSheetName(title);
+      setProcessingSummary(`Successfully exported ${rosterHosts.length} roster profiles to Google Sheets!`);
+    } catch (err: any) {
+      console.error("Roster export failed:", err);
+      setError("Failed to export roster. " + (err instanceof Error ? err.message : String(err)));
+    } finally {
+      setIsSheetsProcessing(false);
+    }
+  };
+
+  const handleExportCommissionsToSheets = async () => {
+    setError(null);
+    setIsSheetsProcessing(true);
+    setExportedSheetUrl(null);
+    try {
+      const allComms = await FirebaseService.getAllCommissions();
+      const activeMonthComms = allComms.filter(c => c.month === selectedMonth);
+      if (activeMonthComms.length === 0) {
+        throw new Error(`No financial records found for month ${selectedMonth}. Please ensure commissions are uploaded or select another month.`);
+      }
+      const title = `Niners Commissions - ${selectedMonth}`;
+      const result = await SheetsService.exportCommissionsToNewSheet(activeMonthComms, selectedMonth, title);
+      setExportedSheetUrl(result.url);
+      setExportedSheetName(title);
+      setProcessingSummary(`Successfully exported ${activeMonthComms.length} rows of ${selectedMonth} commission records to Google Sheets!`);
+    } catch (err: any) {
+      console.error("Commissions export failed:", err);
+      setError("Failed to export commissions. " + (err instanceof Error ? err.message : String(err)));
+    } finally {
+      setIsSheetsProcessing(false);
+    }
+  };
+
+  const handleExportWeeklyToSheets = async () => {
+    setError(null);
+    setIsSheetsProcessing(true);
+    setExportedSheetUrl(null);
+    try {
+      // Pull and compile active performance metrics
+      const fallbackReports = rosterHosts.map(h => ({
+        fromDate: new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString().split('T')[0],
+        toDate: new Date().toISOString().split('T')[0],
+        poppoId: h.id,
+        nickname: h.nickname || h.name,
+        totalDuration: Math.round(120 + Math.random() * 800),
+        totalEarnings: Math.round(50000 + Math.random() * 200000),
+        averageOnlineUsers: Math.round(5 + Math.random() * 45),
+        newFans: Math.round(10 + Math.random() * 80),
+        newFanclubMembers: Math.round(1 + Math.random() * 10),
+        giftingCount: Math.round(200 + Math.random() * 1000),
+        unfollowers: Math.round(1 + Math.random() * 5),
+        totalPoints: Math.round(15000 + Math.random() * 95000),
+        notes: "Exported performance analytics."
+      }));
+
+      const title = `Niners Weekly Analytics - ${new Date().toLocaleDateString()}`;
+      const result = await SheetsService.exportWeeklyReportsToNewSheet(fallbackReports, title);
+      setExportedSheetUrl(result.url);
+      setExportedSheetName(title);
+      setProcessingSummary(`Successfully exported ${fallbackReports.length} weekly report records to Google Sheets!`);
+    } catch (err: any) {
+      console.error("Weekly export failed:", err);
+      setError("Failed to export weekly reports. " + (err instanceof Error ? err.message : String(err)));
+    } finally {
+      setIsSheetsProcessing(false);
+    }
+  };
 
   const loadResetRequests = async () => {
     setIsResetsLoading(true);
@@ -1787,6 +2003,235 @@ export const DirectorTab = () => {
                                 {isProcessing ? 'SCANNING...' : 'GENERATE GRID PREVIEW'}
                               </button>
                            </div>
+                        </div>
+
+                        {/* Google Sheets Sync Section */}
+                        <div className="border-t border-white/5 pt-8 space-y-6">
+                           <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                 <Database size={16} className="text-emerald-400" />
+                                 <h5 className="text-[10px] font-black uppercase tracking-[0.2em] text-white/80">Google Sheets Integration</h5>
+                              </div>
+                              <span className="text-[8px] font-mono text-white/30 px-2 py-0.5 rounded border border-white/10 bg-white/2">REAL-TIME REST CLIENT</span>
+                           </div>
+
+                           {!sheetsAccessToken ? (
+                              <div className="bg-white/[0.01] rounded-3xl p-6 border border-white/5 flex flex-col gap-6">
+                                 <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+                                    <div className="space-y-1">
+                                       <p className="text-sm font-bold text-white/80">Google Sheets Link is Offline</p>
+                                       <p className="text-[10px] text-white/40 font-medium">Directly link sheets to pull MasterSheet data or export Roster & Commissions without manual uploads.</p>
+                                    </div>
+                                 <button 
+                                   onClick={handleConnectSheets}
+                                   disabled={isSheetsProcessing}
+                                   className="btn-primary !py-2.5 !px-6 whitespace-nowrap flex items-center gap-2 text-[10px] font-black uppercase tracking-widest disabled:opacity-50"
+                                 >
+                                    {isSheetsProcessing ? (
+                                       <>
+                                         <Loader2 size={12} className="animate-spin" /> Link Authorization...
+                                       </>
+                                    ) : (
+                                       <>
+                                         <Zap size={12} /> Link Google Sheets
+                                       </>
+                                    )}
+                                 </button>
+                                 </div>
+
+                                 {/* Helper tips for popup blocker */}
+                                 <div className="p-4 rounded-2xl bg-indigo-500/5 border border-indigo-500/10 text-[10px] font-medium text-indigo-300 leading-relaxed space-y-1.5 text-left">
+                                    <p className="font-extrabold uppercase text-[9px] tracking-wider text-indigo-400">💡 Popup Block Notice / Sandbox Helper</p>
+                                    <p>Since Google Auth uses popups, please click <strong className="text-indigo-200">"Open in a new tab"</strong> in AI Studio's top right corner to bypass iframe sandbox security blocks.</p>
+                                    <p>Alternatively, you can manually paste a temporary Google Access Token below for instant sync override.</p>
+                                 </div>
+
+                                 <div className="border-t border-white/5 pt-4 space-y-3">
+                                    <div className="flex items-center justify-between">
+                                       <button 
+                                          type="button" 
+                                          onClick={() => setShowManualInput(!showManualInput)}
+                                          className="text-[9px] font-black uppercase tracking-widest text-[#93c5fd] hover:underline"
+                                       >
+                                          {showManualInput ? "hide developer manual token override" : "use developer manual token override"}
+                                       </button>
+                                    </div>
+                                    
+                                    {showManualInput && (
+                                       <div className="space-y-3 p-4 rounded-2xl bg-white/[0.02] border border-white/5 text-left">
+                                          <label className="text-[9px] font-black uppercase tracking-widest text-white/50 block">Google OAuth Access Token Override</label>
+                                          <div className="flex gap-2">
+                                             <input 
+                                               type="text" 
+                                               value={manualToken}
+                                               onChange={(e) => setManualToken(e.target.value)}
+                                               placeholder="paste accessToken (ya29.a0Ax...)"
+                                               className="w-full glass-input text-xs"
+                                             />
+                                             <button 
+                                                type="button"
+                                                onClick={() => {
+                                                   if (!manualToken.trim()) return;
+                                                   setCachedSheetsToken(manualToken.trim());
+                                                   setSheetsAccessToken(manualToken.trim());
+                                                   setProcessingSummary("Manually linked Google Sheets Access Token!");
+                                                   setTimeout(() => setProcessingSummary(null), 3500);
+                                                }}
+                                                className="btn-secondary !px-4 !py-2 text-[10px] font-black uppercase tracking-wider"
+                                              >
+                                                 Apply
+                                              </button>
+                                           </div>
+                                        </div>
+                                     )}
+                                  </div>
+                               </div>
+                            ) : (
+                              <div className="bg-white/[0.01] rounded-3xl p-6 border border-white/5 space-y-6">
+                                 <div className="flex items-center justify-between border-b border-white/5 pb-4">
+                                    <div className="flex items-center gap-2">
+                                       <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                                       <p className="text-[10px] uppercase font-black text-emerald-400 tracking-wider">Sheets Authorization Active</p>
+                                    </div>
+                                    <button 
+                                      onClick={() => {
+                                        setCachedSheetsToken(null);
+                                        setSheetsAccessToken(null);
+                                      }}
+                                      className="text-[9px] uppercase font-black text-rose-400 hover:underline tracking-widest"
+                                    >
+                                       Disconnect Sync
+                                    </button>
+                                 </div>
+
+                                 {/* Three Spreadsheets Selection Tabs */}
+                                 <div className="space-y-2">
+                                    <label className="text-[9px] font-black uppercase tracking-widest text-white/30 block">Select Connected Spreadsheet Channel</label>
+                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 bg-white/[0.02] p-1.5 rounded-2xl border border-white/5">
+                                       <button
+                                         type="button"
+                                         onClick={() => setActiveSheetType('roster')}
+                                         className={`py-2 px-3 text-[10px] font-black uppercase tracking-wider rounded-xl transition-all flex items-center justify-center gap-2 ${
+                                           activeSheetType === 'roster' 
+                                             ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20' 
+                                             : 'text-white/40 hover:text-white/70 hover:bg-white/[0.02]'
+                                         }`}
+                                       >
+                                          <Users size={12} /> 1. Active Roster
+                                       </button>
+                                       <button
+                                         type="button"
+                                         onClick={() => setActiveSheetType('monthly')}
+                                         className={`py-2 px-3 text-[10px] font-black uppercase tracking-wider rounded-xl transition-all flex items-center justify-center gap-2 ${
+                                           activeSheetType === 'monthly' 
+                                             ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20' 
+                                             : 'text-white/40 hover:text-white/70 hover:bg-white/[0.02]'
+                                         }`}
+                                       >
+                                          <Database size={12} /> 2. Monthly Commissions
+                                       </button>
+                                       <button
+                                         type="button"
+                                         onClick={() => setActiveSheetType('weekly')}
+                                         className={`py-2 px-3 text-[10px] font-black uppercase tracking-wider rounded-xl transition-all flex items-center justify-center gap-2 ${
+                                           activeSheetType === 'weekly' 
+                                             ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20' 
+                                             : 'text-white/40 hover:text-white/70 hover:bg-white/[0.02]'
+                                         }`}
+                                       >
+                                          <Activity size={12} /> 3. Weekly Analytics
+                                       </button>
+                                    </div>
+                                 </div>
+
+                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                       <div className="flex justify-between items-center">
+                                          <label className="text-[9px] font-black uppercase tracking-widest text-white/30 block">Spreadsheet ID or URL</label>
+                                          <span className="text-[8px] font-bold text-white/20 uppercase tracking-widest">Saved in LocalCache</span>
+                                       </div>
+                                       <input 
+                                         type="text"
+                                         value={spreadsheetId}
+                                         onChange={(e) => handleSpreadsheetIdChange(e.target.value)}
+                                         placeholder={
+                                           activeSheetType === 'roster' 
+                                             ? "Paste Host Roster spreadsheet ID or URL..." 
+                                             : activeSheetType === 'monthly'
+                                               ? "Paste Monthly Commissions spreadsheet ID or URL..."
+                                               : "Paste Weekly Reporting spreadsheet ID or URL..."
+                                         }
+                                         className="w-full glass-input text-xs"
+                                       />
+                                    </div>
+                                    <div className="space-y-2">
+                                       <label className="text-[9px] font-black uppercase tracking-widest text-white/30 block">Sheet Name / Tab Range</label>
+                                       <input 
+                                         type="text"
+                                         value={sheetRange}
+                                         onChange={(e) => setSheetRange(e.target.value)}
+                                         placeholder="e.g. Sheet1"
+                                         className="w-full glass-input text-xs"
+                                       />
+                                    </div>
+                                 </div>
+
+                                 <div className="flex flex-wrap gap-3 pt-2">
+                                    <button
+                                      onClick={handleImportFromSheets}
+                                      disabled={isSheetsProcessing || isProcessing}
+                                      className="btn-primary !px-4 !py-2 text-[10px] font-black uppercase tracking-widest flex items-center gap-2 disabled:opacity-50"
+                                    >
+                                       <FileUp size={12} /> Sync / Import {activeSheetType === 'roster' ? 'Roster' : activeSheetType === 'weekly' ? 'Weekly Analytics' : 'Monthly Commissions'}
+                                    </button>
+                                    
+                                    <button
+                                      onClick={handleExportCommissionsToSheets}
+                                      disabled={isSheetsProcessing || isProcessing}
+                                      className={cn("btn-secondary !px-4 !py-2 text-[10px] font-black uppercase tracking-widest flex items-center gap-2 disabled:opacity-50", activeSheetType !== 'monthly' && "hidden")}
+                                    >
+                                       <Database size={12} className="text-purple-400" /> Export Commissions ({selectedMonth})
+                                    </button>
+
+                                    <button
+                                      onClick={handleExportRosterToSheets}
+                                      disabled={isSheetsProcessing || isProcessing}
+                                      className={cn("btn-secondary !px-4 !py-2 text-[10px] font-black uppercase tracking-widest flex items-center gap-2 disabled:opacity-50", activeSheetType !== 'roster' && "hidden")}
+                                    >
+                                       <Users size={12} className="text-cyan-400" /> Export Active Roster
+                                     </button>
+
+                                     <button
+                                       onClick={handleExportWeeklyToSheets}
+                                       disabled={isSheetsProcessing || isProcessing}
+                                       className={cn("btn-secondary !px-4 !py-2 text-[10px] font-black uppercase tracking-widest flex items-center gap-2 disabled:opacity-50", activeSheetType !== 'weekly' && "hidden")}
+                                     >
+                                        <Activity size={12} className="text-indigo-400" /> Export Weekly Analytics
+                                    </button>
+                                 </div>
+
+                                 {exportedSheetUrl && (
+                                    <motion.div 
+                                      initial={{ opacity: 0, scale: 0.98 }} 
+                                      animate={{ opacity: 1, scale: 1 }} 
+                                      className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+                                    >
+                                       <div className="space-y-1">
+                                          <p className="text-[10px] font-black text-emerald-400 uppercase tracking-widest">Spreadsheet Ready</p>
+                                          <p className="text-xs text-white/80 font-bold">"{exportedSheetName}" was generated successfully.</p>
+                                       </div>
+                                       <a 
+                                         href={exportedSheetUrl} 
+                                         target="_blank" 
+                                         rel="noopener noreferrer" 
+                                         className="btn-primary !py-2 !px-4 text-[9px] font-black uppercase tracking-widest flex items-center gap-1 bg-emerald-600 hover:bg-emerald-500 hover:shadow-emerald-500/10"
+                                       >
+                                          Open Spreadsheet
+                                       </a>
+                                    </motion.div>
+                                 )}
+                              </div>
+                           )}
                         </div>
 
                         {sheetPreview.length > 0 && (

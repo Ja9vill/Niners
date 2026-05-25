@@ -743,7 +743,7 @@ export const RosterTab = () => {
                       </div>
                       <div className="w-20 h-20 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center overflow-hidden shrink-0 shadow-2xl relative group">
                         <img 
-                          src={uploadedPhoto || editingHost?.photoUrl || ''} 
+                          src={uploadedPhoto || editingHost?.photoUrl || "https://api.dicebear.com/7.x/avataaars/svg?seed=preview"} 
                           alt="Preview" 
                           className="w-full h-full object-cover" 
                           onError={(e) => {

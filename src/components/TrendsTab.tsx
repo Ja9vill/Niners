@@ -38,12 +38,13 @@ export const TrendsTab = () => {
   const rankings = useMemo(() => {
     return hosts.map(h => {
       const hostComms = filteredCommissions.filter(c => c.poppo_id === h.id);
-      const totalPoints = hostComms.reduce((sum, c) => sum + (c.total_points || 0), 0);
-      const totalHrs = hostComms.reduce((sum, c) => sum + (c.live_duration || 0), 0);
+      const totalPoints = hostComms.reduce((sum, c) => sum + (Number(c.total_points) || 0), 0);
+      const totalHrs = hostComms.reduce((sum, c) => sum + (Number(c.live_duration) || 0), 0);
+      const ptsPerHr = totalHrs > 0 ? totalPoints / totalHrs : 0;
       return {
         ...h,
         totalPoints,
-        ptsPerHr: totalHrs > 0 ? totalPoints / totalHrs : 0
+        ptsPerHr: isNaN(ptsPerHr) ? 0 : ptsPerHr
       };
     }).sort((a, b) => b.totalPoints - a.totalPoints);
   }, [hosts, filteredCommissions]);

@@ -1,6 +1,34 @@
 import { Host, CommissionEntry, PKEntry, ExposureEntry, DirectorNote, CalendarEvent, ActivityLog, FileEntry, FanbaseHealthEntry, AppNotification, HostTask, PerformanceGoal } from '../types';
 
-const PREFIX = 'nine_';
+export interface AuthState {
+  level: number;
+  role: string;
+  name: string;
+  poppo_id: string;
+  nickname: string;
+  position: string;
+  status: string;
+  manager_assigned: string;
+  anchor_team: string;
+  profile_photo: string;
+  token: string;
+}
+
+const PREFIX = "nine_";
+
+const emptyAuthState: AuthState = {
+  level: 0,
+  role: "",
+  name: "",
+  poppo_id: "",
+  nickname: "",
+  position: "",
+  status: "",
+  manager_assigned: "",
+  anchor_team: "",
+  profile_photo: "",
+  token: "",
+};
 
 export const Storage = {
   getHosts: (): Host[] => JSON.parse(localStorage.getItem(`${PREFIX}hosts`) || '[]'),
@@ -68,12 +96,51 @@ export const Storage = {
   getGoals: (hostId: string): PerformanceGoal[] => JSON.parse(localStorage.getItem(`${PREFIX}goals_${hostId}`) || '[]'),
   setGoals: (hostId: string, goals: PerformanceGoal[]) => localStorage.setItem(`${PREFIX}goals_${hostId}`, JSON.stringify(goals)),
 
-  // Auth State (session only)
-  getAuthState: () => {
-    const state = sessionStorage.getItem(`${PREFIX}auth`);
-    return state ? JSON.parse(state) : { level: 0, role: '', name: '' };
+  getAuthState(): AuthState {
+    try {
+      const raw = sessionStorage.getItem(`${PREFIX}auth`);
+      if (!raw) return { ...emptyAuthState };
+
+      const parsed = JSON.parse(raw);
+      return {
+        level: Number(parsed?.level || 0),
+        role: String(parsed?.role || ""),
+        name: String(parsed?.name || ""),
+        poppo_id: String(parsed?.poppo_id || ""),
+        nickname: String(parsed?.nickname || ""),
+        position: String(parsed?.position || ""),
+        status: String(parsed?.status || ""),
+        manager_assigned: String(parsed?.manager_assigned || ""),
+        anchor_team: String(parsed?.anchor_team || ""),
+        profile_photo: String(parsed?.profile_photo || ""),
+        token: String(parsed?.token || ""),
+      };
+    } catch {
+      return { ...emptyAuthState };
+    }
   },
-  setAuthState: (state: { level: number; role: string; name: string }) => {
-    sessionStorage.setItem(`${PREFIX}auth`, JSON.stringify(state));
-  }
+
+  setAuthState(state: Partial<AuthState>) {
+    const nextState: AuthState = {
+      ...emptyAuthState,
+      ...state,
+      level: Number(state?.level || 0),
+      role: String(state?.role || ""),
+      name: String(state?.name || ""),
+      poppo_id: String(state?.poppo_id || ""),
+      nickname: String(state?.nickname || ""),
+      position: String(state?.position || ""),
+      status: String(state?.status || ""),
+      manager_assigned: String(state?.manager_assigned || ""),
+      anchor_team: String(state?.anchor_team || ""),
+      profile_photo: String(state?.profile_photo || ""),
+      token: String(state?.token || ""),
+    };
+
+    sessionStorage.setItem(`${PREFIX}auth`, JSON.stringify(nextState));
+  },
+
+  clearAuthState() {
+    sessionStorage.removeItem(`${PREFIX}auth`);
+  },
 };

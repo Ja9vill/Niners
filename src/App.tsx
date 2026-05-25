@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   DollarSign, 
   Users, 
@@ -16,7 +16,14 @@ import {
   Trash2,
   CheckCircle2,
   Menu,
-  X
+  X,
+  Globe, 
+  LogOut, 
+  Unlock, 
+  Loader2,
+  Trophy,
+  UserPlus,
+  Shield
 } from 'lucide-react';
 import { AuthGate } from './components/AuthGate';
 import { Storage } from './lib/storage';
@@ -36,23 +43,32 @@ import {
   ResponsiveContainer,
   Cell
 } from 'recharts';
-import { Globe, LogOut, Unlock, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
-import { RosterTab } from './components/RosterTab';
+// Imported components
 import { ProfilesTab } from './components/ProfilesTab';
-import { TrendsTab } from './components/TrendsTab';
 import { CalendarTab } from './components/CalendarTab';
-import { DirectorTab } from './components/DirectorTab';
-import { GlossaryTab } from './components/GlossaryTab';
 import { DataReportingTab } from './components/DataReportingTab';
-
+import { PrivacyTab } from './components/PrivacyTab';
+import { TermsTab } from './components/TermsTab';
 import { HomeTab } from './components/HomeTab';
+import { BecomeAgentTab } from './components/BecomeAgentTab';
+import { TalentManagementTab } from './components/TalentManagementTab';
+import { EventsTab } from './components/EventsTab';
+import { RoleBasedHub } from './components/RoleBasedHub';
 
-type Tab = 'home' | 'overview' | 'roster' | 'profiles' | 'trends' | 'calendar' | 'dashboard' | 'reporting' | 'glossary';
+type Tab = 
+  // Public Layer
+  'top-niners' | 'calendar' | 'roster' | 'become-agent' | 'talent-management' |
+  // Authenticated Layer
+  'dashboard' | 'events' | 'reporting' |
+  // Role Hubs
+  'role-hub' |
+  // Legal
+  'privacy' | 'terms';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<Tab>('home');
+  const [activeTab, setActiveTab] = useState<Tab>('top-niners');
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [authState, setAuthState] = useState(Storage.getAuthState());
   const [hosts, setHosts] = useState<Host[]>([]);
@@ -61,36 +77,10 @@ export default function App() {
   const [notifications, setNotifications] = useState(Storage.getNotifications());
   const [showNotifications, setShowNotifications] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [firebaseUser, setFirebaseUser] = useState(auth.currentUser);
-  const [isSyncingCloud, setIsSyncingCloud] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setFirebaseUser(user);
-      // Automatically upgrade local storage session if Firebase reports verified admin
-      if (user?.email === 'jwavpr@gmail.com') {
-        const currentAuth = Storage.getAuthState();
-        if (currentAuth.role !== 'Director' || currentAuth.level < 2) {
-          const newState = { 
-            level: 2, 
-            role: 'Director', 
-            name: user.displayName || 'Director Miss Nine', 
-            poppo_id: '19157913' 
-          };
-          Storage.setAuthState(newState);
-          setAuthState(newState);
-        }
-      }
-    });
-    return () => unsubscribe();
-  }, []);
-
-  // Initialize data from Firebase
-  useEffect(() => {
     const loadData = async () => {
-      if (authState.level === 0) return;
-      
       setIsLoading(true);
       try {
         const [firebaseHosts, firebaseCommissions] = await Promise.all([
@@ -108,7 +98,7 @@ export default function App() {
           setCommission(firebaseCommissions);
         }
       } catch (err) {
-        console.warn("Could not sync with cloud database. Local storage will be used if available.", err);
+        console.warn("Using local cache reference", err);
       } finally {
         setIsLoading(false);
       }
@@ -126,19 +116,7 @@ export default function App() {
     const newState = { level: 0, role: '', name: '', poppo_id: '' };
     Storage.setAuthState(newState);
     setAuthState(newState);
-  };
-
-  const handleGoogleSignIn = async () => {
-    setIsSyncingCloud(true);
-    try {
-      await signInWithGoogle();
-      // Level elevation handled by the useEffect onAuthStateChanged
-    } catch (err: any) {
-      console.error("Sync Error:", err);
-      alert(err.message || "Google Sign-In failed.");
-    } finally {
-      setIsSyncingCloud(false);
-    }
+    setActiveTab('top-niners');
   };
 
   const refreshState = async () => {
@@ -167,69 +145,62 @@ export default function App() {
 
   const renderContent = () => {
     switch (activeTab) {
-      case 'home': return <HomeTab hosts={hosts} commissions={commission} onOpenLogin={() => setShowLoginModal(true)} />;
-      case 'overview': return (
-        <AuthGate onAuthChange={refreshState}>
-          <OverviewTab commissions={commission} hosts={hosts} />
-        </AuthGate>
-      );
-      case 'roster': return (
-        <AuthGate onAuthChange={refreshState}>
-          <RosterTab />
-        </AuthGate>
-      );
-      case 'profiles': return (
-        <AuthGate onAuthChange={refreshState}>
-          <ProfilesTab />
-        </AuthGate>
-      );
-      case 'trends': return (
-        <AuthGate onAuthChange={refreshState}>
-          <TrendsTab />
-        </AuthGate>
-      );
-      case 'calendar': return (
-        <AuthGate onAuthChange={refreshState}>
-          <CalendarTab />
-        </AuthGate>
-      );
-      case 'dashboard': return (
-        <AuthGate onAuthChange={refreshState}>
-          <DirectorTab />
-        </AuthGate>
-      );
-      case 'reporting': return (
-        <AuthGate onAuthChange={refreshState}>
-          <DataReportingTab />
-        </AuthGate>
-      );
-      case 'glossary': return <GlossaryTab />;
-      default: return (
-        <div className="flex items-center justify-center h-64 text-white/30 italic">
-          Section not found
-        </div>
-      );
+      // 1. Public Viewing Layers
+      case 'top-niners': 
+        return <HomeTab hosts={hosts} commissions={commission} onOpenLogin={() => setShowLoginModal(true)} />;
+      case 'calendar': 
+        return <CalendarTab />;
+      case 'roster': 
+        return <ProfilesTab />;
+      case 'become-agent': 
+        return <BecomeAgentTab />;
+      case 'talent-management': 
+        return <TalentManagementTab />;
+
+      // 2. Authenticated Shared Workspaces
+      case 'dashboard': 
+        return (
+          <AuthGate onAuthChange={refreshState}>
+            <OverviewTab commissions={commission} hosts={hosts} />
+          </AuthGate>
+        );
+      case 'events': 
+        return (
+          <AuthGate onAuthChange={refreshState}>
+            <EventsTab />
+          </AuthGate>
+        );
+      case 'reporting': 
+        return (
+          <AuthGate onAuthChange={refreshState}>
+            <DataReportingTab />
+          </AuthGate>
+        );
+
+      // 3. Role-Based Management Hubs
+      case 'role-hub': 
+        return (
+          <AuthGate onAuthChange={refreshState}>
+            <RoleBasedHub />
+          </AuthGate>
+        );
+
+      // Legal pages
+      case 'privacy': 
+        return <PrivacyTab />;
+      case 'terms': 
+        return <TermsTab />;
+      default: 
+        return <div className="p-12 text-center text-white/30 italic">Tab missing alignment</div>;
     }
   };
-
-  const navItems = [
-    { id: 'home', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'overview', label: 'Analytics', icon: Activity, protected: true },
-    { id: 'roster', label: 'Roster', icon: Users, protected: true },
-    { id: 'profiles', label: 'Profiles', icon: ArrowUpRight, protected: true },
-    { id: 'trends', label: 'Trends', icon: TrendingUp, protected: true },
-    { id: 'calendar', label: 'Events', icon: Calendar, protected: true },
-    { id: 'reporting', label: 'Reporting', icon: Activity, protected: true },
-    { id: 'dashboard', label: 'Admin Panel', icon: Lock, protected: true },
-    { id: 'glossary', label: 'Glossary', icon: BookOpen },
-  ];
 
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-mesh">
       {/* Login Modal Overlay */}
       <AnimatePresence>
         {showLoginModal && (
-          <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 animate-fade-in">
             <motion.div 
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -246,591 +217,319 @@ export default function App() {
               <AuthGate onAuthChange={() => {
                 refreshState();
                 setShowLoginModal(false);
-                setActiveTab('overview');
-              }}>
-                <div className="hidden" /> {/* Dummy child for AuthGate */}
-              </AuthGate>
-              <button 
-                onClick={() => setShowLoginModal(false)}
-                className="absolute top-4 right-4 p-2 text-white/20 hover:text-white"
-              >
-                <X size={20} />
-              </button>
+              }} />
             </motion.div>
           </div>
         )}
       </AnimatePresence>
 
-      <div className="flex flex-col h-screen overflow-hidden">
-        {/* Header */}
-        <header className="h-16 border-b border-slate-800 flex items-center justify-between px-4 sm:px-8 shrink-0 bg-[#0F1117] relative z-[100]">
-          <div className="flex items-center gap-4">
-            <button 
-              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-              className="p-2 -ml-2 rounded-lg hover:bg-white/5 text-slate-400 md:hidden"
-            >
-              {isSidebarOpen ? <X size={20} /> : <Menu size={20} />}
-            </button>
-            <div className="flex items-center gap-3 pr-4 sm:pr-6 border-r border-slate-800">
-              <div className="w-8 h-8 bg-indigo-600 rounded flex items-center justify-center font-bold text-white shadow-lg shadow-indigo-500/20">9</div>
-              <h1 className="text-lg font-bold tracking-tight text-white hidden xs:block">NINE <span className="text-slate-500 font-normal">TALENT</span></h1>
+      {/* HEADER BAR */}
+      <header className="sticky top-0 z-50 flex items-center justify-between px-6 py-4 glass border-b border-white/5 shrink-0 bg-[#07080d]/85">
+        <div className="flex items-center gap-3">
+          <button 
+            onClick={() => setIsSidebarOpen(!isSidebarOpen)} 
+            className="p-1.5 md:hidden text-white/70 hover:text-white hover:bg-white/5 rounded-lg transition-all"
+          >
+            <Menu size={20} />
+          </button>
+          
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-500 to-pink-500 flex items-center justify-center font-black text-black select-none text-xs">
+              9
             </div>
-            <h2 className="text-xs sm:text-sm font-black uppercase tracking-[0.2em] text-indigo-400 truncate max-w-[120px] sm:max-w-none">
-              {navItems.find(n => n.id === activeTab)?.label}
-            </h2>
-          </div>
-          <div className="flex items-center gap-3 sm:gap-6">
-            {authState.level === 0 ? (
-              <div className="flex items-center gap-2">
-                <button 
-                  onClick={() => setShowLoginModal(true)}
-                  className="px-4 py-2 rounded-xl bg-indigo-600 text-white text-[10px] font-black uppercase tracking-widest shadow-lg shadow-indigo-500/20 hover:bg-indigo-500 transition-all"
-                >
-                  Member Login
-                </button>
-              </div>
-            ) : (
-              <>
-                {!firebaseUser && authState.role === 'Director' && (
-                  <button 
-                    onClick={handleGoogleSignIn}
-                    disabled={isSyncingCloud}
-                    className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-[10px] font-bold text-indigo-400 hover:bg-indigo-500/20 transition-all disabled:opacity-50"
-                  >
-                    {isSyncingCloud ? <Loader2 size={12} className="animate-spin" /> : <Globe size={12} />}
-                    {isSyncingCloud ? 'SYNCING...' : 'SYNC CLOUD'}
-                  </button>
-                )}
-
-                {/* Notifications */}
-                <div className="relative">
-                  <button 
-                    onClick={() => setShowNotifications(!showNotifications)}
-                    className="relative p-2 rounded-full hover:bg-white/5 transition-colors text-slate-400 hover:text-indigo-400"
-                  >
-                    <Bell size={20} />
-                    {notifications.some(n => !n.read) && (
-                      <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border-2 border-[#0F1117] shadow-lg shadow-red-500/20" />
-                    )}
-                  </button>
-                  <AnimatePresence>
-                    {showNotifications && (
-                      <>
-                        <div className="fixed inset-0 z-[80]" onClick={() => setShowNotifications(false)} />
-                        <motion.div 
-                          initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                          animate={{ opacity: 1, y: 0, scale: 1 }}
-                          exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                          className="absolute right-0 mt-3 w-80 glass-card z-[90] p-0 overflow-hidden border-white/10 shadow-2xl"
-                        >
-                          <div className="p-4 border-b border-white/5 flex items-center justify-between bg-white/5">
-                            <h3 className="text-xs font-bold uppercase tracking-widest text-white/50">Notifications</h3>
-                            <button onClick={markAllRead} className="text-[10px] text-indigo-400 font-bold hover:underline">Mark all read</button>
-                          </div>
-                          <div className="max-h-96 overflow-y-auto custom-scrollbar">
-                            {notifications.length > 0 ? (
-                              notifications.map((n) => (
-                                <div key={n.id} className={cn(
-                                  "p-4 border-b border-white/5 hover:bg-white/5 transition-colors relative group",
-                                  !n.read && "bg-indigo-500/5"
-                                )}>
-                                  <div className="flex gap-3">
-                                    <div className={cn(
-                                      "w-2 h-2 rounded-full mt-1.5 shrink-0",
-                                      n.type === 'success' ? "bg-emerald-500" : 
-                                      n.type === 'warning' ? "bg-amber-500" :
-                                      n.type === 'error' ? "bg-red-500" : "bg-indigo-400"
-                                    )} />
-                                    <div className="space-y-1 pr-6">
-                                      <p className="text-xs font-bold text-white/90">{n.title}</p>
-                                      <p className="text-[11px] text-white/50 leading-relaxed">{n.message}</p>
-                                      <p className="text-[9px] text-white/20 font-mono">{formatDate(n.timestamp)}</p>
-                                    </div>
-                                  </div>
-                                  <button 
-                                    onClick={() => deleteNotification(n.id)}
-                                    className="absolute right-2 top-2 p-1 text-white/10 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all"
-                                  >
-                                    <Trash2 size={12} />
-                                  </button>
-                                </div>
-                              ))
-                            ) : (
-                              <div className="p-12 text-center">
-                                <Bell size={24} className="mx-auto text-white/10 mb-2" />
-                                <p className="text-xs text-white/20 italic">No notifications yet</p>
-                              </div>
-                            )}
-                          </div>
-                        </motion.div>
-                      </>
-                    )}
-                  </AnimatePresence>
-                </div>
-
-                <div className="hidden lg:flex flex-col items-end">
-                  <span className="text-[10px] font-semibold text-indigo-400 uppercase tracking-widest leading-none mb-1">
-                    {authState.role}
-                  </span>
-                  <span className="text-xs text-slate-100">{authState.name}</span>
-                </div>
-                
-                <button 
-                  onClick={handleLogout}
-                  className="p-2 hover:bg-white/5 rounded-full transition-all text-white/30 hover:text-red-400"
-                >
-                  <LogOut size={18} />
-                </button>
-              </>
-            )}
-          </div>
-        </header>
-
-        <div className="flex flex-1 overflow-hidden relative">
-          {/* Overlay for mobile sidebar */}
-          <AnimatePresence>
-            {isSidebarOpen && (
-              <motion.div 
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                onClick={() => setIsSidebarOpen(false)}
-                className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[80] md:hidden"
-              />
-            )}
-          </AnimatePresence>
-
-          {/* Vertical Sidebar */}
-          <nav className={cn(
-            "fixed inset-y-0 left-0 z-[90] w-64 border-r border-slate-800 flex flex-col p-4 gap-1 bg-[#0F1117] transition-transform duration-300 md:relative md:translate-x-0",
-            isSidebarOpen ? "translate-x-0" : "-translate-x-full"
-          )}>
-            <div className="text-[10px] font-black text-slate-600 uppercase tracking-[0.2em] px-3 mb-2 mt-4">Command Center</div>
-            {navItems.map(item => {
-              const Icon = item.icon;
-              const isProtected = item.protected && authState.level < 2;
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => {
-                    if (!isProtected) {
-                      setActiveTab(item.id as Tab);
-                      setIsSidebarOpen(false);
-                    }
-                  }}
-                  disabled={isProtected}
-                  className={cn(
-                    "flex items-center gap-3 px-3 py-2.5 rounded text-sm transition-all relative whitespace-nowrap text-left w-full",
-                    activeTab === item.id 
-                      ? "nav-item-active" 
-                      : "nav-item-inactive",
-                    isProtected && "opacity-20 cursor-not-allowed grayscale"
-                  )}
-                >
-                  <Icon size={18} strokeWidth={activeTab === item.id ? 2.5 : 2} className={cn(activeTab === item.id ? "text-indigo-400" : "text-slate-500")} />
-                  <span className="flex-1">{item.label}</span>
-                  {item.protected && authState.level < 2 && <Lock size={12} className="opacity-50" />}
-                </button>
-              );
-            })}
-            
-            <div className="mt-auto border-t border-slate-800 pt-4 pb-2">
-              <div className="px-3 py-2 rounded text-xs text-slate-500 flex items-center gap-2">
-                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                Live Connection Stable
-              </div>
+            <div>
+              <h1 className="text-sm font-black tracking-tight text-white uppercase sm:text-base">MEMBER 9 NINE</h1>
+              <p className="text-[9px] font-mono font-black text-indigo-400 tracking-wider">TALENT & COMMISSION ENGINE</p>
             </div>
-          </nav>
-
-          {/* Main Content Area */}
-          <main className="flex-1 overflow-y-auto bg-[#0A0B0E] p-4 sm:p-8 custom-scrollbar relative">
-            <AnimatePresence mode="wait">
-              {isLoading ? (
-                <motion.div 
-                  key="loader"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-[#0A0B0E] z-10"
-                >
-                  <div className="w-12 h-12 border-2 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin" />
-                  <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/20">Establishing Secure Uplink</p>
-                </motion.div>
-              ) : (
-                <motion.div
-                  key={activeTab}
-                  initial={{ opacity: 0, y: 5 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.3 }}
-                  className="max-w-6xl mx-auto"
-                >
-                  {renderContent()}
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </main>
+          </div>
         </div>
 
-        {/* Footer */}
-        <footer className="h-10 bg-[#0A0B0E] border-t border-slate-800 flex items-center justify-between px-8 text-[10px] text-slate-500 shrink-0 uppercase tracking-widest font-mono">
-          <div className="flex items-center gap-4">
-            <span>System Pulse: <span className="text-emerald-500">Stable</span></span>
-            <span className="hidden sm:inline opacity-30">•</span>
-            <span className="hidden sm:inline">Database Latency: 14ms</span>
+        <div className="flex items-center gap-4">
+          {/* Notifications Trigger */}
+          <div className="relative">
+            <button 
+              onClick={() => {
+                setShowNotifications(!showNotifications);
+                if (!showNotifications) markAllRead();
+              }}
+              className="relative p-2 text-white/60 hover:text-white hover:bg-white/5 rounded-xl transition-all"
+            >
+              <Bell size={18} />
+              {notifications.some(n => !n.read) && (
+                <span className="absolute top-1 right-1 w-2 h-2 bg-pink-500 rounded-full" />
+              )}
+            </button>
+
+            {/* Notifications Panel */}
+            <AnimatePresence>
+              {showNotifications && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setShowNotifications(false)} />
+                  <motion.div 
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 10 }}
+                    className="absolute right-0 mt-2 w-80 max-h-[360px] overflow-y-auto bg-[#0a0c14] border border-white/10 rounded-2xl p-4 shadow-2xl z-50 custom-scrollbar space-y-3"
+                  >
+                    <div className="flex items-center justify-between pb-2 border-b border-white/5">
+                      <span className="text-[10px] font-black uppercase text-white/40 tracking-wider">Channel Updates</span>
+                      <button onClick={markAllRead} className="text-[9px] font-bold text-indigo-400 hover:text-indigo-300">Mark all read</button>
+                    </div>
+                    {notifications.length > 0 ? (
+                      notifications.map(n => (
+                        <div key={n.id} className="p-3 bg-white/2 hover:bg-white/5 rounded-xl text-left border border-white/5 relative group transition-all">
+                          <button onClick={() => deleteNotification(n.id)} className="absolute top-2 right-2 text-white/10 group-hover:text-red-400"><Trash2 size={10} /></button>
+                          <h5 className="text-[11px] font-black text-white">{n.title}</h5>
+                          <p className="text-[10px] text-slate-400 leading-normal mt-0.5">{n.message}</p>
+                          <span className="text-[8px] font-mono text-slate-600 block mt-1.5">{new Date(n.timestamp).toLocaleString()}</span>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-center py-8 text-white/20 text-xs italic">Inbox empty</p>
+                    )}
+                  </motion.div>
+                </>
+              )}
+            </AnimatePresence>
           </div>
-          <div>© 2026 NINE Talent Mgmt — Leadership Access Only</div>
-        </footer>
+
+          {/* Authentication State button */}
+          {authState.level > 0 ? (
+            <div className="flex items-center gap-3">
+              <div className="text-right hidden sm:block">
+                <span className="block text-xs font-black text-white truncate max-w-[120px]">{authState.name}</span>
+                <span className="block text-[8px] font-mono font-black text-indigo-400 uppercase tracking-widest">{authState.role}</span>
+              </div>
+              <button 
+                onClick={handleLogout}
+                className="btn-secondary px-3 py-2 text-xs flex items-center gap-1.5 rounded-xl border-white/10 hover:border-red-500/30 hover:text-red-400"
+              >
+                <LogOut size={12} />
+                <span className="hidden sm:inline">Logout</span>
+              </button>
+            </div>
+          ) : (
+            <button 
+              onClick={() => setShowLoginModal(true)}
+              className="btn-primary px-4 py-2.5 text-xs font-black uppercase tracking-widest shadow-lg shadow-indigo-600/20 flex items-center gap-1.5 rounded-xl"
+            >
+              <Unlock size={14} />
+              Portal Login
+            </button>
+          )}
+        </div>
+      </header>
+
+      {/* RENDER LAYOUT WITH SIDE NAVIGATION */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* SIDE BAR NAVIGATION */}
+        <aside className={cn(
+          "fixed md:relative inset-y-0 left-0 w-64 glass border-r border-white/5 shrink-0 z-40 bg-[#07080d]/95 md:bg-transparent transform md:transform-none transition-all duration-300 flex flex-col justify-between py-6",
+          isSidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
+        )}>
+          <div className="space-y-8 px-4 overflow-y-auto">
+            
+            {/* PUBLIC SECTIONS */}
+            <div className="space-y-2">
+               <span className="text-[8px] font-black tracking-widest text-[#fd2d78] uppercase px-3 block mb-1">Public Global Layer</span>
+               {[
+                 { id: 'top-niners', label: 'Top Niners', icon: Trophy },
+                 { id: 'calendar', label: 'Agency Calendar', icon: Calendar },
+                 { id: 'roster', label: 'Roster Profiles', icon: Users },
+                 { id: 'become-agent', label: 'Become an Agent', icon: UserPlus },
+                 { id: 'talent-management', label: 'Nine Talent Spec', icon: BookOpen }
+               ].map((item) => {
+                 const Icon = item.icon;
+                 return (
+                   <button
+                     key={item.id}
+                     onClick={() => { setActiveTab(item.id as any); setIsSidebarOpen(false); }}
+                     className={cn(
+                       "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left text-xs font-bold transition-all",
+                       activeTab === item.id 
+                         ? "bg-indigo-600/25 border border-indigo-500/20 text-indigo-400" 
+                         : "text-slate-400 hover:text-white"
+                     )}
+                   >
+                     <Icon size={14} />
+                     {item.label}
+                   </button>
+                 );
+               })}
+            </div>
+
+            {/* OPERATIONAL SECTIONS (AUTH PROTECTED) */}
+            <div className="space-y-2">
+               <span className="text-[8px] font-black tracking-widest text-indigo-400 uppercase px-3 block mb-1">Operational Layer</span>
+               {[
+                 { id: 'dashboard', label: 'Analytics Dashboard', icon: LayoutDashboard },
+                 { id: 'events', label: 'Events Workspace', icon: Calendar },
+                 { id: 'reporting', label: 'Operations Reporting', icon: Activity }
+               ].map((item) => {
+                 const Icon = item.icon;
+                 return (
+                   <button
+                     key={item.id}
+                     onClick={() => { setActiveTab(item.id as any); setIsSidebarOpen(false); }}
+                     className={cn(
+                       "w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-left text-xs font-bold transition-all",
+                       activeTab === item.id 
+                         ? "bg-indigo-600/25 border border-indigo-500/20 text-indigo-400" 
+                         : "text-slate-400 hover:text-white"
+                     )}
+                   >
+                     <div className="flex items-center gap-3">
+                       <Icon size={14} />
+                       {item.label}
+                     </div>
+                     {authState.level === 0 && <span className="text-[9px] text-slate-600">Locked</span>}
+                   </button>
+                 );
+               })}
+            </div>
+
+            {/* ROLE HUB LOCKS */}
+            {authState.level > 0 && (
+              <div className="space-y-2">
+                <span className="text-[8px] font-black tracking-widest text-emerald-400 uppercase px-3 block mb-1">Role Coordination</span>
+                <button
+                   onClick={() => { setActiveTab('role-hub'); setIsSidebarOpen(false); }}
+                   className={cn(
+                     "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left text-xs font-bold transition-all",
+                     activeTab === 'role-hub'
+                       ? "bg-indigo-600/25 border border-indigo-500/20 text-indigo-400"
+                       : "text-slate-400 hover:text-white"
+                   )}
+                >
+                   <Shield size={14} />
+                   <span>Leadership Hub</span>
+                </button>
+              </div>
+            )}
+            
+          </div>
+
+          {/* LOWER DECK FOOTER */}
+          <div className="px-7 border-t border-white/5 pt-4 space-y-1 text-[10px] text-slate-600 font-bold">
+            <button onClick={() => { setActiveTab('privacy'); setIsSidebarOpen(false); }} className="block hover:text-white">Privacy Policy</button>
+            <button onClick={() => { setActiveTab('terms'); setIsSidebarOpen(false); }} className="block hover:text-white">Terms of Operations</button>
+            <div className="pt-2 text-[9px] text-slate-500 font-mono">© 2026 MEMBER 9 INC.</div>
+          </div>
+        </aside>
+
+        {/* MAIN DISPLAY AREA */}
+        <main className="flex-1 overflow-y-auto p-6 md:p-8 custom-scrollbar">
+          {renderContent()}
+        </main>
       </div>
     </div>
   );
 }
 
-// Sub-components (Tabs)
-const OverviewTab = ({ commissions, hosts }: { commissions: CommissionEntry[], hosts: Host[] }) => {
-  const auth = Storage.getAuthState();
-  const logs = Storage.getLogs();
-  const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
-  const [selectedFilter, setSelectedFilter] = useState<string>('all');
+// INLINE OPERATIONAL ANALYTICS DASHBOARD
+interface OverviewTabProps {
+  commissions: CommissionEntry[];
+  hosts: Host[];
+}
 
-  const availableMonths = React.useMemo(() => {
-    const months = Array.from(new Set(commissions.map(c => c.month)));
-    return months.sort().reverse();
+const OverviewTab: React.FC<OverviewTabProps> = ({ commissions, hosts }) => {
+  const [selectedYear, setSelectedYear] = useState<string>('all');
+  const [selectedMonth, setSelectedMonth] = useState<string>('all');
+
+  const years = useMemo(() => {
+    return Array.from(new Set(commissions.map(c => c.month.split('-')[0]))).sort().reverse();
   }, [commissions]);
 
-  const filteredCommissions = React.useMemo(() => {
-    if (selectedFilter === 'all') return commissions;
-    return commissions.filter(c => c.month === selectedFilter);
-  }, [commissions, selectedFilter]);
-
-  const totalCommissionPoints = filteredCommissions.reduce((sum, c) => sum + c.total_points, 0);
-  const activeMonths = new Set(filteredCommissions.map(c => c.month)).size;
-  const peakMonthEntry = [...filteredCommissions].sort((a, b) => b.total_points - a.total_points)[0];
-
-  const hostRankings = React.useMemo(() => {
-    return hosts.map(h => {
-      const hostComms = filteredCommissions.filter(c => c.poppo_id === h.id);
-      const totalPts = hostComms.reduce((sum, c) => sum + (c.total_points || 0), 0);
-      const monthsActive = hostComms.length;
-      return {
-        ...h,
-        totalPoints: totalPts,
-        monthsActive
-      };
-    }).sort((a, b) => b.totalPoints - a.totalPoints);
-  }, [hosts, filteredCommissions]);
-
-  const aggregatedData = React.useMemo(() => {
-    const grouped = commissions.reduce((acc: Record<string, number>, curr) => {
-      acc[curr.month] = (acc[curr.month] || 0) + curr.total_points;
-      return acc;
-    }, {});
-
-    return Object.entries(grouped)
-      .map(([month, value]) => ({ month, value }))
-      .sort((a, b) => a.month.localeCompare(b.month));
+  const rawMonths = useMemo(() => {
+    return Array.from(new Set(commissions.map(c => c.month))).sort().reverse();
   }, [commissions]);
 
-  const kpis = [
-    { 
-      label: 'Agency Total Points', 
-      value: totalCommissionPoints > 0 ? `${(totalCommissionPoints / 1000000).toFixed(1)}M pts` : '0 pts', 
-      icon: DollarSign, 
-      protected: true 
-    },
-    { 
-      label: 'Active Months', 
-      value: `${activeMonths} Months`, 
-      icon: Calendar 
-    },
-    { 
-      label: 'Total Hosts', 
-      value: hosts.length.toString(), 
-      icon: Users 
-    },
-    { 
-      label: 'Peak Period', 
-      value: peakMonthEntry ? formatDate(peakMonthEntry.month) : 'N/A', 
-      subValue: peakMonthEntry ? `${(peakMonthEntry.total_points / 1000000).toFixed(1)}M pts` : '', 
-      icon: TrendingUp 
-    },
-  ];
+  const filteredData = useMemo(() => {
+    return commissions.filter(c => {
+      const yr = c.month.split('-')[0];
+      const matchesYear = selectedYear === 'all' || yr === selectedYear;
+      const matchesMonth = selectedMonth === 'all' || c.month === selectedMonth;
+      return matchesYear && matchesMonth;
+    });
+  }, [commissions, selectedYear, selectedMonth]);
 
-  const sortedHosts = [...hostRankings].slice(0, 10).sort((a, b) => {
-    if (!sortConfig) return 0;
+  const stats = useMemo(() => {
+    const totalPoints = filteredData.reduce((sum, c) => sum + (c.total_points || 0), 0);
+    const activeMonths = Array.from(new Set(filteredData.map(c => c.month))).length;
+    const peakRecord = filteredData.length > 0 ? Math.max(...filteredData.map(c => c.total_points || 0)) : 0;
     
-    let aVal: any = a[sortConfig.key as keyof typeof a];
-    let bVal: any = b[sortConfig.key as keyof typeof b];
-
-    if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
-    if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
-    return 0;
-  });
-
-  const requestSort = (key: string) => {
-    let direction: 'asc' | 'desc' = 'asc';
-    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
-      direction = 'desc';
-    }
-    setSortConfig({ key, direction });
-  };
-
-  const SortIcon = ({ column }: { column: string }) => {
-    if (sortConfig?.key !== column) return <span className="opacity-0 group-hover:opacity-100 ml-1">⇅</span>;
-    return sortConfig.direction === 'asc' ? <span className="ml-1 text-indigo-400">↑</span> : <span className="ml-1 text-indigo-400">↓</span>;
-  };
-
-  if (hosts.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center py-24 text-center space-y-6">
-        <LayoutDashboard size={64} className="text-white/5" />
-        <div className="space-y-2">
-          <h3 className="text-xl font-bold text-white/50">Agency Overview Empty</h3>
-          <p className="text-sm text-white/20 max-w-sm mx-auto leading-relaxed">
-            There is currently no data in the system. Go to the <span className="text-indigo-400 font-bold">Director Hub</span> to upload your first MasterSheet and initialize the dashboard.
-          </p>
-        </div>
-        <div className="flex gap-4">
-          <div className="w-24 h-1 bg-white/5 rounded-full overflow-hidden">
-            <div className="w-1/3 h-full bg-indigo-500/50 animate-pulse" />
-          </div>
-        </div>
-      </div>
-    );
-  }
+    return {
+      totalPoints,
+      activeMonths,
+      totalHosts: hosts.length,
+      peakRecord
+    };
+  }, [filteredData, hosts]);
 
   return (
-    <div className="space-y-8">
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {kpis.map((kpi, i) => (
-          <div key={i} className="glass-card flex items-center justify-between group">
-            <div>
-              <p className="text-white/40 text-[10px] font-bold uppercase tracking-[0.15em]">{kpi.label}</p>
-              <div className="mt-1 flex items-baseline gap-2">
-                {kpi.protected && auth.level < 2 ? (
-                  <div className="flex items-center gap-2 text-white/20">
-                    <span className="text-xl font-bold blur-sm select-none">XXXXXX</span>
-                    <Lock size={14} />
-                  </div>
-                ) : (
-                  <h3 className="text-xl font-black tracking-tight bg-gradient-to-r from-white to-white/60 bg-clip-text text-transparent">
-                    {kpi.value}
-                  </h3>
-                )}
-                {kpi.subValue && <span className="text-xs text-cyan-400 font-medium">{kpi.subValue}</span>}
-              </div>
-            </div>
-            <div className="w-9 h-9 rounded-xl bg-white/5 flex items-center justify-center transition-colors group-hover:bg-indigo-500/20">
-              <kpi.icon size={18} className="text-white/20 group-hover:text-indigo-400 transition-colors" />
-            </div>
+    <div className="space-y-8 max-w-6xl mx-auto">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h2 className="text-2xl font-black text-white tracking-tight">Analytics Overview</h2>
+          <p className="text-xs text-slate-500 font-medium">Monthly live performance points totals, agency volume, and individual performance benchmarks.</p>
+        </div>
+        
+        {/* FILTERS */}
+        <div className="flex flex-wrap gap-3">
+          <select 
+            value={selectedYear}
+            onChange={(e) => { setSelectedYear(e.target.value); setSelectedMonth('all'); }}
+            className="bg-slate-900 border border-slate-800 text-xs font-bold text-white px-3 py-2 rounded-xl outline-none"
+          >
+            <option value="all">All Years</option>
+            {years.map(y => <option key={y} value={y}>{y}</option>)}
+          </select>
+
+          <select 
+            value={selectedMonth}
+            onChange={(e) => setSelectedMonth(e.target.value)}
+            className="bg-slate-900 border border-slate-800 text-xs font-bold text-white px-3 py-2 rounded-xl outline-none"
+          >
+            <option value="all">All Months</option>
+            {rawMonths.map(m => <option key={m} value={m}>{formatMonth(m)}</option>)}
+          </select>
+        </div>
+      </div>
+
+      {/* BENCHMARK GRID UNITS */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
+        {[
+          { label: 'Agency Total Points', value: formatNumber(stats.totalPoints), sub: 'points', color: 'text-indigo-400' },
+          { label: 'Active Months', value: stats.activeMonths, sub: 'reporting cycles', color: 'text-pink-400' },
+          { label: 'Total Hosts', value: stats.totalHosts, sub: 'registered talent', color: 'text-emerald-400' },
+          { label: 'Peak Period Month Record', value: formatNumber(stats.peakRecord), sub: 'gifting', color: 'text-amber-500' }
+        ].map((item, i) => (
+          <div key={i} className="glass-card flex flex-col justify-between">
+             <span className="text-[9px] font-black uppercase text-slate-500 tracking-widest">{item.label}</span>
+             <div className="flex items-baseline gap-1 mt-3">
+                <span className={cn("text-xl sm:text-2xl font-black", item.color)}>{item.value}</span>
+                <span className="text-[10px] font-mono text-slate-600 uppercase font-black">{item.sub}</span>
+             </div>
           </div>
         ))}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Commission Timeline */}
-        <div className="lg:col-span-2 glass-card space-y-6">
-          <div className="flex items-center justify-between">
-            <h3 className="font-bold text-lg flex items-center gap-2">
-              <Activity size={18} className="text-purple-400" />
-              Commission Timeline
-              {auth.level < 2 && <Lock size={14} className="text-white/20 ml-2" />}
-            </h3>
-            <div className="flex items-center gap-4 text-xs font-bold uppercase tracking-tighter text-white/30">
-              {aggregatedData.length > 0 ? (
-                <>
-                  <span>{formatDate(aggregatedData[0].month)}</span>
-                  <ChevronRight size={12} />
-                  <span>{formatDate(aggregatedData[aggregatedData.length - 1].month)}</span>
-                </>
-              ) : (
-                <span>No Data Available</span>
-              )}
-            </div>
-          </div>
-
-          <div className="h-64 w-full">
-            {auth.level < 2 ? (
-              <div className="w-full h-full flex flex-col items-center justify-center glass rounded-xl border border-dashed border-white/10 gap-3">
-                <Lock size={24} className="text-white/20" />
-                <p className="text-white/30 text-sm">Director authentication required to view financials</p>
-              </div>
-            ) : (
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={aggregatedData.map(c => ({
-                  month: formatMonth(c.month),
-                  value: c.value
-                }))}>
-                  <Tooltip 
-                    cursor={{ fill: 'rgba(255,255,255,0.05)' }}
-                    content={({ active, payload }) => {
-                      if (active && payload && payload.length) {
-                        return (
-                          <div className="glass p-3 rounded-lg border border-white/10 shadow-xl">
-                            <p className="text-xs text-white/50 mb-1">{payload[0].payload.month}</p>
-                            <p className="text-sm font-bold text-cyan-400">{formatNumber(payload[0].value as number)} pts</p>
-                          </div>
-                        );
-                      }
-                      return null;
-                    }}
-                  />
-                  <Bar dataKey="value" radius={[4, 4, 0, 0]}>
-                    {aggregatedData.map((_entry, index) => (
-                      <Cell key={`cell-${index}`} fill="#8b5cf6" fillOpacity={0.8} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            )}
-          </div>
-
-          <div className="pt-4 border-t border-white/5">
-             <div className="flex items-center justify-between text-[10px] font-black text-white/20 uppercase tracking-[0.2em] mb-4">
-              <span>Data Continuity Phase</span>
-              <span>Total Volume Analysis</span>
-             </div>
-             <div className="relative h-2 bg-white/5 rounded-full overflow-hidden">
-                <div className="absolute inset-y-0 left-0 w-full bg-gradient-to-r from-indigo-500/20 via-purple-500/40 to-emerald-500/20" />
-             </div>
-          </div>
+      {/* RECHARTS PLOT */}
+      <div className="glass-card !p-6 space-y-4">
+        <h3 className="text-xs font-black text-white/50 uppercase tracking-widest">Monthly Gifting Gaps & Timeline Progress Curve</h3>
+        <div className="h-64 sm:h-80">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={filteredData}>
+              <XAxis dataKey="month" tickFormatter={formatMonth} stroke="rgba(255,255,255,0.2)" fontSize={9} />
+              <YAxis tickFormatter={formatNumber} stroke="rgba(255,255,255,0.2)" fontSize={9} />
+              <Tooltip 
+                contentStyle={{ backgroundColor: '#07090f', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '14px' }}
+                labelStyle={{ fontSize: '10px', color: 'rgba(255,255,255,0.4)', fontWeight: 'bold' }}
+              />
+              <Bar dataKey="total_points" fill="#6366f1" radius={[6, 6, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
         </div>
-
-        {/* Activity Log */}
-        <div className="glass-card flex flex-col">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="font-bold text-lg flex items-center gap-2">
-              <History size={18} className="text-amber-400" />
-              Activity Log
-            </h3>
-            <button className="text-xs font-bold text-cyan-400 hover:underline">Show All</button>
-          </div>
-          <div className="space-y-4 overflow-y-auto max-h-[350px] pr-2 custom-scrollbar">
-            {logs.slice(0, 15).map((log, i) => (
-              <div key={log.id} className="flex gap-3 text-sm border-b border-white/5 pb-3">
-                <div className="shrink-0 w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-xs">
-                  {log.type === 'Auth' ? '🔐' : '📝'}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-white/80 line-clamp-2 leading-snug">{log.action}</p>
-                  <div className="flex items-center gap-2 mt-1 text-[10px] font-medium text-white/40 uppercase">
-                    <span className="text-cyan-400/70">{log.user}</span>
-                    <span>•</span>
-                    <span>{formatDate(log.timestamp)}</span>
-                  </div>
-                </div>
-              </div>
-            ))}
-            {logs.length === 0 && (
-              <div className="text-center py-12 text-white/20 italic">No recent activity detected</div>
-            )}
-          </div>
-        </div>
-      </div>
-      
-       {/* Ranking Table */}
-      <div className="glass-card">
-         <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
-            <h3 className="font-bold text-lg flex items-center gap-2">
-               <TrendingUp size={18} className="text-[#ec4899]" />
-               Agency Contributors Ranking
-               {auth.level < 2 && <Lock size={14} className="text-white/20 ml-2" />}
-            </h3>
-            <div className="flex items-center gap-3">
-              <span className="text-[10px] font-black uppercase text-white/30 tracking-widest">Period:</span>
-              <select 
-                value={selectedFilter}
-                onChange={(e) => setSelectedFilter(e.target.value)}
-                className="bg-white/5 border border-white/10 rounded-lg px-3 py-1 text-xs font-bold text-white outline-none focus:border-indigo-500 transition-all cursor-pointer"
-              >
-                <option value="all">🏆 All-Time Record</option>
-                {availableMonths.map(month => (
-                  <option key={month} value={month}>{formatDate(month).includes(',') ? formatDate(month) : formatMonth(month)}</option>
-                ))}
-              </select>
-            </div>
-         </div>
-          {auth.level < 2 ? (
-            <div className="py-20 flex flex-col items-center justify-center gap-4 text-white/20">
-               <Lock size={40} strokeWidth={1} />
-               <p className="text-white/40">Authenticated access required to view ranking data</p>
-            </div>
-         ) : (
-           <>
-             {/* Desktop Table View */}
-             <div className="hidden md:block overflow-x-auto">
-               <table className="w-full text-left">
-                 <thead>
-                   <tr className="border-b border-white/10 text-[10px] font-bold text-white/30 uppercase tracking-widest">
-                     <th className="px-4 py-3 cursor-pointer group hover:text-white transition-colors" onClick={() => requestSort('rank')}>
-                       Rank <SortIcon column="rank" />
-                     </th>
-                     <th className="px-4 py-3 cursor-pointer group hover:text-white transition-colors" onClick={() => requestSort('id')}>
-                       POPPO ID <SortIcon column="id" />
-                     </th>
-                     <th className="px-4 py-3 cursor-pointer group hover:text-white transition-colors" onClick={() => requestSort('name')}>
-                       Name <SortIcon column="name" />
-                     </th>
-                     <th className="px-4 py-3 text-right cursor-pointer group hover:text-white transition-colors" onClick={() => requestSort('totalPoints')}>
-                       Points <SortIcon column="totalPoints" />
-                     </th>
-                     <th className="px-4 py-3 text-right cursor-pointer group hover:text-white transition-colors" onClick={() => requestSort('commission')}>
-                       Rate <SortIcon column="commission" />
-                     </th>
-                     <th className="px-4 py-3 text-center cursor-pointer group hover:text-white transition-colors" onClick={() => requestSort('monthsActive')}>
-                       Freq <SortIcon column="monthsActive" />
-                     </th>
-                   </tr>
-                 </thead>
-                 <tbody className="divide-y divide-white/5">
-                   {sortedHosts.map((host, i) => (
-                      <tr key={host.id} className="hover:bg-white/5 transition-colors group">
-                        <td className="px-4 py-4 font-bold text-white/50 text-base">#{hostRankings.indexOf(host) + 1}</td>
-                        <td className="px-4 py-4 font-mono text-xs text-cyan-400/60">{host.id}</td>
-                        <td className="px-4 py-4 font-bold text-white/90">{host.name}</td>
-                        <td className="px-4 py-4 text-right font-mono text-sm text-emerald-400">
-                          {formatNumber(host.totalPoints)} pts
-                        </td>
-                        <td className="px-4 py-4 text-right font-medium text-[10px] text-white/40">{host.base_salary_category}</td>
-                        <td className="px-4 py-4 text-center">
-                          <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-white/5 border border-white/10 text-[10px] font-bold">{host.monthsActive}</span>
-                        </td>
-                      </tr>
-                   ))}
-                 </tbody>
-               </table>
-             </div>
-
-             {/* Mobile Card View */}
-             <div className="md:hidden space-y-4">
-               {sortedHosts.map((host, i) => (
-                 <div key={host.id} className="p-4 bg-white/5 rounded-xl border border-white/5 space-y-3">
-                   <div className="flex justify-between items-start">
-                     <div className="flex items-center gap-3">
-                       <span className="text-lg font-black text-white/20">#{hostRankings.indexOf(host) + 1}</span>
-                       <div>
-                         <p className="font-bold text-white text-sm tracking-tight">{host.name}</p>
-                         <p className="text-[10px] font-mono text-white/20">ID: {host.id}</p>
-                       </div>
-                     </div>
-                     <div className="text-right">
-                       <p className="text-sm font-bold text-emerald-400 font-mono">{formatNumber(host.totalPoints)} pts</p>
-                       <p className="text-[10px] font-medium text-white/40 uppercase">{host.base_salary_category}</p>
-                     </div>
-                   </div>
-                   <div className="pt-2 border-t border-white/5 flex justify-between items-center text-[10px]">
-                     <span className="text-white/30 uppercase tracking-widest font-bold">Frequency</span>
-                     <span className="px-2 py-0.5 rounded bg-white/5 border border-white/10 font-bold">{host.monthsActive} Months</span>
-                   </div>
-                 </div>
-               ))}
-             </div>
-
-             {sortedHosts.length === 0 && (
-               <div className="py-20 text-center text-white/20 italic">No rankings available for this period</div>
-             )}
-           </>
-         )}
       </div>
     </div>
   );

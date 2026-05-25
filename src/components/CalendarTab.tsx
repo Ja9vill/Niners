@@ -1,283 +1,123 @@
 import React, { useState } from 'react';
-import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Plus, MapPin, Clock, Tag } from 'lucide-react';
-import { CalendarEvent, EventType } from '../types';
+import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Clock, Info } from 'lucide-react';
+import { CalendarEvent } from '../types';
 import { Storage } from '../lib/storage';
-import { cn, formatDate } from '../lib/utils';
+import { cn } from '../lib/utils';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths } from 'date-fns';
-import { motion, AnimatePresence } from 'motion/react';
-
-const EVENT_COLORS: Record<EventType, string> = {
-  'Solo Livehouse': 'bg-[#f97316]',
-  'Party Livehouse': 'bg-[#ec4899]',
-  'Poppo Official Event': 'bg-[#3b82f6]',
-  'Niners Day': 'bg-[#eab308]',
-  'Agency Event': 'bg-[#10b981]',
-  'External Event': 'bg-[#8b5cf6]',
-  'PK Tournament': 'bg-[#f43f5e]',
-  'Platform Feature': 'bg-[#06b6d4]',
-  'Collaboration': 'bg-[#6366f1]'
-};
+import { motion } from 'motion/react';
 
 export const CalendarTab = () => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [events, setEvents] = useState<CalendarEvent[]>(Storage.getEvents());
-  const [isAdding, setIsAdding] = useState(false);
-  const [activeFilters, setActiveFilters] = useState<EventType[]>([]);
-  const auth = Storage.getAuthState();
-
-  const filteredEvents = events.filter(e => activeFilters.length === 0 || activeFilters.includes(e.type));
 
   const days = eachDayOfInterval({
     start: startOfMonth(currentDate),
     end: endOfMonth(currentDate)
   });
 
-  const getEventsForDay = (day: Date) => filteredEvents.filter(e => isSameDay(new Date(e.date), day));
-
-  const toggleFilter = (type: EventType) => {
-    setActiveFilters(prev => prev.includes(type) ? prev.filter(t => t !== type) : [...prev, type]);
-  };
-
-  const handleCreate = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const formData = new FormData(e.currentTarget);
-    const isTalent = auth.role === 'Talent';
-
-    const newEvent: CalendarEvent = {
-        event_id: isTalent ? auth.poppo_id : crypto.randomUUID(),
-        poppo_id: isTalent ? auth.poppo_id : (formData.get('hostId') as string || 'Agency'),
-        title: formData.get('title') as string,
-        description: formData.get('description') as string,
-        date: formData.get('date') as string,
-        time: formData.get('time') as string,
-        created_by_name: auth.name,
-        created_by_role: auth.role,
-        visibility: formData.get('visibility') as any || 'All',
-        timestamp: new Date().toISOString()
-    };
-    
-    // For talent-created events, replace existing event with same ID if any
-    let updated;
-    if (isTalent) {
-      updated = events.filter(ev => ev.event_id !== newEvent.event_id);
-      updated.push(newEvent);
-    } else {
-      updated = [...events, newEvent];
-    }
-    
-    Storage.setEvents(updated);
-    setEvents(updated);
-    Storage.addLog('Calendar', `Created event: ${newEvent.title}`, auth.name);
-    setIsAdding(false);
-  };
+  const getEventsForDay = (day: Date) => events.filter(e => isSameDay(new Date(e.date), day));
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-      {/* Sidebar: Details */}
-      <div className="glass-card flex flex-col gap-8 order-2 lg:order-1">
+    <div className="space-y-6 max-w-5xl mx-auto pb-12">
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
         <div>
-           <h4 className="font-bold text-white/50 text-[10px] uppercase tracking-widest mb-4">Filter by Type</h4>
-           <div className="flex flex-wrap gap-2">
-              {Object.keys(EVENT_COLORS).map(type => (
-                <button
-                  key={type}
-                  onClick={() => toggleFilter(type as EventType)}
-                  className={cn(
-                    "px-2 py-1 rounded text-[9px] font-bold uppercase transition-all border",
-                    activeFilters.includes(type as EventType)
-                      ? "bg-indigo-600 border-indigo-500 text-white"
-                      : "bg-slate-800 border-slate-700 text-slate-500"
-                  )}
-                >
-                  {type}
-                </button>
-              ))}
-              {activeFilters.length > 0 && (
-                <button 
-                  onClick={() => setActiveFilters([])}
-                  className="px-2 py-1 rounded text-[9px] font-bold uppercase text-indigo-400 hover:text-indigo-300"
-                >
-                  Clear All
-                </button>
-              )}
-           </div>
+          <h2 className="text-2xl font-black text-white tracking-tight uppercase flex items-center gap-2">
+            <CalendarIcon className="text-indigo-400" size={24} />
+            Agency Events Calendar
+          </h2>
+          <p className="text-xs text-slate-500 font-medium mt-1">
+            Browse upcoming streams, activities, collaborations, and platform official features.
+          </p>
         </div>
-
-        <div>
-           <h4 className="font-bold text-white/50 text-[10px] uppercase tracking-widest mb-4">Today's Schedule</h4>
-           <div className="space-y-4">
-              {getEventsForDay(new Date()).length === 0 ? (
-                <p className="text-white/20 text-xs italic">No events scheduled for today</p>
-              ) : (
-                getEventsForDay(new Date()).map(e => (
-                  <div key={e.event_id} className="p-3 bg-white/5 rounded-xl border-l-4 border-l-transparent" style={{ borderLeftColor: EVENT_COLORS[e.visibility === 'Leadership' ? 'Collaboration' : 'Solo Livehouse']?.replace('bg-', '') || '#6366f1' }}>
-                    <h5 className="font-bold text-sm">{e.title}</h5>
-                    <div className="flex items-center gap-1.5 mt-1 text-[10px] text-white/40">
-                       <Clock size={10} />
-                       <span>{e.time}</span>
-                    </div>
-                  </div>
-                ))
-              )}
-           </div>
-        </div>
-
-        <div>
-           <h4 className="font-bold text-white/50 text-[10px] uppercase tracking-widest mb-4">Upcoming (Next 7 Days)</h4>
-           <div className="space-y-4">
-                <p className="text-white/20 text-xs italic">Niners Day (Weekly) • Next: Sunday</p>
-           </div>
+        <div className="flex items-center gap-1.5 p-1 bg-slate-900 rounded-xl border border-slate-800">
+          <button onClick={() => setCurrentDate(subMonths(currentDate, 1))} className="p-1.5 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-all">
+            <ChevronLeft size={16}/>
+          </button>
+          <span className="text-xs font-black text-white px-2 uppercase tracking-wider">
+            {format(currentDate, 'MMMM yyyy')}
+          </span>
+          <button onClick={() => setCurrentDate(addMonths(currentDate, 1))} className="p-1.5 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-all">
+            <ChevronRight size={16}/>
+          </button>
         </div>
       </div>
 
-      {/* Main Calendar Grid */}
-      <div className="lg:col-span-3 space-y-6 order-1 lg:order-2">
-         <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-               <h2 className="text-xl sm:text-2xl font-black text-white/90 truncate">{format(currentDate, 'MMMM yyyy')}</h2>
-               <div className="flex items-center gap-1">
-                 <button onClick={() => setCurrentDate(subMonths(currentDate, 1))} className="p-1 hover:bg-white/5 rounded-full"><ChevronLeft size={20}/></button>
-                 <button onClick={() => setCurrentDate(addMonths(currentDate, 1))} className="p-1 hover:bg-white/5 rounded-full"><ChevronRight size={20}/></button>
-                 <button onClick={() => setCurrentDate(new Date())} className="hidden xs:block px-3 py-1 text-xs font-bold bg-white/5 rounded-full hover:bg-white/10 transition-colors">Today</button>
-               </div>
-            </div>
-            <button onClick={() => setIsAdding(true)} className="btn-primary flex items-center gap-2 px-3 sm:px-6">
-              <Plus size={18} />
-              <span className="hidden sm:inline">Add Event</span>
-            </button>
-         </div>
-
-         {/* Desktop Grid View */}
-         <div className="hidden sm:block glass rounded-3xl border border-white/5 overflow-hidden">
-            <div className="grid grid-cols-7 border-b border-white/5 bg-white/2">
-               {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => (
-                 <div key={d} className="py-4 text-center text-[10px] font-black uppercase text-white/30 tracking-widest">{d}</div>
-               ))}
-            </div>
-            <div className="grid grid-cols-7 grid-rows-5 h-[600px]">
-               {days.map((day, i) => {
-                 const dayEvents = getEventsForDay(day);
-                 return (
-                   <div key={i} className={cn(
-                     "border-r border-b border-white/5 p-2 flex flex-col gap-1 transition-colors hover:bg-white/2",
-                     !isSameMonth(day, currentDate) && "opacity-20",
-                     isSameDay(day, new Date()) && "bg-purple-500/5"
-                   )}>
-                      <span className={cn(
-                        "text-xs font-bold ml-1 mb-1",
-                        isSameDay(day, new Date()) ? "text-purple-400" : "text-white/40"
-                      )}>{format(day, 'd')}</span>
-                      <div className="space-y-1">
-                         {dayEvents.slice(0, 3).map(e => (
-                           <div key={e.event_id} className={cn("h-1.5 rounded-full bg-indigo-500")} title={e.title} />
-                         ))}
-                         {dayEvents.length > 3 && <div className="text-[8px] text-white/20 text-center font-bold">+{dayEvents.length - 3} more</div>}
-                      </div>
-                   </div>
-                 );
-               })}
-            </div>
-         </div>
-
-         {/* Mobile Agenda View */}
-         <div className="sm:hidden space-y-4">
-            {days.filter(d => isSameMonth(d, currentDate)).map((day, i) => {
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+        {/* Calendar Grid */}
+        <div className="lg:col-span-3 glass-card !p-6">
+          <div className="grid grid-cols-7 text-center border-b border-white/5 pb-2 mb-2">
+            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => (
+              <div key={d} className="text-[10px] font-black uppercase text-slate-500 tracking-widest">{d}</div>
+            ))}
+          </div>
+          <div className="grid grid-cols-7 gap-1 min-h-[300px]">
+            {days.map((day, idx) => {
               const dayEvents = getEventsForDay(day);
-              if (dayEvents.length === 0) return null;
+              const isToday = isSameDay(day, new Date());
               return (
-                <div key={i} className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <span className={cn(
-                      "text-[10px] font-black uppercase tracking-widest",
-                      isSameDay(day, new Date()) ? "text-indigo-400" : "text-white/30"
-                    )}>{format(day, 'EEE, MMM d')}</span>
-                    <div className="h-px flex-1 bg-white/5" />
-                  </div>
-                  <div className="space-y-2">
-                    {dayEvents.map(e => (
-                      <div key={e.event_id} className="p-4 bg-white/5 rounded-xl border border-white/5 flex items-center justify-between">
-                        <div>
-                          <p className="text-sm font-bold text-white">{e.title}</p>
-                          <div className="flex items-center gap-2 mt-1">
-                            <Clock size={10} className="text-white/20" />
-                            <span className="text-[10px] text-white/40">{e.time}</span>
-                          </div>
-                        </div>
-                        <div className={cn("w-2 h-2 rounded-full", EVENT_COLORS[e.visibility === 'Leadership' ? 'Collaboration' : 'Solo Livehouse']?.replace('bg-', '') || 'bg-indigo-500')} />
-                      </div>
+                <div 
+                  key={idx} 
+                  className={cn(
+                    "min-h-[64px] p-2 bg-slate-950/40 rounded-xl border border-white/5 flex flex-col justify-between transition-all hover:bg-slate-900/45",
+                    isToday ? "ring-1 ring-indigo-500" : ""
+                  )}
+                >
+                  <span className={cn(
+                    "text-xs font-mono font-bold",
+                    isToday ? "text-indigo-400" : "text-slate-400"
+                  )}>
+                    {format(day, 'd')}
+                  </span>
+                  
+                  <div className="space-y-1 mt-1">
+                    {dayEvents.slice(0, 2).map((e, index) => (
+                      <div 
+                        key={index} 
+                        className="h-1.5 rounded-full bg-indigo-500 shadow-[0_0_6px_rgba(99,102,241,0.5)]" 
+                        title={`${e.title}: ${e.description}`}
+                      />
                     ))}
+                    {dayEvents.length > 2 && (
+                      <span className="text-[8px] text-slate-500 font-bold block">+{dayEvents.length - 2} more</span>
+                    )}
                   </div>
                 </div>
               );
             })}
-            {days.filter(d => isSameMonth(d, currentDate)).every(d => getEventsForDay(d).length === 0) && (
-              <div className="py-20 text-center glass-card border-dashed">
-                <CalendarIcon size={32} className="mx-auto text-white/5 mb-2" />
-                <p className="text-xs text-white/20 italic">No events scheduled for this month</p>
-              </div>
-            )}
-         </div>
-      </div>
-
-      <AnimatePresence>
-        {isAdding && (
-          <div className="fixed inset-0 z-[60] flex items-center justify-center p-6">
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsAdding(false)} className="absolute inset-0 bg-navy/80 backdrop-blur-sm" />
-            <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="relative glass w-full max-w-lg rounded-3xl overflow-hidden border border-white/10">
-              <div className="p-6 border-b border-white/5 font-black text-white uppercase tracking-widest text-[11px]">Create New Event Entry</div>
-              <form onSubmit={handleCreate} className="p-6 space-y-6">
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">Event Title</label>
-                  <input name="title" required className="w-full glass-input" placeholder="e.g. Niners Day Celebration" />
-                </div>
-                
-                <div className="grid grid-cols-2 gap-6">
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">Target Poppo ID</label>
-                    <input 
-                      name="hostId" 
-                      required={auth.role !== 'Talent'} 
-                      disabled={auth.role === 'Talent'}
-                      defaultValue={auth.role === 'Talent' ? auth.poppo_id : ''}
-                      className="w-full glass-input" 
-                      placeholder="Agency" 
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">Event Date</label>
-                    <input name="date" type="date" required className="w-full glass-input" />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-6">
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">Time (12h format)</label>
-                    <input name="time" placeholder="10:00 AM" required className="w-full glass-input font-bold" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">Visibility</label>
-                    <select name="visibility" className="w-full glass-input font-bold">
-                       <option value="All">Everyone (Public)</option>
-                       <option value="Leadership">Leadership Only</option>
-                       <option value="Director">Director Only</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">Description / Notes</label>
-                  <textarea name="description" className="w-full glass-input h-24 resize-none" placeholder="Details about the event requirements..." />
-                </div>
-
-                <div className="pt-4 flex gap-4">
-                   <button type="button" onClick={() => setIsAdding(false)} className="flex-1 px-6 py-4 rounded-2xl bg-white/5 text-white/40 font-black uppercase text-[10px] tracking-widest border border-white/5 hover:bg-white/10 transition-colors">Cancel</button>
-                   <button type="submit" className="flex-[2] btn-primary py-4 text-[10px] font-black uppercase tracking-[0.2em] shadow-xl shadow-indigo-500/20">Authorize & Create</button>
-                </div>
-              </form>
-            </motion.div>
           </div>
-        )}
-      </AnimatePresence>
+        </div>
+
+        {/* Sidebar: Details panel */}
+        <div className="glass-card !p-6 space-y-6">
+          <div className="border-b border-white/5 pb-3">
+             <h4 className="font-black text-white text-xs uppercase tracking-wider flex items-center gap-1.5">
+               <Info size={14} className="text-indigo-400" />
+               Daily Briefing
+             </h4>
+          </div>
+
+          <div className="space-y-4">
+             {getEventsForDay(new Date()).length === 0 ? (
+               <p className="text-slate-500 text-xs italic">No streaming events scheduled for today.</p>
+             ) : (
+               getEventsForDay(new Date()).map((e, idx) => (
+                 <div key={idx} className="p-3 bg-white/5 border border-white/5 rounded-xl space-y-1">
+                   <span className="text-[8px] font-mono font-black text-indigo-400 uppercase tracking-widest">
+                     Target ID #{e.poppo_id}
+                   </span>
+                   <h5 className="font-bold text-white text-xs">{e.title}</h5>
+                   <p className="text-[10px] text-slate-400">{e.description}</p>
+                   <div className="flex items-center gap-1 text-[9px] text-slate-500 font-bold mt-1 uppercase font-mono">
+                      <Clock size={10} />
+                      <span>{e.time}</span>
+                   </div>
+                 </div>
+               ))
+             )}
+          </div>
+        </div>
+
+      </div>
     </div>
   );
 };

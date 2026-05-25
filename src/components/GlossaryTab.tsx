@@ -1,60 +1,61 @@
-import React from 'react';
-import { Book, Tag, TrendingUp, DollarSign, Calendar, ShieldCheck } from 'lucide-react';
+import { useState } from "react";
+import { signInWithPopup, signOut } from "firebase/auth";
+import { auth, googleProvider } from "../lib/firebase";
 
-export const GlossaryTab = () => {
-  const sections = [
-    {
-      title: 'Host Nickname Prefixes',
-      icon: Tag,
-      items: [
-        { term: '∘๏✪❾', desc: 'Official NINE Agency Tag' },
-        { term: 'ᚒ / ᚓ', desc: 'Host role markers' },
-        { term: '𝙼𝙽𝙶𝚁', desc: 'Manager marker' },
-        { term: '∂мιи', desc: 'Admin marker' },
-        { term: 'ᴴᵉᵃᵈ𝙼𝙽𝙶𝚁', desc: 'Head Manager marker' },
-      ]
-    },
-    {
-      title: 'Tier Badges',
-      icon: TrendingUp,
-      items: [
-        { term: 'Tier S', desc: 'Elite performer (20M+ pts/month)' },
-        { term: 'Tier A', desc: 'Top talent (8-15M pts/month)' },
-        { term: 'Tier B', desc: 'Established (4-8M pts/month)' },
-        { term: 'Tier X', desc: 'Evaluation Pending / New Host' },
-      ]
-    },
-    {
-      title: 'Earnings Categories',
-      icon: DollarSign,
-      items: [
-        { term: 'Pts/Hr', desc: 'Points earned per hour of live streaming efficiency' },
-        { term: 'Tips%', desc: 'Percentage of revenue derived from user gifts' },
-        { term: 'Live%', desc: 'Percentage of time spent in solo live sessions vs party' },
-      ]
+export function GlossaryTab() {
+  const [message, setMessage] = useState("");
+
+  const handleGoogleLogin = async () => {
+    try {
+      const result = await signInWithPopup(auth, googleProvider);
+      const token = await result.user.getIdToken();
+
+      const response = await fetch("/api/auth/verify", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ idToken: token }),
+      });
+
+      const data = await response.json();
+      setMessage(`Logged in as ${data.email || result.user.email || "user"}`);
+    } catch (error: any) {
+      setMessage(error?.message || "Login failed");
     }
-  ];
+  };
+
+  const handleLogout = async () => {
+    await signOut(auth);
+    setMessage("Logged out");
+  };
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-      {sections.map((section, idx) => (
-        <div key={idx} className="glass-card">
-           <div className="flex items-center gap-3 mb-6 border-b border-slate-800 pb-4">
-              <div className="w-10 h-10 rounded bg-indigo-600/10 flex items-center justify-center">
-                 <section.icon className="text-indigo-400" size={20} />
-              </div>
-              <h4 className="font-bold text-sm uppercase tracking-widest text-slate-200">{section.title}</h4>
-           </div>
-           <div className="space-y-4">
-              {section.items.map((item, i) => (
-                 <div key={i} className="flex flex-col gap-1 px-4 py-3 bg-slate-800/20 rounded border border-slate-800/50">
-                    <span className="font-mono text-indigo-400 text-xs font-bold">{item.term}</span>
-                    <span className="text-[10px] text-slate-500 uppercase tracking-wide">{item.desc}</span>
-                 </div>
-              ))}
-           </div>
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-6">
+      <div className="w-full max-w-xl rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl">
+        <h1 className="text-2xl font-semibold mb-4">NINE Talent Management Dashboard</h1>
+        <p className="text-slate-400 mb-6">
+          Firebase auth recovery test screen.
+        </p>
+
+        <div className="flex gap-3">
+          <button
+            onClick={handleGoogleLogin}
+            className="rounded-xl bg-blue-600 px-4 py-2 font-medium hover:bg-blue-500"
+          >
+            Sign in with Google
+          </button>
+
+          <button
+            onClick={handleLogout}
+            className="rounded-xl bg-slate-700 px-4 py-2 font-medium hover:bg-slate-600"
+          >
+            Sign out
+          </button>
         </div>
-      ))}
+
+        {message ? <p className="mt-6 text-sm text-emerald-400">{message}</p> : null}
+      </div>
     </div>
   );
-};
+}
