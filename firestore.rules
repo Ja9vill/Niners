@@ -1,11 +1,6 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // Global Safety Net (Global Catch-all)
-    match /{document=**} {
-      allow read, write: if false;
-    }
 
     // Global Helpers
     function isSignedIn() { 
@@ -29,15 +24,14 @@ service cloud.firestore {
     }
 
     // PUBLIC READ for standard entities to support talent login and roster view
-    // (Under local storage authentication mode, reads are unauthenticated)
     
     match /hosts/{id} {
-      allow read: if true;
+      allow get, list: if true;
       allow write: if isDirector();
     }
 
     match /commissions/{id} {
-      allow read: if true;
+      allow get, list: if true;
       allow write: if isDirector();
     }
 
