@@ -56,20 +56,16 @@ import { BecomeAgentTab } from './components/BecomeAgentTab';
 import { TalentManagementTab } from './components/TalentManagementTab';
 import { EventsTab } from './components/EventsTab';
 import { RoleBasedHub } from './components/RoleBasedHub';
+import { MemberDashboardTab } from './components/MemberDashboardTab';
 
 type Tab = 
-  // Public Layer
-  'top-niners' | 'calendar' | 'roster' | 'become-agent' | 'talent-management' |
-  // Authenticated Layer
-  'dashboard' | 'events' | 'reporting' |
-  // Role Hubs
-  'role-hub' |
+  // Public Layer (Footer)
+  'top-niners' | 'roster' | 'calendar' | 'become-agent' | 'member-dashboard' |
   // Legal
   'privacy' | 'terms';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<Tab>('top-niners');
-  const [showLoginModal, setShowLoginModal] = useState(false);
   const [authState, setAuthState] = useState(Storage.getAuthState());
   const [hosts, setHosts] = useState<Host[]>([]);
   const [commission, setCommission] = useState<CommissionEntry[]>([]);
@@ -77,7 +73,6 @@ export default function App() {
   const [notifications, setNotifications] = useState(Storage.getNotifications());
   const [showNotifications, setShowNotifications] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   useEffect(() => {
     const loadData = async () => {
@@ -145,44 +140,26 @@ export default function App() {
 
   const renderContent = () => {
     switch (activeTab) {
-      // 1. Public Viewing Layers
+      // 1. Public Viewing Layers (No Login required, no edits allowed)
       case 'top-niners': 
-        return <HomeTab hosts={hosts} commissions={commission} onOpenLogin={() => setShowLoginModal(true)} />;
+        return <HomeTab hosts={hosts} commissions={commission} onOpenLogin={() => setActiveTab('member-dashboard')} />;
       case 'calendar': 
         return <CalendarTab />;
       case 'roster': 
         return <ProfilesTab />;
       case 'become-agent': 
         return <BecomeAgentTab />;
-      case 'talent-management': 
-        return <TalentManagementTab />;
-
-      // 2. Authenticated Shared Workspaces
-      case 'dashboard': 
+      
+      // 2. Member Dashboard (With internal Auth control + multi-layer operations)
+      case 'member-dashboard':
         return (
-          <AuthGate onAuthChange={refreshState}>
-            <OverviewTab commissions={commission} hosts={hosts} />
-          </AuthGate>
-        );
-      case 'events': 
-        return (
-          <AuthGate onAuthChange={refreshState}>
-            <EventsTab />
-          </AuthGate>
-        );
-      case 'reporting': 
-        return (
-          <AuthGate onAuthChange={refreshState}>
-            <DataReportingTab />
-          </AuthGate>
-        );
-
-      // 3. Role-Based Management Hubs
-      case 'role-hub': 
-        return (
-          <AuthGate onAuthChange={refreshState}>
-            <RoleBasedHub />
-          </AuthGate>
+          <MemberDashboardTab 
+            hosts={hosts}
+            commissions={commission}
+            onRefresh={refreshState}
+            onLogout={handleLogout}
+            OverviewTabComponent={OverviewTab}
+          />
         );
 
       // Legal pages
@@ -196,44 +173,15 @@ export default function App() {
   };
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden bg-mesh">
-      {/* Login Modal Overlay */}
-      <AnimatePresence>
-        {showLoginModal && (
-          <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 animate-fade-in">
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setShowLoginModal(false)}
-              className="absolute inset-0 bg-black/80 backdrop-blur-md"
-            />
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.9, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="relative w-full max-w-sm"
-            >
-              <AuthGate onAuthChange={() => {
-                refreshState();
-                setShowLoginModal(false);
-              }} />
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
+    <div className="flex flex-col h-screen overflow-hidden bg-mesh relative">
       {/* HEADER BAR */}
       <header className="sticky top-0 z-50 flex items-center justify-between px-6 py-4 glass border-b border-white/5 shrink-0 bg-[#07080d]/85">
         <div className="flex items-center gap-3">
+          {/* Nine Talent Management — Clickable Logo/brand link returns to home */}
           <button 
-            onClick={() => setIsSidebarOpen(!isSidebarOpen)} 
-            className="p-1.5 md:hidden text-white/70 hover:text-white hover:bg-white/5 rounded-lg transition-all"
+            onClick={() => setActiveTab('top-niners')} 
+            className="flex items-center gap-2 text-left hover:opacity-80 transition-all cursor-pointer"
           >
-            <Menu size={20} />
-          </button>
-          
-          <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-500 to-pink-500 flex items-center justify-center font-black text-black select-none text-xs">
               9
             </div>
@@ -241,7 +189,7 @@ export default function App() {
               <h1 className="text-sm font-black tracking-tight text-white uppercase sm:text-base">MEMBER 9 NINE</h1>
               <p className="text-[9px] font-mono font-black text-indigo-400 tracking-wider">TALENT & COMMISSION ENGINE</p>
             </div>
-          </div>
+          </button>
         </div>
 
         <div className="flex items-center gap-4">
@@ -293,13 +241,21 @@ export default function App() {
             </AnimatePresence>
           </div>
 
-          {/* Authentication State button */}
+          {/* Authentication State button - clicking redirects directly inside member-dashboard tab form */}
           {authState.level > 0 ? (
             <div className="flex items-center gap-3">
-              <div className="text-right hidden sm:block">
-                <span className="block text-xs font-black text-white truncate max-w-[120px]">{authState.name}</span>
-                <span className="block text-[8px] font-mono font-black text-indigo-400 uppercase tracking-widest">{authState.role}</span>
-              </div>
+              <button 
+                onClick={() => setActiveTab('member-dashboard')}
+                className="flex items-center gap-3 hover:opacity-80 text-left transition-all"
+              >
+                <div className="text-right hidden sm:block">
+                  <span className="block text-xs font-black text-white truncate max-w-[120px]">{authState.name}</span>
+                  <span className="block text-[8px] font-mono font-black text-indigo-400 uppercase tracking-widest">{authState.role}</span>
+                </div>
+                {authState.profile_photo && (
+                  <img src={authState.profile_photo} alt={authState.name} className="w-8 h-8 rounded-xl object-cover border border-white/10" referrerPolicy="no-referrer" />
+                )}
+              </button>
               <button 
                 onClick={handleLogout}
                 className="btn-secondary px-3 py-2 text-xs flex items-center gap-1.5 rounded-xl border-white/10 hover:border-red-500/30 hover:text-red-400"
@@ -310,7 +266,7 @@ export default function App() {
             </div>
           ) : (
             <button 
-              onClick={() => setShowLoginModal(true)}
+              onClick={() => setActiveTab('member-dashboard')}
               className="btn-primary px-4 py-2.5 text-xs font-black uppercase tracking-widest shadow-lg shadow-indigo-600/20 flex items-center gap-1.5 rounded-xl"
             >
               <Unlock size={14} />
@@ -320,108 +276,57 @@ export default function App() {
         </div>
       </header>
 
-      {/* RENDER LAYOUT WITH SIDE NAVIGATION */}
-      <div className="flex flex-1 overflow-hidden">
-        {/* SIDE BAR NAVIGATION */}
-        <aside className={cn(
-          "fixed md:relative inset-y-0 left-0 w-64 glass border-r border-white/5 shrink-0 z-40 bg-[#07080d]/95 md:bg-transparent transform md:transform-none transition-all duration-300 flex flex-col justify-between py-6",
-          isSidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
-        )}>
-          <div className="space-y-8 px-4 overflow-y-auto">
-            
-            {/* PUBLIC SECTIONS */}
-            <div className="space-y-2">
-               <span className="text-[8px] font-black tracking-widest text-[#fd2d78] uppercase px-3 block mb-1">Public Global Layer</span>
-               {[
-                 { id: 'top-niners', label: 'Top Niners', icon: Trophy },
-                 { id: 'calendar', label: 'Agency Calendar', icon: Calendar },
-                 { id: 'roster', label: 'Roster Profiles', icon: Users },
-                 { id: 'become-agent', label: 'Become an Agent', icon: UserPlus },
-                 { id: 'talent-management', label: 'Nine Talent Spec', icon: BookOpen }
-               ].map((item) => {
-                 const Icon = item.icon;
-                 return (
-                   <button
-                     key={item.id}
-                     onClick={() => { setActiveTab(item.id as any); setIsSidebarOpen(false); }}
-                     className={cn(
-                       "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left text-xs font-bold transition-all",
-                       activeTab === item.id 
-                         ? "bg-indigo-600/25 border border-indigo-500/20 text-indigo-400" 
-                         : "text-slate-400 hover:text-white"
-                     )}
-                   >
-                     <Icon size={14} />
-                     {item.label}
-                   </button>
-                 );
-               })}
-            </div>
-
-            {/* OPERATIONAL SECTIONS (AUTH PROTECTED) */}
-            <div className="space-y-2">
-               <span className="text-[8px] font-black tracking-widest text-indigo-400 uppercase px-3 block mb-1">Operational Layer</span>
-               {[
-                 { id: 'dashboard', label: 'Analytics Dashboard', icon: LayoutDashboard },
-                 { id: 'events', label: 'Events Workspace', icon: Calendar },
-                 { id: 'reporting', label: 'Operations Reporting', icon: Activity }
-               ].map((item) => {
-                 const Icon = item.icon;
-                 return (
-                   <button
-                     key={item.id}
-                     onClick={() => { setActiveTab(item.id as any); setIsSidebarOpen(false); }}
-                     className={cn(
-                       "w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-left text-xs font-bold transition-all",
-                       activeTab === item.id 
-                         ? "bg-indigo-600/25 border border-indigo-500/20 text-indigo-400" 
-                         : "text-slate-400 hover:text-white"
-                     )}
-                   >
-                     <div className="flex items-center gap-3">
-                       <Icon size={14} />
-                       {item.label}
-                     </div>
-                     {authState.level === 0 && <span className="text-[9px] text-slate-600">Locked</span>}
-                   </button>
-                 );
-               })}
-            </div>
-
-            {/* ROLE HUB LOCKS */}
-            {authState.level > 0 && (
-              <div className="space-y-2">
-                <span className="text-[8px] font-black tracking-widest text-emerald-400 uppercase px-3 block mb-1">Role Coordination</span>
-                <button
-                   onClick={() => { setActiveTab('role-hub'); setIsSidebarOpen(false); }}
-                   className={cn(
-                     "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left text-xs font-bold transition-all",
-                     activeTab === 'role-hub'
-                       ? "bg-indigo-600/25 border border-indigo-500/20 text-indigo-400"
-                       : "text-slate-400 hover:text-white"
-                   )}
-                >
-                   <Shield size={14} />
-                   <span>Leadership Hub</span>
-                </button>
-              </div>
-            )}
-            
-          </div>
-
-          {/* LOWER DECK FOOTER */}
-          <div className="px-7 border-t border-white/5 pt-4 space-y-1 text-[10px] text-slate-600 font-bold">
-            <button onClick={() => { setActiveTab('privacy'); setIsSidebarOpen(false); }} className="block hover:text-white">Privacy Policy</button>
-            <button onClick={() => { setActiveTab('terms'); setIsSidebarOpen(false); }} className="block hover:text-white">Terms of Operations</button>
-            <div className="pt-2 text-[9px] text-slate-500 font-mono">© 2026 MEMBER 9 INC.</div>
-          </div>
-        </aside>
-
-        {/* MAIN DISPLAY AREA */}
-        <main className="flex-1 overflow-y-auto p-6 md:p-8 custom-scrollbar">
+      {/* RENDER LAYOUT WITH REMOVED LEGACY SIDEBAR */}
+      <div className="flex flex-1 overflow-hidden relative">
+        {/* MAIN DISPLAY AREA (Added pb-24 to prevent bottom navigation overlap) */}
+        <main className="flex-1 overflow-y-auto p-4 md:p-8 pb-28 custom-scrollbar">
           {renderContent()}
+
+          {/* Inline short credit and legal triggers at the very bottom of pages */}
+          <div className="mt-12 pt-6 border-t border-white/5 flex flex-wrap items-center justify-between gap-4 text-[10px] text-slate-500 font-bold px-4">
+            <div className="flex gap-4">
+              <button onClick={() => setActiveTab('privacy')} className="hover:text-white transition-colors">Privacy Policy</button>
+              <button onClick={() => setActiveTab('terms')} className="hover:text-white transition-colors">Terms of Operations</button>
+            </div>
+            <div>© 2026 MEMBER 9 INC. ALL RIGHTS RESERVED.</div>
+          </div>
         </main>
       </div>
+
+      {/* FIXED FLOATING BOTTOM FOOTER MENU (5 Tabs available to public, styled beautifully) */}
+      <footer className="fixed bottom-0 left-0 right-0 z-[100] bg-[#07080d]/92 backdrop-blur-xl border-t border-white/[0.08] px-4 py-2 sm:py-3 shrink-0">
+        <div className="max-w-xl mx-auto flex items-center justify-between gap-1">
+          {[
+            { id: 'top-niners', label: 'Home', icon: Trophy },
+            { id: 'roster', label: 'Roster', icon: Users },
+            { id: 'calendar', label: 'Calendar', icon: Calendar },
+            { id: 'become-agent', label: 'Recruit', icon: UserPlus },
+            { id: 'member-dashboard', label: 'Portal', icon: LayoutDashboard }
+          ].map((tabItem) => {
+            const Icon = tabItem.icon;
+            const isActive = activeTab === tabItem.id;
+            return (
+              <button
+                key={tabItem.id}
+                id={`footer-tab-${tabItem.id}`}
+                onClick={() => setActiveTab(tabItem.id as any)}
+                style={{ minHeight: '44px', minWidth: '44px' }}
+                className={cn(
+                  "flex flex-col items-center justify-center flex-1 py-1 rounded-2xl transition-all cursor-pointer",
+                  isActive 
+                    ? "text-indigo-400 bg-indigo-500/10 shadow-[0_0_15px_rgba(99,102,241,0.1)] font-extrabold scale-102" 
+                    : "text-slate-500 hover:text-white"
+                )}
+              >
+                <Icon size={18} className={cn("mb-1 transition-transform", isActive && "scale-105")} />
+                <span className="text-[9px] tracking-wider truncate font-bold uppercase block">
+                  {tabItem.label}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </footer>
     </div>
   );
 }
