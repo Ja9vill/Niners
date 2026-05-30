@@ -226,7 +226,7 @@ export default function App() {
                     {notifications.length > 0 ? (
                       notifications.map(n => (
                         <div key={n.id} className="p-3 bg-white/2 hover:bg-white/5 rounded-xl text-left border border-white/5 relative group transition-all">
-                          <button onClick={() => deleteNotification(n.id)} className="absolute top-2 right-2 text-white/10 group-hover:text-red-400"><Trash2 size={10} /></button>
+                          <button onClick={() => deleteNotification(n.id)} aria-label={`Delete notification: ${n.title}`} className="absolute top-2 right-2 text-white/10 group-hover:text-red-400"><Trash2 size={10} /></button>
                           <h5 className="text-[11px] font-black text-white">{n.title}</h5>
                           <p className="text-[10px] text-slate-400 leading-normal mt-0.5">{n.message}</p>
                           <span className="text-[8px] font-mono text-slate-600 block mt-1.5">{new Date(n.timestamp).toLocaleString()}</span>
@@ -310,8 +310,8 @@ export default function App() {
                 key={tabItem.id}
                 id={`footer-tab-${tabItem.id}`}
                 onClick={() => setActiveTab(tabItem.id as any)}
-                style={{ minHeight: '44px', minWidth: '44px' }}
                 className={cn(
+                  "min-h-[44px] min-w-[44px]",
                   "flex flex-col items-center justify-center flex-1 py-1 rounded-2xl transition-all cursor-pointer",
                   isActive 
                     ? "text-indigo-400 bg-indigo-500/10 shadow-[0_0_15px_rgba(99,102,241,0.1)] font-extrabold scale-102" 
@@ -384,6 +384,7 @@ const OverviewTab: React.FC<OverviewTabProps> = ({ commissions, hosts }) => {
           <select 
             value={selectedYear}
             onChange={(e) => { setSelectedYear(e.target.value); setSelectedMonth('all'); }}
+            aria-label="Filter by year"
             className="bg-slate-900 border border-slate-800 text-xs font-bold text-white px-3 py-2 rounded-xl outline-none"
           >
             <option value="all">All Years</option>
@@ -393,6 +394,7 @@ const OverviewTab: React.FC<OverviewTabProps> = ({ commissions, hosts }) => {
           <select 
             value={selectedMonth}
             onChange={(e) => setSelectedMonth(e.target.value)}
+            aria-label="Filter by month"
             className="bg-slate-900 border border-slate-800 text-xs font-bold text-white px-3 py-2 rounded-xl outline-none"
           >
             <option value="all">All Months</option>

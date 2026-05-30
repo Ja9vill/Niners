@@ -30,13 +30,13 @@ export const CalendarTab = () => {
           </p>
         </div>
         <div className="flex items-center gap-1.5 p-1 bg-slate-900 rounded-xl border border-slate-800">
-          <button onClick={() => setCurrentDate(subMonths(currentDate, 1))} className="p-1.5 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-all">
+          <button onClick={() => setCurrentDate(subMonths(currentDate, 1))} aria-label="Previous month" className="p-1.5 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-all">
             <ChevronLeft size={16}/>
           </button>
           <span className="text-xs font-black text-white px-2 uppercase tracking-wider">
             {format(currentDate, 'MMMM yyyy')}
           </span>
-          <button onClick={() => setCurrentDate(addMonths(currentDate, 1))} className="p-1.5 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-all">
+          <button onClick={() => setCurrentDate(addMonths(currentDate, 1))} aria-label="Next month" className="p-1.5 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-all">
             <ChevronRight size={16}/>
           </button>
         </div>

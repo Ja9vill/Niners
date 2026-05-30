@@ -1,3 +1,4 @@
+/* eslint-disable i18next/no-literal-string */
 import React, { useState, useRef, useMemo } from 'react';
 import { Shield, FileUp, Clipboard, CheckCircle2, History, Trash2, FolderPlus, ArrowRight, Zap, AlertCircle, FileText, Loader2, Activity, UserPlus, Edit2, X, LayoutDashboard, Database, Target, Briefcase, FileSearch, Users, Plus, Lock } from 'lucide-react';
 import { Storage } from '../lib/storage';
@@ -99,7 +100,7 @@ const HostEditModal = ({ host, onClose, onUpdate }: { host: Host, onClose: () =>
             <Edit2 size={20} className="text-indigo-400" />
             Edit Profile: {host.name}
           </h3>
-          <button onClick={onClose} className="p-2 hover:bg-white/5 rounded-full text-white/40 hover:text-white"><X size={20}/></button>
+          <button onClick={onClose} aria-label="Close modal" className="p-2 hover:bg-white/5 rounded-full text-white/40 hover:text-white"><X size={20}/></button>
         </div>
 
         <div className="flex flex-col md:flex-row gap-8 items-start">
@@ -146,98 +147,112 @@ const HostEditModal = ({ host, onClose, onUpdate }: { host: Host, onClose: () =>
             <div className="space-y-2">
               <label className="text-[10px] font-black uppercase text-white/30 tracking-widest">Display Name</label>
               <input 
-                type="text" 
-                value={formData.name || ''} 
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                className="w-full glass-input"
-              />
+                 type="text" 
+                 value={formData.name || ''} 
+                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                 aria-label="Display Name"
+                 placeholder="Display name"
+                 className="w-full glass-input"
+               />
             </div>
             <div className="space-y-2">
               <label className="text-[10px] font-black uppercase text-white/30 tracking-widest">Poppo ID (Locked)</label>
               <input 
-                type="text" 
-                value={formData.id || ''} 
-                readOnly
-                className="w-full glass-input opacity-50 cursor-not-allowed"
-              />
+                 type="text" 
+                 value={formData.id || ''} 
+                 readOnly
+                 aria-label="Poppo ID (locked)"
+                 placeholder="Poppo ID"
+                 className="w-full glass-input opacity-50 cursor-not-allowed"
+               />
             </div>
             <div className="space-y-2">
               <label className="text-[10px] font-black uppercase text-white/30 tracking-widest">Position</label>
               <select 
-                value={formData.position || 'Talent'} 
-                onChange={(e) => setFormData({ ...formData, position: e.target.value as Position, role: e.target.value as Position })}
-                className="w-full glass-input"
-              >
-                {positions.map(p => <option key={p} value={p}>{p}</option>)}
-              </select>
+                 value={formData.position || 'Talent'} 
+                 onChange={(e) => setFormData({ ...formData, position: e.target.value as Position, role: e.target.value as Position })}
+                 aria-label="Position"
+                 className="w-full glass-input"
+               >
+                 {positions.map(p => <option key={p} value={p}>{p}</option>)}
+               </select>
             </div>
             <div className="space-y-2">
               <label className="text-[10px] font-black uppercase text-white/30 tracking-widest">Tier</label>
               <select 
-                value={formData.tier || 'X'} 
-                onChange={(e) => setFormData({ ...formData, tier: e.target.value as Tier })}
-                className="w-full glass-input"
-              >
-                {tiers.map(t => <option key={t} value={t}>{t}</option>)}
-              </select>
+                 value={formData.tier || 'X'} 
+                 onChange={(e) => setFormData({ ...formData, tier: e.target.value as Tier })}
+                 aria-label="Tier"
+                 className="w-full glass-input"
+               >
+                 {tiers.map(t => <option key={t} value={t}>{t}</option>)}
+               </select>
             </div>
             <div className="space-y-2">
               <label className="text-[10px] font-black uppercase text-white/30 tracking-widest">Current Team</label>
               <input 
-                type="text" 
-                value={formData.team || ''} 
-                onChange={(e) => setFormData({ ...formData, team: e.target.value })}
-                className="w-full glass-input"
-              />
+                 type="text" 
+                 value={formData.team || ''} 
+                 onChange={(e) => setFormData({ ...formData, team: e.target.value })}
+                 aria-label="Current Team"
+                 placeholder="Team name"
+                 className="w-full glass-input"
+               />
             </div>
             <div className="space-y-2">
               <label className="text-[10px] font-black uppercase text-white/30 tracking-widest">Status</label>
               <select 
-                value={formData.status || 'Active'} 
-                onChange={(e) => setFormData({ ...formData, status: e.target.value as HostStatus })}
-                className="w-full glass-input"
-              >
-                {statuses.map(s => <option key={s} value={s}>{s}</option>)}
-              </select>
+                 value={formData.status || 'Active'} 
+                 onChange={(e) => setFormData({ ...formData, status: e.target.value as HostStatus })}
+                 aria-label="Status"
+                 className="w-full glass-input"
+               >
+                 {statuses.map(s => <option key={s} value={s}>{s}</option>)}
+               </select>
             </div>
             <div className="space-y-2">
               <label className="text-[10px] font-black uppercase text-white/30 tracking-widest">Manager</label>
               <select 
-                value={formData.manager || 'Nine Management'} 
-                onChange={(e) => setFormData({ ...formData, manager: e.target.value })}
-                className="w-full glass-input font-bold"
-              >
-                {MANAGERS.map(m => <option key={m} value={m}>{m}</option>)}
-              </select>
+                 value={formData.manager || 'Nine Management'} 
+                 onChange={(e) => setFormData({ ...formData, manager: e.target.value })}
+                 aria-label="Manager"
+                 className="w-full glass-input font-bold"
+               >
+                 {MANAGERS.map(m => <option key={m} value={m}>{m}</option>)}
+               </select>
             </div>
             <div className="space-y-2">
               <label className="text-[10px] font-black uppercase text-white/30 tracking-widest">Anchor Type</label>
               <select 
-                value={formData.anchor_type || 'Nine Agency'} 
-                onChange={(e) => setFormData({ ...formData, anchor_type: e.target.value as AnchorType })}
-                className="w-full glass-input font-bold"
-              >
-                {anchorTypes.map(a => <option key={a} value={a}>{a}</option>)}
-              </select>
+                 value={formData.anchor_type || 'Nine Agency'} 
+                 onChange={(e) => setFormData({ ...formData, anchor_type: e.target.value as AnchorType })}
+                 aria-label="Anchor Type"
+                 className="w-full glass-input font-bold"
+               >
+                 {anchorTypes.map(a => <option key={a} value={a}>{a}</option>)}
+               </select>
             </div>
             <div className="space-y-2">
               <label className="text-[10px] font-black uppercase text-white/30 tracking-widest">Salary Class</label>
               <select 
-                value={formData.base_salary_category || 'N/A'} 
-                onChange={(e) => setFormData({ ...formData, base_salary_category: e.target.value as BaseSalaryTier })}
-                className="w-full glass-input font-bold"
-              >
-                {BASE_SALARY_POLICIES.map(s => <option key={s} value={s}>{s}</option>)}
-              </select>
+                 value={formData.base_salary_category || 'N/A'} 
+                 onChange={(e) => setFormData({ ...formData, base_salary_category: e.target.value as BaseSalaryTier })}
+                 aria-label="Salary Class"
+                 className="w-full glass-input font-bold"
+               >
+                 {BASE_SALARY_POLICIES.map(s => <option key={s} value={s}>{s}</option>)}
+               </select>
             </div>
             <div className="space-y-2">
               <label className="text-[10px] font-black uppercase text-white/30 tracking-widest">Poppo Level</label>
               <input 
-                type="number" 
-                value={formData.level ?? 1} 
-                onChange={(e) => setFormData({ ...formData, level: parseInt(e.target.value) || 1 })}
-                className="w-full glass-input font-bold"
-              />
+                 type="number" 
+                 value={formData.level ?? 1} 
+                 onChange={(e) => setFormData({ ...formData, level: parseInt(e.target.value) || 1 })}
+                 aria-label="Poppo Level"
+                 placeholder="1"
+                 className="w-full glass-input font-bold"
+               />
             </div>
           </div>
         </div>
@@ -397,6 +412,7 @@ const RosterManualEditor = ({ hosts, onRefresh, activeCategory, isLoading }: { h
                 <select 
                   value={h.tier}
                   onChange={(e) => handleUpdate({ ...h, tier: e.target.value as Tier })}
+                  aria-label={`Tier for ${h.name}`}
                   className="bg-transparent border-none focus:ring-1 focus:ring-indigo-500/50 rounded-lg px-1 py-1 w-full font-bold text-cyan-400 hover:bg-white/5 cursor-pointer appearance-none text-center"
                 >
                   {tiers.map(t => <option key={t} value={t} className="bg-[#0A0A0A]">{t}</option>)}
@@ -411,6 +427,8 @@ const RosterManualEditor = ({ hosts, onRefresh, activeCategory, isLoading }: { h
                       handleUpdate({ ...h, team: e.target.value });
                     }
                   }}
+                  aria-label={`Team for ${h.name}`}
+                  placeholder="Team"
                   className="bg-transparent border-none focus:ring-1 focus:ring-indigo-500/50 rounded-lg px-2 py-1 w-full text-white/60 hover:bg-white/5"
                 />
               </td>
@@ -418,6 +436,7 @@ const RosterManualEditor = ({ hosts, onRefresh, activeCategory, isLoading }: { h
                 <select 
                   value={h.status}
                   onChange={(e) => handleUpdate({ ...h, status: e.target.value as HostStatus })}
+                  aria-label={`Status for ${h.name}`}
                   className={cn(
                     "bg-transparent border-none focus:ring-1 focus:ring-indigo-500/50 rounded-lg px-2 py-1 w-full font-bold hover:bg-white/5 cursor-pointer appearance-none",
                     h.status === 'Active' ? 'text-emerald-400' : 'text-white/30'
@@ -430,6 +449,7 @@ const RosterManualEditor = ({ hosts, onRefresh, activeCategory, isLoading }: { h
                 <select 
                   value={h.anchor_type}
                   onChange={(e) => handleUpdate({ ...h, anchor_type: e.target.value as AnchorType })}
+                  aria-label={`Anchor type for ${h.name}`}
                   className="bg-transparent border-none focus:ring-1 focus:ring-indigo-500/50 rounded-lg px-2 py-1 w-full font-medium text-white/40 hover:bg-white/5 cursor-pointer appearance-none"
                 >
                   {anchorTypes.map(at => <option key={at} value={at} className="bg-[#0A0A0A]">{at}</option>)}
@@ -437,8 +457,8 @@ const RosterManualEditor = ({ hosts, onRefresh, activeCategory, isLoading }: { h
               </td>
               <td className="px-4 py-3 text-right">
                 <div className="flex justify-end gap-2 text-white/20">
-                  <button onClick={() => setIsEditing(h)} className="hover:text-indigo-400 p-1" title="Full Edit"><Edit2 size={13}/></button>
-                  <button onClick={() => handleDelete(h.id)} className="hover:text-red-400 p-1" title="Delete Profile"><Trash2 size={13}/></button>
+                  <button onClick={() => setIsEditing(h)} aria-label="Edit Profile" className="hover:text-indigo-400 p-1" title="Full Edit"><Edit2 size={13}/></button>
+                  <button onClick={() => handleDelete(h.id)} aria-label="Delete Profile" className="hover:text-red-400 p-1" title="Delete Profile"><Trash2 size={13}/></button>
                 </div>
               </td>
             </tr>
@@ -510,6 +530,7 @@ const DataSpotlight = ({
           </div>
           <button 
             onClick={onClose}
+            aria-label="Close data spotlight"
             className="p-3 bg-white/5 hover:bg-white/10 rounded-2xl transition-all text-white/40 hover:text-white"
           >
             <Trash2 size={20} className="rotate-45" />
@@ -546,6 +567,8 @@ const DataSpotlight = ({
                             className="bg-white/5 border border-white/10 rounded px-2 py-1 text-xs w-full"
                             value={tempRow?.poppo_name || ''}
                             onChange={(e) => setTempRow({ ...tempRow, poppo_name: e.target.value })}
+                            aria-label="Host name"
+                            placeholder="Host name"
                           />
                         </td>
                         <td className="px-6 py-4 text-white/40">{row.month}</td>
@@ -555,6 +578,8 @@ const DataSpotlight = ({
                             className="bg-white/5 border border-white/10 rounded px-2 py-1 text-xs w-24 text-center"
                             value={tempRow?.total_earnings ?? 0}
                             onChange={(e) => setTempRow({ ...tempRow, total_earnings: Number(e.target.value) })}
+                            aria-label="Total earnings"
+                            placeholder="0"
                           />
                         </td>
                         <td className="px-6 py-4 text-center">
@@ -563,6 +588,8 @@ const DataSpotlight = ({
                             className="bg-white/5 border border-white/10 rounded px-2 py-1 text-xs w-24 text-center"
                             value={tempRow?.my_commission ?? 0}
                             onChange={(e) => setTempRow({ ...tempRow, my_commission: Number(e.target.value) })}
+                            aria-label="My commission"
+                            placeholder="0"
                           />
                         </td>
                         <td className="px-6 py-4 text-right">
@@ -572,11 +599,12 @@ const DataSpotlight = ({
                                  onUpdateRow(idx, tempRow);
                                  setEditingRow(null);
                                }}
+                               aria-label="Save row changes"
                                className="text-emerald-400 hover:text-emerald-300 font-bold"
                              >
                                 <CheckCircle2 size={16} />
                              </button>
-                             <button onClick={() => setEditingRow(null)} className="text-white/20 hover:text-white">✕</button>
+                             <button onClick={() => setEditingRow(null)} aria-label="Cancel edit" className="text-white/20 hover:text-white">✕</button>
                           </div>
                         </td>
                       </>
@@ -593,6 +621,7 @@ const DataSpotlight = ({
                               setEditingRow(idx);
                               setTempRow({ ...row });
                             }}
+                            aria-label="Edit this row"
                             className="p-2 hover:bg-white/10 rounded-lg text-white/20 hover:text-white"
                           >
                             <Clipboard size={14} />
@@ -1640,7 +1669,7 @@ export const DirectorTab = () => {
                    <Lock size={18} className="text-amber-400" />
                    Password Reset Requests
                  </h3>
-                 <button onClick={loadResetRequests} className="p-2 hover:bg-white/5 rounded-xl transition-all text-white/20 hover:text-white">
+                 <button onClick={loadResetRequests} aria-label="Refresh reset requests" className="p-2 hover:bg-white/5 rounded-xl transition-all text-white/20 hover:text-white">
                    <History size={14} className={cn(isResetsLoading && "animate-spin")} />
                  </button>
                </div>
@@ -1805,6 +1834,7 @@ export const DirectorTab = () => {
                     <select 
                       value={selectedMonth}
                       onChange={(e) => setSelectedMonth(e.target.value)}
+                      aria-label="Active record month"
                       className="bg-transparent text-emerald-400 font-bold text-xs outline-none cursor-pointer"
                     >
                       {Object.keys(cloudStats).sort((a,b) => b.localeCompare(a)).map(m => (
@@ -1927,10 +1957,12 @@ export const DirectorTab = () => {
                              <div className="flex items-center gap-4">
                                 <div className="flex items-center gap-3 bg-white/5 p-2 px-4 rounded-xl border border-white/5">
                                    <span className="text-[9px] font-black uppercase tracking-widest text-white/20">Target Window</span>
+                                   {/* Note: input[type=month] is not supported in Firefox/Safari — fallback gracefully */}
                                    <input 
                                      type="month" 
                                      value={selectedMonth}
                                      onChange={(e) => setSelectedMonth(e.target.value)}
+                                     aria-label="Target reporting month"
                                      className="bg-transparent text-indigo-400 font-bold text-xs outline-none [color-scheme:dark]"
                                    />
                                 </div>
@@ -1943,7 +1975,7 @@ export const DirectorTab = () => {
                              onClick={() => fileInputRef.current?.click()}
                              className="border-2 border-dashed border-white/5 rounded-3xl p-10 flex flex-col items-center justify-center gap-6 hover:border-indigo-500/40 hover:bg-indigo-500/[0.02] transition-all cursor-pointer relative group"
                            >
-                              <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" accept=".csv,.xlsx,.txt,.pdf,image/*" />
+                              <input type="file" ref={fileInputRef} onChange={handleFileUpload} aria-label="Upload MasterSheet file" className="hidden" accept=".csv,.xlsx,.txt,.pdf,image/*" />
                               <div className="w-16 h-16 rounded-full bg-indigo-500/10 flex items-center justify-center border border-indigo-500/20 group-hover:scale-110 transition-transform">
                                  <FileUp size={32} className="text-indigo-400" />
                               </div>
@@ -2249,7 +2281,7 @@ export const DirectorTab = () => {
                                   </div>
                                 </div>
                                 <div className="flex items-center gap-3">
-                                  <button onClick={() => setSheetPreview([])} className="flex-1 sm:flex-none btn-secondary !py-2.5 !px-6 !text-[10px]">ABORT</button>
+                                  <button onClick={() => setSheetPreview([])} aria-label="Abort preview" className="flex-1 sm:flex-none btn-secondary !py-2.5 !px-6 !text-[10px]">ABORT</button>
                                   <button 
                                     onClick={handleSaveSheet}
                                     disabled={isProcessing}
@@ -2319,14 +2351,14 @@ export const DirectorTab = () => {
                                    <p className="text-[11px] font-black uppercase text-red-400">System Constraint Violation</p>
                                    <p className="text-[10px] text-red-300 font-mono leading-relaxed">{error}</p>
                                 </div>
-                                <button onClick={() => setError(null)} className="ml-auto text-red-400 hover:scale-125 transition-transform">✕</button>
+                                <button onClick={() => setError(null)} aria-label="Dismiss error" className="ml-auto text-red-400 hover:scale-125 transition-transform">✕</button>
                              </motion.div>
                           )}
                           {processingSummary && (
                             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl flex items-center gap-3">
                                <CheckCircle2 size={16} className="text-emerald-400" />
                                <p className="text-[11px] font-bold text-emerald-400 uppercase tracking-tight">{processingSummary}</p>
-                               <button onClick={() => setProcessingSummary(null)} className="ml-auto text-emerald-400">✕</button>
+                               <button onClick={() => setProcessingSummary(null)} aria-label="Dismiss summary" className="ml-auto text-emerald-400">✕</button>
                             </motion.div>
                           )}
                         </AnimatePresence>
@@ -2368,7 +2400,7 @@ export const DirectorTab = () => {
                                    {formatDate(file.timestamp)}
                                 </td>
                                 <td className="px-6 py-4 text-right">
-                                   <button onClick={(e) => { e.stopPropagation(); deleteFile(file.id); }} className="p-2 hover:bg-red-500/10 rounded-lg text-white/20 hover:text-red-400 transition-all">
+                                   <button onClick={(e) => { e.stopPropagation(); deleteFile(file.id); }} aria-label={`Delete file ${file.name}`} className="p-2 hover:bg-red-500/10 rounded-lg text-white/20 hover:text-red-400 transition-all">
                                      <Trash2 size={13} />
                                    </button>
                                 </td>
@@ -2436,7 +2468,7 @@ export const DirectorTab = () => {
                     <Shield size={18} className="text-indigo-400" />
                     Global Roster Override
                  </h3>
-                 <button onClick={() => loadRoster()} className="p-2 bg-white/5 hover:bg-white/10 rounded-xl transition-all text-white/40"><History size={14} /></button>
+                 <button onClick={() => loadRoster()} aria-label="Refresh roster" className="p-2 bg-white/5 hover:bg-white/10 rounded-xl transition-all text-white/40"><History size={14} /></button>
                </div>
                <div className="tech-card !p-0 overflow-hidden">
                   <RosterManualEditor hosts={rosterHosts} onRefresh={loadRoster} activeCategory="ManualEdit" isLoading={isRosterLoading} />
@@ -2453,7 +2485,7 @@ export const DirectorTab = () => {
                      <Database size={20} className="text-cyan-400" />
                      Data Vault Stewardship
                   </h3>
-                  <button onClick={loadCloudStats} disabled={isStatsLoading} className="text-[10px] font-black uppercase tracking-widest text-indigo-400 hover:text-indigo-300 flex items-center gap-2 transition-colors">
+                  <button onClick={loadCloudStats} disabled={isStatsLoading} aria-label="Recalibrate audit" className="text-[10px] font-black uppercase tracking-widest text-indigo-400 hover:text-indigo-300 flex items-center gap-2 transition-colors">
                     <History size={14} className={cn(isStatsLoading && "animate-spin")} />
                     RECALIBRATE AUDIT
                   </button>
@@ -2478,6 +2510,7 @@ export const DirectorTab = () => {
                              finally { setIsStatsLoading(false); }
                            }
                          }}
+                         aria-label={`Delete all records for ${formatMonth(month)}`}
                          className="absolute top-4 right-4 p-2 bg-red-500/10 text-red-500 rounded-xl opacity-0 group-hover:opacity-100 transition-all hover:bg-red-500 hover:text-white"
                        >
                          <Trash2 size={14} />

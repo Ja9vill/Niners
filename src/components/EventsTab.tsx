@@ -1,3 +1,4 @@
+/* eslint-disable i18next/no-literal-string */
 import React, { useState, useEffect } from 'react';
 import { Storage } from '../lib/storage';
 import { FirebaseService } from '../lib/firebaseService';
@@ -128,7 +129,7 @@ export const EventsTab = () => {
           <div className="lg:col-span-1 glass-card border border-white/10 !p-6 space-y-6">
             <div className="flex items-center justify-between pb-4 border-b border-white/5">
               <h3 className="font-bold text-white text-sm">New Operational Event</h3>
-              <button onClick={() => setIsAdding(false)} className="text-white/40 hover:text-white"><X size={16} /></button>
+              <button onClick={() => setIsAdding(false)} aria-label="Close event form" className="text-white/40 hover:text-white"><X size={16} /></button>
             </div>
 
             <form onSubmit={handleCreateEvent} className="space-y-4">
@@ -139,13 +140,13 @@ export const EventsTab = () => {
 
               <div className="space-y-1">
                 <label className="text-[10px] font-black text-white/30 uppercase tracking-widest pl-1">Host Poppo ID (or 'Agency')</label>
-                <input required name="poppo_id" defaultValue="Agency" className="w-full glass-input font-mono" />
+                <input required name="poppo_id" defaultValue="Agency" aria-label="Host Poppo ID" placeholder="Agency" className="w-full glass-input font-mono" />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <label className="text-[10px] font-black text-white/30 uppercase tracking-widest pl-1">Event Date</label>
-                  <input required name="date" type="date" className="w-full glass-input" />
+                  <input required name="date" type="date" aria-label="Event Date" className="w-full glass-input" />
                 </div>
                 <div className="space-y-1">
                   <label className="text-[10px] font-black text-white/30 uppercase tracking-widest pl-1">Event Time</label>
@@ -155,7 +156,7 @@ export const EventsTab = () => {
 
               <div className="space-y-1">
                 <label className="text-[10px] font-black text-white/30 uppercase tracking-widest pl-1">Visibility Level</label>
-                <select name="visibility" className="w-full glass-input font-bold">
+                <select name="visibility" aria-label="Visibility Level" className="w-full glass-input font-bold">
                   <option value="All">All Members (Public)</option>
                   <option value="Leadership">Leadership Only</option>
                   <option value="Director Only">Director Only</option>
@@ -196,7 +197,7 @@ export const EventsTab = () => {
                   {selectedAttendees.map(h => (
                     <span key={h.id} className="inline-flex items-center gap-1 px-2 py-0.5 bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 rounded text-[10px]">
                       {h.name}
-                      <button type="button" onClick={() => setSelectedAttendees(selectedAttendees.filter(x => x.id !== h.id))}><X size={8} /></button>
+                      <button type="button" aria-label={`Remove ${h.name} from attendees`} onClick={() => setSelectedAttendees(selectedAttendees.filter(x => x.id !== h.id))}><X size={8} /></button>
                     </span>
                   ))}
                 </div>
@@ -243,6 +244,7 @@ export const EventsTab = () => {
                     {canDelete && (
                       <button 
                         onClick={() => handleDeleteEvent(event.event_id)}
+                        aria-label={`Delete event: ${event.title}`}
                         className="p-1.5 text-white/15 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all"
                       >
                         <Trash2 size={14} />

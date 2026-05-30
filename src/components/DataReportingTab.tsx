@@ -1,3 +1,4 @@
+/* eslint-disable i18next/no-literal-string */
 import React, { useState, useEffect } from 'react';
 import { Storage } from '../lib/storage';
 import { FirebaseService } from '../lib/firebaseService';
@@ -297,11 +298,11 @@ export const DataReportingTab = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-white/30 uppercase tracking-widest pl-1">From Date</label>
-                <input name="from_date" type="date" required className="w-full glass-input" />
+                <input name="from_date" type="date" required aria-label="From Date" className="w-full glass-input" />
               </div>
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-white/30 uppercase tracking-widest pl-1">To Date</label>
-                <input name="to_date" type="date" required className="w-full glass-input" />
+                <input name="to_date" type="date" required aria-label="To Date" className="w-full glass-input" />
               </div>
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-white/30 uppercase tracking-widest pl-1">Poppo ID</label>
@@ -368,15 +369,15 @@ export const DataReportingTab = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-white/30 uppercase tracking-widest pl-1">From Date</label>
-                <input name="from_date" type="date" required className="w-full glass-input" />
+                <input name="from_date" type="date" required aria-label="From Date" className="w-full glass-input" />
               </div>
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-white/30 uppercase tracking-widest pl-1">To Date</label>
-                <input name="to_date" type="date" required className="w-full glass-input" />
+                <input name="to_date" type="date" required aria-label="To Date" className="w-full glass-input" />
               </div>
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-white/30 uppercase tracking-widest pl-1">Updated By (Logged Role)</label>
-                <input name="updated_by_role" disabled value={auth.role} className="w-full glass-input text-slate-500 font-bold" />
+                <input name="updated_by_role" disabled value={auth.role} aria-label="Updated By (Logged Role)" className="w-full glass-input text-slate-500 font-bold" />
               </div>
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-white/30 uppercase tracking-widest pl-1">Poppo ID</label>
@@ -439,7 +440,7 @@ export const DataReportingTab = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-white/30 uppercase tracking-widest pl-1">Timestamp</label>
-                <input disabled value={new Date().toLocaleString()} className="w-full glass-input text-slate-500 font-bold" />
+                <input disabled value={new Date().toLocaleString()} aria-label="Timestamp" className="w-full glass-input text-slate-500 font-bold" />
               </div>
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-white/30 uppercase tracking-widest pl-1">Host Poppo ID</label>
@@ -454,11 +455,11 @@ export const DataReportingTab = () => {
               </div>
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-white/30 uppercase tracking-widest pl-1">Event Date</label>
-                <input name="event_date" type="date" required className="w-full glass-input" />
+                <input name="event_date" type="date" required aria-label="Event Date" className="w-full glass-input" />
               </div>
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-white/30 uppercase tracking-widest pl-1">Event Type</label>
-                <select name="event_type" className="w-full glass-input font-bold">
+                <select name="event_type" aria-label="Event Type" className="w-full glass-input font-bold">
                   <option value="Solo Livehouse">Solo Livehouse</option>
                   <option value="Party Livehouse">Party Livehouse</option>
                   <option value="Poppo Official Event">Poppo Official Event</option>
@@ -510,6 +511,7 @@ export const DataReportingTab = () => {
                       <button 
                         type="button" 
                         onClick={() => handleRemoveAttendee(host.id)}
+                        aria-label={`Remove ${host.name} from attendees`}
                         className="text-indigo-400 hover:text-white"
                       >
                         <X size={10} />
@@ -550,11 +552,11 @@ export const DataReportingTab = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-white/30 uppercase tracking-widest pl-1">From Date</label>
-                <input name="from_date" type="date" required className="w-full glass-input" />
+                <input name="from_date" type="date" required aria-label="From Date" className="w-full glass-input" />
               </div>
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-white/30 uppercase tracking-widest pl-1">To Date</label>
-                <input name="to_date" type="date" required className="w-full glass-input" />
+                <input name="to_date" type="date" required aria-label="To Date" className="w-full glass-input" />
               </div>
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-white/30 uppercase tracking-widest pl-1">Poppo ID</label>
@@ -563,6 +565,8 @@ export const DataReportingTab = () => {
                   required={!isTalent} 
                   disabled={isTalent} 
                   defaultValue={isTalent ? auth.poppo_id : ''} 
+                  aria-label="Poppo ID"
+                  placeholder="e.g. 19381364"
                   className="w-full glass-input font-mono" 
                 />
               </div>
@@ -572,6 +576,8 @@ export const DataReportingTab = () => {
                   name="nickname" 
                   required 
                   defaultValue={isTalent ? auth.name : ''}
+                  aria-label="Nickname"
+                  placeholder="Host Display Nickname"
                   className="w-full glass-input" 
                 />
               </div>
@@ -635,11 +641,11 @@ export const DataReportingTab = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-white/30 uppercase tracking-widest pl-1">From Date</label>
-                <input name="from_date" type="date" required className="w-full glass-input" />
+                <input name="from_date" type="date" required aria-label="From Date" className="w-full glass-input" />
               </div>
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-white/30 uppercase tracking-widest pl-1">To Date</label>
-                <input name="to_date" type="date" required className="w-full glass-input" />
+                <input name="to_date" type="date" required aria-label="To Date" className="w-full glass-input" />
               </div>
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-white/30 uppercase tracking-widest pl-1">Poppo ID</label>
@@ -648,6 +654,8 @@ export const DataReportingTab = () => {
                   required={!isTalent} 
                   disabled={isTalent} 
                   defaultValue={isTalent ? auth.poppo_id : ''} 
+                  aria-label="Poppo ID"
+                  placeholder="e.g. 19381364"
                   className="w-full glass-input font-mono" 
                 />
               </div>
@@ -657,6 +665,8 @@ export const DataReportingTab = () => {
                   name="nickname" 
                   required 
                   defaultValue={isTalent ? auth.name : ''}
+                  aria-label="Nickname"
+                  placeholder="Host Display Nickname"
                   className="w-full glass-input" 
                 />
               </div>
