@@ -362,7 +362,12 @@ export const RosterTab = () => {
                     <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest">{m.position}</span>
                   </div>
                 </div>
-                <button onClick={() => { setEditingHost(m); setIsAdding(true); }} className="opacity-0 group-hover:opacity-100 p-2 hover:bg-slate-800 rounded transition-all">
+                <button
+                  onClick={() => { setEditingHost(m); setIsAdding(true); }}
+                  title={`Edit ${m.name}`}
+                  aria-label={`Edit ${m.name}`}
+                  className="opacity-0 group-hover:opacity-100 p-2 hover:bg-slate-800 rounded transition-all"
+                >
                   <Edit2 size={12} className="text-slate-500" />
                 </button>
               </div>
@@ -507,12 +512,32 @@ export const RosterTab = () => {
 
               <div className="pt-4 border-t border-white/5 flex items-center justify-between">
                 <div className="flex gap-1">
-                  <button onClick={() => { if (checkPassword(isDirector ? 'Director' : 'Leadership')) setViewingNotes(host.id); }} className="p-2 bg-white/5 hover:bg-white/10 rounded-lg text-white/20 hover:text-cyan-400 transition-all border border-white/5"><MessageSquare size={14}/></button>
-                  <button onClick={() => setViewingTasks(host.id)} className="p-2 bg-white/5 hover:bg-white/10 rounded-lg text-white/20 hover:text-amber-400 transition-all border border-white/5"><ListTodo size={14}/></button>
+                  <button
+                    onClick={() => { if (checkPassword(isDirector ? 'Director' : 'Leadership')) setViewingNotes(host.id); }}
+                    title="View secret notes"
+                    aria-label="View secret notes"
+                    className="p-2 bg-white/5 hover:bg-white/10 rounded-lg text-white/20 hover:text-cyan-400 transition-all border border-white/5"
+                  ><MessageSquare size={14}/></button>
+                  <button
+                    onClick={() => setViewingTasks(host.id)}
+                    title="Assign tasks"
+                    aria-label="Assign tasks"
+                    className="p-2 bg-white/5 hover:bg-white/10 rounded-lg text-white/20 hover:text-amber-400 transition-all border border-white/5"
+                  ><ListTodo size={14}/></button>
                 </div>
                 <div className="flex gap-1">
-                  <button onClick={() => { if (checkPassword(isDirector ? 'Director' : 'Leadership')) { setEditingHost(host); setIsAdding(true); } }} className="p-2 bg-white/5 hover:bg-white/10 rounded-lg text-white/20 hover:text-indigo-400 transition-all border border-white/5"><Edit2 size={14}/></button>
-                  <button onClick={() => { if (checkPassword(isDirector ? 'Director' : 'Leadership')) handleDelete(host.id); }} className="p-2 bg-red-500/10 hover:bg-red-500/20 rounded-lg text-white/20 hover:text-red-400 transition-all border border-red-500/10"><Trash2 size={14}/></button>
+                  <button
+                    onClick={() => { if (checkPassword(isDirector ? 'Director' : 'Leadership')) { setEditingHost(host); setIsAdding(true); } }}
+                    title="Edit member record"
+                    aria-label="Edit member record"
+                    className="p-2 bg-white/5 hover:bg-white/10 rounded-lg text-white/20 hover:text-indigo-400 transition-all border border-white/5"
+                  ><Edit2 size={14}/></button>
+                  <button
+                    onClick={() => { if (checkPassword(isDirector ? 'Director' : 'Leadership')) handleDelete(host.id); }}
+                    title="Delete member record"
+                    aria-label="Delete member record"
+                    className="p-2 bg-red-500/10 hover:bg-red-500/20 rounded-lg text-white/20 hover:text-red-400 transition-all border border-red-500/10"
+                  ><Trash2 size={14}/></button>
                 </div>
               </div>
             </div>
@@ -530,7 +555,12 @@ export const RosterTab = () => {
                      <MessageSquare size={18} className="text-cyan-400" />
                      Host Notes: #{viewingNotes}
                    </h3>
-                   <button onClick={() => setViewingNotes(null)} className="text-slate-500 hover:text-white"><X size={20} /></button>
+                   <button
+                     onClick={() => setViewingNotes(null)}
+                     title="Close notes panel"
+                     aria-label="Close notes panel"
+                     className="text-slate-500 hover:text-white"
+                   ><X size={20} /></button>
                 </div>
                 <div className="p-6 overflow-y-auto space-y-4 flex-1 custom-scrollbar">
                    {isLoadingNotes ? (
@@ -547,10 +577,10 @@ export const RosterTab = () => {
                            </div>
                            {isDirector && (
                              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <button onClick={() => startEditingNote(note.id, note.content)} className="p-1 hover:bg-white/10 rounded text-white/30 hover:text-cyan-400 transition-colors">
+                                <button onClick={() => startEditingNote(note.id, note.content)} title="Edit note" aria-label="Edit note" className="p-1 hover:bg-white/10 rounded text-white/30 hover:text-cyan-400 transition-colors">
                                    <Edit2 size={10} />
                                 </button>
-                                <button onClick={() => handleDeleteNote(note.id)} className="p-1 hover:bg-white/10 rounded text-white/30 hover:text-red-400 transition-colors">
+                                <button onClick={() => handleDeleteNote(note.id)} title="Delete note" aria-label="Delete note" className="p-1 hover:bg-white/10 rounded text-white/30 hover:text-red-400 transition-colors">
                                    <Trash2 size={10} />
                                 </button>
                              </div>
@@ -590,7 +620,12 @@ export const RosterTab = () => {
                      <ListTodo size={18} className="text-amber-400" />
                      Host Tasks: #{viewingTasks}
                    </h3>
-                   <button onClick={() => setViewingTasks(null)} className="text-slate-500 hover:text-white"><X size={20} /></button>
+                   <button
+                     onClick={() => setViewingTasks(null)}
+                     title="Close tasks panel"
+                     aria-label="Close tasks panel"
+                     className="text-slate-500 hover:text-white"
+                   ><X size={20} /></button>
                 </div>
                 <div className="p-6 overflow-y-auto space-y-4 flex-1 custom-scrollbar">
                    {Storage.getTasks(viewingTasks).map((task, i) => (
@@ -659,43 +694,43 @@ export const RosterTab = () => {
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">Position / Role</label>
-                    <select name="position" defaultValue={editingHost?.position} className="w-full glass-input font-bold">
+                    <select name="position" defaultValue={editingHost?.position} title="Position / Role" aria-label="Position / Role" className="w-full glass-input font-bold">
                       {POSITIONS.map(p => <option key={p} value={p}>{p}</option>)}
                     </select>
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">Team Assignment</label>
-                    <select name="team" defaultValue={editingHost?.team} className="w-full glass-input font-bold">
+                    <select name="team" defaultValue={editingHost?.team} title="Team Assignment" aria-label="Team Assignment" className="w-full glass-input font-bold">
                       {TEAMS.map(t => <option key={t} value={t}>{t}</option>)}
                     </select>
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">Manager</label>
-                    <select name="manager" defaultValue={editingHost?.manager} className="w-full glass-input font-bold">
+                    <select name="manager" defaultValue={editingHost?.manager} title="Manager" aria-label="Manager" className="w-full glass-input font-bold">
                       {MANAGERS.map(m => <option key={m} value={m}>{m}</option>)}
                     </select>
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">Salary Category</label>
-                    <select name="base_salary_category" defaultValue={editingHost?.base_salary_category} className="w-full glass-input font-bold">
+                    <select name="base_salary_category" defaultValue={editingHost?.base_salary_category} title="Salary Category" aria-label="Salary Category" className="w-full glass-input font-bold">
                       {BASE_SALARY_POLICIES.map(s => <option key={s} value={s}>{s}</option>)}
                     </select>
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">Current Status</label>
-                    <select name="status" defaultValue={editingHost?.status} className="w-full glass-input font-bold">
+                    <select name="status" defaultValue={editingHost?.status} title="Current Status" aria-label="Current Status" className="w-full glass-input font-bold">
                       {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
                     </select>
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">Anchor Type</label>
-                    <select name="anchor_type" defaultValue={editingHost?.anchor_type} className="w-full glass-input font-bold">
+                    <select name="anchor_type" defaultValue={editingHost?.anchor_type} title="Anchor Type" aria-label="Anchor Type" className="w-full glass-input font-bold">
                       {ANCHORS.map(a => <option key={a} value={a}>{a}</option>)}
                     </select>
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">Poppo Level</label>
-                    <input name="level" type="number" defaultValue={editingHost?.level || 1} className="w-full glass-input font-bold" />
+                    <input name="level" type="number" defaultValue={editingHost?.level || 1} title="Poppo Level" aria-label="Poppo Level" placeholder="e.g. 1" className="w-full glass-input font-bold" />
                   </div>
                   <div className="col-span-2">
                     <label className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">Profile Photo (Upload or URL)</label>

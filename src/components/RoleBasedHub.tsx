@@ -222,7 +222,14 @@ export const RoleBasedHub = () => {
                       e.currentTarget.reset();
                     }} className="flex gap-2">
                       <input name="taskTitle" placeholder="Assign quick host task..." className="flex-1 glass-input py-1.5 text-xs" />
-                      <button type="submit" className="px-3 bg-indigo-600 rounded-xl hover:bg-indigo-500 transition-all text-white"><Send size={12} /></button>
+                      <button
+                        type="submit"
+                        title="Assign task to host"
+                        aria-label="Assign task to host"
+                        className="px-3 bg-indigo-600 rounded-xl hover:bg-indigo-500 transition-all text-white"
+                      >
+                        <Send size={12} />
+                      </button>
                     </form>
                   </div>
                 );
@@ -442,7 +449,11 @@ export const RoleBasedHub = () => {
                   <span className="text-indigo-400 font-black">Efficiency King (#1001)</span>
                 </div>
                 <div className="flex gap-2">
-                  <select className="flex-1 glass-input py-1 text-xs">
+                  <select
+                    title="Select spotlight winner host"
+                    aria-label="Select spotlight winner host"
+                    className="flex-1 glass-input py-1 text-xs"
+                  >
                     {hosts.map(h => (
                       <option key={h.id} value={h.id}>{h.name} (#{h.id})</option>
                     ))}

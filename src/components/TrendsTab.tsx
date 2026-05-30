@@ -116,6 +116,8 @@ export const TrendsTab = () => {
                 <select 
                   value={selectedFilter}
                   onChange={(e) => setSelectedFilter(e.target.value)}
+                  title="Filter rankings by period"
+                  aria-label="Filter rankings by period"
                   className="bg-white/5 border border-white/10 rounded-lg px-3 py-1 text-xs font-bold text-white outline-none focus:border-indigo-500 transition-all cursor-pointer min-w-[140px]"
                 >
                   <option value="all">🏆 All-Time Record</option>
