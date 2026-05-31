@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Storage } from '../lib/storage';
 import { auth } from '../lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
+import { Navigate } from 'react-router-dom';
 
 interface RoleGuardProps {
   roles: string[];
@@ -101,7 +102,7 @@ export const RoleGuard: React.FC<RoleGuardProps> = ({ roles, children }) => {
     return <>{children}</>;
   }
 
-  return null;
+  return <Navigate to="/unauthorized" replace />;
 };
 
 /**

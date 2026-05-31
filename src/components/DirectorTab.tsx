@@ -43,6 +43,8 @@ import * as XLSX from 'xlsx';
 import { FirebaseService } from '../lib/firebaseService';
 import { MANAGERS, BASE_SALARY_POLICIES } from '../lib/constants';
 import { FinancialUpload } from './FinancialUpload';
+import { SystemLogsViewer } from './SystemLogsViewer';
+import { CreateMemberForm } from './CreateMemberForm';
 
 // --- Types for AI Recommendations ---
 interface AIInsight {
@@ -70,8 +72,8 @@ export const DirectorTab = () => {
   const isDirector = localAuth.role?.toLowerCase() === 'director';
   const hasAccess = isDirector;
 
-  // Sidebar views: overview, awards, tasks, roster_admin, financials
-  const [activeView, setActiveView] = useState<'overview' | 'awards' | 'tasks' | 'roster_admin' | 'financials'>('overview');
+  // Sidebar views: overview, awards, tasks, roster_admin, financials, system_logs, create_user
+  const [activeView, setActiveView] = useState<'overview' | 'awards' | 'tasks' | 'roster_admin' | 'financials' | 'system_logs' | 'create_user'>('overview');
   
   // Data State
   const [hosts, setHosts] = useState<Host[]>([]);
@@ -675,9 +677,11 @@ export const DirectorTab = () => {
         {[
           { id: 'overview', label: 'Overview', icon: LayoutDashboard },
           { id: 'awards', label: 'Awards & Badges', icon: Award },
-          { id: 'tasks', label: 'Tasks Desk', icon: ListTodo },
+          { id: 'tasks', label: 'AI Tasks', icon: CheckCircle2 },
           { id: 'roster_admin', label: 'Roster Admin', icon: Users },
-          { id: 'financials', label: 'Financials', icon: Database },
+          { id: 'create_user', label: 'Provision User', icon: UserPlus },
+          { id: 'financials', label: 'Financial Data', icon: FileUp },
+          { id: 'system_logs', label: 'System Logs', icon: AlertCircle },
         ].map(item => (
           <button
             key={item.id}
@@ -807,7 +811,7 @@ export const DirectorTab = () => {
                               <span className={cn(
                                 "text-[8px] font-black uppercase px-2 py-0.5 rounded-full",
                                 item.priority === 'High' ? 'bg-red-500/10 text-red-400 border border-red-500/20' :
-                                item.priority === 'Medium' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
+                                item.priority === 'Medium' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
                                 'bg-[#D4AF37]/10 text-[#D4AF37] border border-[#D4AF37]/20'
                               )}>
                                 {item.priority} Priority
@@ -2181,6 +2185,12 @@ export const DirectorTab = () => {
               </motion.div>
             )}
 
+            {activeView === 'create_user' && (
+              <motion.div key="create_user" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
+                <CreateMemberForm />
+              </motion.div>
+            )}
+
           </AnimatePresence>
         )}
         {showMergeModal && existingHost && incomingHost && (
@@ -2336,6 +2346,13 @@ export const DirectorTab = () => {
                 </button>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* --- SYSTEM LOGS VIEW --- */}
+        {activeView === 'system_logs' && (
+          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <SystemLogsViewer />
           </div>
         )}
       </main>

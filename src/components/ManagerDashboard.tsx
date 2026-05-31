@@ -59,6 +59,7 @@ export const ManagerDashboard: React.FC = () => {
   const [isTaskSubmitting, setIsTaskSubmitting] = useState(false);
   const [taskSuccess, setTaskSuccess] = useState('');
   const [taskError, setTaskError] = useState('');
+  const [isNotifying, setIsNotifying] = useState(false);
 
   const openTaskModalForInsight = (insight: any) => {
     setTaskAssigneeId(insight.poppoId);
@@ -115,6 +116,38 @@ export const ManagerDashboard: React.FC = () => {
       setTaskError(err.message || 'Failed to create and assign task.');
     } finally {
       setIsTaskSubmitting(false);
+    }
+  };
+
+  const handleNotifyHost = async () => {
+    if (!taskAssigneeId || !taskTitle) {
+      setTaskError('Assignee and Task Title are required to send a notification.');
+      return;
+    }
+    setIsNotifying(true);
+    setTaskError('');
+    setTaskSuccess('');
+    
+    try {
+      const res = await fetch('/api/notify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          targetPoppoId: taskAssigneeId,
+          title: 'New Task Assigned',
+          body: `New Task: ${taskTitle}. Tap to view.`
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to send notification');
+      
+      setTaskSuccess(`Push notification sent to host ${taskAssigneeId}!`);
+    } catch (err: any) {
+      console.error('Notify Error:', err);
+      setTaskError(err.message || 'Notification failed.');
+    } finally {
+      setIsNotifying(false);
     }
   };
 
@@ -1308,14 +1341,25 @@ export const ManagerDashboard: React.FC = () => {
                 />
               </div>
 
-              <button
-                type="submit"
-                disabled={isTaskSubmitting}
-                className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all cursor-pointer flex items-center justify-center gap-2 shadow-lg"
-              >
-                {isTaskSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
-                <span>{isTaskSubmitting ? 'Delegating...' : 'Delegate Task'}</span>
-              </button>
+              <div className="flex gap-3">
+                <button
+                  type="submit"
+                  disabled={isTaskSubmitting}
+                  className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all cursor-pointer flex items-center justify-center gap-2 shadow-lg"
+                >
+                  {isTaskSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
+                  <span>{isTaskSubmitting ? 'Delegating...' : 'Delegate Task'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleNotifyHost}
+                  disabled={isNotifying || !taskAssigneeId || !taskTitle}
+                  className="flex-1 py-3 bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-slate-900 rounded-xl text-xs font-black uppercase tracking-widest transition-all cursor-pointer flex items-center justify-center gap-2 shadow-lg"
+                >
+                  {isNotifying && <Loader2 className="h-4 w-4 animate-spin" />}
+                  <span>{isNotifying ? 'Sending...' : 'Notify Host'}</span>
+                </button>
+              </div>
 
               {taskSuccess && (
                 <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-xl text-xs font-bold flex items-center gap-2">

@@ -3,9 +3,11 @@ import path from "path";
 import dotenv from "dotenv";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
-import authRouter from "./src/server/auth";
+import { getMessaging } from "firebase-admin/messaging";
+import authRouter, { getAdminFirestore, getFirebaseAdminApp } from "./src/server/auth";
 import auditRouter from "./src/server/auditRouter";
 import { initFirebaseSecrets } from "./src/server/secrets";
+import { logSystemEvent } from "./src/server/Logger";
 
 dotenv.config();
 
@@ -75,6 +77,11 @@ async function startServer() {
       return res.json({ text: response.text });
     } catch (error: any) {
       console.error("Gemini API error:", error);
+      logSystemEvent({
+        severity: 'Error',
+        actionDescription: 'Gemini API Chat failed',
+        stackTrace: error?.stack || error?.message
+      });
       return res.status(500).json({ error: error?.message || "Chat failed" });
     }
   });
@@ -209,6 +216,11 @@ Rules:
       return res.json({ data: extractedData });
     } catch (error: any) {
       console.error("Extraction error:", error);
+      logSystemEvent({
+        severity: 'Error',
+        actionDescription: 'Mastersheet Extraction failed',
+        stackTrace: error?.stack || error?.message
+      });
       return res.status(500).json({ error: error?.message || "Extraction failed" });
     }
   });
@@ -256,7 +268,54 @@ Rules:
       });
     } catch (error: any) {
       console.error("reCAPTCHA verification error:", error);
+      logSystemEvent({
+        severity: 'Error',
+        actionDescription: 'reCAPTCHA verification failed',
+        stackTrace: error?.stack || error?.message
+      });
       return res.status(500).json({ error: error?.message || "reCAPTCHA verification failed" });
+    }
+  });
+
+  app.post("/api/notify", async (req, res) => {
+    try {
+      const { targetPoppoId, title, body } = req.body;
+      if (!targetPoppoId || !title || !body) {
+        return res.status(400).json({ error: "Missing required fields" });
+      }
+
+      const db = getAdminFirestore();
+      const userDoc = await db.collection('users').doc(targetPoppoId).get();
+      
+      if (!userDoc.exists) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      const userData = userDoc.data();
+      const fcmTokens = userData?.fcmTokens || [];
+
+      if (fcmTokens.length === 0) {
+        return res.status(404).json({ error: "User has no registered devices for notifications" });
+      }
+
+      const messaging = getMessaging(getFirebaseAdminApp());
+      
+      const message = {
+        notification: {
+          title,
+          body
+        },
+        tokens: fcmTokens
+      };
+
+      const response = await messaging.sendEachForMulticast(message);
+      
+      // Optional: Cleanup invalid tokens based on response.responses
+      
+      return res.json({ success: true, successCount: response.successCount, failureCount: response.failureCount });
+    } catch (error: any) {
+      console.error("FCM Notify error:", error);
+      return res.status(500).json({ error: error?.message || "Notification dispatch failed" });
     }
   });
 

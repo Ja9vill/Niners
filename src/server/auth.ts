@@ -6,6 +6,7 @@ import { getFirestore } from "firebase-admin/firestore";
 import { getStorage } from "firebase-admin/storage";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
+import { body, validationResult } from "express-validator";
 import { getStaticHosts } from "../lib/staticHosts";
 import { logAuthEvent } from "./auditLogger";
 import { initFirebaseSecrets } from "./secrets";
@@ -652,107 +653,127 @@ router.get("/users", requireAuth(3), async (req: any, res) => {
 
 /**
  * POST /api/admin/create-user
-
- * Creates a new user in both the hosts and users collections.
- * Body: { poppoId: string, nickname: string, role: string }
- * Auth: Bearer JWT, level >= 3
+ * Securely provisions a new user in Firebase Auth and local Firestore.
+ * Auth: Bearer Firebase ID Token, must have 'director' role.
  */
-router.post("/create-user", requireAuth(3), async (req: any, res) => {
-  try {
-    const { poppoId, nickname, role } = req.body;
+router.post(
+  "/create-user",
+  verifyFirebaseIdToken,
+  [
+    body("poppoId").isString().trim().isAlphanumeric().isLength({ min: 1, max: 128 }).withMessage("Poppo ID must be alphanumeric and max 128 characters"),
+    body("nickname").isString().trim().notEmpty().withMessage("Nickname is required"),
+    body("temporaryPassword").isString().isLength({ min: 6 }).withMessage("Temporary password must be at least 6 characters"),
+    body("role").isString().trim().toLowerCase().isIn(["head admin", "admin", "manager", "agent", "host"]).withMessage("Invalid app role")
+  ],
+  async (req: any, res: any) => {
+    try {
+      // Step 2: Validate Caller claims
+      const callerRole = String(req.firebaseUser?.role || "").toLowerCase();
+      if (callerRole !== "director" && req.firebaseUser?.isSuperAdmin !== true) {
+        return res.status(403).json({ error: "Forbidden: Only Directors can create users." });
+      }
 
-    if (!poppoId || !nickname || !role) {
-      return res.status(400).json({ error: "Poppo ID, Nickname, and Role are required." });
+      // Step 3: Validate and sanitize request body
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ error: "Validation failed", details: errors.array() });
+      }
+
+      const { poppoId, nickname, temporaryPassword, role } = req.body;
+
+      const db = getAdminFirestore();
+      const hostRef = db.collection("hosts").doc(poppoId);
+      const hostSnap = await hostRef.get();
+
+      if (hostSnap.exists) {
+        return res.status(400).json({ error: `User with Poppo ID '${poppoId}' already exists.` });
+      }
+
+      const authInstance = getAuth(getFirebaseAdminApp());
+      
+      // Check if user exists in Firebase Auth
+      try {
+        await authInstance.getUser(poppoId);
+        return res.status(400).json({ error: `User with Poppo ID '${poppoId}' already exists in Authentication.` });
+      } catch (err: any) {
+        if (err.code !== "auth/user-not-found") {
+          throw err;
+        }
+      }
+
+      // Step 4: Use Firebase Admin SDK to create the user account
+      await authInstance.createUser({
+        uid: poppoId,
+        password: temporaryPassword,
+        displayName: nickname,
+      });
+
+      // Set custom claims
+      await authInstance.setCustomUserClaims(poppoId, {
+        role: role,
+        isSuperAdmin: role === "director",
+        tempPasswordRequired: true
+      });
+
+      // Step 5: Save newly provisioned user record
+      const hashedPassword = await bcrypt.hash(temporaryPassword, BCRYPT_ROUNDS);
+      const now = new Date().toISOString();
+      const creatorPoppoId = req.firebaseUser?.uid || "admin";
+
+      const levelMap: Record<string, number> = {
+        "head admin": 4,
+        "admin": 3,
+        "manager": 2,
+        "agent": 2,
+        "host": 1
+      };
+      const level = levelMap[role] || 1;
+
+      const hostData = {
+        id: poppoId,
+        name: nickname,
+        nickname: nickname,
+        role: role,
+        level,
+        team: "Alpha",
+        manager: "Unassigned",
+        anchor_type: "Nine Agency",
+        base_salary_category: "N/A",
+        status: "Active",
+        tier: "C",
+        photoUrl: "",
+        isActive: true,
+        is_temp_password: true,
+        password: hashedPassword, // Legacy fallback
+        created_at: now,
+        updated_at: now,
+        created_by: creatorPoppoId
+      };
+      await hostRef.set(hostData);
+
+      const userData = {
+        poppoId: poppoId,
+        nickname: nickname,
+        role: role,
+        is_temp_password: true,
+        created_at: now,
+        updated_at: now,
+        created_by: creatorPoppoId
+      };
+      await db.collection("users").doc(poppoId).set(userData);
+
+      console.log(`👤 User ${poppoId} created securely by Director ${creatorPoppoId}`);
+      return res.status(201).json({
+        success: true,
+        message: `User '${nickname}' created successfully.`,
+        user: { poppoId, nickname, role }
+      });
+    } catch (error: any) {
+      console.error("[CreateUser] Backend Error:", error);
+      return res.status(500).json({ error: error?.message || "Internal server error during user creation." });
     }
-
-    const cleanPoppoId = String(poppoId).trim();
-    const cleanNickname = String(nickname).trim();
-    const cleanRole = String(role).trim().toLowerCase();
-
-    if (!/^[a-zA-Z0-9]+$/.test(cleanPoppoId)) {
-      return res.status(400).json({ error: "Poppo ID must be alphanumeric." });
-    }
-
-    const allowedRoles = ["director", "admin", "manager", "agent", "host"];
-    if (!allowedRoles.includes(cleanRole)) {
-      return res.status(400).json({ error: `Invalid role. Allowed roles are: ${allowedRoles.join(", ")}` });
-    }
-
-    // Role-to-level mapping
-    const levelMap: Record<string, number> = {
-      director: 5,
-      admin: 4,
-      manager: 3,
-      agent: 2,
-      host: 1
-    };
-    const level = levelMap[cleanRole] || 1;
-
-    const db = getAdminFirestore();
-    const hostRef = db.collection("hosts").doc(cleanPoppoId);
-    const hostSnap = await hostRef.get();
-
-    if (hostSnap.exists) {
-      return res.status(400).json({ error: `User with Poppo ID '${cleanPoppoId}' already exists.` });
-    }
-
-    // Default temporary password
-    const defaultPassword = "Welcome123!";
-    const hashedPassword = await bcrypt.hash(defaultPassword, BCRYPT_ROUNDS);
-
-    const now = new Date().toISOString();
-    const creatorPoppoId = req.adminUser?.poppo_id || "admin";
-
-    // 1. Create in hosts collection
-    const hostData = {
-      id: cleanPoppoId,
-      name: cleanNickname,
-      nickname: cleanNickname,
-      role: cleanRole,
-      level,
-      team: "Alpha",
-      manager: "Unassigned",
-      anchor_type: "Nine Agency",
-      base_salary_category: "N/A",
-      status: "Active",
-      tier: "C",
-      photoUrl: "",
-      isActive: true,
-      is_temp_password: true,
-      password: hashedPassword,
-      created_at: now,
-      updated_at: now,
-      created_by: creatorPoppoId
-    };
-    await hostRef.set(hostData);
-
-    // 2. Create in users collection
-    const userData = {
-      poppoId: cleanPoppoId,
-      nickname: cleanNickname,
-      role: cleanRole,
-      is_temp_password: true,
-      tempPassword: hashedPassword,
-      created_at: now,
-      updated_at: now,
-      created_by: creatorPoppoId
-    };
-    await db.collection("users").doc(cleanPoppoId).set(userData);
-
-    // 3. Sync custom claims
-    await syncCustomClaims(cleanPoppoId, cleanRole, true);
-
-    console.log(`👤 User ${cleanPoppoId} created by ${req.adminUser?.nickname || "admin"}`);
-    return res.status(201).json({
-      success: true,
-      message: `User '${cleanNickname}' created successfully with temporary password: '${defaultPassword}'.`,
-      user: { poppoId: cleanPoppoId, nickname: cleanNickname, role: cleanRole }
-    });
-  } catch (error: any) {
-    console.error("Create user endpoint failed:", error);
-    return res.status(500).json({ error: error?.message || "Internal server error" });
   }
-});
+);
 
 /**
  * DELETE /api/admin/delete-user/:poppoId
@@ -793,6 +814,37 @@ router.delete("/delete-user/:poppoId", verifyAdminRole, async (req: any, res: an
   }
 });
 
+
+/**
+ * GET /api/admin/verify-claims/:uid
+ * Diagnostic route to verify custom claims on a Firebase Auth user.
+ * Auth: Bearer Firebase ID Token, must have 'director' role or isSuperAdmin claim.
+ */
+router.get("/verify-claims/:uid", verifyAdminRole, async (req: any, res: any) => {
+  const { uid } = req.params;
+  if (!uid) {
+    return res.status(400).json({ error: "User UID is required." });
+  }
+
+  try {
+    const authInstance = getAuth(getFirebaseAdminApp());
+    const userRecord = await authInstance.getUser(uid);
+    
+    console.log(`\n=== SECURITY DIAGNOSTIC: Custom Claims for UID: ${uid} ===`);
+    console.log(JSON.stringify(userRecord.customClaims || {}, null, 2));
+    console.log(`=========================================================\n`);
+
+    return res.status(200).json({
+      success: true,
+      uid: userRecord.uid,
+      displayName: userRecord.displayName,
+      customClaims: userRecord.customClaims || {}
+    });
+  } catch (error: any) {
+    console.error("Failed to verify custom claims:", error);
+    return res.status(500).json({ error: error?.message || "Failed to retrieve user claims." });
+  }
+});
 
 /**
 

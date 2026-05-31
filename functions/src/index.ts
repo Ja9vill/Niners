@@ -1,6 +1,8 @@
 import { onCall, HttpsError, type CallableRequest } from "firebase-functions/v2/https";
+import { onSchedule } from "firebase-functions/v2/scheduler";
 import { getAuth } from "firebase-admin/auth";
 import { initializeApp } from "firebase-admin/app";
+import { getFirestore } from "firebase-admin/firestore";
 
 // Initialize Firebase Admin SDK
 initializeApp();
@@ -89,3 +91,36 @@ export const authenticatePoppoUser = onCall(
     }
   }
 );
+
+/**
+ * Scheduled function to automatically delete system_logs older than 30 days.
+ * Runs every day at midnight (UTC).
+ */
+export const cleanupOldSystemLogs = onSchedule("every day 00:00", async (event) => {
+  const db = getFirestore();
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  const cutoffTimestamp = thirtyDaysAgo.toISOString();
+
+  try {
+    const logsRef = db.collection("system_logs");
+    const oldLogsQuery = logsRef.where("timestamp", "<", cutoffTimestamp).limit(500);
+    
+    let deletedCount = 0;
+    while (true) {
+      const snapshot = await oldLogsQuery.get();
+      if (snapshot.empty) break;
+
+      const batch = db.batch();
+      snapshot.docs.forEach((doc) => {
+        batch.delete(doc.ref);
+      });
+      await batch.commit();
+      deletedCount += snapshot.size;
+    }
+    
+    console.log(`Successfully deleted ${deletedCount} old system_logs.`);
+  } catch (err) {
+    console.error("Failed to clean up old system_logs:", err);
+  }
+});
