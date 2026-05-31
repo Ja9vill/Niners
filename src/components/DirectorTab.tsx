@@ -231,6 +231,9 @@ export const DirectorTab = () => {
 
       const rowObj = {
         poppo_id: poppoId,
+        poppo_name: nickname, // Required by CommissionEntry
+        month: r[1]?.trim() || '', // Required by CommissionEntry (maps to from_date)
+        year: parseInt(r[1]?.substring(0,4) || '2024'), // Ensure year is present
         from_date: r[1]?.trim() || '',
         to_date: r[2]?.trim() || '',
         nickname: nickname,
@@ -248,6 +251,13 @@ export const DirectorTab = () => {
         super_salary: parseInt(r[15]?.replace(/,/g, '')) || 0,
         super_rank: parseInt(r[16]?.replace(/,/g, '')) || 0,
         level: parseInt(r[17]?.replace(/,/g, '')) || 0,
+        // Legacy Required fields to satisfy TS CommissionEntry
+        video_duration: 0,
+        video_earnings: 0,
+        agentweb_commission_rate: 0,
+        agentweb_commission_earning: 0,
+        total_earnings: parseInt(r[6]?.replace(/,/g, '')) || 0,
+        my_commission: parseInt(r[7]?.replace(/,/g, '')) || 0,
         _isUnknownHost: !matchingHost // Used to filter out before saving
       };
 
