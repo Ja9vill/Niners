@@ -2,29 +2,7 @@ import React from 'react';
 import { ArrowRight, Star, Users, ShieldCheck, Download, ExternalLink, Trophy } from 'lucide-react';
 import { cn } from '../lib/utils';
 
-const MOCK_TOP_PERFORMERS = [
-  {
-    id: '1001',
-    nickname: 'Aurora Stars',
-    avatar: 'https://api.dicebear.com/7.x/notionists/svg?seed=Aurora&backgroundColor=D4AF37',
-    metric: 'Top Diamond Earner',
-    value: '1.2M pts',
-  },
-  {
-    id: '1002',
-    nickname: 'Luna Eclipse',
-    avatar: 'https://api.dicebear.com/7.x/notionists/svg?seed=Luna&backgroundColor=11111A',
-    metric: 'Most Active',
-    value: '142 hrs',
-  },
-  {
-    id: '1003',
-    nickname: 'Nova Prime',
-    avatar: 'https://api.dicebear.com/7.x/notionists/svg?seed=Nova&backgroundColor=D4AF37',
-    metric: 'Highest Growth',
-    value: '+45%',
-  }
-];
+const MOCK_TOP_PERFORMERS: any[] = [];
 
 export const LandingPage = () => {
   return (
@@ -55,13 +33,13 @@ export const LandingPage = () => {
           
           <div className="flex flex-col sm:flex-row items-center gap-4 pt-4 w-full sm:w-auto">
             <a 
-              href="#become-an-agent"
+              href="/poppo-live"
               className="w-full sm:w-auto px-8 py-4 rounded-full bg-[#D4AF37] text-black font-black uppercase tracking-widest text-sm hover:scale-105 active:scale-95 transition-all shadow-[0_0_30px_rgba(212,175,55,0.4)] flex items-center justify-center gap-2"
             >
               Join the Roster <ArrowRight size={18} />
             </a>
             <a 
-              href="#download-app"
+              href="/poppo-live"
               className="w-full sm:w-auto px-8 py-4 rounded-full bg-white/5 border border-white/10 text-white font-bold uppercase tracking-widest text-sm hover:bg-white/10 transition-all flex items-center justify-center gap-2"
             >
               Download App <Download size={18} />

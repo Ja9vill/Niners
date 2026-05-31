@@ -86,72 +86,10 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
             setEvents(stored);
             await FirebaseService.saveCalendarEvents(stored);
           } else {
-            // Both are empty, initialize mockup events
-            const mockEvents: CalendarEvent[] = [
-              {
-                event_id: 'mock-pk-showcase',
-                poppo_id: '19157913',
-                event_host_id: '19157913',
-                title: 'Alpha Team PK Showcase',
-                description: 'Host roster battle versus external network groups.',
-                date: '2026-05-26',
-                time: '14:00 - 16:00',
-                type: 'Official PK',
-                location: 'CHANNEL ROOM 109',
-                created_by_name: 'Director Miss Nine',
-                created_by_role: 'Director',
-                visibility: 'All',
-                participants: ['19157922', '19157930'],
-                timestamp: new Date().toISOString()
-              },
-              {
-                event_id: 'mock-strategic-review',
-                poppo_id: '19157913',
-                title: 'Director Strategic Review',
-                description: 'Executive review of Monthly Roster & commission structures.',
-                date: '2026-05-26',
-                time: '18:30 - 19:30',
-                type: 'Agency Event',
-                location: 'EXECUTIVE SUITE (9F)',
-                created_by_name: 'Director Miss Nine',
-                created_by_role: 'Director',
-                visibility: 'All',
-                timestamp: new Date().toISOString()
-              },
-              {
-                event_id: 'mock-solo-live',
-                poppo_id: '19157922',
-                event_host_id: '19157922',
-                title: 'Solo Livehouse Performance',
-                description: 'Special solo livehouse music set by top talent.',
-                date: '2026-05-27',
-                time: '19:00 - 21:00',
-                type: 'Solo Livehouse',
-                location: 'VIRTUAL ROOM 2',
-                created_by_name: 'Admin Sarah',
-                created_by_role: 'Admin',
-                visibility: 'All',
-                participants: ['19157922'],
-                timestamp: new Date().toISOString()
-              },
-              {
-                event_id: 'mock-party-live',
-                poppo_id: 'Agency',
-                title: 'Agency Collaboration Gala',
-                description: 'Joint agency celebration event.',
-                date: '2026-05-28',
-                time: '20:00 - 22:00',
-                type: 'Agency Event',
-                location: 'MAIN AUDITORIUM',
-                created_by_name: 'Director Miss Nine',
-                created_by_role: 'Director',
-                visibility: 'All',
-                timestamp: new Date().toISOString()
-              }
-            ];
-            Storage.setEvents(mockEvents);
-            setEvents(mockEvents);
-            await FirebaseService.saveCalendarEvents(mockEvents);
+            // Both are empty, no mock events
+            Storage.setEvents([]);
+            setEvents([]);
+            await FirebaseService.saveCalendarEvents([]);
           }
         }
       } catch (err) {
@@ -614,7 +552,8 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
           </div>
 
           {/* 7-Day Calendar Grid */}
-          <div className="grid grid-cols-7 gap-2 md:gap-4 bg-[#0B0D12] p-4 rounded-3xl border border-white/5 shadow-xl">
+        <div className="overflow-x-auto pb-4 -mx-4 px-4 sm:mx-0 sm:px-0 custom-scrollbar">
+          <div className="grid grid-cols-7 gap-2 md:gap-4 bg-[#0B0D12] p-4 rounded-3xl border border-white/5 shadow-xl min-w-[700px]">
             {weekDays.map((day, idx) => {
               const dayName = format(day, 'EEEE');
               const dayAbbr = format(day, 'EEE').toUpperCase();
@@ -656,6 +595,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
               );
             })}
           </div>
+        </div>
 
           {/* Events Section Heading */}
           <div className="flex items-center justify-between border-b border-slate-800 pb-3">

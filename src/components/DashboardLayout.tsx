@@ -17,7 +17,7 @@ export const DashboardLayout = () => {
 
   const handleLogout = async () => {
     await signOut(auth);
-    Storage.purge();
+    Storage.clearAuthState();
     navigate('/login');
   };
 
@@ -28,12 +28,16 @@ export const DashboardLayout = () => {
       { path: '/app/calendar', label: 'Calendar', icon: Calendar },
     ];
     
-    if (authState.role === 'director' || authState.role === 'manager' || authState.role === 'agent') {
-      links.push({ path: '/app/profiles', label: 'Profiles', icon: User });
-    }
+    const role = (authState.role || '').toLowerCase();
     
-    if (authState.role === 'director') {
-      links.push({ path: '/app/director', label: 'Director Control', icon: Shield });
+    if (role === 'director' || role === 'admin' || role === 'head admin') {
+      links.push({ path: '/app/director', label: 'Hub', icon: Shield });
+      links.push({ path: '/app/profiles', label: 'Manager Hub', icon: Users });
+      links.push({ path: '/app/my-profile', label: 'My Profile', icon: User });
+    } else if (role === 'manager' || role === 'agent') {
+      links.push({ path: '/app/profiles', label: 'Hub', icon: Users });
+    } else {
+      links.push({ path: '/app/my-profile', label: 'Profile', icon: User });
     }
 
     return links;
@@ -43,6 +47,20 @@ export const DashboardLayout = () => {
 
   return (
     <div className="flex flex-col h-[100dvh] bg-[#0A0A0F] text-[#F0EFE8] overflow-hidden selection:bg-[#D4AF37]/30 selection:text-white">
+      {authState.mockRole && (
+        <div className="w-full bg-indigo-600 text-white text-xs font-bold py-2 flex items-center justify-center gap-4 z-[9999] shrink-0 sticky top-0 shadow-lg">
+          <span>Viewing as: <span className="uppercase text-amber-300">{authState.role}</span></span>
+          <button 
+            onClick={() => {
+              Storage.setMockRole(null);
+              window.location.reload();
+            }}
+            className="px-3 py-1 bg-white/20 hover:bg-white/30 rounded-md transition-colors"
+          >
+            Return to Director
+          </button>
+        </div>
+      )}
       {/* Mobile Header */}
       <header className="md:hidden flex items-center justify-between p-4 bg-[#11111A] border-b border-white/5 shrink-0 z-20">
         <div className="flex items-center gap-3">

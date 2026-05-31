@@ -63,9 +63,94 @@ function handleFirestoreError(error: unknown, operationType: OperationType, path
 }
 
 export const FirebaseService = {
+  // Users management
+  async getAllUsers(): Promise<any[]> {
+    const path = 'users';
+    try {
+      const snapshot = await getDocs(collection(db, path));
+      return snapshot.docs.map(d => ({ poppo_id: d.id, ...d.data() }));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.LIST, path);
+      return [];
+    }
+  },
+
+  async updateUser(poppoId: string, data: any) {
+    const path = `users/${poppoId}`;
+    try {
+      const docRef = doc(db, 'users', poppoId);
+      await setDoc(docRef, { ...data, updated_at: new Date().toISOString() }, { merge: true });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, path);
+    }
+  },
+
+  async getAllRoleMetadata(): Promise<any[]> {
+    const collections = ['users', 'host', 'manager', 'admin', 'head_admin', 'agent', 'director'];
+    let metadataMap: Record<string, any> = {};
+    let errors: string[] = [];
+    for (const col of collections) {
+      try {
+        const snapshot = await getDocs(collection(db, col));
+        snapshot.docs.forEach(d => {
+          const id = d.id;
+          const data = d.data();
+          metadataMap[id] = { ...metadataMap[id], poppo_id: id, ...data };
+        });
+      } catch (error: any) {
+        console.warn(`Could not fetch metadata for collection: ${col}`, error);
+        errors.push(`${col}: ${error.message}`);
+      }
+    }
+    
+    const allMetadata = Object.values(metadataMap);
+    
+    // If we have errors and NO data was fetched, throw the errors so the UI shows them
+    if (errors.length > 0 && allMetadata.length === 0) {
+      throw new Error(`Permission Denied fetching collections: ${errors.join(', ')}`);
+    }
+    
+    return allMetadata;
+  },
+
+  async updateRoleMetadata(role: string, poppoId: string, data: any) {
+    const roleCollection = (role || "").toLowerCase().replace(/\s+/g, '_');
+    if (!roleCollection) return;
+    
+    const path = `${roleCollection}/${poppoId}`;
+    try {
+      const docRef = doc(db, roleCollection, poppoId);
+      await setDoc(docRef, { ...data }, { merge: true });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, path);
+    }
+  },
+
+  async submitRpkReport(hostId: string, fromDate: string, toDate: string, data: any) {
+    const docId = `${fromDate}_${toDate}`;
+    const path = `host/${hostId}/rpk_reporting/${docId}`;
+    try {
+      const docRef = doc(db, 'host', hostId, 'rpk_reporting', docId);
+      await setDoc(docRef, { ...data, timestamp: new Date().toISOString() });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, path);
+    }
+  },
+
+  async submitFanbaseReport(hostId: string, fromDate: string, toDate: string, data: any) {
+    const docId = `${fromDate}_${toDate}`;
+    const path = `host/${hostId}/fanbase_report/${docId}`;
+    try {
+      const docRef = doc(db, 'host', hostId, 'fanbase_report', docId);
+      await setDoc(docRef, { ...data, timestamp: new Date().toISOString() });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, path);
+    }
+  },
+
   // Hosts management
   async saveHosts(hosts: Host[]) {
-    const path = 'hosts';
+    const path = 'users';
     try {
       const batch = writeBatch(db);
       hosts.forEach(h => {
@@ -81,7 +166,7 @@ export const FirebaseService = {
   async updateHost(host: Host) {
     const path = `hosts/${host.id}`;
     try {
-      const docRef = doc(db, 'hosts', host.id);
+      const docRef = doc(db, 'users', host.id);
       await setDoc(docRef, { ...host, updated_at: new Date().toISOString() });
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, path);
@@ -91,26 +176,39 @@ export const FirebaseService = {
   async deleteHost(hostId: string) {
     const path = `hosts/${hostId}`;
     try {
-      await deleteDoc(doc(db, 'hosts', hostId));
+      await deleteDoc(doc(db, 'users', hostId));
     } catch (error) {
       handleFirestoreError(error, OperationType.DELETE, path);
     }
   },
 
   async getAllHosts(): Promise<Host[]> {
-    const path = 'hosts';
-    try {
-      const snapshot = await getDocs(collection(db, path));
-      return snapshot.docs.map(d => d.data() as Host);
-    } catch (error) {
-      handleFirestoreError(error, OperationType.LIST, path);
-      return [];
+    const collections = ['host', 'manager', 'admin', 'head_admin', 'agent', 'director'];
+    let allHosts: any[] = [];
+    for (const col of collections) {
+      try {
+        const snapshot = await getDocs(collection(db, col));
+        const docs = snapshot.docs.map(d => {
+          const data = d.data();
+          return { 
+            ...data, 
+            id: d.id, 
+            poppo_id: d.id,
+            name: data.nickname || data.name || 'Unknown',
+            nickname: data.nickname || data.name || 'Unknown',
+          } as Host;
+        });
+        allHosts = allHosts.concat(docs);
+      } catch (error) {
+        console.warn(`Could not fetch hosts for collection: ${col}`, error);
+      }
     }
+    return allHosts;
   },
   
   // *** User credentials retrieval ***
   async getUserCredentials(): Promise<{ poppo_id: string; password?: string }[]> {
-    const path = 'hosts';
+    const path = 'users';
     try {
       const snapshot = await getDocs(collection(db, path));
       return snapshot.docs.map(d => {
@@ -553,7 +651,7 @@ export const FirebaseService = {
    * Returns an unsubscribe function — call it on component unmount to stop listening.
    */
   subscribeToHosts(callback: (hosts: Host[]) => void): () => void {
-    const path = 'hosts';
+    const path = 'users';
     const unsubscribe = onSnapshot(
       collection(db, path),
       (snapshot) => {
@@ -576,7 +674,7 @@ export const FirebaseService = {
   async patchHost(poppoId: string, patch: Partial<Host>): Promise<void> {
     const path = `hosts/${poppoId}`;
     try {
-      const docRef = doc(db, 'hosts', poppoId);
+      const docRef = doc(db, 'users', poppoId);
       await updateDoc(docRef, { ...patch, updated_at: new Date().toISOString() });
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, path);
@@ -646,7 +744,7 @@ export interface HostRosterUser {
  * Returns an unsubscribe function — call it in useEffect cleanup.
  */
 export const subscribeToHosts = (callback: (hosts: HostRosterUser[]) => void): (() => void) => {
-  const q = query(collection(db, 'hosts'));
+  const q = query(collection(db, 'users'));
   return onSnapshot(
     q,
     (snapshot) => {
@@ -676,7 +774,7 @@ export const patchHost = async (
   poppoId: string,
   updates: Partial<Omit<HostRosterUser, 'poppo_id'>>
 ): Promise<{ success: true }> => {
-  const hostDocRef = doc(db, 'hosts', poppoId);
+  const hostDocRef = doc(db, 'users', poppoId);
   await updateDoc(hostDocRef, { ...updates, updated_at: new Date().toISOString() });
   return { success: true };
 };

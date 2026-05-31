@@ -61,23 +61,26 @@ export const Login = () => {
       } catch (err: any) {
         errorMsg = err.message || 'Invalid Poppo ID or Password';
         
-        // Retry with leading zeros logic
-        if (trimmedPassword.startsWith('0')) {
-          const stripped = trimmedPassword.replace(/^0+/, '');
-          if (stripped !== '') {
-            try {
-              await authService.authenticateWithPoppo(trimmedPoppoId, stripped);
-              success = true;
-            } catch (err2: any) {
-              errorMsg = err2.message || 'Invalid Poppo ID or Password';
+        // Only retry with leading zero if the error is exactly about invalid credentials
+        if (errorMsg === 'Invalid ID or password.' || errorMsg === 'Invalid Poppo ID or password.' || errorMsg === 'Invalid Poppo ID or Password') {
+          // Retry with leading zeros logic
+          if (trimmedPassword.startsWith('0')) {
+            const stripped = trimmedPassword.replace(/^0+/, '');
+            if (stripped !== '') {
+              try {
+                await authService.authenticateWithPoppo(trimmedPoppoId, stripped);
+                success = true;
+              } catch (err2: any) {
+                errorMsg = err2.message || 'Invalid Poppo ID or Password';
+              }
             }
-          }
-        } else {
-          try {
-            await authService.authenticateWithPoppo(trimmedPoppoId, '0' + trimmedPassword);
-            success = true;
-          } catch (err3: any) {
-            errorMsg = err3.message || 'Invalid Poppo ID or Password';
+          } else {
+            try {
+              await authService.authenticateWithPoppo(trimmedPoppoId, '0' + trimmedPassword);
+              success = true;
+            } catch (err3: any) {
+              errorMsg = err3.message || 'Invalid Poppo ID or Password';
+            }
           }
         }
       }

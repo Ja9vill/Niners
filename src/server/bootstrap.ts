@@ -33,7 +33,7 @@ async function runBootstrap() {
     }, { merge: true });
 
     // 4. Insert/Update the record in hosts collection (since the app queries hosts on auth and rendering)
-    await db.collection("hosts").doc(poppoId).set({
+    await db.collection("users").doc(poppoId).set({
       id: poppoId,
       name: "Miss Nine",
       nickname: "Miss Nine",

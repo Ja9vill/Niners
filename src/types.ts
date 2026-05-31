@@ -1,6 +1,6 @@
 export type Role = 'Talent' | 'Manager' | 'Admin' | 'Head Admin' | 'Director' | 'Agent';
 export type BaseSalaryTier = 'N/A' | 'Rocket Host' | 'Star Host' | 'S idol' | 'ESport Host' | 'Regular Host';
-export type HostStatus = 'Active' | 'Inconsistent' | 'Released' | 'Inactive';
+export type HostStatus = 'Active' | 'Inconsistent' | 'Released' | 'Inactive' | 'Releasing';
 export type AnchorType = 'Nine Agency' | 'Sub Agency' | 'External';
 export type Tier = 'S' | 'A' | 'B' | 'C' | 'X';
 export type EventType = 'Solo Livehouse' | 'Party Livehouse' | 'Poppo Official Event' | 'Niners Day' | 'Agency Event' | 'External Event' | 'PK Tournament' | 'Platform Feature' | 'Collaboration' | 'Broadcast Block' | 'Staff Meeting';
@@ -58,9 +58,22 @@ export interface Host {
   nickname?: string;
   description?: string;
   password?: string;
+  followers_count?: number;
   is_temp_password?: boolean;
   reset_requested?: boolean;
   isActive: boolean;
+  // Profile enhancements
+  bio?: string;
+  social_links?: {
+    fb?: string;
+    ig?: string;
+    tiktok?: string;
+    whatsapp?: string;
+  };
+  streaming_hours?: {
+    from: string;
+    to: string;
+  }[];
   // Google OAuth fields
   googleUid?: string;
   googleEmail?: string;
@@ -224,6 +237,15 @@ export interface LivehouseRequest {
   managerId: string; // Assigned manager's Poppo ID
   notes?: string;
   timestamp: string;
+}
+
+export interface AgencyAward {
+  id: string;
+  hostId: string;
+  title: string;
+  dateAwarded: string;
+  iconType: 'trophy' | 'star' | 'medal' | 'crown' | 'badge';
+  description?: string;
 }
 
 export interface ActivityLog {

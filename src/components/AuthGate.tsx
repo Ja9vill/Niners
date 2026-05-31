@@ -4,6 +4,7 @@ import { Lock, User, CheckCircle2, Loader2, Shield, ShieldCheck, Eye, EyeOff } f
 import { Storage } from '../lib/storage';
 import { motion } from 'motion/react';
 import { PoppoAuthService } from '../lib/customAuth';
+import { UpdatePasswordTab } from './UpdatePasswordTab';
 import appLogo from '../logo.jpg';
 
 const TEXT = {
@@ -33,6 +34,7 @@ export const AuthGate: React.FC<AuthGateProps> = ({ children, onAuthChange }) =>
   const [initializing, setInitializing] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [requiresMigration, setRequiresMigration] = useState(false);
 
   useEffect(() => {
     const current = Storage.getAuthState();
@@ -60,7 +62,13 @@ export const AuthGate: React.FC<AuthGateProps> = ({ children, onAuthChange }) =>
       let errorMsg = '';
 
       try {
-        await authService.authenticateWithPoppo(trimmedPoppoId, trimmedPassword);
+        const result = await authService.authenticateWithPoppo(trimmedPoppoId, trimmedPassword);
+        
+        if (result.status === 'MIGRATION_REQUIRED') {
+          setRequiresMigration(true);
+          return;
+        }
+        
         success = true;
       } catch (err: any) {
         errorMsg = err.message || 'Invalid Poppo ID or Password';
@@ -70,7 +78,11 @@ export const AuthGate: React.FC<AuthGateProps> = ({ children, onAuthChange }) =>
           const stripped = trimmedPassword.replace(/^0+/, '');
           if (stripped !== '') {
             try {
-              await authService.authenticateWithPoppo(trimmedPoppoId, stripped);
+              const res2 = await authService.authenticateWithPoppo(trimmedPoppoId, stripped);
+              if (res2.status === 'MIGRATION_REQUIRED') {
+                setRequiresMigration(true);
+                return;
+              }
               success = true;
             } catch (err2: any) {
               errorMsg = err2.message || 'Invalid Poppo ID or Password';
@@ -78,7 +90,11 @@ export const AuthGate: React.FC<AuthGateProps> = ({ children, onAuthChange }) =>
           }
         } else {
           try {
-            await authService.authenticateWithPoppo(trimmedPoppoId, '0' + trimmedPassword);
+            const res3 = await authService.authenticateWithPoppo(trimmedPoppoId, '0' + trimmedPassword);
+            if (res3.status === 'MIGRATION_REQUIRED') {
+              setRequiresMigration(true);
+              return;
+            }
             success = true;
           } catch (err3: any) {
             errorMsg = err3.message || 'Invalid Poppo ID or Password';
@@ -116,6 +132,21 @@ export const AuthGate: React.FC<AuthGateProps> = ({ children, onAuthChange }) =>
         >
           <div className="w-6 h-6 rounded-[8px] bg-[#D4AF37]" />
         </motion.div>
+      </div>
+    );
+  }
+
+  if (requiresMigration) {
+    return (
+      <div className="w-full min-h-[80vh] flex items-center justify-center bg-transparent">
+        <UpdatePasswordTab 
+          onMigrationComplete={() => {
+            const newState = Storage.getAuthState();
+            setAuthState(newState);
+            Storage.addLog('Auth', `Logged in and migrated password as ${newState.nickname}`, newState.nickname);
+            onAuthChange();
+          }} 
+        />
       </div>
     );
   }

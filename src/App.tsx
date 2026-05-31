@@ -3,17 +3,21 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { DashboardLayout } from './components/DashboardLayout';
 import { RequireAuth } from './components/RequireAuth';
 import { RoleGuard } from './components/RoleGuard';
+import { Storage } from './lib/storage';
 
 // Pages & Tabs
 import { Login } from './pages/Login';
 import { Overview } from './pages/Overview';
 import { RosterTab } from './components/RosterTab';
-import { ProfilesTab } from './components/ProfilesTab';
 import { CalendarTab } from './components/CalendarTab';
 import { DirectorTab } from './components/DirectorTab';
+import { ManagerDashboard } from './components/ManagerDashboard';
+import { HostProfileEditor } from './components/HostProfileEditor';
 import { PublicLayout } from './components/PublicLayout';
 import { LandingPage } from './pages/LandingPage';
-
+import { PublicRoster } from './pages/PublicRoster';
+import { PublicCalendar } from './pages/PublicCalendar';
+import { PoppoLivePage } from './pages/PoppoLivePage';
 export default function App() {
   return (
     <BrowserRouter>
@@ -22,10 +26,14 @@ export default function App() {
         <Route path="/" element={<PublicLayout />}>
           <Route index element={<LandingPage />} />
           <Route path="login" element={<Login />} />
-          {/* Add place holder routes to match navLinks from PublicLayout */}
-          <Route path="become-an-agent" element={<Navigate to="/" replace />} />
-          <Route path="leaderboards" element={<Navigate to="/" replace />} />
-          <Route path="policy" element={<Navigate to="/" replace />} />
+          {/* New Public Routes */}
+          <Route path="roster" element={<PublicRoster />} />
+          <Route path="calendar" element={<PublicCalendar />} />
+          <Route path="poppo-live" element={<PoppoLivePage />} />
+          
+          {/* Legacy Placeholder Routes */}
+          <Route path="become-an-agent" element={<Navigate to="/poppo-live" replace />} />
+          <Route path="leaderboards" element={<Navigate to="/roster" replace />} />
         </Route>
 
         {/* Protected Dashboard Routes */}
@@ -43,10 +51,19 @@ export default function App() {
           <Route path="calendar" element={<CalendarTab />} />
           
           <Route 
+            path="my-profile" 
+            element={
+              <RoleGuard roles={['talent', 'host']}>
+                <HostProfileEditor />
+              </RoleGuard>
+            } 
+          />
+
+          <Route 
             path="profiles" 
             element={
               <RoleGuard roles={['director', 'manager', 'agent']}>
-                <ProfilesTab />
+                <ManagerDashboard />
               </RoleGuard>
             } 
           />

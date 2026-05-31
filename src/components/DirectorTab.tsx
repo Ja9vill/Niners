@@ -1,4 +1,5 @@
 /* eslint-disable */
+/* eslint-disable */
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
   Shield, 
@@ -45,6 +46,7 @@ import { MANAGERS, BASE_SALARY_POLICIES } from '../lib/constants';
 import { FinancialUpload } from './FinancialUpload';
 import { SystemLogsViewer } from './SystemLogsViewer';
 import { CreateMemberForm } from './CreateMemberForm';
+import { RosterManagementTab } from './RosterManagementTab';
 
 // --- Types for AI Recommendations ---
 interface AIInsight {
@@ -72,8 +74,8 @@ export const DirectorTab = () => {
   const isDirector = localAuth.role?.toLowerCase() === 'director';
   const hasAccess = isDirector;
 
-  // Sidebar views: overview, awards, tasks, roster_admin, financials, system_logs, create_user
-  const [activeView, setActiveView] = useState<'overview' | 'awards' | 'tasks' | 'roster_admin' | 'financials' | 'system_logs' | 'create_user'>('overview');
+  // Sidebar views: roster_management, financials, system_logs, create_user
+  const [activeView, setActiveView] = useState<'roster_management' | 'financials' | 'system_logs' | 'create_user'>('roster_management');
   
   // Data State
   const [hosts, setHosts] = useState<Host[]>([]);
@@ -672,13 +674,29 @@ export const DirectorTab = () => {
           </div>
           <div className="text-xs font-bold text-[#F0EFE8] truncate">{localAuth.name}</div>
           <div className="text-[9px] text-[#D4AF37] font-black mt-1 uppercase tracking-wider">Secure Session Active</div>
+          
+          <div className="mt-4 pt-4 border-t border-white/5">
+            <label className="text-[9px] font-black uppercase text-[#A09E9A]/60 tracking-[0.2em] block mb-2">View As Role</label>
+            <select
+              className="w-full bg-black/40 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-[#F0EFE8] focus:outline-none focus:border-indigo-500/50 cursor-pointer"
+              value={localAuth.mockRole || ''}
+              onChange={(e) => {
+                Storage.setMockRole(e.target.value || null);
+                window.location.reload();
+              }}
+              title="View system as another role"
+            >
+              <option value="">-- Director (Default) --</option>
+              <option value="host">Host</option>
+              <option value="manager">Manager</option>
+              <option value="agent">Agent</option>
+              <option value="admin">Admin</option>
+            </select>
+          </div>
         </div>
 
         {[
-          { id: 'overview', label: 'Overview', icon: LayoutDashboard },
-          { id: 'awards', label: 'Awards & Badges', icon: Award },
-          { id: 'tasks', label: 'AI Tasks', icon: CheckCircle2 },
-          { id: 'roster_admin', label: 'Roster Admin', icon: Users },
+          { id: 'roster_management', label: 'Roster Management', icon: Users },
           { id: 'create_user', label: 'Provision User', icon: UserPlus },
           { id: 'financials', label: 'Financial Data', icon: FileUp },
           { id: 'system_logs', label: 'System Logs', icon: AlertCircle },
@@ -1717,6 +1735,12 @@ export const DirectorTab = () => {
             )}
 
             {/* MODULE 5: FINANCIALS SHEET UPLOADER & BULK PARSING */}
+            {activeView === 'roster_management' && (
+              <motion.div key="roster-management" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
+                <RosterManagementTab hosts={hosts} onUpdate={loadData} auditLogAction={auditLogAction} />
+              </motion.div>
+            )}
+
             {activeView === 'financials' && (
               <motion.div key="financials" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
                 

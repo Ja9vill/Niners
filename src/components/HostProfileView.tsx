@@ -1,4 +1,5 @@
 /* eslint-disable */
+/* eslint-disable */
 import React, { useState, useEffect } from 'react';
 import { X, Calendar, ChevronLeft, Edit2, Loader2 } from 'lucide-react';
 import { Host, CommissionEntry, CalendarEvent } from '../types';
@@ -46,6 +47,31 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
   const [editLevel, setEditLevel] = useState<number>(host.level || 1);
   const [isSaving, setIsSaving] = useState(false);
   const [isProcessingPhoto, setIsProcessingPhoto] = useState(false);
+
+  // RPK Reporting States
+  const [isRpkFormOpen, setIsRpkFormOpen] = useState(false);
+  const [isSubmittingRpk, setIsSubmittingRpk] = useState(false);
+  const [rpkFormData, setRpkFormData] = useState({
+    from_date: '',
+    to_date: '',
+    pk_wins_percent: '',
+    pk_points: '',
+    pk_sessions: ''
+  });
+
+  // Fanbase Reporting States
+  const [isFanbaseFormOpen, setIsFanbaseFormOpen] = useState(false);
+  const [isSubmittingFanbase, setIsSubmittingFanbase] = useState(false);
+  const [fanbaseFormData, setFanbaseFormData] = useState({
+    from_date: '',
+    to_date: '',
+    total_followers: '',
+    fanclub_subscribers: '',
+    fanclub_gc_members: '',
+    gc_activity_count_host: '',
+    gc_activity_count_fans: '',
+    notes: ''
+  });
 
   useEffect(() => {
     // Reset edit values when host changes
@@ -214,6 +240,84 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
       alert("Failed to save changes. Please try again.");
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  // Submit RPK Report
+  const handleRpkSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!rpkFormData.from_date || !rpkFormData.to_date) {
+      alert("From Date and To Date are required.");
+      return;
+    }
+    setIsSubmittingRpk(true);
+    try {
+      const currentAuth = Storage.getAuthState();
+      const reportData = {
+        reporter_id: currentAuth?.poppo_id || "Unknown",
+        reporter_name: currentAuth?.name || currentAuth?.nickname || "Unknown",
+        reporter_role: currentAuth?.role || "Unknown",
+        poppo_id: host.id,
+        nickname: host.nickname || host.name,
+        from_date: rpkFormData.from_date,
+        to_date: rpkFormData.to_date,
+        pk_wins_percent: rpkFormData.pk_wins_percent,
+        pk_points: rpkFormData.pk_points,
+        pk_sessions: rpkFormData.pk_sessions
+      };
+      
+      await FirebaseService.submitRpkReport(host.id, rpkFormData.from_date, rpkFormData.to_date, reportData);
+      
+      setIsRpkFormOpen(false);
+      setRpkFormData({from_date: '', to_date: '', pk_wins_percent: '', pk_points: '', pk_sessions: ''});
+      alert("RPK Report submitted successfully.");
+    } catch(err) {
+      console.error(err);
+      alert("Failed to submit RPK Report");
+    } finally {
+      setIsSubmittingRpk(false);
+    }
+  };
+
+  // Submit Fanbase Report
+  const handleFanbaseSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!fanbaseFormData.from_date || !fanbaseFormData.to_date) {
+      alert("From Date and To Date are required.");
+      return;
+    }
+    setIsSubmittingFanbase(true);
+    try {
+      const currentAuth = Storage.getAuthState();
+      const reportData = {
+        reporter_id: currentAuth?.poppo_id || "Unknown",
+        reporter_name: currentAuth?.name || currentAuth?.nickname || "Unknown",
+        reporter_role: currentAuth?.role || "Unknown",
+        poppo_id: host.id,
+        nickname: host.nickname || host.name,
+        from_date: fanbaseFormData.from_date,
+        to_date: fanbaseFormData.to_date,
+        total_followers: fanbaseFormData.total_followers,
+        fanclub_subscribers: fanbaseFormData.fanclub_subscribers,
+        fanclub_gc_members: fanbaseFormData.fanclub_gc_members,
+        gc_activity_count_host: fanbaseFormData.gc_activity_count_host,
+        gc_activity_count_fans: fanbaseFormData.gc_activity_count_fans,
+        notes: fanbaseFormData.notes
+      };
+      
+      await FirebaseService.submitFanbaseReport(host.id, fanbaseFormData.from_date, fanbaseFormData.to_date, reportData);
+      
+      setIsFanbaseFormOpen(false);
+      setFanbaseFormData({
+        from_date: '', to_date: '', total_followers: '', fanclub_subscribers: '', 
+        fanclub_gc_members: '', gc_activity_count_host: '', gc_activity_count_fans: '', notes: ''
+      });
+      alert("Fanbase Report submitted successfully.");
+    } catch(err) {
+      console.error(err);
+      alert("Failed to submit Fanbase Report");
+    } finally {
+      setIsSubmittingFanbase(false);
     }
   };
 
@@ -592,6 +696,21 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
         </div>
       </div>
       
+      <div className="flex justify-end gap-2 mt-2">
+        <button 
+          onClick={() => setIsFanbaseFormOpen(true)}
+          className="px-3 py-1.5 bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 text-indigo-400 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer"
+        >
+          Submit Fanbase Report
+        </button>
+        <button 
+          onClick={() => setIsRpkFormOpen(true)}
+          className="px-3 py-1.5 bg-[#D4AF37]/10 hover:bg-[#D4AF37]/20 border border-[#D4AF37]/30 text-[#D4AF37] rounded-lg text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer"
+        >
+          Submit RPK Report
+        </button>
+      </div>
+
       <div className="grid grid-cols-3 gap-2.5 bg-[#1A1A28]/50 border border-white/5 p-3 rounded-2xl">
         {[
           { label: 'PK WIN %', value: `${pkData.win_percentage}%`, subLabel: 'Monthly' },
@@ -640,6 +759,219 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
       </div>
     </div>
   );
+
+  const renderRpkModal = () => {
+    if (!isRpkFormOpen) return null;
+    
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+        <div className="bg-[#13131E] border border-white/10 rounded-2xl max-w-sm w-full p-5 shadow-2xl relative">
+          <button 
+            title="Close"
+            onClick={() => setIsRpkFormOpen(false)}
+            className="absolute top-4 right-4 p-1.5 bg-[#1A1A28] border border-white/10 rounded-full text-[#A09E9A] hover:text-[#F0EFE8] cursor-pointer"
+          >
+            <X size={14} />
+          </button>
+          
+          <h3 className="text-sm font-black uppercase tracking-wider text-[#F0EFE8] mb-1">Submit RPK Report</h3>
+          <p className="text-[10px] text-[#A09E9A] mb-4">Submitting performance data for Host: <span className="text-[#D4AF37] font-bold">{host.nickname || host.name}</span></p>
+
+          <form onSubmit={handleRpkSubmit} className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="text-[9px] font-black uppercase tracking-wider text-[#A09E9A]">From Date (DD-MM-YYYY)</label>
+                <input 
+                  type="text" 
+                  required
+                  placeholder="DD-MM-YYYY"
+                  value={rpkFormData.from_date}
+                  onChange={(e) => setRpkFormData({...rpkFormData, from_date: e.target.value})}
+                  className="w-full bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[9px] font-black uppercase tracking-wider text-[#A09E9A]">To Date (DD-MM-YYYY)</label>
+                <input 
+                  type="text" 
+                  required
+                  placeholder="DD-MM-YYYY"
+                  value={rpkFormData.to_date}
+                  onChange={(e) => setRpkFormData({...rpkFormData, to_date: e.target.value})}
+                  className="w-full bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-[9px] font-black uppercase tracking-wider text-[#A09E9A]">PK Wins %</label>
+              <input 
+                type="text" 
+                placeholder="e.g. 75%"
+                value={rpkFormData.pk_wins_percent}
+                onChange={(e) => setRpkFormData({...rpkFormData, pk_wins_percent: e.target.value})}
+                className="w-full bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-[9px] font-black uppercase tracking-wider text-[#A09E9A]">PK Points</label>
+              <input 
+                type="text" 
+                placeholder="Total PK Points"
+                value={rpkFormData.pk_points}
+                onChange={(e) => setRpkFormData({...rpkFormData, pk_points: e.target.value})}
+                className="w-full bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-[9px] font-black uppercase tracking-wider text-[#A09E9A]">PK Sessions</label>
+              <input 
+                type="text" 
+                placeholder="Total Sessions"
+                value={rpkFormData.pk_sessions}
+                onChange={(e) => setRpkFormData({...rpkFormData, pk_sessions: e.target.value})}
+                className="w-full bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
+              />
+            </div>
+
+            <button 
+              type="submit"
+              disabled={isSubmittingRpk}
+              className="w-full mt-2 py-2.5 bg-[#D4AF37] hover:bg-[#C5A028] text-black rounded-xl text-[11px] font-black uppercase tracking-widest transition-all cursor-pointer disabled:opacity-50"
+            >
+              {isSubmittingRpk ? 'Submitting...' : 'Submit Report'}
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  };
+
+  const renderFanbaseModal = () => {
+    if (!isFanbaseFormOpen) return null;
+    
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+        <div className="bg-[#13131E] border border-white/10 rounded-2xl max-w-sm w-full p-5 shadow-2xl relative max-h-[90vh] overflow-y-auto custom-scrollbar">
+          <button 
+            title="Close"
+            onClick={() => setIsFanbaseFormOpen(false)}
+            className="absolute top-4 right-4 p-1.5 bg-[#1A1A28] border border-white/10 rounded-full text-[#A09E9A] hover:text-[#F0EFE8] cursor-pointer"
+          >
+            <X size={14} />
+          </button>
+          
+          <h3 className="text-sm font-black uppercase tracking-wider text-[#F0EFE8] mb-1">Submit Fanbase Report</h3>
+          <p className="text-[10px] text-[#A09E9A] mb-4">Submitting data for Host: <span className="text-indigo-400 font-bold">{host.nickname || host.name}</span></p>
+
+          <form onSubmit={handleFanbaseSubmit} className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="text-[9px] font-black uppercase tracking-wider text-[#A09E9A]">From Date (DD-MM-YYYY)</label>
+                <input 
+                  type="text" 
+                  required
+                  placeholder="DD-MM-YYYY"
+                  value={fanbaseFormData.from_date}
+                  onChange={(e) => setFanbaseFormData({...fanbaseFormData, from_date: e.target.value})}
+                  className="w-full bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-indigo-500"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[9px] font-black uppercase tracking-wider text-[#A09E9A]">To Date (DD-MM-YYYY)</label>
+                <input 
+                  type="text" 
+                  required
+                  placeholder="DD-MM-YYYY"
+                  value={fanbaseFormData.to_date}
+                  onChange={(e) => setFanbaseFormData({...fanbaseFormData, to_date: e.target.value})}
+                  className="w-full bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-indigo-500"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-[9px] font-black uppercase tracking-wider text-[#A09E9A]">Total Followers</label>
+              <input 
+                type="text" 
+                placeholder="0"
+                value={fanbaseFormData.total_followers}
+                onChange={(e) => setFanbaseFormData({...fanbaseFormData, total_followers: e.target.value})}
+                className="w-full bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-indigo-500"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="text-[9px] font-black uppercase tracking-wider text-[#A09E9A]">Fanclub Subs</label>
+                <input 
+                  type="text" 
+                  placeholder="0"
+                  value={fanbaseFormData.fanclub_subscribers}
+                  onChange={(e) => setFanbaseFormData({...fanbaseFormData, fanclub_subscribers: e.target.value})}
+                  className="w-full bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-indigo-500"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[9px] font-black uppercase tracking-wider text-[#A09E9A]">Fanclub GC</label>
+                <input 
+                  type="text" 
+                  placeholder="0"
+                  value={fanbaseFormData.fanclub_gc_members}
+                  onChange={(e) => setFanbaseFormData({...fanbaseFormData, fanclub_gc_members: e.target.value})}
+                  className="w-full bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-indigo-500"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="text-[9px] font-black uppercase tracking-wider text-[#A09E9A]">GC Host Activity</label>
+                <input 
+                  type="text" 
+                  placeholder="0"
+                  value={fanbaseFormData.gc_activity_count_host}
+                  onChange={(e) => setFanbaseFormData({...fanbaseFormData, gc_activity_count_host: e.target.value})}
+                  className="w-full bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-indigo-500"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[9px] font-black uppercase tracking-wider text-[#A09E9A]">GC Fans Activity</label>
+                <input 
+                  type="text" 
+                  placeholder="0"
+                  value={fanbaseFormData.gc_activity_count_fans}
+                  onChange={(e) => setFanbaseFormData({...fanbaseFormData, gc_activity_count_fans: e.target.value})}
+                  className="w-full bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-indigo-500"
+                />
+              </div>
+            </div>
+            
+            <div className="space-y-1">
+              <label className="text-[9px] font-black uppercase tracking-wider text-[#A09E9A]">Notes</label>
+              <textarea 
+                placeholder="Optional notes..."
+                rows={2}
+                value={fanbaseFormData.notes}
+                onChange={(e) => setFanbaseFormData({...fanbaseFormData, notes: e.target.value})}
+                className="w-full bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-indigo-500 resize-none"
+              />
+            </div>
+
+            <button 
+              type="submit"
+              disabled={isSubmittingFanbase}
+              className="w-full mt-2 py-2.5 bg-indigo-500 hover:bg-indigo-400 text-white rounded-xl text-[11px] font-black uppercase tracking-widest transition-all cursor-pointer disabled:opacity-50"
+            >
+              {isSubmittingFanbase ? 'Submitting...' : 'Submit Report'}
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className={cn(
@@ -745,6 +1077,9 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
           )}
         </div>
       )}
+      
+      {renderRpkModal()}
+      {renderFanbaseModal()}
     </div>
   );
 };

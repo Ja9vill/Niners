@@ -1,17 +1,48 @@
-import React from 'react';
-import { LayoutDashboard } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { LayoutDashboard, Loader2 } from 'lucide-react';
+import { FirebaseService } from '../lib/firebaseService';
+import { CommissionEntry, Host } from '../types';
+import { OverviewTab } from '../NineDashboardV1';
 
 export const Overview = () => {
+  const [commissions, setCommissions] = useState<CommissionEntry[]>([]);
+  const [hosts, setHosts] = useState<Host[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [fetchedHosts, fetchedCommissions] = await Promise.all([
+          FirebaseService.getAllHosts(),
+          FirebaseService.getAllCommissions()
+        ]);
+        setHosts(fetchedHosts);
+        setCommissions(fetchedCommissions);
+      } catch (err) {
+        console.error("Error fetching overview data:", err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchData();
+  }, []);
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 gap-4">
+        <Loader2 className="w-8 h-8 animate-spin text-[#D4AF37]" />
+        <p className="text-sm font-bold text-[#A09E9A] uppercase tracking-widest">Loading Dashboard...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center gap-3">
-        <LayoutDashboard className="text-indigo-500" size={24} />
+        <LayoutDashboard className="text-[#D4AF37]" size={24} />
         <h2 className="text-2xl font-black text-white uppercase tracking-widest">Dashboard Overview</h2>
       </div>
-      <div className="p-8 bg-[#11111A] border border-white/5 rounded-2xl text-center">
-        <p className="text-slate-400">Welcome to the Nine Streaming Dashboard.</p>
-        <p className="text-xs text-slate-500 mt-2">The legacy overview logic has been backed up to NineDashboardV1.tsx.</p>
-      </div>
+      <OverviewTab commissions={commissions} hosts={hosts} />
     </div>
   );
 };

@@ -1,199 +1,68 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
-import { Menu, X, Instagram, Facebook, MessageCircle, Shield, Home, Trophy, UserPlus, Users, Calendar, PlayCircle } from 'lucide-react';
+import { Trophy, Users, Calendar, PlayCircle } from 'lucide-react';
 import { cn } from '../lib/utils';
 import appLogo from '../logo.jpg';
 
 export const PublicLayout = () => {
-  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const location = useLocation();
 
-  // Close drawer when route changes
-  useEffect(() => {
-    setIsDrawerOpen(false);
-  }, [location.pathname]);
-
-  const navLinks = [
-    { label: 'Home', path: '/', icon: Home },
-    { label: 'Become an Agent', path: '/become-an-agent', icon: UserPlus },
-    { label: 'Leaderboards', path: '/leaderboards', icon: Trophy },
-    { label: 'Agency Policy', path: '/policy', icon: Shield },
-  ];
-
   return (
-    <div className="flex flex-col min-h-[100dvh] bg-[#0A0A0F] text-[#F0EFE8] font-sans selection:bg-[#D4AF37]/30 selection:text-white">
-      {/* Global Header */}
-      <header className="sticky top-0 z-50 w-full bg-[#0A0A0F]/80 backdrop-blur-md border-b border-white/5">
-        <div className="max-w-screen-xl mx-auto px-4 h-16 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-3 group">
+    <div className="fixed inset-0 w-full h-[100dvh] flex flex-col overflow-hidden bg-[#0A0A0F] text-[#F0EFE8] font-sans selection:bg-[#D4AF37]/30 selection:text-white">
+      {/* Native App Top Bar */}
+      <header className="w-full bg-[#0A0A0F]/90 backdrop-blur-md border-b border-white/5 shrink-0 z-50">
+        <div className="w-full px-4 h-14 flex items-center justify-between pt-[env(safe-area-inset-top)]">
+          <Link to="/" className="flex items-center gap-3">
             <img 
               src={appLogo} 
               alt="Nine Talent Management" 
-              className="w-9 h-9 rounded-xl border border-[#D4AF37]/30 shadow-md object-cover group-hover:scale-105 transition-transform" 
+              className="w-8 h-8 rounded-full border border-[#D4AF37]/30 shadow-md object-cover" 
             />
-            <span className="font-black tracking-widest text-[#D4AF37] text-base uppercase">
-              Nine Talent
+            <span className="font-black tracking-widest text-[#D4AF37] text-sm uppercase">
+              NINE TALENT
             </span>
           </Link>
-
-          {/* Desktop Nav */}
-          <nav className="hidden md:flex items-center gap-8">
-            {navLinks.map((link) => (
-              <Link 
-                key={link.path} 
-                to={link.path}
-                className={cn(
-                  "text-xs font-bold uppercase tracking-widest transition-colors hover:text-[#D4AF37]",
-                  location.pathname === link.path ? "text-[#D4AF37]" : "text-[#A09E9A]"
-                )}
-              >
-                {link.label}
-              </Link>
-            ))}
-            <Link 
-              to="/login"
-              className="px-5 py-2 rounded-full bg-[#D4AF37]/10 text-[#D4AF37] border border-[#D4AF37]/20 text-xs font-bold uppercase tracking-widest hover:bg-[#D4AF37]/20 transition-all"
-            >
-              Sign In
-            </Link>
-          </nav>
-
-          {/* Mobile Hamburger Toggle */}
-          <button 
-            className="md:hidden p-2 -mr-2 text-[#D4AF37]"
-            onClick={() => setIsDrawerOpen(true)}
-            aria-label="Open Navigation Menu"
+          <Link 
+            to="/login"
+            className="px-4 py-1.5 rounded-full bg-[#D4AF37]/10 text-[#D4AF37] border border-[#D4AF37]/20 text-[10px] font-bold uppercase tracking-widest"
           >
-            <Menu size={28} />
-          </button>
+            Login
+          </Link>
         </div>
       </header>
 
-      {/* Mobile Side-Drawer Overlay */}
-      <div 
-        className={cn(
-          "fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm transition-opacity duration-300 md:hidden",
-          isDrawerOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
-        )}
-        onClick={() => setIsDrawerOpen(false)}
-      />
-
-      {/* Mobile Side-Drawer */}
-      <aside 
-        className={cn(
-          "fixed top-0 right-0 h-[100dvh] w-3/4 max-w-sm bg-[#11111A] border-l border-white/5 z-[110] transform transition-transform duration-300 ease-in-out md:hidden flex flex-col shadow-2xl",
-          isDrawerOpen ? "translate-x-0" : "translate-x-full"
-        )}
+      {/* Main Scrollable Content */}
+      <main 
+        className="flex-1 w-full overflow-y-auto custom-scrollbar" 
+        style={{ WebkitOverflowScrolling: 'touch' }}
       >
-        <div className="h-16 flex items-center justify-between px-6 border-b border-white/5 shrink-0">
-          <span className="font-black tracking-widest text-[#D4AF37] text-sm uppercase">Menu</span>
-          <button 
-            onClick={() => setIsDrawerOpen(false)}
-            className="p-2 -mr-2 text-[#A09E9A] hover:text-white transition-colors"
-            aria-label="Close Navigation Menu"
-          >
-            <X size={24} />
-          </button>
-        </div>
-
-        <nav className="flex-1 overflow-y-auto py-6 px-4 space-y-2">
-          {navLinks.map((link) => {
-            const Icon = link.icon;
-            const isActive = location.pathname === link.path;
-            return (
-              <Link
-                key={link.path}
-                to={link.path}
-                onClick={() => setIsDrawerOpen(false)}
-                className={cn(
-                  "flex items-center gap-4 px-4 py-4 rounded-2xl transition-all font-bold text-sm",
-                  isActive 
-                    ? "bg-[#D4AF37]/10 text-[#D4AF37]" 
-                    : "text-[#A09E9A] hover:bg-white/5 hover:text-white"
-                )}
-              >
-                <Icon size={20} />
-                <span>{link.label}</span>
-              </Link>
-            );
-          })}
-        </nav>
-
-        <div className="p-6 border-t border-white/5 shrink-0 flex flex-col gap-6">
-          <div className="flex items-center justify-center gap-8">
-            <a 
-              href="https://wa.me/message/5Y6QFQXSIEZRI1" 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="text-[#25D366] hover:scale-110 transition-transform"
-            >
-              <MessageCircle size={24} className="fill-current" />
-            </a>
-            <a 
-              href="https://instagram.com/9talentManagement" 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="text-[#E1306C] hover:scale-110 transition-transform"
-            >
-              <Instagram size={24} />
-            </a>
-            <a 
-              href="https://facebook.com/9talentManagement" 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="text-[#1877F2] hover:scale-110 transition-transform"
-            >
-              <Facebook size={24} className="fill-current" />
-            </a>
-          </div>
-          <Link 
-            to="/login"
-            onClick={() => setIsDrawerOpen(false)}
-            className="w-full flex items-center justify-center py-4 rounded-xl bg-[#D4AF37] text-black font-black uppercase tracking-widest text-sm active:scale-95 transition-transform shadow-[0_0_20px_rgba(212,175,55,0.3)]"
-          >
-            Dashboard Login
-          </Link>
-        </div>
-      </aside>
-
-      {/* Main Content Render */}
-      <main className="flex-1 flex flex-col w-full">
         <Outlet />
       </main>
 
-      {/* Sticky Mobile Channels Footer */}
-      <footer className="sticky bottom-0 z-40 w-full bg-[#11111A] border-t border-white/5 pb-safe">
-        <div className="max-w-screen-xl mx-auto px-2 h-16 flex items-center justify-between">
-          <Link 
-            to="/leaderboards" 
-            className="flex flex-col items-center justify-center gap-1 text-[#A09E9A] hover:text-[#D4AF37] transition-colors flex-1"
-          >
-            <Trophy size={20} />
-            <span className="text-[9px] font-bold uppercase tracking-wider">Top Niners</span>
-          </Link>
+      {/* Native Bottom Tab Bar */}
+      <footer className="shrink-0 z-40 w-full bg-[#11111A] border-t border-white/5 min-h-[56px] pt-1 pb-[calc(0.5rem+env(safe-area-inset-bottom))]">
+        <div className="w-full px-2 flex items-center justify-around">
           <Link 
             to="/roster" 
-            className="flex flex-col items-center justify-center gap-1 text-[#A09E9A] hover:text-[#D4AF37] transition-colors flex-1"
+            className="flex flex-col items-center justify-center gap-1 text-[#A09E9A] hover:text-[#D4AF37] transition-colors flex-1 py-1"
           >
-            <Users size={20} />
-            <span className="text-[9px] font-bold uppercase tracking-wider">Roster</span>
+            <Trophy size={20} className={cn(location.pathname === '/roster' && 'text-[#D4AF37]')} />
+            <span className={cn("text-[9px] font-bold uppercase tracking-wider", location.pathname === '/roster' && 'text-[#D4AF37]')}>Roster</span>
           </Link>
           <Link 
             to="/calendar" 
-            className="flex flex-col items-center justify-center gap-1 text-[#A09E9A] hover:text-[#D4AF37] transition-colors flex-1"
+            className="flex flex-col items-center justify-center gap-1 text-[#A09E9A] hover:text-[#D4AF37] transition-colors flex-1 py-1"
           >
-            <Calendar size={20} />
-            <span className="text-[9px] font-bold uppercase tracking-wider">Calendar</span>
+            <Calendar size={20} className={cn(location.pathname === '/calendar' && 'text-[#D4AF37]')} />
+            <span className={cn("text-[9px] font-bold uppercase tracking-wider", location.pathname === '/calendar' && 'text-[#D4AF37]')}>Calendar</span>
           </Link>
-          <a 
-            href="https://invite-poppo.com/6CxF5E" 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className="flex flex-col items-center justify-center gap-1 text-[#A09E9A] hover:text-[#D4AF37] transition-colors flex-1"
+          <Link 
+            to="/poppo-live" 
+            className="flex flex-col items-center justify-center gap-1 text-[#A09E9A] hover:text-[#D4AF37] transition-colors flex-1 py-1"
           >
-            <PlayCircle size={20} />
-            <span className="text-[9px] font-bold uppercase tracking-wider">Poppo Live</span>
-          </a>
+            <PlayCircle size={20} className={cn(location.pathname === '/poppo-live' && 'text-[#D4AF37]')} />
+            <span className={cn("text-[9px] font-bold uppercase tracking-wider", location.pathname === '/poppo-live' && 'text-[#D4AF37]')}>Poppo</span>
+          </Link>
         </div>
       </footer>
     </div>

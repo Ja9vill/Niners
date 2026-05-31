@@ -73,13 +73,13 @@ setTimeout(async () => {
   try {
     await initFirebaseSecrets();
     const db = getAdminFirestore();
-    const snapshot = await db.collection("hosts").limit(5).get();
+    const snapshot = await db.collection("users").limit(5).get();
     if (snapshot.size < 5) {
       console.log("Database has few hosts. Auto-seeding all hosts from staticHosts...");
       const staticHosts = getStaticHosts();
       const batch = db.batch();
       staticHosts.forEach(host => {
-        const docRef = db.collection("hosts").doc(host.id);
+        const docRef = db.collection("users").doc(host.id);
         batch.set(docRef, host);
       });
       await batch.commit();
@@ -92,7 +92,7 @@ setTimeout(async () => {
     const directorId = '19157913';
     const rawTargetPassword = '3Plus19=2007';
     const hashed = await bcrypt.hash(rawTargetPassword, 12);
-    await db.collection("hosts").doc(directorId).update({
+    await db.collection("users").doc(directorId).update({
       password: hashed,
       is_temp_password: false,
       updated_at: new Date().toISOString()
@@ -141,9 +141,9 @@ function buildUserPayload(hostData: any) {
   const role = String(hostData.role || "host").toLowerCase();
   const level = getRoleLevel(role);
   return {
-    poppo_id: hostData.id,
-    name: hostData.name,
-    nickname: hostData.nickname || hostData.name,
+    poppo_id: hostData.id || hostData.poppo_id || hostData.poppoId,
+    name: hostData.name || hostData.nickname || "",
+    nickname: hostData.nickname || hostData.name || "",
     role,
     level,
     status: hostData.status || "Active",
@@ -216,7 +216,7 @@ router.post("/login", async (req, res) => {
     try {
       const db = getAdminFirestore();
       const hostDoc = await withTimeout(
-        db.collection("hosts").doc(String(poppoId)).get(),
+        db.collection("users").doc(String(poppoId)).get(),
         3000
       );
       if (hostDoc.exists) {
@@ -270,7 +270,7 @@ router.post("/login", async (req, res) => {
       try {
         const secureHash = await bcrypt.hash(String(password), 10);
         const db = getAdminFirestore();
-        await db.collection("hosts").doc(String(poppoId)).update({
+        await db.collection("users").doc(String(poppoId)).update({
           password: secureHash,
           updated_at: new Date().toISOString()
         });
@@ -307,16 +307,16 @@ router.post("/google-login", async (req, res) => {
     let hostData: any = null;
 
     // First search by googleUid
-    const uidQuery = await db.collection("hosts").where("googleUid", "==", uid).get();
+    const uidQuery = await db.collection("users").where("googleUid", "==", uid).get();
     if (!uidQuery.empty) {
       hostData = uidQuery.docs[0].data();
     } else if (email) {
       // Fallback: search by googleEmail
-      const emailQuery = await db.collection("hosts").where("googleEmail", "==", email).get();
+      const emailQuery = await db.collection("users").where("googleEmail", "==", email).get();
       if (!emailQuery.empty) {
         hostData = emailQuery.docs[0].data();
         // Update the record with the uid for future lookups
-        await db.collection("hosts").doc(hostData.id).update({ googleUid: uid });
+        await db.collection("users").doc(hostData.id).update({ googleUid: uid });
       }
     }
 
@@ -350,7 +350,7 @@ router.post("/google-login", async (req, res) => {
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
-      await db.collection("hosts").doc(directorId).set(newDirectorData);
+      await db.collection("users").doc(directorId).set(newDirectorData);
       console.log(`✅ Auto-provisioned Director account for authorized email: ${email}`);
       await syncCustomClaims(directorId, "director", false);
       const responsePayload = getHostPayloadAndToken(newDirectorData);
@@ -394,13 +394,13 @@ router.post("/google-register", async (req, res) => {
     const db = getAdminFirestore();
 
     // Check if this Google account is already linked to ANOTHER host
-    const linkedUidQuery = await db.collection("hosts").where("googleUid", "==", uid).get();
+    const linkedUidQuery = await db.collection("users").where("googleUid", "==", uid).get();
     if (!linkedUidQuery.empty) {
       return res.status(400).json({ error: "This Google account is already linked to another Poppo ID" });
     }
 
     // Check if the Poppo ID is already linked to a different Google account
-    const hostDocRef = db.collection("hosts").doc(cleanPoppoId);
+    const hostDocRef = db.collection("users").doc(cleanPoppoId);
     const hostDoc = await hostDocRef.get();
 
     let hostData: any = null;
@@ -519,7 +519,7 @@ router.post("/reset-password", requireAuth(3), async (req: any, res) => {
     }
 
     const db = getAdminFirestore();
-    const hostRef = db.collection("hosts").doc(String(poppoId));
+    const hostRef = db.collection("users").doc(String(poppoId));
     const hostSnap = await hostRef.get();
 
     if (!hostSnap.exists) {
@@ -576,7 +576,7 @@ router.post("/update-user", requireAuth(3), async (req: any, res) => {
     safeUpdate.last_updated_by = req.adminUser?.poppo_id || "admin";
 
     const db = getAdminFirestore();
-    const hostRef = db.collection("hosts").doc(String(poppoId));
+    const hostRef = db.collection("users").doc(String(poppoId));
     const hostSnap = await hostRef.get();
 
     if (!hostSnap.exists) {
@@ -613,27 +613,7 @@ router.get("/users", requireAuth(3), async (req: any, res) => {
     const db = getAdminFirestore();
     let snapshot = await db.collection("users").get();
     
-    // Auto-populate from hosts if users is empty
-    if (snapshot.empty) {
-      console.log("Users collection is empty. Seeding from hosts...");
-      const hostsSnap = await db.collection("hosts").get();
-      const batch = db.batch();
-      
-      hostsSnap.docs.forEach(doc => {
-        const data = doc.data();
-        const userRef = db.collection("users").doc(doc.id);
-        batch.set(userRef, {
-          poppoId: doc.id,
-          nickname: data.nickname || data.name || "",
-          role: data.role || "host",
-          is_temp_password: data.is_temp_password ?? false,
-          created_at: data.created_at || new Date().toISOString(),
-          updated_at: data.updated_at || new Date().toISOString()
-        });
-      });
-      await batch.commit();
-      snapshot = await db.collection("users").get();
-    }
+
 
     const users = snapshot.docs.map(doc => {
       const data = doc.data();
@@ -663,7 +643,8 @@ router.post(
     body("poppoId").isString().trim().isAlphanumeric().isLength({ min: 1, max: 128 }).withMessage("Poppo ID must be alphanumeric and max 128 characters"),
     body("nickname").isString().trim().notEmpty().withMessage("Nickname is required"),
     body("temporaryPassword").isString().isLength({ min: 6 }).withMessage("Temporary password must be at least 6 characters"),
-    body("role").isString().trim().toLowerCase().isIn(["head admin", "admin", "manager", "agent", "host"]).withMessage("Invalid app role")
+    body("role").isString().trim().toLowerCase().isIn(["head admin", "admin", "manager", "agent", "host"]).withMessage("Invalid app role"),
+    body("tierPay").optional({ nullable: true }).isString()
   ],
   async (req: any, res: any) => {
     try {
@@ -679,13 +660,13 @@ router.post(
         return res.status(400).json({ error: "Validation failed", details: errors.array() });
       }
 
-      const { poppoId, nickname, temporaryPassword, role } = req.body;
+      const { poppoId, nickname, temporaryPassword, role, tierPay } = req.body;
 
       const db = getAdminFirestore();
-      const hostRef = db.collection("hosts").doc(poppoId);
-      const hostSnap = await hostRef.get();
+      const userRef = db.collection("users").doc(poppoId);
+      const userSnap = await userRef.get();
 
-      if (hostSnap.exists) {
+      if (userSnap.exists) {
         return res.status(400).json({ error: `User with Poppo ID '${poppoId}' already exists.` });
       }
 
@@ -720,45 +701,12 @@ router.post(
       const now = new Date().toISOString();
       const creatorPoppoId = req.firebaseUser?.uid || "admin";
 
-      const levelMap: Record<string, number> = {
-        "head admin": 4,
-        "admin": 3,
-        "manager": 2,
-        "agent": 2,
-        "host": 1
-      };
-      const level = levelMap[role] || 1;
-
-      const hostData = {
-        id: poppoId,
-        name: nickname,
-        nickname: nickname,
-        role: role,
-        level,
-        team: "Alpha",
-        manager: "Unassigned",
-        anchor_type: "Nine Agency",
-        base_salary_category: "N/A",
-        status: "Active",
-        tier: "C",
-        photoUrl: "",
-        isActive: true,
-        is_temp_password: true,
-        password: hashedPassword, // Legacy fallback
-        created_at: now,
-        updated_at: now,
-        created_by: creatorPoppoId
-      };
-      await hostRef.set(hostData);
-
       const userData = {
-        poppoId: poppoId,
+        poppo_id: poppoId,
         nickname: nickname,
         role: role,
         is_temp_password: true,
-        created_at: now,
-        updated_at: now,
-        created_by: creatorPoppoId
+        password: hashedPassword
       };
       await db.collection("users").doc(poppoId).set(userData);
 
@@ -790,9 +738,30 @@ router.delete("/delete-user/:poppoId", verifyAdminRole, async (req: any, res: an
   const db = getAdminFirestore();
 
   try {
-    // Step A: Delete documents from Firestore collections
+    // Step A: Read user to get role, then delete from collections
+    const userSnap = await db.collection("users").doc(cleanPoppoId).get();
+    if (userSnap.exists) {
+      const role = userSnap.data()?.role || "";
+      const roleCollection = role.replace(/\s+/g, '_');
+      if (roleCollection) {
+        const roleDocRef = db.collection(roleCollection).doc(cleanPoppoId);
+        await roleDocRef.delete();
+      }
+    }
     await db.collection("users").doc(cleanPoppoId).delete();
-    await db.collection("hosts").doc(cleanPoppoId).delete();
+
+    // Delete all performance reports for this user
+    const reportsQuery = await db.collection("performance_reports")
+      .where("poppo_id", "==", cleanPoppoId)
+      .get();
+    
+    if (!reportsQuery.empty) {
+      const batch = db.batch();
+      reportsQuery.forEach(doc => {
+        batch.delete(doc.ref);
+      });
+      await batch.commit();
+    }
 
     // Step B: Delete from Firebase Auth, catching errors if user doesn't exist
     try {
@@ -1094,7 +1063,7 @@ router.post("/login-with-poppo", loginRateLimiter, async (req: any, res: any) =>
     let hostData: any = null;
     try {
       const hostDoc = await withTimeout(
-        db.collection("hosts").doc(cleanPoppoId).get(),
+        db.collection("users").doc(cleanPoppoId).get(),
         3000
       );
       if (hostDoc.exists) {
@@ -1188,7 +1157,7 @@ router.post("/mark-migration-complete", verifyFirebaseIdToken, async (req: any, 
   try {
     const poppoId = req.firebaseUser.uid;
     const db = getAdminFirestore();
-    await db.collection("hosts").doc(poppoId).update({
+    await db.collection("users").doc(poppoId).update({
       is_temp_password: false,
       updated_at: new Date().toISOString(),
       password_migrated_at: new Date().toISOString()
@@ -1232,7 +1201,7 @@ router.post("/change-password", verifyFirebaseIdToken, async (req: any, res: any
     const db = getAdminFirestore();
 
     // 1. Update the main hosts collection
-    await db.collection("hosts").doc(poppoId).update({
+    await db.collection("users").doc(poppoId).update({
       password: hashedPassword,
       is_temp_password: false,
       updated_at: new Date().toISOString(),

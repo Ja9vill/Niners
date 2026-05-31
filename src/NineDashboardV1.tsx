@@ -212,15 +212,6 @@ export default function App() {
         const [firebaseHosts, firebaseCommissions] = await Promise.race([fetchPromise, timeoutPromise]);
         
         let finalHosts = firebaseHosts;
-        if (finalHosts.length === 0) {
-          const cached = Storage.getHosts();
-          if (cached.length > 0) {
-            finalHosts = cached;
-          } else {
-            const { getStaticHosts } = await import('./lib/staticHosts');
-            finalHosts = getStaticHosts();
-          }
-        }
         Storage.setHosts(finalHosts);
         setHosts(finalHosts);
         
@@ -371,7 +362,8 @@ export default function App() {
           <OverviewTab commissions={commission} hosts={hosts} />
         </AuthGate>
       );
-      case 'roster': return wrapProtected(<RosterTab />);
+      case 'roster': 
+        return <ProfilesTab isReadOnly={authState.level === 0} />;
       case 'profiles': 
         const userRoleForProfiles = (authState.role || '').toLowerCase();
         if (userRoleForProfiles === 'manager' || userRoleForProfiles === 'agent') {
@@ -383,7 +375,7 @@ export default function App() {
         }
         return wrapProtected(
           <AuthGate onAuthChange={refreshState}>
-            <ProfilesTab />
+            <ProfilesTab isReadOnly={false} />
           </AuthGate>
         );
       case 'tasks':
@@ -559,12 +551,16 @@ export default function App() {
                 {isSidebarOpen ? <X size={20} /> : <Menu size={20} />}
               </button>
               {/* Logo */}
-              <div className="flex items-center gap-2.5 pl-2 sm:pl-3 border-l app-logo-border">
-                <img src={appLogo} alt="Niners App Logo" className="h-9 w-9 rounded-xl border border-[#D4AF37]/30 shadow-md object-cover select-none pointer-events-none" />
+              <button 
+                onClick={() => { setActiveTab('home'); if (isMobileView) setIsSidebarOpen(false); }}
+                className="flex items-center gap-2.5 pl-2 sm:pl-3 border-l app-logo-border cursor-pointer hover:opacity-80 transition-opacity"
+                title="Go to Home"
+              >
+                <img src={appLogo} alt="NINE TALENT MANAGEMENT Logo" className="h-9 w-9 rounded-xl border border-[#D4AF37]/30 shadow-md object-cover select-none pointer-events-none" />
                 <span className="font-['Outfit'] font-black tracking-widest text-[#D4AF37] text-base uppercase hidden xs:block">
-                  Niners App
+                  NINE TALENT MANAGEMENT
                 </span>
-              </div>
+              </button>
               <span className="hidden sm:block text-xs font-black uppercase tracking-[0.2em] text-[#D4AF37]/60 truncate max-w-[150px]">
                 {navItems.find(n => n.id === activeTab)?.label || 'Portal'}
               </span>
@@ -907,6 +903,17 @@ export default function App() {
                 )}
               </div>
 
+              {/* View Toggle button */}
+              <div className="px-2 mt-4 shrink-0">
+                <button
+                  onClick={() => setIsMobileView(!isMobileView)}
+                  className="w-full py-2 border border-[#D4AF37]/20 hover:border-[#D4AF37]/40 bg-[#D4AF37]/5 hover:bg-[#D4AF37]/10 text-[#D4AF37] rounded-xl text-[9px] font-black uppercase tracking-[0.2em] transition-all cursor-pointer flex items-center justify-center gap-2 select-none"
+                >
+                  {isMobileView ? <Monitor size={14} /> : <Smartphone size={14} />}
+                  <span>Switch to {isMobileView ? 'Desktop' : 'Mobile'} View</span>
+                </button>
+              </div>
+
               {/* Reset session button */}
               <div className="px-2 mt-4 shrink-0">
                 <button
@@ -976,10 +983,10 @@ export default function App() {
           isMobileView ? "" : "md:hidden"
         )}>
           {[
-            { id: 'home', label: 'Top Niners', icon: Trophy },
-            { id: 'calendar', label: 'Calendar', icon: Calendar },
+            { id: 'overview', label: 'Overview', icon: Activity },
             { id: 'roster', label: 'Roster', icon: Users },
-            { id: 'account', label: 'Account', icon: User }
+            { id: 'calendar', label: 'Calendar', icon: Calendar },
+            { id: 'dashboard', label: 'Hub', icon: LayoutDashboard }
           ].map(tab => {
             const Icon = tab.icon;
             const isSelected = activeTab === tab.id || (tab.id === 'home' && activeTab === 'overview');
@@ -1031,7 +1038,7 @@ export default function App() {
 
 
 // Sub-components (Tabs)
-const OverviewTab = ({ commissions, hosts }: { commissions: CommissionEntry[], hosts: Host[] }) => {
+export const OverviewTab = ({ commissions, hosts }: { commissions: CommissionEntry[], hosts: Host[] }) => {
   const auth = Storage.getAuthState();
   const logs = Storage.getLogs();
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
@@ -1303,52 +1310,8 @@ const OverviewTab = ({ commissions, hosts }: { commissions: CommissionEntry[], h
             </div>
          ) : (
             <>
-             {/* Desktop Table View */}
-             <div className="hidden md:block overflow-x-auto">
-                <table className="w-full text-left">
-                  <thead>
-                    <tr className="border-b border-white/10 text-[10px] font-bold text-[#A09E9A]/50 uppercase tracking-widest">
-                      <th className="px-4 py-3 cursor-pointer group hover:text-[#F0EFE8] transition-colors" onClick={() => requestSort('rank')}>
-                        Rank <SortIcon column="rank" />
-                      </th>
-                      <th className="px-4 py-3 cursor-pointer group hover:text-[#F0EFE8] transition-colors" onClick={() => requestSort('id')}>
-                        POPPO ID <SortIcon column="id" />
-                      </th>
-                      <th className="px-4 py-3 cursor-pointer group hover:text-[#F0EFE8] transition-colors" onClick={() => requestSort('name')}>
-                        Name <SortIcon column="name" />
-                      </th>
-                      <th className="px-4 py-3 text-right cursor-pointer group hover:text-[#F0EFE8] transition-colors" onClick={() => requestSort('totalPoints')}>
-                        Points <SortIcon column="totalPoints" />
-                      </th>
-                      <th className="px-4 py-3 text-right cursor-pointer group hover:text-[#F0EFE8] transition-colors" onClick={() => requestSort('commission')}>
-                        Rate <SortIcon column="commission" />
-                      </th>
-                      <th className="px-4 py-3 text-center cursor-pointer group hover:text-[#F0EFE8] transition-colors" onClick={() => requestSort('monthsActive')}>
-                        Freq <SortIcon column="monthsActive" />
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-white/5">
-                    {sortedHosts.map((host, i) => (
-                       <tr key={host.id} className="hover:bg-white/5 transition-colors group">
-                         <td className="px-4 py-4 font-bold text-[#A09E9A]/60 text-base">#{hostRankings.indexOf(host) + 1}</td>
-                         <td className="px-4 py-4 font-mono text-xs text-cyan-400/60">{host.id}</td>
-                         <td className="px-4 py-4 font-bold text-[#F0EFE8]">{host.name}</td>
-                         <td className="px-4 py-4 text-right font-mono text-sm text-emerald-400">
-                           {formatNumber(host.totalPoints)} pts
-                         </td>
-                         <td className="px-4 py-4 text-right font-medium text-[10px] text-[#A09E9A]/60">{host.base_salary_category}</td>
-                         <td className="px-4 py-4 text-center">
-                           <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-white/5 border border-white/10 text-[10px] font-bold">{host.monthsActive}</span>
-                         </td>
-                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-             </div>
-
-             {/* Mobile Card View */}
-             <div className="md:hidden space-y-4">
+             {/* Native Card View */}
+             <div className="space-y-4">
                {sortedHosts.map((host, i) => (
                  <div key={host.id} className="p-4 bg-white/5 rounded-xl border border-white/5 space-y-3">
                    <div className="flex justify-between items-start">
