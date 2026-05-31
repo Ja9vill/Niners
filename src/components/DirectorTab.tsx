@@ -46,7 +46,6 @@ import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
 import { FirebaseService } from '../lib/firebaseService';
 import { MANAGERS, BASE_SALARY_POLICIES } from '../lib/constants';
-import { FinancialUpload } from './FinancialUpload';
 import { SystemLogsViewer } from './SystemLogsViewer';
 import { CreateMemberForm } from './CreateMemberForm';
 import { RosterManagementTab } from './RosterManagementTab';
@@ -229,13 +228,36 @@ export const DirectorTab = () => {
       // Enforce nickname if host exists, otherwise keep original but it won't be saved
       const nickname = matchingHost ? (matchingHost.nickname || matchingHost.name) : (r[3]?.trim() || 'Pending Intake');
 
+      let parsedYear = new Date().getFullYear();
+      let parsedMonth = '';
+      const r1 = r[1]?.trim() || '';
+      const r2 = r[2]?.trim() || '';
+      
+      // If r2 is just a 4-digit year (e.g. "2024"), it's the old monthly format
+      if (/^20\d{2}$/.test(r2)) {
+        parsedYear = parseInt(r2);
+        parsedMonth = r1;
+      } else if (r1) {
+        // Otherwise, it's a date (e.g. "2024-05-01" or "05/01/2024")
+        const d = new Date(r1);
+        if (!isNaN(d.getTime())) {
+          parsedYear = d.getFullYear();
+          parsedMonth = `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, '0')}`;
+        } else {
+          // Fallback: try to find a year in the string
+          const match = r1.match(/\b(20\d{2})\b/);
+          if (match) parsedYear = parseInt(match[1]);
+          parsedMonth = r1;
+        }
+      }
+
       const rowObj = {
         poppo_id: poppoId,
         poppo_name: nickname, // Required by CommissionEntry
-        month: r[1]?.trim() || '', // Required by CommissionEntry (maps to from_date)
-        year: parseInt(r[1]?.substring(0,4) || '2024'), // Ensure year is present
-        from_date: r[1]?.trim() || '',
-        to_date: r[2]?.trim() || '',
+        month: parsedMonth, // Required by CommissionEntry
+        year: parsedYear, // Ensure year is present
+        from_date: r1,
+        to_date: r2,
         nickname: nickname,
         live_duration: parseFloat(r[4]) || 0,
         party_host_duration: parseFloat(r[5]) || 0,
@@ -267,73 +289,7 @@ export const DirectorTab = () => {
     showSuccess(`Successfully added ${parsed.length} rows locally. Click "Save Changes" to upload.`);
   };
 
-  const handleXlsxImport = async (data: any[]) => {
-    const parsed: any[] = [];
-    const helperFind = (row: any, keys: string[], defaultVal: any = '') => {
-      const match = Object.keys(row).find(k => {
-        const ck = k.trim().toLowerCase().replace(/[\s_-]+/g, '');
-        return keys.some(pk => pk.toLowerCase().replace(/[\s_-]+/g, '') === ck);
-      });
-      return match ? row[match] : defaultVal;
-    };
 
-    for (const r of data) {
-      const poppoId = String(helperFind(r, ['poppo_id', 'poppoid', 'poppo id', 'id', 'uid'])).trim();
-      if (!poppoId) continue;
-
-      const matchingHost = hosts.find(h => String(h.id).trim() === poppoId);
-      const nickname = String(helperFind(r, ['nickname', 'nick name', 'nick', 'name', 'poppo_name', 'poppo name'], '')).trim() || 
-                       (matchingHost ? (matchingHost.nickname || matchingHost.name) : 'Pending Intake');
-
-      if (financialTab === 'monthly') {
-        parsed.push({
-          poppo_id: poppoId,
-          month: String(helperFind(r, ['month', 'period', 'month_val'], '')),
-          year: parseInt(helperFind(r, ['year', 'year_val'], new Date().getFullYear())),
-          nickname: nickname,
-          live_duration: parseFloat(helperFind(r, ['live_duration', 'live hours', 'live duration'], 0)) || 0,
-          party_host_duration: parseFloat(helperFind(r, ['party_host_duration', 'party hours', 'party duration'], 0)) || 0,
-          total_points: parseInt(String(helperFind(r, ['total_points', 'total earnings of points', 'points'], 0)).replace(/,/g, '')) || 0,
-          agent_commission: parseInt(String(helperFind(r, ['agent_commission', 'agent commission', 'commission'], 0)).replace(/,/g, '')) || 0,
-          live_earnings: parseInt(String(helperFind(r, ['live_earnings', 'live earnings'], 0)).replace(/,/g, '')) || 0,
-          party_earnings: parseInt(String(helperFind(r, ['party_earnings', 'party earnings'], 0)).replace(/,/g, '')) || 0,
-          private_chat: parseInt(String(helperFind(r, ['private_chat', 'private chat'], 0)).replace(/,/g, '')) || 0,
-          tips: parseInt(String(helperFind(r, ['tips', 'tip'], 0)).replace(/,/g, '')) || 0,
-          platform_reward: parseInt(String(helperFind(r, ['platform_reward', 'platform reward'], 0)).replace(/,/g, '')) || 0,
-          other_earnings: parseInt(String(helperFind(r, ['other_earnings', 'other earnings', 'otherearn', 'other_earn'], 0)).replace(/,/g, '')) || 0,
-          platform_hourly_salary: parseInt(String(helperFind(r, ['platform_hourly_salary', 'platform hourly salary', 'hourly salary'], 0)).replace(/,/g, '')) || 0,
-          super_salary: parseInt(String(helperFind(r, ['super_salary', 'super salary'], 0)).replace(/,/g, '')) || 0,
-          super_rank: parseInt(String(helperFind(r, ['super_rank', 'super rank'], 0)).replace(/,/g, '')) || 0,
-          level: parseInt(String(helperFind(r, ['level', 'lvl'], 0)).replace(/,/g, '')) || 0
-        });
-      } else {
-        parsed.push({
-          poppo_id: poppoId,
-          from_date: String(helperFind(r, ['from_date', 'from date', 'fromdate'], '')),
-          to_date: String(helperFind(r, ['to_date', 'to date', 'todate'], '')),
-          nickname: nickname,
-          live_duration: parseFloat(helperFind(r, ['live_duration', 'live hours', 'live duration'], 0)) || 0,
-          party_host_duration: parseFloat(helperFind(r, ['party_host_duration', 'party hours', 'party duration'], 0)) || 0,
-          total_points: parseInt(String(helperFind(r, ['total_points', 'total earnings of points', 'points'], 0)).replace(/,/g, '')) || 0,
-          agent_commission: parseInt(String(helperFind(r, ['agent_commission', 'agent commission', 'commission'], 0)).replace(/,/g, '')) || 0,
-          live_earnings: parseInt(String(helperFind(r, ['live_earnings', 'live earnings'], 0)).replace(/,/g, '')) || 0,
-          party_earnings: parseInt(String(helperFind(r, ['party_earnings', 'party earnings'], 0)).replace(/,/g, '')) || 0,
-          private_chat: parseInt(String(helperFind(r, ['private_chat', 'private chat'], 0)).replace(/,/g, '')) || 0,
-          tips: parseInt(String(helperFind(r, ['tips', 'tip'], 0)).replace(/,/g, '')) || 0,
-          platform_reward: parseInt(String(helperFind(r, ['platform_reward', 'platform reward'], 0)).replace(/,/g, '')) || 0,
-          other_earnings: parseInt(String(helperFind(r, ['other_earnings', 'other earnings', 'otherearn', 'other_earn'], 0)).replace(/,/g, '')) || 0,
-          platform_hourly_salary: parseInt(String(helperFind(r, ['platform_hourly_salary', 'platform hourly salary', 'hourly salary'], 0)).replace(/,/g, '')) || 0,
-          super_salary: parseInt(String(helperFind(r, ['super_salary', 'super salary'], 0)).replace(/,/g, '')) || 0,
-          super_rank: parseInt(String(helperFind(r, ['super_rank', 'super rank'], 0)).replace(/,/g, '')) || 0,
-          level: parseInt(String(helperFind(r, ['level', 'lvl'], 0)).replace(/,/g, '')) || 0
-        });
-      }
-    }
-
-    const setLedger = financialTab === 'monthly' ? setMonthlyLedger : setWeeklyLedger;
-    setLedger(prev => [...prev, ...parsed]);
-    showSuccess(`Successfully imported ${parsed.length} rows from report. Click "Save Changes" to save.`);
-  };
 
   const handleSaveChanges = async () => {
     setIsSavingFinancials(true);
@@ -1805,78 +1761,38 @@ export const DirectorTab = () => {
                   </button>
                 </div>
 
-                <div className="mb-6">
-                  <FinancialUpload onUploadSuccess={loadData} />
-                </div>
-
-                {/* Bulk Intake & Paste Section (Flat-file Storage Ledger) */}
-                <div className="tech-card bg-[#1A1A28] border border-white/5 p-6 rounded-2xl grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  {/* File Upload Area */}
-                  <div className="border-2 border-dashed border-white/10 rounded-2xl p-6 flex flex-col items-center justify-center gap-3 hover:border-[#D4AF37]/50 hover:bg-[#D4AF37]/[0.02] transition-all cursor-pointer relative group">
-                    <div className="w-10 h-10 rounded-full bg-[#D4AF37]/10 flex items-center justify-center border border-[#D4AF37]/20 group-hover:scale-105 transition-transform">
-                      <span className="text-[#D4AF37]">📁</span>
+                {/* Unified Ingestion Zone */}
+                <div className="tech-card bg-[#1A1A28] border border-white/5 p-6 rounded-2xl">
+                  <div className="flex flex-col space-y-4">
+                    <div className="flex items-center justify-between">
+                      <label htmlFor="bulk-ledger-paste" className="text-sm font-black uppercase tracking-widest text-[#F0EFE8] flex items-center gap-2">
+                        <span className="text-[#D4AF37]">📋</span> Paste Raw Ledger Data
+                      </label>
+                      <span className="text-[9px] text-[#A09E9A] uppercase tracking-wider font-bold">
+                        Supports direct paste from Excel/Sheets
+                      </span>
                     </div>
-                    <div className="text-center space-y-1">
-                      <p className="font-bold text-xs uppercase tracking-wider text-[#F0EFE8]">Upload Commission Report</p>
-                      <p className="text-[9px] text-[#A09E9A]">Drag XLSX or CSV file here or click to browse</p>
-                    </div>
-                    <input 
-                      type="file" 
-                      accept=".csv,.xlsx" 
-                      onChange={async (e) => {
-                        const file = e.target.files?.[0];
-                        if (!file) return;
-                        setIsLoading(true);
-                        try {
-                          const reader = new FileReader();
-                          reader.onload = async (evt) => {
-                            const bstr = evt.target?.result as string;
-                            const wb = XLSX.read(bstr, { type: 'binary' });
-                            const wsname = wb.SheetNames[0];
-                            const ws = wb.Sheets[wsname];
-                            const data = XLSX.utils.sheet_to_json(ws);
-                            await handleXlsxImport(data);
-                          };
-                          reader.readAsBinaryString(file);
-                        } catch (err) {
-                          alert("Failed to parse report file");
-                        } finally {
-                          setIsLoading(false);
+                    <textarea
+                      id="bulk-ledger-paste"
+                      placeholder={
+                        financialTab === 'monthly'
+                          ? "Paste monthly columns (tab-separated):\nPoppoID\tMonth\tYear\tNickname\tLiveHours\tPartyHours\tTotalPoints\tAgentCommission\tLiveEarnings\tPartyEarnings\tPrivateChat\tTips\tPlatformReward\tOtherEarnings\tHourlySalary\tSuperSalary\tSuperRank\tLevel"
+                          : "Paste weekly columns (tab-separated):\nPoppoID\tFromDate\tToDate\tNickname\tLiveHours\tPartyHours\tTotalPoints\tAgentCommission\tLiveEarnings\tPartyEarnings\tPrivateChat\tTips\tPlatformReward\tOtherEarnings\tHourlySalary\tSuperSalary\tSuperRank\tLevel"
+                      }
+                      className="w-full h-32 glass-input font-mono text-[10px] resize-none focus:ring-1 focus:ring-[#D4AF37] text-[#F0EFE8] bg-[#0D0D14] border border-white/10 rounded-xl p-4 shadow-inner"
+                    />
+                    <button
+                      onClick={() => {
+                        const textarea = document.getElementById('bulk-ledger-paste') as HTMLTextAreaElement;
+                        if (textarea && textarea.value.trim()) {
+                          handleBulkPaste(textarea.value);
+                          textarea.value = '';
                         }
                       }}
-                      className="absolute inset-0 opacity-0 cursor-pointer"
-                      title="Upload Excel or CSV report"
-                    />
-                  </div>
-
-                  {/* Bulk Paste Textarea */}
-                  <div className="space-y-2 flex flex-col">
-                    <label htmlFor="bulk-ledger-paste" className="text-[9px] font-black uppercase tracking-wider text-[#A09E9A]">
-                      Excel / Sheets Tabular Paste Intake
-                    </label>
-                    <div className="flex gap-2 flex-1">
-                      <textarea
-                        id="bulk-ledger-paste"
-                        placeholder={
-                          financialTab === 'monthly'
-                            ? "Paste monthly columns (tab-separated):\nPoppoID\tMonth\tYear\tNickname\tLiveHours\tPartyHours\tTotalPoints\tAgentCommission\tLiveEarnings\tPartyEarnings\tPrivateChat\tTips\tPlatformReward\tOtherEarnings\tHourlySalary\tSuperSalary\tSuperRank\tLevel"
-                            : "Paste weekly columns (tab-separated):\nPoppoID\tFromDate\tToDate\tNickname\tLiveHours\tPartyHours\tTotalPoints\tAgentCommission\tLiveEarnings\tPartyEarnings\tPrivateChat\tTips\tPlatformReward\tOtherEarnings\tHourlySalary\tSuperSalary\tSuperRank\tLevel"
-                        }
-                        className="flex-1 h-24 glass-input font-mono text-[9px] resize-none focus:ring-1 focus:ring-[#D4AF37] text-[#F0EFE8] bg-[#0D0D14] border border-white/10"
-                      />
-                      <button
-                        onClick={() => {
-                          const textarea = document.getElementById('bulk-ledger-paste') as HTMLTextAreaElement;
-                          if (textarea) {
-                            handleBulkPaste(textarea.value);
-                            textarea.value = '';
-                          }
-                        }}
-                        className="px-4 bg-[#D4AF37]/10 hover:bg-[#D4AF37]/25 text-[#D4AF37] border border-[#D4AF37]/25 hover:text-white transition-all font-black uppercase text-[10px] tracking-wider rounded-xl cursor-pointer"
-                      >
-                        Paste
-                      </button>
-                    </div>
+                      className="w-full py-4 bg-[#D4AF37]/10 hover:bg-[#D4AF37] text-[#D4AF37] hover:text-[#0D0D14] transition-all font-black uppercase text-[11px] tracking-widest rounded-xl cursor-pointer shadow-lg active:scale-95"
+                    >
+                      Process & Load Data to Grid
+                    </button>
                   </div>
                 </div>
 
