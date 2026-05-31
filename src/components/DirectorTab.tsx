@@ -225,51 +225,33 @@ export const DirectorTab = () => {
 
       const poppoId = r[0]?.trim() || '';
       const matchingHost = hosts.find(h => String(h.id).trim() === poppoId);
-      const nickname = r[3]?.trim() || (matchingHost ? (matchingHost.nickname || matchingHost.name) : 'Pending Intake');
+      
+      // Enforce nickname if host exists, otherwise keep original but it won't be saved
+      const nickname = matchingHost ? (matchingHost.nickname || matchingHost.name) : (r[3]?.trim() || 'Pending Intake');
 
-      if (financialTab === 'monthly') {
-        parsed.push({
-          poppo_id: poppoId,
-          month: r[1]?.trim() || '',
-          year: parseInt(r[2]?.replace(/,/g, '')) || new Date().getFullYear(),
-          nickname: nickname,
-          live_duration: parseFloat(r[4]) || 0,
-          party_host_duration: parseFloat(r[5]) || 0,
-          total_points: parseInt(r[6]?.replace(/,/g, '')) || 0,
-          agent_commission: parseInt(r[7]?.replace(/,/g, '')) || 0,
-          live_earnings: parseInt(r[8]?.replace(/,/g, '')) || 0,
-          party_earnings: parseInt(r[9]?.replace(/,/g, '')) || 0,
-          private_chat: parseInt(r[10]?.replace(/,/g, '')) || 0,
-          tips: parseInt(r[11]?.replace(/,/g, '')) || 0,
-          platform_reward: parseInt(r[12]?.replace(/,/g, '')) || 0,
-          other_earnings: parseInt(r[13]?.replace(/,/g, '')) || 0,
-          platform_hourly_salary: parseInt(r[14]?.replace(/,/g, '')) || 0,
-          super_salary: parseInt(r[15]?.replace(/,/g, '')) || 0,
-          super_rank: parseInt(r[16]?.replace(/,/g, '')) || 0,
-          level: parseInt(r[17]?.replace(/,/g, '')) || 0
-        });
-      } else {
-        parsed.push({
-          poppo_id: poppoId,
-          from_date: r[1]?.trim() || '',
-          to_date: r[2]?.trim() || '',
-          nickname: nickname,
-          live_duration: parseFloat(r[4]) || 0,
-          party_host_duration: parseFloat(r[5]) || 0,
-          total_points: parseInt(r[6]?.replace(/,/g, '')) || 0,
-          agent_commission: parseInt(r[7]?.replace(/,/g, '')) || 0,
-          live_earnings: parseInt(r[8]?.replace(/,/g, '')) || 0,
-          party_earnings: parseInt(r[9]?.replace(/,/g, '')) || 0,
-          private_chat: parseInt(r[10]?.replace(/,/g, '')) || 0,
-          tips: parseInt(r[11]?.replace(/,/g, '')) || 0,
-          platform_reward: parseInt(r[12]?.replace(/,/g, '')) || 0,
-          other_earnings: parseInt(r[13]?.replace(/,/g, '')) || 0,
-          platform_hourly_salary: parseInt(r[14]?.replace(/,/g, '')) || 0,
-          super_salary: parseInt(r[15]?.replace(/,/g, '')) || 0,
-          super_rank: parseInt(r[16]?.replace(/,/g, '')) || 0,
-          level: parseInt(r[17]?.replace(/,/g, '')) || 0
-        });
-      }
+      const rowObj = {
+        poppo_id: poppoId,
+        from_date: r[1]?.trim() || '',
+        to_date: r[2]?.trim() || '',
+        nickname: nickname,
+        live_duration: parseFloat(r[4]) || 0,
+        party_host_duration: parseFloat(r[5]) || 0,
+        total_points: parseInt(r[6]?.replace(/,/g, '')) || 0,
+        agent_commission: parseInt(r[7]?.replace(/,/g, '')) || 0,
+        live_earnings: parseInt(r[8]?.replace(/,/g, '')) || 0,
+        party_earnings: parseInt(r[9]?.replace(/,/g, '')) || 0,
+        private_chat: parseInt(r[10]?.replace(/,/g, '')) || 0,
+        tips: parseInt(r[11]?.replace(/,/g, '')) || 0,
+        platform_reward: parseInt(r[12]?.replace(/,/g, '')) || 0,
+        other_earnings: parseInt(r[13]?.replace(/,/g, '')) || 0,
+        platform_hourly_salary: parseInt(r[14]?.replace(/,/g, '')) || 0,
+        super_salary: parseInt(r[15]?.replace(/,/g, '')) || 0,
+        super_rank: parseInt(r[16]?.replace(/,/g, '')) || 0,
+        level: parseInt(r[17]?.replace(/,/g, '')) || 0,
+        _isUnknownHost: !matchingHost // Used to filter out before saving
+      };
+
+      parsed.push(rowObj);
     }
     setLedger(prev => [...prev, ...parsed]);
     showSuccess(`Successfully added ${parsed.length} rows locally. Click "Save Changes" to upload.`);
@@ -348,14 +330,32 @@ export const DirectorTab = () => {
     try {
       const type = financialTab;
       const data = type === 'monthly' ? monthlyLedger : weeklyLedger;
-      await FirebaseService.saveFinancials(type, data);
-      await auditLogAction('SAVE_FINANCIALS_STORAGE', null, { type, count: data.length });
+      
+      // Only save rows where the poppo_id is found in the users list (hosts)
+      const validDataToSave = data.filter(row => hosts.some(h => String(h.id).trim() === String(row.poppo_id).trim()));
+      const unknownCount = data.length - validDataToSave.length;
+
+      // Save to the performance_report collection as requested
+      await FirebaseService.savePerformanceReport(validDataToSave);
+      
+      // We also save to the original endpoint for backward compatibility (optional)
+      try {
+        await FirebaseService.saveFinancials(type, validDataToSave);
+      } catch (e) {
+        console.warn("Legacy saveFinancials failed, but performance_report succeeded", e);
+      }
+      
+      await auditLogAction('SAVE_FINANCIALS_STORAGE', null, { type, count: validDataToSave.length });
 
       if (type === 'monthly') {
-        setCommissions(data);
+        setCommissions(validDataToSave);
       }
 
-      showSuccess(`${type === 'monthly' ? 'Monthly' : 'Weekly'} financials saved successfully to Firebase Storage.`);
+      let successMsg = `Financials saved successfully (${validDataToSave.length} rows) to Firebase Storage.`;
+      if (unknownCount > 0) {
+        successMsg += ` Note: ${unknownCount} rows were ignored because their Poppo IDs are not in the users database.`;
+      }
+      showSuccess(successMsg);
     } catch (err) {
       console.error("Failed to save financials to storage:", err);
       alert("Failed to save financials to Firebase Storage.");

@@ -786,6 +786,21 @@ export const FirebaseService = {
       return [];
     }
   },
+
+  async savePerformanceReport(data: any[]): Promise<void> {
+    const path = 'performance_report';
+    try {
+      const batch = writeBatch(db);
+      data.forEach(r => {
+        const id = `${r.poppo_id}_${r.from_date || ''}_${r.to_date || ''}`;
+        const docRef = doc(db, path, id);
+        batch.set(docRef, r, { merge: true });
+      });
+      await batch.commit();
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, path);
+    }
+  },
 };
 // ─── Roster Management types & standalone exports ─────────────────────────────
 // These are used by AppUsersTab for the admin roster management feature.
