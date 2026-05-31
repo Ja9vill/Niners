@@ -30,7 +30,7 @@ for (const [filePath, fileProblems] of fileMap.entries()) {
   }
   
   const content = fs.readFileSync(normalizedPath, 'utf8');
-  const lines = content.split('\\n');
+  const lines = content.split('\n');
   
   for (const prob of fileProblems) {
     const lineIndex = prob.startLine - 1;
