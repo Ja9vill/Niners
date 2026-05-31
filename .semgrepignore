@@ -1,0 +1,13 @@
+# Compiled production bundles — warnings here come from bundled third-party libraries
+# (React, Firebase, Recharts, Framer Motion, etc.), not from application source code.
+dist/
+build/
+Niners/dist/
+Niners/build/
+
+# Dependencies
+node_modules/
+Niners/node_modules/
+
+# Admin scripts
+fix-ide-warnings.js

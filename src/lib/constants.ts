@@ -5,7 +5,7 @@ export const MANAGERS = [
 ];
 
 export const BASE_SALARY_POLICIES: BaseSalaryTier[] = [
-  'N/A', 'Rocket Host', 'Star Host', 'S idol', 'ESport Host'
+  'Regular Host', 'Rocket Host', 'Star Host', 'S idol', 'ESport Host', 'N/A'
 ];
 
 // Mock initial data if empty
@@ -14,7 +14,6 @@ export const INITIAL_HOSTS: Host[] = [
     id: '1001', 
     name: 'Ye Joon', 
     nickname: 'Efficiency King',
-    position: 'Talent', 
     role: 'Talent',
     team: 'Alpha',
     manager: 'Ely', 
@@ -25,6 +24,7 @@ export const INITIAL_HOSTS: Host[] = [
     tier: 'S',
     password: '1234',
     is_temp_password: true,
+    isActive: true,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString()
   },
@@ -32,7 +32,6 @@ export const INITIAL_HOSTS: Host[] = [
     id: '1002', 
     name: 'LYKA', 
     nickname: 'LYKA',
-    position: 'Talent', 
     role: 'Talent',
     team: 'Beta',
     manager: 'Jean', 
@@ -43,6 +42,7 @@ export const INITIAL_HOSTS: Host[] = [
     tier: 'A',
     password: '1234',
     is_temp_password: true,
+    isActive: true,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString()
   },

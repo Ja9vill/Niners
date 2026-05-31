@@ -4,19 +4,29 @@ import dotenv from "dotenv";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 import authRouter from "./src/server/auth";
+import auditRouter from "./src/server/auditRouter";
+import { initFirebaseSecrets } from "./src/server/secrets";
 
 dotenv.config();
 
 async function startServer() {
+  await initFirebaseSecrets();
   const app = express();
   const PORT = Number(process.env.PORT || 3000);
 
   app.use(express.json({ limit: "50mb" }));
 
   app.use("/api/auth", authRouter);
+  app.use("/api/admin", authRouter);
+  app.use("/api", auditRouter);
 
-  app.get("/api/health", (_req, res) => {
-    res.json({ status: "ok" });
+  app.get("/api/health", (req, res) => {
+    res.json({
+      status: "ok",
+      domain: req.headers.host,
+      forwardedHost: req.headers['x-forwarded-host'] || req.headers['x-original-host'] || null,
+      headers: req.headers
+    });
   });
 
   app.post("/api/chat", async (req, res) => {
@@ -40,6 +50,26 @@ async function startServer() {
       const response = await ai.models.generateContent({
         model: "gemini-2.5-flash",
         contents: message,
+        config: {
+          safetySettings: [
+            {
+              category: "HARM_CATEGORY_HARASSMENT" as any,
+              threshold: "BLOCK_LOW_AND_ABOVE" as any,
+            },
+            {
+              category: "HARM_CATEGORY_HATE_SPEECH" as any,
+              threshold: "BLOCK_LOW_AND_ABOVE" as any,
+            },
+            {
+              category: "HARM_CATEGORY_SEXUALLY_EXPLICIT" as any,
+              threshold: "BLOCK_LOW_AND_ABOVE" as any,
+            },
+            {
+              category: "HARM_CATEGORY_DANGEROUS_CONTENT" as any,
+              threshold: "BLOCK_LOW_AND_ABOVE" as any,
+            },
+          ],
+        },
       });
 
       return res.json({ text: response.text });
@@ -136,6 +166,24 @@ Rules:
             ],
             config: {
               responseMimeType: "application/json",
+              safetySettings: [
+                {
+                  category: "HARM_CATEGORY_HARASSMENT" as any,
+                  threshold: "BLOCK_LOW_AND_ABOVE" as any,
+                },
+                {
+                  category: "HARM_CATEGORY_HATE_SPEECH" as any,
+                  threshold: "BLOCK_LOW_AND_ABOVE" as any,
+                },
+                {
+                  category: "HARM_CATEGORY_SEXUALLY_EXPLICIT" as any,
+                  threshold: "BLOCK_LOW_AND_ABOVE" as any,
+                },
+                {
+                  category: "HARM_CATEGORY_DANGEROUS_CONTENT" as any,
+                  threshold: "BLOCK_LOW_AND_ABOVE" as any,
+                },
+              ],
             },
           });
 
@@ -173,7 +221,7 @@ Rules:
         return res.status(400).json({ error: "No reCAPTCHA token provided" });
       }
 
-      const projectId = "gen-lang-client-0222945352";
+      const projectId = process.env.FIREBASE_PROJECT_ID || "nine-dashboard-733997";
       const siteKey = "6LfqX-wsAAAAAGeVHsRVuRvGgnT5e_ubHVNZQbvj";
       const apiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY || "";
 

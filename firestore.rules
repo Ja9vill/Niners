@@ -2,77 +2,151 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Global Helpers
+    // Helper functions for auth status and roles
     function isSignedIn() { 
       return request.auth != null; 
     }
     
-    function isEmail(email) {
-      return isSignedIn() && 
-        request.auth.token != null && 
-        request.auth.token.email == email;
+    function getRole() {
+      return isSignedIn() && request.auth.token != null ? request.auth.token.role : '';
     }
     
-    function hasRole(role) {
-      return isSignedIn() && 
-        exists(/databases/$(database)/documents/hosts/$(request.auth.uid)) && 
-        get(/databases/$(database)/documents/hosts/$(request.auth.uid)).data.role == role;
-    }
-
     function isDirector() {
-      return isEmail("jwavpr@gmail.com") || hasRole("Director");
+      return getRole() == 'Director';
+    }
+    
+    function isHeadAdmin() {
+      return getRole() == 'Head Admin';
+    }
+    
+    function isAdmin() {
+      return getRole() == 'Admin';
+    }
+    
+    function isManager() {
+      return getRole() == 'Manager';
+    }
+    
+    function isAgent() {
+      return getRole() == 'Agent';
+    }
+    
+    function isHost() {
+      return getRole() == 'Host';
+    }
+    
+    function isLeadership() {
+      return isDirector() || isHeadAdmin();
+    }
+    
+    function isStaff() {
+      return isLeadership() || isAdmin() || isManager() || isAgent();
     }
 
-    // PUBLIC READ for standard entities to support talent login and roster view
-    
-    match /hosts/{id} {
-      allow get, list: if true;
-      allow write: if isDirector();
+    // 1. users Collection Rules
+    match /users/{userId} {
+      // Leadership/Admin can read all profiles. Managers/Agents can read themselves or users assigned to them.
+      // Hosts can read their own profile.
+      allow read: if isLeadership() || isAdmin() || (
+        (isManager() || isAgent()) && (request.auth.uid == userId || (resource != null && resource.data.assignedManagerId == request.auth.uid))
+      ) || (isSignedIn() && request.auth.uid == userId);
+      
+      // Directors & Head Admins can do any write
+      // The user themselves can update their profile, but cannot escalate their own role or change critical fields
+      allow create: if isLeadership();
+      allow update: if isLeadership() || (
+        isSignedIn() && request.auth.uid == userId &&
+        request.resource.data.role == resource.data.role &&
+        request.resource.data.poppoId == resource.data.poppoId &&
+        (resource.data.assignedManagerId == null ? request.resource.data.assignedManagerId == null : request.resource.data.assignedManagerId == resource.data.assignedManagerId)
+      );
+      allow delete: if isLeadership();
     }
 
-    match /commissions/{id} {
-      allow get, list: if true;
-      allow write: if isDirector();
+    // 2. performance_reports Collection Rules
+    match /performance_reports/{reportId} {
+      allow read: if isStaff() || (isSignedIn() && resource.data.poppoId == request.auth.uid);
+      allow write: if isLeadership() || isAdmin();
     }
 
-    match /notes/{id} {
-      allow read: if true;
-      allow write: if isDirector();
+    // 3. fanbase_reports Collection Rules
+    match /fanbase_reports/{reportId} {
+      allow read: if isStaff() || (isSignedIn() && resource.data.poppoId == request.auth.uid);
+      
+      // Leadership & Admins can write any report
+      // Hosts can create (submit) their own fanbase reports
+      allow create: if isLeadership() || isAdmin() || (
+        isHost() && 
+        request.resource.data.poppoId == request.auth.uid &&
+        request.resource.data.reporterId == request.auth.uid
+      );
+      allow update, delete: if isLeadership() || isAdmin();
     }
 
-    match /pk_records/{id} { 
-      allow read: if true; 
-      allow write: if isDirector(); 
-    }
-    
-    match /exposures/{id} { 
-      allow read: if true; 
-      allow write: if isDirector(); 
-    }
-    
-    match /fanbase_health/{id} { 
-      allow read: if true; 
-      allow write: if isDirector(); 
-    }
-    
-    match /tasks/{id} { 
-      allow read: if true; 
-      allow write: if isDirector(); 
-    }
-    
-    match /goals/{id} { 
-      allow read: if true; 
-      allow write: if isDirector(); 
-    }
-    
-    match /calendar/{id} { 
-      allow read: if true; 
-      allow write: if isDirector(); 
+    // 4. pk_reports Collection Rules
+    match /pk_reports/{reportId} {
+      allow read: if isStaff() || (isSignedIn() && resource.data.poppoId == request.auth.uid);
+      
+      // Leadership & Admins can write any report
+      // Hosts can create (submit) their own PK reports
+      allow create: if isLeadership() || isAdmin() || (
+        isHost() && 
+        request.resource.data.poppoId == request.auth.uid &&
+        request.resource.data.reporterId == request.auth.uid
+      );
+      allow update, delete: if isLeadership() || isAdmin();
     }
 
-    match /reset_requests/{id} {
-      allow read, create: if true;
-      allow update, delete: if isDirector();
+    // 5. events Collection Rules
+    match /events/{eventId} {
+      // Hidden events (marked as Director Only) can only be read by Directors
+      allow read: if isDirector() || (
+        isSignedIn() && 
+        (!resource.data.keys().hasAll(['visibility']) || resource.data.visibility != 'Director Only') &&
+        (!resource.data.keys().hasAll(['eventType']) || resource.data.eventType != 'Director Only')
+      );
+      
+      // Directors, Head Admins, Admins, and Managers can write events
+      allow write: if isLeadership() || isAdmin() || isManager();
+    }
+
+    // 6. tasks Collection Rules
+    match /tasks/{taskId} {
+      // Staff can read all tasks. Assignee can read tasks assigned to them
+      allow read: if isStaff() || (isSignedIn() && resource.data.assigneeId == request.auth.uid);
+      
+      // Leadership & Admins can perform any write
+      // Managers & Agents can write (create/update) tasks they assigned
+      // Hosts can only update the status field of tasks assigned to them
+      allow create: if isLeadership() || isAdmin() || (
+        (isManager() || isAgent()) && 
+        request.resource.data.assignerId == request.auth.uid
+      );
+      allow update: if isLeadership() || isAdmin() || (
+        (isManager() || isAgent()) && 
+        resource.data.assignerId == request.auth.uid && 
+        request.resource.data.assignerId == request.auth.uid
+      ) || (
+        isHost() &&
+        resource.data.assigneeId == request.auth.uid &&
+        request.resource.data.assigneeId == resource.data.assigneeId &&
+        request.resource.data.taskId == resource.data.taskId &&
+        request.resource.data.assignerId == resource.data.assignerId &&
+        request.resource.data.title == resource.data.title &&
+        request.resource.data.content == resource.data.content &&
+        request.resource.data.taskType == resource.data.taskType &&
+        request.resource.data.dueDate == resource.data.dueDate &&
+        request.resource.data.createdAt == resource.data.createdAt
+      );
+      allow delete: if isLeadership() || isAdmin() || (
+        (isManager() || isAgent()) && 
+        resource.data.assignerId == request.auth.uid
+      );
+    }
+    
+    // Default Deny: block all other access by default
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }

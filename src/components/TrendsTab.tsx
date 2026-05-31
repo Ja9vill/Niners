@@ -9,18 +9,36 @@ import { motion } from 'motion/react';
 export const TrendsTab = () => {
   const [hosts, setHosts] = useState<Host[]>([]);
   const [commissions, setCommissions] = useState<CommissionEntry[]>([]);
+  const [exposuresList, setExposuresList] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedFilter, setSelectedFilter] = useState<string>('all');
 
   React.useEffect(() => {
     const load = async () => {
-      const [hostData, commData] = await Promise.all([
-        FirebaseService.getAllHosts(),
-        FirebaseService.getAllCommissions()
-      ]);
-      setHosts(hostData);
-      setCommissions(commData);
-      setIsLoading(false);
+      setIsLoading(true);
+      try {
+        const fetchPromise = Promise.all([
+          FirebaseService.getAllHosts(),
+          FirebaseService.getAllCommissions(),
+          FirebaseService.getAllExposures()
+        ]);
+        const timeoutPromise = new Promise<[Host[], CommissionEntry[], any[]]>((_, reject) =>
+          setTimeout(() => reject(new Error("Trends fetch timed out")), 5000)
+        );
+        const [hostData, commData, exposuresData] = await Promise.race([fetchPromise, timeoutPromise]);
+        setHosts(hostData);
+        setCommissions(commData);
+        setExposuresList(exposuresData);
+      } catch (err) {
+        console.error("Failed to load trends:", err);
+        const cachedHosts = Storage.getHosts();
+        const cachedComms = Storage.getCommission();
+        if (cachedHosts && cachedHosts.length > 0) setHosts(cachedHosts);
+        if (cachedComms && cachedComms.length > 0) setCommissions(cachedComms);
+        setExposuresList([]);
+      } finally {
+        setIsLoading(false);
+      }
     };
     load();
   }, []);
@@ -34,6 +52,12 @@ export const TrendsTab = () => {
     if (selectedFilter === 'all') return commissions;
     return commissions.filter(c => c.month === selectedFilter);
   }, [commissions, selectedFilter]);
+
+  const getRoleModelRatio = (hostId: string) => {
+    if (!exposuresList || exposuresList.length === 0) return 100;
+    const count = exposuresList.filter(e => e.poppo_id === hostId || (e.agency_attendance && e.agency_attendance.includes(hostId))).length;
+    return Math.min(100, Math.round((count / exposuresList.length) * 100));
+  };
 
   const rankings = useMemo(() => {
     return hosts.map(h => {
@@ -49,9 +73,9 @@ export const TrendsTab = () => {
     }).sort((a, b) => b.totalPoints - a.totalPoints);
   }, [hosts, filteredCommissions]);
 
-  const elite = hosts.filter(h => h.tier === 'S' || h.tier === 'A');
-  const established = hosts.filter(h => h.tier === 'B');
-  const developing = hosts.filter(h => h.tier === 'C' || h.tier === 'D');
+  const elite = hosts.filter(h => getRoleModelRatio(h.id) >= 90);
+  const established = hosts.filter(h => getRoleModelRatio(h.id) >= 60 && getRoleModelRatio(h.id) < 90);
+  const developing = hosts.filter(h => getRoleModelRatio(h.id) < 60);
   const atRisk = hosts.filter(h => h.status === 'Inconsistent' || h.status === 'Inactive');
 
   if (isLoading) return <div className="p-20 text-center text-white/20 italic">Processing trends...</div>;
@@ -80,9 +104,9 @@ export const TrendsTab = () => {
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
            {[
-             { label: '🏆 Elite', range: '20M+ pts', color: 'text-yellow-500', hosts: elite },
-             { label: '⭐ Established', range: '8-15M pts', color: 'text-indigo-400', hosts: established },
-             { label: '📈 Developing', range: '4-8M pts', color: 'text-emerald-400', hosts: developing },
+             { label: '🏆 Elite', range: 'Ratio >= 90%', color: 'text-yellow-500', hosts: elite },
+             { label: '⭐ Established', range: 'Ratio 60-89%', color: 'text-indigo-400', hosts: established },
+             { label: '📈 Developing', range: 'Ratio < 60%', color: 'text-emerald-400', hosts: developing },
              { label: '⚠️ At Risk', range: '< 1M pts', color: 'text-red-400', hosts: atRisk },
            ].map((stage, i) => (
              <div key={i} className="glass-card !p-6 flex flex-col h-full bg-[#0F1117] border-slate-800">
@@ -116,9 +140,9 @@ export const TrendsTab = () => {
                 <select 
                   value={selectedFilter}
                   onChange={(e) => setSelectedFilter(e.target.value)}
-                  title="Filter rankings by period"
-                  aria-label="Filter rankings by period"
                   className="bg-white/5 border border-white/10 rounded-lg px-3 py-1 text-xs font-bold text-white outline-none focus:border-indigo-500 transition-all cursor-pointer min-w-[140px]"
+                  title="Select rank period filter"
+                  aria-label="Select rank period filter"
                 >
                   <option value="all">🏆 All-Time Record</option>
                   {availableMonths.map(month => (
@@ -147,7 +171,7 @@ export const TrendsTab = () => {
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
                          <span className="font-bold text-white/90">{host.name}</span>
-                         <span className="text-[10px] font-black px-1.5 py-0.5 rounded border border-white/10 bg-white/5 text-white/40">{host.tier}</span>
+                         <span className="text-[10px] font-black px-1.5 py-0.5 rounded border border-white/10 bg-white/5 text-white/40">Ratio: {getRoleModelRatio(host.id)}%</span>
                       </div>
                     </td>
                     <td className="px-6 py-4 text-right font-mono text-xs text-white/70">{formatNumber(host.totalPoints)} pts</td>
@@ -171,7 +195,7 @@ export const TrendsTab = () => {
                   <span className="text-xs font-black text-white/20">#{i + 1}</span>
                   <div className="min-w-0">
                     <p className="font-bold text-white text-sm truncate">{host.name}</p>
-                    <p className="text-[10px] text-white/30">{host.tier} Tier</p>
+                    <p className="text-[10px] text-white/30">Ratio: {getRoleModelRatio(host.id)}%</p>
                   </div>
                 </div>
                 <div className="text-right shrink-0">

@@ -138,7 +138,7 @@ export const SheetsService = {
     const rows = hosts.map(h => [
       h.id || '',
       h.name || h.nickname || '',
-      h.position || 'Talent',
+      h.role || 'Talent',
       h.role || 'Host',
       h.status || 'Active',
       h.manager || 'Unassigned',
@@ -210,8 +210,7 @@ export const SheetsService = {
       const nickname = String(findVal(['Nickname', 'nickname', 'Nick']) || '').trim();
       const name = String(findVal(['Name', 'name', 'host_name']) || nickname || 'Unnamed').trim();
       
-      const position = (findVal(['Position', 'position', 'pos']) || 'Talent') as any;
-      const role = (findVal(['Role', 'role']) || position) as any;
+      const role = (findVal(['Position', 'position', 'pos', 'Role', 'role']) || 'Talent') as any;
       const status = (findVal(['Status', 'status']) || 'Active') as any;
       const manager = String(findVal(['Manager Assigned', 'manager_assigned', 'manager', 'Manager']) || 'Unassigned').trim();
       const team = String(findVal(['Anchor / Team', 'anchor_team', 'team', 'Team', 'Anchor']) || 'Alpha').trim();
@@ -223,7 +222,6 @@ export const SheetsService = {
         id,
         name: name || nickname || 'Unknown Host',
         nickname: nickname || name,
-        position,
         role,
         status,
         manager,

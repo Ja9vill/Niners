@@ -1,0 +1,37 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "top_niners_earnings_summary",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "poppoId", "order": "ASCENDING" },
+        { "fieldPath": "periodKey", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "reporting_submissions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "submittedByUserId", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "tasks",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "relatedPoppoId", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "tasks",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "assignedToUserId", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

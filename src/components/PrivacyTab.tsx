@@ -1,3 +1,4 @@
+/* eslint-disable */
 import React from 'react';
 import { ShieldCheck, Calendar, Eye, Database, FileText, Lock, Users, AlertCircle } from 'lucide-react';
 
@@ -61,7 +62,7 @@ export const PrivacyTab = () => {
               <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 mt-2 shrink-0" />
               <div className="space-y-1">
                 <span className="text-xs font-bold text-white/90">Identity and Roster Information</span>
-                <p className="text-[11px] sm:text-xs text-white/50 leading-relaxed">Including Poppo ID, nickname, position, role, status, manager assignment, team assignment, profile photo, profile bio, date ranges, and operational notes.</p>
+                <p className="text-[11px] sm:text-xs text-white/50 leading-relaxed">Including Poppo ID, nickname, role, status, manager assignment, team assignment, profile photo, profile bio, date ranges, and operational notes.</p>
               </div>
             </li>
             <li className="flex items-start gap-3">

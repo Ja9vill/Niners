@@ -1,9 +1,9 @@
-export type Position = 'Talent' | 'Manager' | 'Admin' | 'Head Admin' | 'Director' | 'Sub Agent' | 'Police Admin';
-export type BaseSalaryTier = 'N/A' | 'Rocket Host' | 'Star Host' | 'S idol' | 'ESport Host';
+export type Role = 'Talent' | 'Manager' | 'Admin' | 'Head Admin' | 'Director' | 'Agent';
+export type BaseSalaryTier = 'N/A' | 'Rocket Host' | 'Star Host' | 'S idol' | 'ESport Host' | 'Regular Host';
 export type HostStatus = 'Active' | 'Inconsistent' | 'Released' | 'Inactive';
 export type AnchorType = 'Nine Agency' | 'Sub Agency' | 'External';
 export type Tier = 'S' | 'A' | 'B' | 'C' | 'X';
-export type EventType = 'Solo Livehouse' | 'Party Livehouse' | 'Poppo Official Event' | 'Niners Day' | 'Agency Event' | 'External Event' | 'PK Tournament' | 'Platform Feature' | 'Collaboration';
+export type EventType = 'Solo Livehouse' | 'Party Livehouse' | 'Poppo Official Event' | 'Niners Day' | 'Agency Event' | 'External Event' | 'PK Tournament' | 'Platform Feature' | 'Collaboration' | 'Broadcast Block' | 'Staff Meeting';
 export type Trend = 'Growing' | 'Declining' | 'Stable' | 'At Risk' | 'New' | 'Explosive';
 export type NoteType = 'Note' | 'Task' | 'Feedback';
 
@@ -43,8 +43,7 @@ export interface PerformanceGoal {
 export interface Host {
   id: string; // POPPO ID (numeric master key)
   name: string;
-  position: Position;
-  role: Position; // Added redundant field for transition if needed
+  role: Role;
   team: string;
   manager: string;
   anchor_type: AnchorType;
@@ -61,6 +60,10 @@ export interface Host {
   password?: string;
   is_temp_password?: boolean;
   reset_requested?: boolean;
+  isActive: boolean;
+  // Google OAuth fields
+  googleUid?: string;
+  googleEmail?: string;
   // Legacy fields for compatibility during transition
   anchor?: AnchorType;
   baseSalary?: BaseSalaryTier;
@@ -111,6 +114,10 @@ export interface CommissionEntry {
   super_rank?: number;
   level?: number;
   agency_commission_override?: number;
+  timestamp?: string;
+  from_date?: string;
+  to_date?: string;
+  year?: number;
 }
 
 export interface PKEntry {
@@ -135,7 +142,49 @@ export interface ExposureEntry {
   submitted_by: string;
   submitted_role: string;
   timestamp: string;
+  agency_attendance?: string[]; // Array of Poppo IDs
 }
+
+export interface WeeklyLiveDataEntry {
+  id: string;
+  poppo_id: string;
+  nickname: string;
+  from_date: string;
+  to_date: string;
+  total_duration: number;
+  total_earnings: number;
+  avg_online_users: number;
+  new_fans: number;
+  new_fanclub_members: number;
+  gifting_count: number;
+  unfollowers: number;
+  total_points: number;
+  notes: string;
+  submitted_by: string;
+  submitted_role: string;
+  timestamp: string;
+}
+
+export interface MonthlyLiveDataEntry {
+  id: string;
+  poppo_id: string;
+  nickname: string;
+  from_date: string;
+  to_date: string;
+  total_duration: number;
+  total_earnings: number;
+  avg_online_users: number;
+  new_fans: number;
+  new_fanclub_members: number;
+  gifting_count: number;
+  unfollowers: number;
+  total_points: number;
+  notes: string;
+  submitted_by: string;
+  submitted_role: string;
+  timestamp: string;
+}
+
 
 export interface DirectorNote {
   id: string;
@@ -155,6 +204,25 @@ export interface CalendarEvent {
   created_by_name: string;
   created_by_role: string;
   visibility: 'All' | 'Leadership' | 'Director Only';
+  timestamp: string;
+  type?: string;
+  location?: string;
+  event_host_id?: string;
+  participants?: string[];
+}
+
+export interface LivehouseRequest {
+  id: string;
+  poppoId: string;
+  name: string;
+  date: string;
+  timeslot: string; // e.g., "14:00 - 15:00"
+  status: 'Pending Approval' | 'New Timeslot Proposed' | 'Approved' | 'Closed' | 'Host Accepted Proposal';
+  proposedTimeslot?: string;
+  proposedDate?: string;
+  proposedBy?: string;
+  managerId: string; // Assigned manager's Poppo ID
+  notes?: string;
   timestamp: string;
 }
 
@@ -177,3 +245,93 @@ export interface FileEntry {
   description?: string;
   month?: string;
 }
+
+export interface TopNinersEarningsSummary {
+  summaryId: string;
+  periodKey: 'all_time' | string; // Constraint: 'all_time' or 'YYYY-MM' format
+  month: number | null;
+  year: number | null;
+  poppoId: string;
+  nickname: string;
+  role: string;
+  totalEarningsPoints: number;
+  rank: number;
+  isPublished: boolean;
+  profilePhotoUrl: string;
+}
+
+export interface EventsCalendarPublic {
+  eventId: string;
+  eventTitle: string;
+  eventDate: string; // YYYY-MM-DD
+  eventDay: number;
+  eventMonth: number;
+  eventYear: number;
+  eventStartTime: string; // HH:MM
+  eventEndTime: string; // HH:MM
+  locationOrPlatform: string;
+  isPublished: boolean;
+}
+
+export interface ReportingSubmissionPayload {
+  poppoId: string;
+  nickname: string;
+  // Dates
+  weekStartDate?: string;
+  weekEndDate?: string;
+  from_date?: string;
+  to_date?: string;
+  // Random PK
+  pk_score?: number;
+  win_percentage?: number;
+  sessions?: number;
+  // Fanbase
+  fanclubSubscribers?: number;
+  fanclubGcMembers?: number;
+  preStreamUpdate?: string;
+  postStreamUpdate?: string;
+  // Live Data (Weekly & Monthly)
+  totalDuration?: number;
+  totalEarnings?: number;
+  totalPoints?: number;
+  avg_online_users?: number;
+  new_fans?: number;
+  new_fanclub_members?: number;
+  gifting_count?: number;
+  unfollowers?: number;
+  notes?: string;
+  submitted_by?: string;
+  submitted_role?: string;
+  timestamp?: string;
+  // Legacy
+  "3mosEarnings"?: number;
+}
+
+export interface ReportingSubmission {
+  submissionId: string;
+  reportType: 'random_pk' | 'fanbase' | 'weekly_live_data' | 'monthly_live_data';
+  submittedByUserId: string;
+  status: 'draft' | 'submitted';
+  dataPayload: ReportingSubmissionPayload;
+}
+
+export interface Task {
+  taskId: string;
+  assignedToUserId: string;
+  relatedPoppoId: string;
+  taskType: string;
+  title: string;
+  description: string;
+  status: 'Assigned' | 'In Progress' | 'Completed';
+  dueDate: string;
+}
+
+export interface ActivityAuditLog {
+  logId: string;
+  timestamp: string; // DateTime/String
+  actorUserId: string;
+  actionType: string;
+  beforeValue: string; // String/JSON
+  afterValue: string; // String/JSON
+}
+

@@ -1,6 +1,31 @@
 {
-  "firestore": {
-    "rules": "firestore.rules",
-    "database": "ai-studio-f578d03a-99b3-4c41-84dd-9901137e8386"
+  "hosting": {
+    "public": "dist",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "redirects": [
+      {
+        "source": "**",
+        "destination": "https://9poppo.com/:splat",
+        "type": 301,
+        "condition": "host != '9poppo.com'"
+      }
+    ],
+    "rewrites": [
+      {
+        "source": "/api/**",
+        "run": {
+          "serviceId": "nine-dashboard",
+          "region": "us-central1"
+        }
+      },
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
+    ]
   }
 }

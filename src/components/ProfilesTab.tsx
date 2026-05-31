@@ -1,16 +1,82 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Search, Filter, TrendingUp, BarChart3, PieChart, Info, UserPen, Target, Plus, ChevronRight, X, Shield, Edit2, Loader2, Fingerprint, Star, Camera, Calendar, DollarSign, Award, BookOpen, Heart } from 'lucide-react';
-import { Host, Tier, BaseSalaryTier, HostStatus, AnchorType, PerformanceGoal, Position, CommissionEntry, DirectorNote, NoteType } from '../types';
+import { Search, Filter, TrendingUp, BarChart3, PieChart, Info, UserPen, Target, Plus, ChevronRight, X, Shield, Edit2, Loader2, Fingerprint } from 'lucide-react';
+import { Host, Tier, BaseSalaryTier, HostStatus, AnchorType, PerformanceGoal, Role, CommissionEntry, DirectorNote, NoteType } from '../types';
 import { Storage } from '../lib/storage';
 import { FirebaseService } from '../lib/firebaseService';
 import { cn, formatNumber } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 import { MANAGERS, BASE_SALARY_POLICIES } from '../lib/constants';
 
-const POSITIONS: Position[] = ['Talent', 'Manager', 'Admin', 'Head Admin', 'Director', 'Sub Agent', 'Police Admin'];
+const ROLES: Role[] = ['Talent', 'Manager', 'Admin', 'Head Admin', 'Director', 'Agent'];
 const STATUSES: HostStatus[] = ['Active', 'Inconsistent', 'Released', 'Inactive'];
 const ANCHORS: AnchorType[] = ['Nine Agency', 'Sub Agency', 'External'];
-const TEAMS = ['Alpha', 'Beta', 'Gamma', 'Delta', 'Director Only'];
+
+// Constants to satisfy JSX internationalization rules
+const TEXT = {
+  loadingProfiles: 'Loading Host Profiles...',
+  noProfilesAvailable: 'No Profiles Available',
+  initializeRoster: 'Please initialize the agency roster in the Director Hub to view individual host profiles.',
+  syncingMasterSheet: 'Syncing MasterSheet Data...',
+  noCommissionData: 'No Commission Data Found',
+  commissionTrends: 'Commission Trends',
+  incomeBreakdown: 'Income Breakdown',
+  livePerformance: 'Live Performance',
+  live78: 'Live: 78%',
+  tips12: 'Tips: 12%',
+  party5: 'Party: 5%',
+  other5: 'Other: 5%',
+  agencyRecord: 'Agency Record',
+  performanceGoals: 'Performance Goals',
+  manage: 'Manage',
+  noActivePursuits: 'No Active Pursuits',
+  biography: 'Description / Biography',
+  managerNotesHistory: 'Manager Notes History',
+  syncingNotes: 'Syncing Notes...',
+  noStrategicNotes: 'No strategic notes on file',
+  subscribers: 'Subscribers: ',
+  gcMembers: 'GC Members',
+  reporter: 'Reporter',
+  preStreamUpdate: 'Pre-stream Update',
+  postStreamUpdate: 'Post-stream Update',
+  noFanbaseReports: 'No fanbase health reports found.',
+  date: 'Date',
+  winPct: 'Win%',
+  score: 'Score',
+  noPkRecords: 'No PK records found',
+  noExposureLogs: 'No exposure logs found.',
+  goalType: 'Goal Type',
+  weeklyFanbaseGrowth: 'Weekly Fanbase Growth',
+  fanclubGcUpdates: 'Fanclub GC Updates',
+  hoursStreamed: 'Hours Streamed',
+  randomPkSessions: 'Random PK Sessions',
+  songRequests: 'Engagement: Song Requests',
+  targetValue: 'Target Value',
+  currentProgress: 'Current Progress',
+  period: 'Period',
+  weekly: 'Weekly',
+  daily: 'Daily',
+  monthly: 'Monthly',
+  deadlineDate: 'Deadline Date',
+  cancel: 'Cancel',
+  setGoalAndNotify: 'Set Goal & Notify',
+  poppoId: 'Poppo ID',
+  nickname: 'Nickname',
+  fullName: 'Full Name',
+  positionRole: 'Position / Role',
+  teamAssignment: 'Team Assignment',
+  manager: 'Manager',
+  salaryCategory: 'Salary Category',
+  currentStatus: 'Current Status',
+  anchorType: 'Anchor Type',
+  poppoLevel: 'Poppo Level',
+  profilePhoto: 'Profile Photo',
+  profilePhotoUploadOrUrl: '(Upload or URL)',
+  profilePhotoReadOnly: '(Read Only)',
+  updateAgencyProfile: 'Update Agency Profile',
+  tier: 'TIER',
+  roleModelRatio: 'Role Model Ratio',
+  roleModelRatioUppercase: 'ROLE MODEL RATIO',
+};
 
 import {
   BarChart,
@@ -18,11 +84,12 @@ import {
   XAxis,
   YAxis,
   Tooltip,
-  ResponsiveContainer
+  ResponsiveContainer,
 } from 'recharts';
 
 export const ProfilesTab = () => {
   const [hosts, setHosts] = useState<Host[]>([]);
+  const [exposuresList, setExposuresList] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedHostId, setSelectedHostId] = useState<string | null>(null);
@@ -31,26 +98,38 @@ export const ProfilesTab = () => {
   const [uploadedPhoto, setUploadedPhoto] = useState<string | null>(null);
   const [isProcessingPhoto, setIsProcessingPhoto] = useState(false);
   
-  // Custom Role Model Ratio calculations
-  const [tierFilter, setTierFilter] = useState<Tier[]>([]);
-  const [salaryFilter, setSalaryFilter] = useState<BaseSalaryTier[]>([]);
-  
-  const auth = Storage.getAuthState();
-
   useEffect(() => {
     if (!isEditingHost) {
       setUploadedPhoto(null);
     }
   }, [isEditingHost]);
 
-  useEffect(() => {
+  // Filters
+  const [tierFilter, setTierFilter] = useState<Tier[]>([]);
+  const [salaryFilter, setSalaryFilter] = useState<BaseSalaryTier[]>([]);
+  
+  const auth = Storage.getAuthState();
+
+  React.useEffect(() => {
     const load = async () => {
       setIsLoading(true);
       try {
-        const data = await FirebaseService.getAllHosts();
-        setHosts(data || []);
+        const fetchPromise = Promise.all([
+          FirebaseService.getAllHosts(),
+          FirebaseService.getAllExposures()
+        ]);
+        const timeoutPromise = new Promise<[Host[], any[]]>((_, reject) =>
+          setTimeout(() => reject(new Error("Profiles fetch timed out")), 5000)
+        );
+        const [hostsData, exposuresData] = await Promise.race([fetchPromise, timeoutPromise]);
+        setHosts(hostsData);
+        setExposuresList(exposuresData);
       } catch (err) {
         console.error("Failed to load profiles:", err);
+        const cachedHosts = Storage.getHosts();
+        if (cachedHosts && cachedHosts.length > 0) {
+          setHosts(cachedHosts);
+        }
       } finally {
         setIsLoading(false);
       }
@@ -99,7 +178,7 @@ export const ProfilesTab = () => {
     setIsLoadingNotes(true);
     try {
       const data = await FirebaseService.getNotesByHost(id);
-      setHostNotes(data as DirectorNote[] || []);
+      setHostNotes(data as DirectorNote[]);
     } catch (err) {
       console.error("Failed to load notes:", err);
     } finally {
@@ -123,10 +202,9 @@ export const ProfilesTab = () => {
     }
   }, [selectedHostId]);
 
-  // Derived metrics / totals
   const stats = useMemo(() => {
     if (commissions.length === 0) return { total: 0, avgHrs: 0, avgPtsHr: 0, bestMonth: 0, livePct: 0, commPct: 0 };
-    const latest = commissions[commissions.length - 1];
+    const latest = commissions.slice(-1)[0];
     const totalPoints = commissions.reduce((sum, c) => sum + (Number(c.total_points) || 0), 0);
     const totalHrs = commissions.reduce((sum, c) => sum + (Number(c.live_duration) || 0), 0);
     const bestMonth = Math.max(...commissions.map(c => Number(c.total_points) || 0));
@@ -164,8 +242,44 @@ export const ProfilesTab = () => {
       { id: crypto.randomUUID(), hostId: selectedHost.id, type, target, current, period, deadline }
     ];
     Storage.setGoals(selectedHost.id, updatedGoals);
+    
     Storage.addLog('Profiles', `Updated goals for ${selectedHost.name}`, auth.name);
+    
+    // Check if goal reached
+    if (current >= target) {
+      Storage.addNotification({
+        title: 'Goal Reached!',
+        message: `${selectedHost.name} has reached their ${type} goal!`,
+        type: 'success'
+      });
+    }
+
     setIsManagingGoals(false);
+  };
+  
+  const handleAddNote = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedHost || !newNoteContent.trim()) return;
+    
+    setIsAddingNote(true);
+    const note: DirectorNote = {
+      id: crypto.randomUUID(),
+      hostId: selectedHost.id,
+      type: newNoteType,
+      content: newNoteContent,
+      createdAt: new Date().toISOString()
+    };
+    
+    try {
+      await FirebaseService.saveNote(note);
+      setNewNoteContent('');
+      loadNotes(selectedHost.id);
+      Storage.addLog('Profiles', `Added ${newNoteType} for ${selectedHost.name}`, auth.name);
+    } catch (err) {
+      alert("Failed to save note.");
+    } finally {
+      setIsAddingNote(false);
+    }
   };
 
   const handleUpdateProfile = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -174,13 +288,13 @@ export const ProfilesTab = () => {
     const formData = new FormData(e.currentTarget);
     
     const photoUrl = uploadedPhoto || (formData.get('photoUrl') as string);
+    
     const updatedHost: Host = {
       ...selectedHost,
       id: formData.get('id') as string,
       name: formData.get('name') as string,
       nickname: formData.get('nickname') as string || (formData.get('name') as string),
-      position: formData.get('position') as Position,
-      role: formData.get('position') as Position,
+      role: formData.get('role') as Role,
       team: formData.get('team') as string,
       manager: formData.get('manager') as string,
       anchor_type: formData.get('anchor_type') as AnchorType,
@@ -189,6 +303,7 @@ export const ProfilesTab = () => {
       level: Number(formData.get('level') || selectedHost.level || 1),
       photoUrl: photoUrl,
       description: formData.get('description') as string,
+      isActive: selectedHost.isActive ?? true,
       updated_at: new Date().toISOString()
     };
 
@@ -258,13 +373,25 @@ export const ProfilesTab = () => {
     }
   };
 
-  const mapTierToRatio = (tier: string) => {
-    switch(tier) {
-      case 'S': return 'Role Model Ratio (100%)';
-      case 'A': return 'Role Model Ratio (80%)';
-      case 'B': return 'Role Model Ratio (60%)';
-      case 'C': return 'Role Model Ratio (40%)';
-      default: return 'Role Model Ratio (0%)';
+  const getGoalColor = (type: string) => {
+    switch (type) {
+      case 'fanbase': return 'bg-indigo-500 shadow-[0_0_10px_rgba(99,102,241,0.5)]';
+      case 'fanclub_gc': return 'bg-cyan-500 shadow-[0_0_10px_rgba(6,182,212,0.5)]';
+      case 'hours': return 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]';
+      case 'pk': return 'bg-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.5)]';
+      case 'song_requests': return 'bg-pink-500 shadow-[0_0_10px_rgba(236,72,153,0.5)]';
+      default: return 'bg-slate-500';
+    }
+  };
+
+  const getLabel = (type: string) => {
+    switch (type) {
+      case 'fanbase': return TEXT.weeklyFanbaseGrowth;
+      case 'fanclub_gc': return TEXT.fanclubGcUpdates;
+      case 'hours': return TEXT.hoursStreamed;
+      case 'pk': return TEXT.randomPkSessions;
+      case 'song_requests': return TEXT.songRequests;
+      default: return type;
     }
   };
 
@@ -272,14 +399,14 @@ export const ProfilesTab = () => {
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row gap-4 items-center">
          <div className="relative flex-1 w-full">
-           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600" />
-           <input 
-             type="text" 
-             placeholder="Search by ID or Name..." 
-             className="w-full glass-input pl-10 text-xs" 
-             value={searchTerm} 
-             onChange={(e) => setSearchTerm(e.target.value)} 
-           />
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600" />
+            <input 
+              type="text" 
+              placeholder="Search by ID or Name..." 
+              className="w-full glass-input pl-10 text-xs" 
+              value={searchTerm} 
+              onChange={(e) => setSearchTerm(e.target.value)} 
+            />
          </div>
          <div className="flex items-center gap-2 overflow-x-auto w-full md:w-auto pb-1 no-scrollbar">
             {['S', 'A', 'B', 'C', 'X'].map(t => (
@@ -291,32 +418,32 @@ export const ProfilesTab = () => {
                   tierFilter.includes(t as Tier) ? "bg-indigo-600 border-indigo-500 text-white" : "bg-slate-800 border-slate-700 text-slate-500"
                 )}
               >
-                {t === 'S' ? 'Ratio Model 100%' : t === 'A' ? 'Ratio Model 80%' : t === 'B' ? 'Ratio Model 60%' : `Ratio model Under 40%`}
+                {TEXT.tier} {t}
               </button>
             ))}
          </div>
       </div>
 
       {isLoading ? (
-        <div className="p-20 text-center text-white/20 italic">Loading Host Profiles...</div>
+        <div className="p-20 text-center text-white/20 italic">{TEXT.loadingProfiles}</div>
       ) : hosts.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-32 text-center space-y-4">
           <UserPen size={48} className="text-white/5" />
-          <h3 className="text-lg font-bold text-white/40">No Profiles Available</h3>
-          <p className="text-xs text-white/20 max-w-xs leading-relaxed font-medium">Please initialize the agency roster to view individual profiles.</p>
+          <h3 className="text-lg font-bold text-white/40">{TEXT.noProfilesAvailable}</h3>
+          <p className="text-xs text-white/20 max-w-xs leading-relaxed font-medium">{TEXT.initializeRoster}</p>
         </div>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4 animate-fade-in">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
           {filteredGrid.map(host => (
             <motion.div 
               layoutId={host.id}
               key={host.id}
               onClick={() => setSelectedHostId(host.id)}
-              className="group relative glass-card !p-0 overflow-hidden cursor-pointer hover:ring-1 hover:ring-indigo-500 transition-all bg-[#0F1117] border-slate-800 flex flex-col h-full"
+              className="group relative glass-card !p-0 overflow-hidden cursor-pointer hover:ring-1 hover:ring-indigo-500 transition-all bg-[#0F1117] border-slate-800"
             >
-              <div className="aspect-[3/4] bg-slate-800 relative w-full">
+              <div className="aspect-[3/4] bg-slate-800 relative">
                 {host.photoUrl ? (
-                  <img src={host.photoUrl} alt={host.name} className="w-full h-full object-cover transition-all" referrerPolicy="no-referrer" />
+                  <img src={host.photoUrl} alt={host.name} className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all" referrerPolicy="no-referrer" />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center text-slate-700 font-bold text-3xl">
                     {host.name?.[0] || '?'}
@@ -324,41 +451,43 @@ export const ProfilesTab = () => {
                 )}
                 <div className="absolute inset-0 bg-gradient-to-t from-[#0F1117] via-transparent to-transparent opacity-60" />
               </div>
-              <div className="p-4 bg-slate-950 flex flex-col justify-between flex-1">
-                <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <span className="px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider text-indigo-400 bg-indigo-500/10 border border-indigo-500/20">
-                      {host.tier === 'S' ? 'Ratio: 100%' : host.tier === 'A' ? 'Ratio: 80%' : 'Ratio: 60%'}
-                    </span>
-                    <span className="text-[9px] font-mono text-slate-500">#{host.id}</span>
-                  </div>
-                  <h4 className="font-bold text-white truncate text-sm">{host.nickname || host.name}</h4>
-                  <p className="text-[8px] text-indigo-400/70 uppercase font-black tracking-widest mt-0.5">{host.position}</p>
+              <div className="p-4 absolute bottom-0 left-0 right-0">
+                <div className="flex items-center justify-between mb-1">
+                  <span className={cn(
+                    "px-1.5 py-0.5 rounded text-[7px] font-black uppercase tracking-widest border",
+                    host.tier === 'S' ? "bg-yellow-900/30 text-yellow-500 border-yellow-500/20" :
+                    host.tier === 'A' ? "bg-indigo-900/30 text-indigo-400 border-indigo-400/20" :
+                    host.tier === 'B' ? "bg-cyan-900/30 text-cyan-400 border-cyan-400/20" : "bg-slate-800 text-slate-500 border-slate-700"
+                  )}>
+                    {TEXT.roleModelRatio}: {Math.min(100, Math.round((exposuresList.filter(e => e.poppo_id === host.id || (e.agency_attendance && e.agency_attendance.includes(host.id))).length / (exposuresList.length || 1)) * 100))}%
+                  </span>
+                  <span className="text-[9px] font-mono text-slate-500">#{host.id}</span>
                 </div>
+                <h4 className="font-bold text-white truncate text-sm">{host.nickname || host.name}</h4>
+                <p className="text-[8px] text-slate-500 uppercase font-black tracking-widest mt-0.5">{host.role}</p>
               </div>
             </motion.div>
           ))}
         </div>
       )}
 
-      {/* Roster Profile details view modal formatted strictly in the precise sequence order 1 to 8 */}
+      {/* Details View Modal */}
       <AnimatePresence>
         {selectedHost && (
           <div className="fixed inset-0 z-[70] flex items-center justify-end">
             <motion.div 
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               onClick={() => setSelectedHostId(null)}
-              className="absolute inset-0 bg-navy/60 backdrop-blur-sm"
+              className="absolute inset-0 bg-[#08080F]/80 backdrop-blur-md"
             />
             <motion.div 
               initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
               transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className="relative w-full max-w-4xl h-full bg-[#07080e] border-l border-white/10 overflow-y-auto"
+              className="relative w-full max-w-4xl h-full bg-[#0a0a1a] border-l border-white/10 overflow-y-auto"
             >
-              {/* STICKY HEADER */}
-              <div className="sticky top-0 z-10 glass border-b border-white/15 p-6 flex items-center justify-between">
+              <div className="sticky top-0 z-10 glass border-b border-white/10 p-6 flex items-center justify-between">
                 <div className="flex items-center gap-4">
-                  <div className="w-14 h-14 rounded-2xl bg-slate-800 overflow-hidden border border-white/10 shrink-0">
+                  <div className="w-16 h-16 rounded-2xl bg-slate-800 overflow-hidden border border-white/10 shrink-0">
                     {selectedHost.photoUrl ? (
                       <img src={selectedHost.photoUrl} alt={selectedHost.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                     ) : (
@@ -368,238 +497,554 @@ export const ProfilesTab = () => {
                     )}
                   </div>
                   <div>
-                    <h2 className="text-xl font-black text-white flex items-center gap-2">
+                    <h2 className="text-xl font-bold flex items-center gap-2">
                        {selectedHost.nickname || selectedHost.name}
                        <span className="text-white/20 text-sm font-mono">#{selectedHost.id}</span>
                     </h2>
                     <div className="flex items-center gap-2 mt-1">
-                      <span className="px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-400 text-[8px] font-black border border-indigo-500/20 uppercase">
-                        {mapTierToRatio(selectedHost.tier)}
+                      <span className="px-2 py-0.5 rounded bg-yellow-500/10 text-yellow-500 text-[8px] font-black border border-yellow-500/20">
+                        {TEXT.roleModelRatioUppercase}: {Math.min(100, Math.round((exposuresList.filter(e => e.poppo_id === selectedHost.id || (e.agency_attendance && e.agency_attendance.includes(selectedHost.id))).length / (exposuresList.length || 1)) * 100))}%
                       </span>
-                      <span className="text-[10px] text-white/40 uppercase font-bold tracking-wider">{selectedHost.position} // TEAM {selectedHost.team || 'Alpha'}</span>
+                      <span className="text-[10px] text-white/40 uppercase font-bold">{selectedHost.role}</span>
                     </div>
                   </div>
                 </div>
-                <button onClick={() => setSelectedHostId(null)} className="p-2 hover:bg-white/5 rounded-full text-white/40 hover:text-white">✕</button>
+                <button onClick={() => setSelectedHostId(null)} className="p-2 hover:bg-white/5 rounded-full">✕</button>
               </div>
 
-              {/* STRICT DELIVERY SEQUENCE BLOCKS */}
               <div className="p-8 space-y-12">
-
-                {/* --- 1. BASIC PROFILE INFORMATION --- */}
-                <section className="space-y-4">
-                  <h3 className="text-xs font-black text-white/40 uppercase tracking-[0.25em] flex items-center gap-2 pb-2 border-b border-white/5">
-                    <Fingerprint size={14} className="text-indigo-400" />
-                    1. Basic Profile Information
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="p-5 bg-white/[0.02] border border-white/5 rounded-2xl space-y-2">
-                       <div className="flex justify-between py-1.5 border-b border-white/5"><span className="text-white/30 text-[10px] font-black uppercase tracking-wider">Nickname</span><span className="text-xs font-bold text-white">{selectedHost.nickname || 'N/A'}</span></div>
-                       <div className="flex justify-between py-1.5 border-b border-white/5"><span className="text-white/30 text-[10px] font-black uppercase tracking-wider">Full name</span><span className="text-xs font-bold text-white">{selectedHost.name}</span></div>
-                       <div className="flex justify-between py-1.5 border-b border-white/5"><span className="text-white/30 text-[10px] font-black uppercase tracking-wider">Poppo ID</span><span className="text-xs font-bold text-white font-mono">{selectedHost.id}</span></div>
-                       <div className="flex justify-between py-1.5"><span className="text-white/30 text-[10px] font-black uppercase tracking-wider">Position/Role</span><span className="text-xs font-bold text-white">{selectedHost.position}</span></div>
-                    </div>
-                    <div className="p-5 bg-white/[0.02] border border-white/5 rounded-2xl space-y-2">
-                       <div className="flex justify-between py-1.5 border-b border-white/5"><span className="text-white/30 text-[10px] font-black uppercase tracking-wider">Manager</span><span className="text-xs font-bold text-white">{selectedHost.manager || 'Ely'}</span></div>
-                       <div className="flex justify-between py-1.5 border-b border-white/5"><span className="text-white/30 text-[10px] font-black uppercase tracking-wider">Anchor team</span><span className="text-xs font-bold text-indigo-400">{selectedHost.team || 'Alpha'}</span></div>
-                       <div className="flex justify-between py-1.5 border-b border-white/5"><span className="text-white/30 text-[10px] font-black uppercase tracking-wider">Base Policy</span><span className="text-xs font-bold text-white">{selectedHost.base_salary_category || 'S idol'}</span></div>
-                       <div className="flex justify-between py-1.5"><span className="text-white/30 text-[10px] font-black uppercase tracking-wider">Status</span><span className="text-xs font-bold text-emerald-400">{selectedHost.status || 'Active'}</span></div>
-                    </div>
-                  </div>
-                  {/* Bio statement */}
-                  <div className="p-5 bg-white/[0.01] border border-white/5 rounded-2xl italic text-xs text-slate-400 leading-relaxed">
-                    "{selectedHost.description || 'No biography details loaded.'}"
-                  </div>
-                </section>
-
-
-                {/* --- 2. FANBASE KPI SECTION --- */}
-                <section className="space-y-4">
-                  <h3 className="text-xs font-black text-white/40 uppercase tracking-[0.25em] flex items-center gap-2 pb-2 border-b border-white/5">
-                    <Heart size={14} className="text-pink-400" />
-                    2. Fanbase KPI (Foreground: Subscribers & GC Members Only)
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-center">
-                    <div className="p-6 bg-[#fd2d78]/5 border border-[#fd2d78]/10 rounded-2xl">
-                      <span className="text-[10px] font-black text-[#fd2d78] uppercase tracking-wider block mb-1">Subscribers</span>
-                      <span className="text-2xl font-black text-white">
-                        {Storage.getFanbaseHealth(selectedHost.id)?.[0]?.subscribers || 140}
-                      </span>
-                    </div>
-                    <div className="p-6 bg-indigo-500/5 border border-indigo-500/10 rounded-2xl">
-                      <span className="text-[10px] font-black text-indigo-400 uppercase tracking-wider block mb-1">GC Members</span>
-                      <span className="text-2xl font-black text-white">
-                        {Storage.getFanbaseHealth(selectedHost.id)?.[0]?.gcMembers || 82}
-                      </span>
-                    </div>
-                  </div>
-                </section>
-
-
-                {/* --- 3. EXPOSURE SUMMARY --- */}
-                <section className="space-y-4">
-                  <h3 className="text-xs font-black text-white/40 uppercase tracking-[0.25em] flex items-center gap-2 pb-2 border-b border-white/5">
-                    <Camera size={14} className="text-cyan-400" />
-                    3. Exposure Summary
-                  </h3>
-                  <div className="space-y-2">
-                    {Storage.getExposures(selectedHost.id).map((exp, idx) => (
-                      <div key={idx} className="p-4 bg-white/5 border border-white/5 rounded-xl flex items-center justify-between">
-                        <div>
-                          <p className="text-xs font-black text-white font-sans">{exp.event_type}</p>
-                          <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">{exp.description}</p>
-                        </div>
-                        <span className="text-[10px] font-mono text-slate-500 whitespace-nowrap">{exp.event_date}</span>
-                      </div>
-                    ))}
-                    {Storage.getExposures(selectedHost.id).length === 0 && (
-                      <div className="p-8 text-center border border-dashed border-white/5 rounded-2xl text-[10px] font-bold uppercase tracking-widest text-slate-500 italic">No exposures recorded.</div>
-                    )}
-                  </div>
-                </section>
-
-
-                {/* --- 4. RANDOM PK SUMMARY --- */}
-                <section className="space-y-4">
-                  <h3 className="text-xs font-black text-white/40 uppercase tracking-[0.25em] flex items-center gap-2 pb-2 border-b border-white/5">
-                    <Award size={14} className="text-amber-500" />
-                    4. Random PK Summary
-                  </h3>
-                  <div className="overflow-hidden border border-white/5 rounded-2xl bg-[#0F1117]">
-                     <table className="w-full text-left text-xs font-mono">
-                       <thead className="bg-white/5 uppercase text-[9px] font-black text-slate-400">
-                         <tr>
-                           <th className="p-3">Session Date</th>
-                           <th className="p-3 text-right">PK Win Rate</th>
-                           <th className="p-3 text-right">Aggregate Score</th>
-                         </tr>
-                       </thead>
-                       <tbody className="divide-y divide-white/5">
-                         {Storage.getPKData(selectedHost.id).map((pk, idx) => (
-                           <tr key={idx} className="text-slate-300">
-                             <td className="p-3">{new Date(pk.timestamp).toLocaleDateString()}</td>
-                             <td className="p-3 text-right font-bold text-amber-500">{pk.win_percentage}%</td>
-                             <td className="p-3 text-right text-emerald-400 font-bold">{formatNumber(pk.pk_score)}</td>
-                           </tr>
-                         ))}
-                         {Storage.getPKData(selectedHost.id).length === 0 && (
-                           <tr>
-                             <td colSpan={3} className="p-6 text-center text-slate-500 italic">No Random PK logs located.</td>
-                           </tr>
-                         )}
-                       </tbody>
-                     </table>
-                  </div>
-                </section>
-
-
-                {/* --- 5. UPCOMING EVENTS --- */}
-                <section className="space-y-4">
-                  <h3 className="text-xs font-black text-white/40 uppercase tracking-[0.25em] flex items-center gap-2 pb-2 border-b border-white/5">
-                    <Calendar size={14} className="text-indigo-400" />
-                    5. Upcoming Calendar Events
-                  </h3>
-                  <div className="space-y-3">
-                     {Storage.getEvents().filter(e => e.poppo_id === selectedHost.id || e.poppo_id === 'Agency').map((ev, idx) => (
-                       <div key={idx} className="p-4 bg-white/5 border border-white/5 rounded-2xl flex justify-between items-center">
-                         <div>
-                           <h4 className="font-bold text-white text-xs">{ev.title}</h4>
-                           <p className="text-[10px] text-slate-400 mt-0.5">{ev.description}</p>
+                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    {/* Main Stats Card */}
+                    <div className="lg:col-span-2 glass-card space-y-6">
+                       {isLoadingCommissions ? (
+                         <div className="h-64 flex flex-col items-center justify-center gap-4">
+                           <Loader2 className="w-10 h-10 text-indigo-500 animate-spin" />
+                           <p className="text-[10px] font-black uppercase tracking-widest text-white/30">{TEXT.syncingMasterSheet}</p>
                          </div>
-                         <div className="text-right font-mono text-[10px] text-slate-500">
-                           <div>{ev.date}</div>
-                           <div>{ev.time}</div>
+                       ) : commissions.length === 0 ? (
+                         <div className="h-64 flex flex-col items-center justify-center gap-4 border border-dashed border-white/5 rounded-2xl">
+                           <Info className="w-8 h-8 text-white/10" />
+                           <p className="text-[10px] font-bold text-white/20 uppercase tracking-widest">{TEXT.noCommissionData}</p>
+                         </div>
+                       ) : (
+                         <>
+                           <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                              {[
+                                { label: 'Total Points', value: formatNumber(stats.total), sub: 'pts' },
+                                { label: 'Avg Live', value: stats.avgHrs.toFixed(1), sub: 'hrs' },
+                                { label: 'Pts / Hr', value: formatNumber(Math.round(stats.avgPtsHr)), sub: '' },
+                                { label: 'Best Month', value: formatNumber(stats.bestMonth), sub: 'pts' },
+                                { label: 'Live %', value: stats.livePct.toFixed(1), sub: '%' },
+                                { label: 'Comm. %', value: stats.commPct.toFixed(1), sub: '%' },
+                              ].map((s, i) => (
+                                <div key={i} className="bg-white/5 p-4 rounded-xl border border-white/5">
+                                   <p className="text-[10px] font-bold text-white/30 uppercase mb-1">{s.label}</p>
+                                   <div className="flex items-baseline gap-1">
+                                      <span className="text-lg font-bold">{s.value}</span>
+                                      <span className="text-[10px] text-cyan-400">{s.sub}</span>
+                                   </div>
+                                </div>
+                              ))}
+                           </div>
+
+                           <div className="space-y-4">
+                              <h5 className="text-xs font-bold uppercase tracking-widest text-white/30">{TEXT.commissionTrends}</h5>
+                              <div className="h-48 w-full bg-white/5 rounded-2xl p-4">
+                                <ResponsiveContainer width="100%" height="100%">
+                                  <BarChart data={commissions}>
+                                    <XAxis dataKey="month" hide />
+                                    <Tooltip 
+                                      contentStyle={{ backgroundColor: '#0f1117', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px' }}
+                                      labelStyle={{ color: 'rgba(255,255,255,0.4)', fontSize: '10px', fontWeight: 'bold' }}
+                                    />
+                                    <Bar dataKey="total_points" fill="#6366f1" radius={[4, 4, 0, 0]} />
+                                  </BarChart>
+                                </ResponsiveContainer>
+                              </div>
+                           </div>
+                         </>
+                       )}
+                    </div>
+
+                    {/* Breakdown and Details */}
+                    <div className="space-y-8">
+                       <div className="glass-card text-center py-8">
+                          <h5 className="text-xs font-bold uppercase tracking-widest text-white/30 mb-6">{TEXT.incomeBreakdown}</h5>
+                          <div className="w-40 h-40 mx-auto relative flex items-center justify-center">
+                             <div className="absolute inset-0 rounded-full border-[10px] border-white/5" />
+                             <div className="text-center">
+                                <span className="block text-2xl font-bold">78%</span>
+                                <span className="text-[10px] text-white/30 uppercase font-black">{TEXT.livePerformance}</span>
+                             </div>
+                          </div>
+                          <div className="grid grid-cols-2 gap-4 mt-8">
+                             <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-purple-500" /> <span className="text-[10px] text-white/50">{TEXT.live78}</span></div>
+                             <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-pink-500" /> <span className="text-[10px] text-white/50">{TEXT.tips12}</span></div>
+                             <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-cyan-500" /> <span className="text-[10px] text-white/50">{TEXT.party5}</span></div>
+                             <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-emerald-500" /> <span className="text-[10px] text-white/50">{TEXT.other5}</span></div>
+                          </div>
+                       </div>
+                        {/* Agency Record Section */}
+                        <section className="space-y-4">
+                          <div className="flex items-center gap-3 pb-2 border-b border-white/5">
+                            <div className="p-2 rounded-xl bg-indigo-500/10 text-indigo-400">
+                              <Fingerprint size={16} />
+                            </div>
+                            <h5 className="text-[10px] font-black uppercase tracking-[0.2em] text-white/80">{TEXT.agencyRecord}</h5>
+                          </div>
+                          <div className="glass-card !bg-white/[0.01] !p-6">
+                            <div className="space-y-3">
+                               {[
+                                 { label: 'Role', value: selectedHost.role },
+                                 { label: 'Team', value: selectedHost.team },
+                                 { label: 'Manager', value: selectedHost.manager },
+                                 { label: 'Anchor Type', value: selectedHost.anchor_type },
+                                 { label: 'Salary Class', value: selectedHost.base_salary_category },
+                                 { label: 'Current Status', value: selectedHost.status },
+                                 { label: 'Poppo Level', value: selectedHost.level },
+                                 { label: 'Onboarding', value: new Date(selectedHost.created_at).toLocaleDateString() },
+                                 { label: 'Last Sync', value: new Date(selectedHost.updated_at).toLocaleDateString() },
+                               ].map((item, i) => (
+                                 <div key={i} className="flex justify-between items-center py-2 border-b border-white/5 last:border-0 hover:bg-white/[0.02] px-2 rounded-lg transition-colors">
+                                    <span className="text-[9px] font-black text-white/20 uppercase tracking-widest">{item.label}</span>
+                                    <span className="text-xs font-bold text-white/60 tracking-tight">{item.value || 'N/A'}</span>
+                                 </div>
+                               ))}
+                            </div>
+                            {auth.role === 'Director' && (
+                              <button 
+                                onClick={() => { if (checkPassword('Director')) setIsEditingHost(true); }}
+                                className="w-full mt-6 border border-indigo-500/30 bg-indigo-500/5 hover:bg-indigo-500/10 text-indigo-400 py-3 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] flex items-center justify-center gap-2 transition-all active:scale-95"
+                              >
+                                 <UserPen size={14} />
+                                 Modify Profile
+                              </button>
+                            )}
+                          </div>
+                        </section>
+ 
+                        {/* Performance Goals Section */}
+                        <section className="space-y-4">
+                           <div className="flex items-center justify-between items-end pb-2 border-b border-white/5">
+                              <div className="flex items-center gap-3">
+                                <div className="p-2 rounded-xl bg-pink-500/10 text-pink-500">
+                                  <Target size={16} />
+                                </div>
+                                <h5 className="text-[10px] font-black uppercase tracking-[0.2em] text-white/80">{TEXT.performanceGoals}</h5>
+                              </div>
+                              {auth.role !== 'Talent' && (
+                                <button onClick={() => setIsManagingGoals(true)} className="text-[10px] font-bold text-indigo-400 hover:underline mb-1">{TEXT.manage}</button>
+                              )}
+                           </div>
+                           <div className="glass-card !bg-white/[0.01] !p-6">
+                             <div className="space-y-5">
+                                {goals.map(goal => (
+                                  <div key={goal.id} className="space-y-2">
+                                     <div className="flex justify-between text-[10px]">
+                                        <span className="text-white/40 font-bold uppercase tracking-tight">{getLabel(goal.type)}</span>
+                                        <span className="font-mono font-bold text-white/80">{goal.current} / {goal.target}</span>
+                                     </div>
+                                     <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
+                                        <div 
+                                          className={cn("h-full transition-all duration-1000", getGoalColor(goal.type))} 
+                                          ref={(el) => {
+                                             if (el) {
+                                               el.style.width = `${Math.min(100, (goal.current / goal.target) * 100)}%`;
+                                             }
+                                           }}
+                                        />
+                                     </div>
+                                  </div>
+                                ))}
+                                {goals.length === 0 && (
+                                  <div className="flex flex-col items-center justify-center py-6 text-center">
+                                    <Target size={24} className="text-white/5 mb-2" />
+                                    <p className="text-[10px] text-white/20 italic font-medium uppercase tracking-widest">{TEXT.noActivePursuits}</p>
+                                  </div>
+                                )}
+                             </div>
+                           </div>
+                        </section>
+
+                       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                         <div className="glass-card flex flex-col h-full border-indigo-500/10">
+                            <div className="flex items-center justify-between mb-6">
+                               <h5 className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-400">{TEXT.biography}</h5>
+                               <button 
+                                 onClick={() => { if (checkPassword('Director')) setIsEditingHost(true); }}
+                                 className="p-1.5 hover:bg-white/5 rounded-lg text-white/20 hover:text-white transition-colors"
+                                 title="Edit host description"
+                               >
+                                 <Edit2 size={12} />
+                               </button>
+                            </div>
+                            <div className="flex-1 bg-white/[0.02] rounded-2xl p-6 border border-white/5 relative group min-h-[160px]">
+                               <p className="text-sm text-white/60 leading-relaxed italic whitespace-pre-wrap">
+                                  {selectedHost.description || "No biography or talent assessment provided. Tap the edit icon to establish this record."}
+                               </p>
+                               <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <Info size={14} className="text-white/10" />
+                               </div>
+                            </div>
+                         </div>
+  
+                         <div className="glass-card flex flex-col h-full border-cyan-500/10">
+                            <div className="flex items-center justify-between mb-6">
+                               <h5 className="text-[10px] font-black uppercase tracking-[0.2em] text-cyan-400">{TEXT.managerNotesHistory}</h5>
+                               {auth.role === 'Director' && (
+                                 <button 
+                                   onClick={() => {
+                                     const content = prompt("Add a new strategic note:");
+                                     if (content) {
+                                       const note: DirectorNote = {
+                                         id: crypto.randomUUID(),
+                                         hostId: selectedHost.id,
+                                         type: 'Note',
+                                         content,
+                                         createdAt: new Date().toISOString()
+                                       };
+                                       FirebaseService.saveNote(note).then(() => loadNotes(selectedHost.id));
+                                     }
+                                   }}
+                                   className="p-1.5 bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500 hover:text-white rounded-lg transition-all"
+                                   title="Add manager note"
+                                 >
+                                    <Plus size={12} />
+                                 </button>
+                               )}
+                            </div>
+                            
+                            <div className="flex-1 space-y-4 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+                               {isLoadingNotes ? (
+                                 <div className="py-12 flex flex-col items-center gap-3">
+                                   <Loader2 size={24} className="animate-spin text-cyan-500" />
+                                   <span className="text-[10px] font-black uppercase tracking-widest text-white/20">{TEXT.syncingNotes}</span>
+                                 </div>
+                               ) : hostNotes.map((note) => (
+                                 <motion.div 
+                                   initial={{ opacity: 0, scale: 0.95 }}
+                                   animate={{ opacity: 1, scale: 1 }}
+                                   key={note.id} 
+                                   className="relative p-5 bg-white/[0.02] rounded-2xl border border-white/5 hover:border-cyan-500/20 transition-all group"
+                                 >
+                                    <div className="flex justify-between items-center mb-2">
+                                       <div className="flex items-center gap-2">
+                                          <span className={cn(
+                                            "text-[8px] font-black uppercase px-2 py-0.5 rounded-full border",
+                                            note.type === 'Feedback' ? "bg-pink-500/10 text-pink-500 border-pink-500/20" :
+                                            note.type === 'Task' ? "bg-amber-500/10 text-amber-500 border-amber-500/20" :
+                                            "bg-cyan-500/10 text-cyan-500 border-cyan-500/20"
+                                          )}>
+                                             {note.type}
+                                          </span>
+                                          <span className="text-[9px] font-mono text-white/20">{new Date(note.createdAt).toLocaleDateString()}</span>
+                                       </div>
+                                       {auth.role === 'Director' && (
+                                         <button 
+                                           onClick={async () => {
+                                              if (confirm("Delete this management note?")) {
+                                                await FirebaseService.deleteNote(note.id);
+                                                loadNotes(selectedHost.id);
+                                              }
+                                           }}
+                                           className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-500/10 text-red-400 rounded transition-all"
+                                           title="Delete management note"
+                                         >
+                                             <X size={10} />
+                                         </button>
+                                       )}
+                                    </div>
+                                    <p className="text-xs text-white/70 leading-relaxed font-medium">"{note.content}"</p>
+                                 </motion.div>
+                               ))}
+                               {hostNotes.length === 0 && !isLoadingNotes && (
+                                 <div className="py-20 text-center space-y-4 border border-dashed border-white/5 rounded-2xl">
+                                    <UserPen size={32} className="mx-auto text-white/5" />
+                                    <p className="text-[10px] text-white/20 italic font-black uppercase tracking-widest">{TEXT.noStrategicNotes}</p>
+                                 </div>
+                                )}
+                            </div>
                          </div>
                        </div>
-                     ))}
-                     {Storage.getEvents().filter(e => e.poppo_id === selectedHost.id || e.poppo_id === 'Agency').length === 0 && (
-                       <p className="text-[10px] font-bold text-slate-500 text-center py-4 uppercase tracking-widest italic border border-dashed border-white/5 rounded-xl">No active events listed.</p>
-                     )}
-                  </div>
-                </section>
 
+                       <div className="space-y-4">
+                          <div className="flex items-center justify-between">
+                             <h5 className="text-xs font-bold uppercase tracking-widest text-white/30">📊 Fanbase Health History</h5>
+                          </div>
+                          <div className="space-y-3">
+                             {Storage.getFanbaseHealth(selectedHost.id).map((entry, idx) => (
+                               <div key={idx} className="glass rounded-xl border border-white/5 p-4 space-y-3">
+                                  <div className="flex justify-between items-center border-b border-white/5 pb-2">
+                                     <span className="text-[10px] font-mono text-white/20">{new Date(entry.submittedAt).toLocaleDateString()}</span>
+                                     <span className="text-[10px] text-indigo-400 font-bold uppercase tracking-wider">{TEXT.subscribers}{entry.subscribers}</span>
+                                  </div>
+                                  <div className="grid grid-cols-2 gap-4">
+                                     <div className="space-y-1">
+                                        <p className="text-[9px] font-bold text-slate-500 uppercase">{TEXT.gcMembers}</p>
+                                        <p className="text-xs">{entry.gcMembers}</p>
+                                     </div>
+                                     <div className="space-y-1">
+                                        <p className="text-[9px] font-bold text-slate-500 uppercase">{TEXT.reporter}</p>
+                                        <p className="text-xs">{entry.submittedBy}</p>
+                                     </div>
+                                  </div>
+                                  <div className="space-y-1">
+                                     <p className="text-[9px] font-bold text-slate-500 uppercase">{TEXT.preStreamUpdate}</p>
+                                     <p className="text-xs text-white/70 italic">"{entry.preStreamUpdate}"</p>
+                                  </div>
+                                  <div className="space-y-1">
+                                     <p className="text-[9px] font-bold text-slate-500 uppercase">{TEXT.postStreamUpdate}</p>
+                                     <p className="text-xs text-white/70 italic">"{entry.postStreamUpdate}"</p>
+                                  </div>
+                               </div>
+                             ))}
+                             {Storage.getFanbaseHealth(selectedHost.id).length === 0 && (
+                               <p className="text-[10px] text-white/20 italic text-center py-4 bg-white/5 rounded-xl border border-dashed border-white/10">{TEXT.noFanbaseReports}</p>
+                             )}
+                          </div>
+                       </div>
 
-                {/* --- 6. FINANCIAL & LIVE METRICS --- */}
-                <section className="space-y-4">
-                  <h3 className="text-xs font-black text-white/40 uppercase tracking-[0.25em] flex items-center gap-2 pb-2 border-b border-white/5">
-                    <DollarSign size={14} className="text-emerald-400" />
-                    6. Financial & Live Performance Metrics
-                  </h3>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
-                    <div className="p-4 bg-white/5 border border-white/5 rounded-xl">
-                      <span className="text-[8px] font-black text-slate-500 uppercase block mb-1">Live duration</span>
-                      <span className="text-sm font-bold text-white">{stats.avgHrs.toFixed(1)} hrs</span>
+                       <div className="space-y-4">
+                          <div className="flex items-center justify-between">
+                             <h5 className="text-xs font-bold uppercase tracking-widest text-white/30">🎲 Random PK Data</h5>
+                          </div>
+                          <div className="glass rounded-xl border border-white/5 overflow-hidden">
+                             <table className="w-full text-left text-[10px]">
+                                <thead className="bg-white/5 uppercase font-black text-white/20">
+                                   <tr>
+                                      <th className="p-2">{TEXT.date}</th>
+                                      <th className="p-2 text-right">{TEXT.winPct}</th>
+                                      <th className="p-2 text-right">{TEXT.score}</th>
+                                   </tr>
+                                </thead>
+                                <tbody>
+                                   {Storage.getPKData(selectedHost.id).map((pk, i) => (
+                                      <tr key={pk.id} className="border-t border-white/5">
+                                         <td className="p-2 text-white/50">{new Date(pk.timestamp).toLocaleDateString()}</td>
+                                         <td className="p-2 text-right font-bold text-emerald-400">{pk.win_percentage}%</td>
+                                         <td className="p-2 text-right font-bold text-emerald-400">{pk.pk_score.toLocaleString()}</td>
+                                      </tr>
+                                   ))}
+                                   {Storage.getPKData(selectedHost.id).length === 0 && (
+                                      <tr><td colSpan={3} className="p-4 text-center text-white/20 italic">{TEXT.noPkRecords}</td></tr>
+                                   )}
+                                </tbody>
+                              </table>
+                          </div>
+                       </div>
+
+                       <div className="space-y-4">
+                          <div className="flex items-center justify-between">
+                             <h5 className="text-xs font-bold uppercase tracking-widest text-white/30">📣 Exposures & Visibility</h5>
+                          </div>
+                          <div className="space-y-2">
+                             {Storage.getExposures(selectedHost.id).map((exp, i) => (
+                               <div key={exp.id} className="flex items-center justify-between p-3 bg-white/5 rounded-xl border border-white/5">
+                                  <div>
+                                     <p className="text-xs font-bold">{exp.event_type}</p>
+                                     <p className="text-[10px] text-white/30">{exp.description}</p>
+                                  </div>
+                                  <span className="text-[10px] font-mono text-white/20">{new Date(exp.event_date).toLocaleDateString()}</span>
+                               </div>
+                             ))}
+                             {Storage.getExposures(selectedHost.id).length === 0 && (
+                               <p className="text-[10px] text-white/20 italic text-center py-4 bg-white/5 rounded-xl border border-dashed border-white/10">{TEXT.noExposureLogs}</p>
+                             )}
+                          </div>
+                       </div>
                     </div>
-                    <div className="p-4 bg-white/5 border border-white/5 rounded-xl">
-                      <span className="text-[8px] font-black text-slate-500 uppercase block mb-1">Gifting point score</span>
-                      <span className="text-sm font-bold text-emerald-400">{formatNumber(stats.total)}</span>
-                    </div>
-                    <div className="p-4 bg-white/5 border border-white/5 rounded-xl">
-                      <span className="text-[8px] font-black text-slate-500 uppercase block mb-1">Earnings share</span>
-                      <span className="text-sm font-bold text-indigo-400">{stats.livePct.toFixed(1)}%</span>
-                    </div>
-                    <div className="p-4 bg-white/5 border border-white/5 rounded-xl">
-                      <span className="text-[8px] font-black text-slate-500 uppercase block mb-1">My commission</span>
-                      <span className="text-sm font-bold text-pink-400">{stats.commPct.toFixed(1)}%</span>
-                    </div>
-                  </div>
-                  {/* Trends graph */}
-                  <div className="h-40 bg-white/[0.01] border border-white/5 p-4 rounded-xl">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={commissions}>
-                        <XAxis dataKey="month" hide />
-                        <Tooltip contentStyle={{ backgroundColor: '#0c0d12', border: 'none', borderRadius: '12px', fontSize: '10px' }} />
-                        <Bar dataKey="total_points" fill="#6366f1" radius={[4, 4, 0, 0]} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                </section>
-
-
-                {/* --- 7. OVERALL TOTALS & HISTORY --- */}
-                <section className="space-y-4">
-                  <h3 className="text-xs font-black text-white/40 uppercase tracking-[0.25em] flex items-center gap-2 pb-2 border-b border-white/5">
-                    <TrendingUp size={14} className="text-indigo-400" />
-                    7. Cumulative Overall History
-                  </h3>
-                  <div className="space-y-2">
-                    {commissions.map((comm, idx) => (
-                      <div key={idx} className="p-4 bg-white/5 border border-white/5 rounded-xl flex items-center justify-between font-mono text-[11px]">
-                        <span className="font-bold text-white">{comm.month} Ledger</span>
-                        <span className="text-emerald-400 font-bold">{formatNumber(comm.total_points)} points</span>
-                        <span className="text-slate-500">{comm.live_duration} streaming hours</span>
-                      </div>
-                    ))}
-                    {commissions.length === 0 && (
-                      <p className="text-[10px] text-slate-500 text-center py-4 uppercase tracking-widest italic font-bold">No historic ledger periods processed.</p>
-                    )}
-                  </div>
-                </section>
-
-
-                {/* --- 8. DIRECTOR'S STRATEGIC NOTES --- */}
-                <section className="space-y-4">
-                  <h3 className="text-xs font-black text-white/40 uppercase tracking-[0.25em] flex items-center gap-2 pb-2 border-b border-white/5">
-                    <BookOpen size={14} className="text-purple-400" />
-                    8. Director's Strategic & Compliance Notes
-                  </h3>
-                  <div className="space-y-3">
-                    {hostNotes.map((note) => (
-                      <div key={note.id} className="p-4 bg-purple-500/5 border border-purple-500/10 rounded-xl">
-                        <div className="flex justify-between items-center mb-1 text-[9px] font-bold text-purple-400 uppercase tracking-widest">
-                          <span>{note.type} Log Entry</span>
-                          <span>{new Date(note.createdAt).toLocaleDateString()}</span>
-                        </div>
-                        <p className="text-xs text-slate-300 font-semibold">"{note.content}"</p>
-                      </div>
-                    ))}
-                    {hostNotes.length === 0 && (
-                      <p className="text-[10px] text-slate-500 text-center py-4 uppercase tracking-widest italic font-bold">No strategic directorship guidelines compiled.</p>
-                    )}
-                  </div>
-                </section>
-
+                 </div>
               </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {isManagingGoals && selectedHost && (
+           <div className="fixed inset-0 z-[80] flex items-center justify-center p-6">
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsManagingGoals(false)} className="absolute inset-0 bg-[#08080F]/80 backdrop-blur-md" />
+              <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="relative glass w-full max-w-md rounded-3xl overflow-hidden border border-white/10 flex flex-col">
+                 <div className="p-6 border-b border-white/5 flex items-center justify-between">
+                    <h3 className="font-bold flex items-center gap-2">
+                      <Plus size={18} className="text-indigo-400" />
+                      Set Host Goal
+                    </h3>
+                    <button onClick={() => setIsManagingGoals(false)} className="text-slate-500 hover:text-white transition-colors" title="Close goal management"><X size={20} /></button>
+                 </div>
+                 <form onSubmit={handleUpdateGoal} className="p-6 space-y-4">
+                    <div className="space-y-4">
+                       <div>
+                          <label htmlFor="goal-type" className="text-[10px] font-bold text-white/40 uppercase block mb-1">{TEXT.goalType}</label>
+                          <select id="goal-type" name="type" required className="w-full glass-input" title="Goal Type">
+                             <option value="fanbase">{TEXT.weeklyFanbaseGrowth}</option>
+                             <option value="fanclub_gc">{TEXT.fanclubGcUpdates}</option>
+                             <option value="hours">{TEXT.hoursStreamed}</option>
+                             <option value="pk">{TEXT.randomPkSessions}</option>
+                             <option value="song_requests">{TEXT.songRequests}</option>
+                          </select>
+                       </div>
+                       <div className="grid grid-cols-2 gap-4">
+                          <div>
+                             <label htmlFor="goal-target" className="text-[10px] font-bold text-white/40 uppercase block mb-1">{TEXT.targetValue}</label>
+                             <input id="goal-target" name="target" type="number" required className="w-full glass-input" placeholder="e.g. 500" title="Target Value" />
+                          </div>
+                          <div>
+                             <label htmlFor="goal-current" className="text-[10px] font-bold text-white/40 uppercase block mb-1">{TEXT.currentProgress}</label>
+                             <input id="goal-current" name="current" type="number" required className="w-full glass-input" placeholder="e.g. 0" title="Current Progress" />
+                          </div>
+                       </div>
+                       <div className="grid grid-cols-2 gap-4">
+                          <div>
+                             <label htmlFor="goal-period" className="text-[10px] font-bold text-white/40 uppercase block mb-1">{TEXT.period}</label>
+                             <select id="goal-period" name="period" className="w-full glass-input" title="Goal Period">
+                                <option value="Weekly">{TEXT.weekly}</option>
+                                <option value="Daily">{TEXT.daily}</option>
+                                <option value="Monthly">{TEXT.monthly}</option>
+                             </select>
+                          </div>
+                          <div>
+                             <label htmlFor="goal-deadline" className="text-[10px] font-bold text-white/40 uppercase block mb-1">{TEXT.deadlineDate}</label>
+                             <input id="goal-deadline" name="deadline" type="date" required className="w-full glass-input" title="Deadline Date" />
+                          </div>
+                       </div>
+                    </div>
+                    <div className="pt-4 flex gap-4">
+                       <button type="button" onClick={() => setIsManagingGoals(false)} className="flex-1 btn-secondary py-2">{TEXT.cancel}</button>
+                       <button type="submit" className="flex-[2] btn-primary py-2 text-xs">{TEXT.setGoalAndNotify}</button>
+                    </div>
+                 </form>
+              </motion.div>
+           </div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {isEditingHost && selectedHost && (
+          <div className="fixed inset-0 z-[80] flex items-center justify-center p-6">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsEditingHost(false)} className="absolute inset-0 bg-[#08080F]/80 backdrop-blur-md" />
+            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="relative w-full max-w-lg glass rounded-3xl overflow-hidden border border-white/10 flex flex-col shadow-2xl shadow-indigo-500/20">
+              <div className="p-6 border-b border-white/5 flex items-center justify-between">
+                <h3 className="font-bold flex items-center gap-2">
+                  <Shield size={18} className="text-indigo-400" />
+                  Modify Agency Profile
+                </h3>
+                <button onClick={() => setIsEditingHost(false)} className="text-slate-500 hover:text-white transition-colors" title="Close edit profile modal"><X size={20} /></button>
+              </div>
+              <form onSubmit={handleUpdateProfile} className="p-6 space-y-6 overflow-y-auto custom-scrollbar max-h-[70vh]">
+                <div className="grid grid-cols-2 gap-6">
+                  <div className="space-y-1.5">
+                    <label htmlFor="edit-poppo-id" className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">{TEXT.poppoId}</label>
+                    <input id="edit-poppo-id" name="id" defaultValue={selectedHost.id} required disabled className="w-full glass-input opacity-50" title="Poppo ID" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label htmlFor="edit-nickname" className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">{TEXT.nickname}</label>
+                    <input id="edit-nickname" name="nickname" defaultValue={selectedHost.nickname} required className="w-full glass-input" title="Nickname" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label htmlFor="edit-name" className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">{TEXT.fullName}</label>
+                    <input id="edit-name" name="name" defaultValue={selectedHost.name} required className="w-full glass-input" title="Full Name" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label htmlFor="edit-role" className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">{TEXT.positionRole}</label>
+                    <select id="edit-role" name="role" defaultValue={selectedHost.role} className="w-full glass-input font-bold" title="Position / Role">
+                      {ROLES.map(p => <option key={p} value={p}>{p}</option>)}
+                    </select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label htmlFor="edit-team" className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">{TEXT.teamAssignment}</label>
+                    <input id="edit-team" name="team" type="text" defaultValue={selectedHost.team} className="w-full glass-input" placeholder="Unassigned" title="Team Assignment" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label htmlFor="edit-manager" className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">{TEXT.manager}</label>
+                    <select id="edit-manager" name="manager" defaultValue={selectedHost.manager} className="w-full glass-input font-bold" title="Manager">
+                      {MANAGERS.map(m => <option key={m} value={m}>{m}</option>)}
+                    </select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label htmlFor="edit-salary" className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">{TEXT.salaryCategory}</label>
+                    <select id="edit-salary" name="base_salary_category" defaultValue={selectedHost.base_salary_category} className="w-full glass-input font-bold" title="Salary Category">
+                      {BASE_SALARY_POLICIES.map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label htmlFor="edit-status" className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">{TEXT.currentStatus}</label>
+                    <select id="edit-status" name="status" defaultValue={selectedHost.status} className="w-full glass-input font-bold" title="Current Status">
+                      {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label htmlFor="edit-anchor-type" className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">{TEXT.anchorType}</label>
+                    <select id="edit-anchor-type" name="anchor_type" defaultValue={selectedHost.anchor_type} className="w-full glass-input font-bold" title="Anchor Type">
+                      {ANCHORS.map(a => <option key={a} value={a}>{a}</option>)}
+                    </select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label htmlFor="edit-level" className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">{TEXT.poppoLevel}</label>
+                    <input id="edit-level" name="level" type="number" defaultValue={selectedHost.level} className="w-full glass-input font-bold" title="Poppo Level" />
+                  </div>
+                  <div className="col-span-2">
+                    <label className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">{TEXT.profilePhoto} {auth.role === 'Director' ? TEXT.profilePhotoUploadOrUrl : TEXT.profilePhotoReadOnly}</label>
+                    <div className="flex gap-4 items-center">
+                      <div className="flex-1 space-y-2">
+                        {auth.role === 'Director' ? (
+                          <>
+                            <input 
+                              type="file" 
+                              accept="image/*"
+                              onChange={handleFileChange}
+                              className="hidden" 
+                              id="profile-photo-upload" 
+                            />
+                            <label 
+                              htmlFor="profile-photo-upload" 
+                              className="w-full h-12 glass-input flex items-center justify-center gap-3 cursor-pointer hover:bg-white/5 transition-all text-xs font-bold text-white/60"
+                            >
+                              <Plus size={16} />
+                              Upload Binary Photo
+                            </label>
+                            <input 
+                              name="photoUrl" 
+                              id="profile-photo-url-input" 
+                              defaultValue={selectedHost.photoUrl} 
+                              className="w-full glass-input" 
+                              placeholder="Or paste external URL..." 
+                              title="Profile Photo URL"
+                              onChange={(e) => setUploadedPhoto(null)}
+                            />
+                          </>
+                        ) : (
+                          <input 
+                            name="photoUrl" 
+                            defaultValue={selectedHost.photoUrl} 
+                            disabled 
+                            className="w-full glass-input opacity-50 cursor-not-allowed" 
+                            title="Profile Photo URL"
+                          />
+                        )}
+                      </div>
+                      <div className="w-20 h-20 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center overflow-hidden shrink-0 shadow-2xl">
+                        <img 
+                          src={uploadedPhoto || selectedHost.photoUrl || "https://api.dicebear.com/7.x/avataaars/svg?seed=preview"} 
+                          alt="Preview" 
+                          className="w-full h-full object-cover" 
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src = 'https://api.dicebear.com/7.x/avataaars/svg?seed=preview';
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="col-span-2">
+                    <label htmlFor="edit-description" className="text-[10px] font-black text-white/40 tracking-widest block mb-1">{TEXT.biography}</label>
+                    <textarea id="edit-description" name="description" defaultValue={selectedHost.description} className="w-full glass-input h-24 resize-none" title="Description / Biography" />
+                  </div>
+                </div>
+                <div className="pt-4 flex gap-4">
+                   <button type="button" onClick={() => setIsEditingHost(false)} className="flex-1 btn-secondary py-3 text-[10px] font-black uppercase tracking-widest">{TEXT.cancel}</button>
+                   <button type="submit" className="flex-[2] btn-primary py-3 text-[10px] font-black uppercase tracking-widest">{TEXT.updateAgencyProfile}</button>
+                </div>
+              </form>
             </motion.div>
           </div>
         )}

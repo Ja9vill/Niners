@@ -6,3 +6,11 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# Service account keys and secrets - NEVER commit these
+gcp-key.json
+*-key.json
+*-service-account.json
+auth-service-account.js
+db-dump.json
+firebase-debug.log

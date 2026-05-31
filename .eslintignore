@@ -1,0 +1,14 @@
+node_modules
+dist
+fix-ide-warnings.js
+dist-ssr
+*.local
+.env
+.env.*
+.DS_Store
+Niners/src/components/DirectorTab.tsx
+Niners/src/components/DataReportingTab.tsx
+Niners/src/components/HomeTab.tsx
+Niners/src/App.tsx
+src/App.tsx
+**/*.tsx

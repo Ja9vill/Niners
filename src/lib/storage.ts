@@ -1,4 +1,4 @@
-import { Host, CommissionEntry, PKEntry, ExposureEntry, DirectorNote, CalendarEvent, ActivityLog, FileEntry, FanbaseHealthEntry, AppNotification, HostTask, PerformanceGoal } from '../types';
+import { Host, CommissionEntry, PKEntry, ExposureEntry, DirectorNote, CalendarEvent, ActivityLog, FileEntry, FanbaseHealthEntry, AppNotification, HostTask, PerformanceGoal, LivehouseRequest } from '../types';
 
 export interface AuthState {
   level: number;
@@ -6,7 +6,6 @@ export interface AuthState {
   name: string;
   poppo_id: string;
   nickname: string;
-  position: string;
   status: string;
   manager_assigned: string;
   anchor_team: string;
@@ -22,7 +21,6 @@ const emptyAuthState: AuthState = {
   name: "",
   poppo_id: "",
   nickname: "",
-  position: "",
   status: "",
   manager_assigned: "",
   anchor_team: "",
@@ -96,6 +94,9 @@ export const Storage = {
   getGoals: (hostId: string): PerformanceGoal[] => JSON.parse(localStorage.getItem(`${PREFIX}goals_${hostId}`) || '[]'),
   setGoals: (hostId: string, goals: PerformanceGoal[]) => localStorage.setItem(`${PREFIX}goals_${hostId}`, JSON.stringify(goals)),
 
+  getLivehouseRequests: (): LivehouseRequest[] => JSON.parse(localStorage.getItem(`${PREFIX}livehouse_requests`) || '[]'),
+  setLivehouseRequests: (requests: LivehouseRequest[]) => localStorage.setItem(`${PREFIX}livehouse_requests`, JSON.stringify(requests)),
+
   getAuthState(): AuthState {
     try {
       const raw = sessionStorage.getItem(`${PREFIX}auth`);
@@ -108,7 +109,6 @@ export const Storage = {
         name: String(parsed?.name || ""),
         poppo_id: String(parsed?.poppo_id || ""),
         nickname: String(parsed?.nickname || ""),
-        position: String(parsed?.position || ""),
         status: String(parsed?.status || ""),
         manager_assigned: String(parsed?.manager_assigned || ""),
         anchor_team: String(parsed?.anchor_team || ""),
@@ -129,7 +129,6 @@ export const Storage = {
       name: String(state?.name || ""),
       poppo_id: String(state?.poppo_id || ""),
       nickname: String(state?.nickname || ""),
-      position: String(state?.position || ""),
       status: String(state?.status || ""),
       manager_assigned: String(state?.manager_assigned || ""),
       anchor_team: String(state?.anchor_team || ""),

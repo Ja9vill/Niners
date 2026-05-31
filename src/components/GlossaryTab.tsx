@@ -2,7 +2,7 @@ import { useState } from "react";
 import { signInWithPopup, signOut } from "firebase/auth";
 import { auth, googleProvider } from "../lib/firebase";
 
-export function GlossaryTab() {
+export const GlossaryTab = () => {
   const [message, setMessage] = useState("");
 
   const handleGoogleLogin = async () => {
