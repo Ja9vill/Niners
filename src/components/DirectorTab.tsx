@@ -1371,8 +1371,7 @@ export const DirectorTab = () => {
                         setIsLoading(true);
                         try {
                           const rawText = rosterPasteText.trim();
-                          const rows = rawText.split('
-').filter(line => line.trim() !== '').map(line => line.split('\t'));
+                          const rows = rawText.split('\n').filter(line => line.trim() !== '').map(line => line.split('\t'));
                           
                           // Skip header row if pasted
                           const startIdx = (rows[0] && (
@@ -1850,10 +1849,8 @@ export const DirectorTab = () => {
                         id="bulk-ledger-paste"
                         placeholder={
                           financialTab === 'monthly'
-                            ? "Paste monthly columns (tab-separated):
-PoppoID\tMonth\tYear\tNickname\tLiveHours\tPartyHours\tTotalPoints\tAgentCommission\tLiveEarnings\tPartyEarnings\tPrivateChat\tTips\tPlatformReward\tOtherEarnings\tHourlySalary\tSuperSalary\tSuperRank\tLevel"
-                            : "Paste weekly columns (tab-separated):
-PoppoID\tFromDate\tToDate\tNickname\tLiveHours\tPartyHours\tTotalPoints\tAgentCommission\tLiveEarnings\tPartyEarnings\tPrivateChat\tTips\tPlatformReward\tOtherEarnings\tHourlySalary\tSuperSalary\tSuperRank\tLevel"
+                            ? "Paste monthly columns (tab-separated):\nPoppoID\tMonth\tYear\tNickname\tLiveHours\tPartyHours\tTotalPoints\tAgentCommission\tLiveEarnings\tPartyEarnings\tPrivateChat\tTips\tPlatformReward\tOtherEarnings\tHourlySalary\tSuperSalary\tSuperRank\tLevel"
+                            : "Paste weekly columns (tab-separated):\nPoppoID\tFromDate\tToDate\tNickname\tLiveHours\tPartyHours\tTotalPoints\tAgentCommission\tLiveEarnings\tPartyEarnings\tPrivateChat\tTips\tPlatformReward\tOtherEarnings\tHourlySalary\tSuperSalary\tSuperRank\tLevel"
                         }
                         className="flex-1 h-24 glass-input font-mono text-[9px] resize-none focus:ring-1 focus:ring-[#D4AF37] text-[#F0EFE8] bg-[#0D0D14] border border-white/10"
                       />
