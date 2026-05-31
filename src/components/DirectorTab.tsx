@@ -208,8 +208,7 @@ export const DirectorTab = () => {
 
   const handleBulkPaste = (text: string) => {
     if (!text.trim()) return;
-    const rows = text.split('
-').filter(r => r.trim() !== '').map(r => r.split('\t'));
+    const rows = text.split('\n').filter(r => r.trim() !== '').map(r => r.split('\t'));
     const setLedger = financialTab === 'monthly' ? setMonthlyLedger : setWeeklyLedger;
 
     const startIdx = (rows[0] && (
