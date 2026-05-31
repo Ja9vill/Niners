@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
-import { Menu, X, Instagram, Facebook, MessageCircle, Shield, Home, Trophy, UserPlus } from 'lucide-react';
+import { Menu, X, Instagram, Facebook, MessageCircle, Shield, Home, Trophy, UserPlus, Users, Calendar, PlayCircle } from 'lucide-react';
 import { cn } from '../lib/utils';
 import appLogo from '../logo.jpg';
 
@@ -119,7 +119,33 @@ export const PublicLayout = () => {
           })}
         </nav>
 
-        <div className="p-6 border-t border-white/5 shrink-0">
+        <div className="p-6 border-t border-white/5 shrink-0 flex flex-col gap-6">
+          <div className="flex items-center justify-center gap-8">
+            <a 
+              href="https://wa.me/message/5Y6QFQXSIEZRI1" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="text-[#25D366] hover:scale-110 transition-transform"
+            >
+              <MessageCircle size={24} className="fill-current" />
+            </a>
+            <a 
+              href="https://instagram.com/9talentManagement" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="text-[#E1306C] hover:scale-110 transition-transform"
+            >
+              <Instagram size={24} />
+            </a>
+            <a 
+              href="https://facebook.com/9talentManagement" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="text-[#1877F2] hover:scale-110 transition-transform"
+            >
+              <Facebook size={24} className="fill-current" />
+            </a>
+          </div>
           <Link 
             to="/login"
             onClick={() => setIsDrawerOpen(false)}
@@ -137,33 +163,36 @@ export const PublicLayout = () => {
 
       {/* Sticky Mobile Channels Footer */}
       <footer className="sticky bottom-0 z-40 w-full bg-[#11111A] border-t border-white/5 pb-safe">
-        <div className="max-w-screen-xl mx-auto px-4 h-16 flex items-center justify-around">
+        <div className="max-w-screen-xl mx-auto px-2 h-16 flex items-center justify-between">
+          <Link 
+            to="/leaderboards" 
+            className="flex flex-col items-center justify-center gap-1 text-[#A09E9A] hover:text-[#D4AF37] transition-colors flex-1"
+          >
+            <Trophy size={20} />
+            <span className="text-[9px] font-bold uppercase tracking-wider">Top Niners</span>
+          </Link>
+          <Link 
+            to="/roster" 
+            className="flex flex-col items-center justify-center gap-1 text-[#A09E9A] hover:text-[#D4AF37] transition-colors flex-1"
+          >
+            <Users size={20} />
+            <span className="text-[9px] font-bold uppercase tracking-wider">Roster</span>
+          </Link>
+          <Link 
+            to="/calendar" 
+            className="flex flex-col items-center justify-center gap-1 text-[#A09E9A] hover:text-[#D4AF37] transition-colors flex-1"
+          >
+            <Calendar size={20} />
+            <span className="text-[9px] font-bold uppercase tracking-wider">Calendar</span>
+          </Link>
           <a 
-            href="https://wa.me/message/5Y6QFQXSIEZRI1" 
+            href="https://invite-poppo.com/6CxF5E" 
             target="_blank" 
             rel="noopener noreferrer"
-            className="flex flex-col items-center justify-center gap-1 text-[#25D366] hover:scale-110 transition-transform flex-1"
+            className="flex flex-col items-center justify-center gap-1 text-[#A09E9A] hover:text-[#D4AF37] transition-colors flex-1"
           >
-            <MessageCircle size={22} className="fill-current" />
-            <span className="text-[9px] font-bold uppercase tracking-wider">WhatsApp</span>
-          </a>
-          <a 
-            href="https://instagram.com/9talentManagement" 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className="flex flex-col items-center justify-center gap-1 text-[#E1306C] hover:scale-110 transition-transform flex-1"
-          >
-            <Instagram size={22} />
-            <span className="text-[9px] font-bold uppercase tracking-wider">Instagram</span>
-          </a>
-          <a 
-            href="https://facebook.com/9talentManagement" 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className="flex flex-col items-center justify-center gap-1 text-[#1877F2] hover:scale-110 transition-transform flex-1"
-          >
-            <Facebook size={22} className="fill-current" />
-            <span className="text-[9px] font-bold uppercase tracking-wider">Facebook</span>
+            <PlayCircle size={20} />
+            <span className="text-[9px] font-bold uppercase tracking-wider">Poppo Live</span>
           </a>
         </div>
       </footer>
