@@ -352,7 +352,7 @@ export const DirectorTab = () => {
       try {
         await FirebaseService.saveFinancials(type, validDataToSave);
       } catch (e) {
-        console.warn("Legacy saveFinancials failed, but performance_report succeeded", e);
+        console.warn("Legacy saveFinancials failed, but performance_reports succeeded", e);
       }
       
       await auditLogAction('SAVE_FINANCIALS_STORAGE', null, { type, count: validDataToSave.length });

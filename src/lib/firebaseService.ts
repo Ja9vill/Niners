@@ -788,7 +788,7 @@ export const FirebaseService = {
   },
 
   async savePerformanceReport(data: any[]): Promise<void> {
-    const path = 'performance_report';
+    const path = 'performance_reports';
     try {
       const batch = writeBatch(db);
       data.forEach(r => {
