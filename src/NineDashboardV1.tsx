@@ -568,6 +568,21 @@ export default function App() {
           
           {/* ===== RIGHT HEADER ACTIONS ===== */}
           <div className="flex items-center gap-1 sm:gap-2">
+            {/* Revert to Director Toggle */}
+            {authState.originalRole === 'director' && (
+              <button 
+                onClick={() => {
+                  Storage.setMockRole(null);
+                  window.location.reload();
+                }}
+                className="px-3 py-1 bg-red-500/20 text-red-400 border border-red-500/30 rounded-lg text-xs font-bold hover:bg-red-500/30 transition-colors flex items-center gap-1.5 whitespace-nowrap mr-1"
+                title="Revert to Director View"
+              >
+                <LogOut size={14} className="shrink-0" />
+                <span className="hidden sm:inline">Revert</span>
+              </button>
+            )}
+            
             {/* View Toggle */}
             <div className="relative">
               <button 

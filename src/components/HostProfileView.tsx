@@ -546,7 +546,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
   );
 
   const renderBiographyCard = () => {
-    if (!host.description && !isEditing) return null;
+    if (!host.bio && !host.description && !isEditing) return null;
     return (
       <div className="bg-[#1A1A28] border border-white/5 rounded-2xl p-4 space-y-2 shadow-md">
         <h4 className="text-[8px] font-black text-[#A09E9A] uppercase tracking-widest leading-none">BIOGRAPHY</h4>
@@ -559,9 +559,58 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
             className="w-full bg-[#0D0D14] border border-white/10 rounded-xl p-2 text-xs text-[#F0EFE8] resize-none focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] outline-none"
           />
         ) : (
-          <p className="text-xs text-[#A09E9A] leading-relaxed italic">
-            "{host.description || 'No biography or talent assessment provided.'}"
+          <p className="text-xs text-[#A09E9A] leading-relaxed italic whitespace-pre-wrap">
+            "{host.bio || host.description || 'No biography or talent assessment provided.'}"
           </p>
+        )}
+      </div>
+    );
+  };
+
+  const renderSocialAndStreamingCard = () => {
+    if (!host.social_links && (!host.streaming_hours || host.streaming_hours.length === 0)) return null;
+    
+    return (
+      <div className="bg-[#1A1A28] border border-white/5 rounded-2xl p-4 space-y-4 shadow-md">
+        {host.social_links && (
+          <div className="space-y-2">
+            <h4 className="text-[8px] font-black text-[#A09E9A] uppercase tracking-widest leading-none">SOCIAL MEDIA</h4>
+            <div className="flex flex-wrap gap-2">
+              {host.social_links.ig && (
+                <a href={host.social_links.ig.startsWith('http') ? host.social_links.ig : `https://instagram.com/${host.social_links.ig.replace('@', '')}`} target="_blank" rel="noopener noreferrer" className="px-2 py-1 bg-pink-500/10 border border-pink-500/20 text-pink-400 rounded-md text-[10px] font-bold hover:bg-pink-500/20 transition-colors">
+                  Instagram
+                </a>
+              )}
+              {host.social_links.tiktok && (
+                <a href={host.social_links.tiktok.startsWith('http') ? host.social_links.tiktok : `https://tiktok.com/@${host.social_links.tiktok.replace('@', '')}`} target="_blank" rel="noopener noreferrer" className="px-2 py-1 bg-[#00f2fe]/10 border border-[#00f2fe]/20 text-[#00f2fe] rounded-md text-[10px] font-bold hover:bg-[#00f2fe]/20 transition-colors">
+                  TikTok
+                </a>
+              )}
+              {host.social_links.fb && (
+                <a href={host.social_links.fb.startsWith('http') ? host.social_links.fb : `https://facebook.com/${host.social_links.fb}`} target="_blank" rel="noopener noreferrer" className="px-2 py-1 bg-blue-500/10 border border-blue-500/20 text-blue-400 rounded-md text-[10px] font-bold hover:bg-blue-500/20 transition-colors">
+                  Facebook
+                </a>
+              )}
+              {host.social_links.whatsapp && (
+                <span className="px-2 py-1 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-md text-[10px] font-bold">
+                  WA: {host.social_links.whatsapp}
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+
+        {host.streaming_hours && host.streaming_hours.length > 0 && (
+          <div className="space-y-2 pt-2 border-t border-white/5">
+            <h4 className="text-[8px] font-black text-[#A09E9A] uppercase tracking-widest leading-none">STREAMING SCHEDULE</h4>
+            <div className="grid grid-cols-2 gap-2">
+              {host.streaming_hours.map((slot, idx) => (
+                <div key={idx} className="bg-[#0D0D14] border border-white/5 rounded p-1.5 text-center">
+                  <span className="text-[10px] font-bold text-[#F0EFE8]">{slot.from} - {slot.to}</span>
+                </div>
+              ))}
+            </div>
+          </div>
         )}
       </div>
     );
@@ -1041,6 +1090,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
             <>
               {renderIdentityCard()}
               {renderBiographyCard()}
+              {renderSocialAndStreamingCard()}
               {renderPerformanceHistory()}
               {renderEarningsTrend()}
               <div className="flex flex-col md:flex-row gap-6">
@@ -1062,6 +1112,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
               <div className="space-y-6 lg:col-span-1">
                 {renderIdentityCard()}
                 {renderBiographyCard()}
+                {renderSocialAndStreamingCard()}
               </div>
               
               {/* Right Column (Metrics & Performance) */}

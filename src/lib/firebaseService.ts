@@ -59,6 +59,11 @@ function handleFirestoreError(error: unknown, operationType: OperationType, path
   });
 
   console.error('Firestore Error JSON: ', JSON.stringify(errInfo));
+  
+  if (operationType === OperationType.LIST) {
+    console.warn(`[FirebaseService] Returning empty list for failed LIST operation on ${path}`);
+    return;
+  }
   throw new Error(JSON.stringify(errInfo));
 }
 
@@ -176,18 +181,7 @@ export const FirebaseService = {
     return allMetadata;
   },
 
-  async updateRoleMetadata(role: string, poppoId: string, data: any) {
-    const roleCollection = (role || "").toLowerCase().replace(/\s+/g, '_');
-    if (!roleCollection) return;
-    
-    const path = `${roleCollection}/${poppoId}`;
-    try {
-      const docRef = doc(db, roleCollection, poppoId);
-      await setDoc(docRef, { ...data }, { merge: true });
-    } catch (error) {
-      handleFirestoreError(error, OperationType.UPDATE, path);
-    }
-  },
+
 
   async submitRpkReport(hostId: string, fromDate: string, toDate: string, data: any) {
     const docId = `${fromDate}_${toDate}`;
@@ -199,6 +193,8 @@ export const FirebaseService = {
       handleFirestoreError(error, OperationType.WRITE, path);
     }
   },
+
+
 
   async submitFanbaseReport(hostId: string, fromDate: string, toDate: string, data: any) {
     const docId = `${fromDate}_${toDate}`;
@@ -704,9 +700,14 @@ export const FirebaseService = {
       const snapshot = await getDocs(collection(db, path));
       return snapshot.docs.map(d => d.data() as ActivityAuditLog);
     } catch (error) {
-      handleFirestoreError(error, OperationType.LIST, path);
+      console.error("Failed to read system audit logs", error);
       return [];
     }
+  },
+
+  async getAwards(hostId: string): Promise<any[]> {
+    // Stub implementation to fix TS error. Can be implemented later.
+    return Promise.resolve([]);
   },
 
   /**

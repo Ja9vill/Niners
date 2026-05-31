@@ -135,6 +135,8 @@ export const ProfilesTab: React.FC<ProfilesTabProps> = ({ isReadOnly = false }) 
           <select
             value={roleFilter}
             onChange={(e) => setRoleFilter(e.target.value as any)}
+            title="Filter by Role"
+            aria-label="Filter by Role"
             className="pl-9 pr-4 py-2 bg-black/20 border border-white/10 rounded-xl text-xs text-[#F0EFE8] focus:outline-none focus:border-indigo-500/50 w-full appearance-none"
           >
             <option value="All Members">All Members</option>
@@ -149,6 +151,8 @@ export const ProfilesTab: React.FC<ProfilesTabProps> = ({ isReadOnly = false }) 
           <select
             value={tierFilter}
             onChange={(e) => setTierFilter(e.target.value)}
+            title="Filter by Tier"
+            aria-label="Filter by Tier"
             className="pl-9 pr-4 py-2 bg-black/20 border border-white/10 rounded-xl text-xs text-[#F0EFE8] focus:outline-none focus:border-indigo-500/50 w-full appearance-none"
           >
             <option value="All Tiers">All Tiers</option>
@@ -248,6 +252,8 @@ export const ProfilesTab: React.FC<ProfilesTabProps> = ({ isReadOnly = false }) 
               </div>
               <button 
                 onClick={closeSpotlight}
+                title="Close Spotlight"
+                aria-label="Close Spotlight"
                 className="p-2 rounded-xl hover:bg-white/10 text-[#A09E9A] hover:text-white transition-colors"
               >
                 <X size={20} />

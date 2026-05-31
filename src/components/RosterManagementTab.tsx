@@ -59,7 +59,7 @@ interface RosterManagementTabProps {
   auditLogAction: (actionType: string, beforeValue: any, afterValue: any) => Promise<void>;
 }
 
-export const RosterManagementTab: React.FC<RosterManagementTabProps> = ({ onUpdate, auditLogAction }) => {
+export const RosterManagementTab: React.FC<RosterManagementTabProps> = ({ hosts, onUpdate, auditLogAction }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('All');
   const [users, setUsers] = useState<any[]>([]);
@@ -70,6 +70,7 @@ export const RosterManagementTab: React.FC<RosterManagementTabProps> = ({ onUpda
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const hasUnsavedChanges = Object.keys(editedHosts).length > 0;
 
   // Upload State
   const [selectedHostForUpload, setSelectedHostForUpload] = useState<any>(null);
@@ -77,25 +78,32 @@ export const RosterManagementTab: React.FC<RosterManagementTabProps> = ({ onUpda
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    const fetchUsers = async () => {
-      setIsLoadingUsers(true);
-      try {
-        setFetchError(null);
-        const fetchedUsers = await FirebaseService.getAllRoleMetadata();
-        if (!fetchedUsers || fetchedUsers.length === 0) {
-          setFetchError("getAllRoleMetadata returned 0 users. Likely a permissions issue or empty database.");
+    if (hosts && hosts.length > 0) {
+      const mappedUsers = hosts.map(u => ({ ...u, id: u.id || (u as any).poppo_id || (u as any).poppoId }));
+      setUsers(mappedUsers);
+      setIsLoadingUsers(false);
+      setFetchError(null);
+    } else {
+      const fetchUsers = async () => {
+        setIsLoadingUsers(true);
+        try {
+          setFetchError(null);
+          const fetchedUsers = await FirebaseService.getAllRoleMetadata();
+          if (!fetchedUsers || fetchedUsers.length === 0) {
+            setFetchError("getAllRoleMetadata returned 0 users. Likely a permissions issue or empty database.");
+          }
+          const mappedUsers = fetchedUsers.map(u => ({ ...u, id: u.poppo_id || u.poppoId || u.id }));
+          setUsers(mappedUsers);
+        } catch (error: any) {
+          console.error("Error fetching users:", error);
+          setFetchError(error.message || String(error));
+        } finally {
+          setIsLoadingUsers(false);
         }
-        const mappedUsers = fetchedUsers.map(u => ({ ...u, id: u.poppo_id || u.poppoId || u.id }));
-        setUsers(mappedUsers);
-      } catch (error: any) {
-        console.error("Error fetching users:", error);
-        setFetchError(error.message || String(error));
-      } finally {
-        setIsLoadingUsers(false);
-      }
-    };
-    fetchUsers();
-  }, [saveSuccess]); // Refetch when save is successful
+      };
+      fetchUsers();
+    }
+  }, [hosts, saveSuccess]); // Refetch when save is successful
 
   // Managers/Agents list for the 'Assigned Manager' dropdown
   const managerOptions = useMemo(() => {
@@ -464,7 +472,9 @@ export const RosterManagementTab: React.FC<RosterManagementTabProps> = ({ onUpda
         ref={fileInputRef} 
         onChange={handleFileChange} 
         accept="image/*" 
-        className="hidden" 
+        className="hidden"
+        title="Upload profile photo"
+        aria-label="Upload profile photo"
       />
 
       {/* Upload Spotlight Modal */}
@@ -482,6 +492,8 @@ export const RosterManagementTab: React.FC<RosterManagementTabProps> = ({ onUpda
                 onClick={() => !isUploading && setSelectedHostForUpload(null)}
                 className="p-1.5 rounded-lg hover:bg-white/10 text-[#A09E9A] hover:text-white transition-colors disabled:opacity-50"
                 disabled={isUploading}
+                title="Close modal"
+                aria-label="Close modal"
               >
                 <X size={18} />
               </button>

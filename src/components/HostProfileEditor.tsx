@@ -275,6 +275,8 @@ export const HostProfileEditor = () => {
                     </div>
                     <button 
                       onClick={() => removeTimeSlot(index)}
+                      title="Remove Timeslot"
+                      aria-label="Remove Timeslot"
                       className="p-2 text-[#A09E9A] hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
                     >
                       <Trash2 size={14} />

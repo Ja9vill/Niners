@@ -113,7 +113,7 @@ export const HostSpotlightModal: React.FC<HostSpotlightModalProps> = ({
           </div>
           
           <div className="flex flex-col items-end gap-3">
-            <button onClick={onClose} className="p-2 hover:bg-white/5 rounded-full transition-colors text-[#A09E9A] hover:text-white">
+            <button onClick={onClose} className="p-2 hover:bg-white/5 rounded-full transition-colors text-[#A09E9A] hover:text-white" title="Close modal" aria-label="Close modal">
               <X size={24} />
             </button>
             {hasChanges && (
@@ -145,6 +145,8 @@ export const HostSpotlightModal: React.FC<HostSpotlightModalProps> = ({
                     value={getDisplayValue('status') as string || 'Active'}
                     onChange={(e) => handleFieldChange('status', e.target.value)}
                     className="w-full bg-black/20 border border-white/10 rounded-xl px-3 py-2 text-sm text-[#F0EFE8] focus:outline-none focus:border-indigo-500/50"
+                    title="Select status"
+                    aria-label="Select status"
                   >
                     {['Active', 'Inconsistent', 'Inactive', 'Releasing', 'Released'].map(s => (
                       <option key={s} value={s} className="bg-[#1A1A28]">{s}</option>
@@ -157,6 +159,8 @@ export const HostSpotlightModal: React.FC<HostSpotlightModalProps> = ({
                     value={getDisplayValue('tier_pay' as any) as string || ''}
                     onChange={(e) => handleFieldChange('tier_pay' as any, e.target.value)}
                     className="w-full bg-black/20 border border-white/10 rounded-xl px-3 py-2 text-sm text-[#F0EFE8] focus:outline-none focus:border-indigo-500/50"
+                    title="Select tier pay"
+                    aria-label="Select tier pay"
                   >
                     <option value="" className="bg-[#1A1A28]">Select Tier...</option>
                     {['Star Host', 'Rocket Host', 'S idol', 'Esports', 'Regular Host', 'Influencer'].map(t => (
@@ -186,6 +190,8 @@ export const HostSpotlightModal: React.FC<HostSpotlightModalProps> = ({
                         handleFieldChange('assigned_manager' as any, matched ? matched.name : '');
                       }}
                       className="w-full bg-black/20 border border-white/10 rounded-xl px-3 py-2 text-sm text-[#F0EFE8] focus:outline-none focus:border-indigo-500/50"
+                      title="Select assigned manager"
+                      aria-label="Select assigned manager"
                     >
                       <option value="" className="bg-[#1A1A28]">No Manager</option>
                       {managerOptions.map(m => (
