@@ -1,5 +1,5 @@
 import { auth, db, storage } from './firebase';
-import { ref, uploadString, getBytes } from 'firebase/storage';
+import { ref, uploadString, getBytes, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { Storage } from './storage';
 import { doc, setDoc, getDoc, collection, query, where, getDocs, deleteDoc, writeBatch, Timestamp, onSnapshot, updateDoc } from 'firebase/firestore';
 import { CommissionEntry, Host, PKEntry, ExposureEntry, FanbaseHealthEntry, WeeklyLiveDataEntry, MonthlyLiveDataEntry, TopNinersEarningsSummary, EventsCalendarPublic, ReportingSubmission, Task, ActivityAuditLog, CalendarEvent, LivehouseRequest } from '../types';
@@ -82,6 +82,69 @@ export const FirebaseService = {
       await setDoc(docRef, { ...data, updated_at: new Date().toISOString() }, { merge: true });
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, path);
+    }
+  },
+
+  async updateRoleMetadata(role: string, id: string, data: any): Promise<void> {
+    try {
+      if (!id) throw new Error("ID is required for role metadata updates.");
+      const safeRole = (role || 'host').toLowerCase().replace(/\s+/g, '_');
+      
+      const roleRef = doc(db, safeRole, id);
+      const userRef = doc(db, 'users', id);
+      
+      const finalData = { ...data, updated_at: new Date().toISOString() };
+      
+      // Attempt to update the users collection first as the source of truth
+      try {
+        await setDoc(userRef, finalData, { merge: true });
+      } catch (e: any) {
+         console.warn(`[UPDATE] Could not update 'users' collection for ID: ${id}: ${e.message}`);
+      }
+
+      await setDoc(roleRef, finalData, { merge: true });
+      console.log(`[UPDATE] Role metadata updated for ${id} in ${safeRole}`);
+    } catch (error: any) {
+      console.error(`[UPDATE] Role metadata error for ID: ${id}`, error);
+      handleFirestoreError(error, OperationType.UPDATE, `role_metadata/${id}`);
+    }
+  },
+
+  async uploadProfilePhoto(file: File, id: string, name: string, role: string): Promise<string> {
+    try {
+      if (!file || !id) throw new Error("File and ID are required.");
+      
+      // Create SEO friendly filename based on nickname
+      const extension = file.name.split('.').pop()?.toLowerCase() || 'jpg';
+      const cleanName = (name || id).replace(/[^a-zA-Z0-9-]/g, '-').toLowerCase();
+      const fileName = `${cleanName}-${id}.${extension}`;
+      const storageRef = ref(storage, `profile_photos/${fileName}`);
+
+      // Set SEO optimized metadata
+      const metadata = {
+        contentType: file.type,
+        cacheControl: 'public,max-age=31536000',
+        customMetadata: {
+          alt: `${name} - Nine Dashboard Profile`,
+          description: `Profile photo for ${name} (${role}) on Nine Dashboard.`,
+          'og:image': 'true',
+          uploadedAt: new Date().toISOString()
+        }
+      };
+
+      // Upload the file
+      await uploadBytes(storageRef, file, metadata);
+      
+      // Get the direct download URL
+      const downloadURL = await getDownloadURL(storageRef);
+
+      // Update both the specific role collection and the main 'users' collection
+      await this.updateRoleMetadata(role, id, { photoUrl: downloadURL });
+
+      return downloadURL;
+    } catch (error: any) {
+      console.error(`[UPLOAD] Profile photo upload failed for ID: ${id}`, error);
+      throw error;
     }
   },
 

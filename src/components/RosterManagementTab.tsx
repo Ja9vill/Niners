@@ -1,6 +1,6 @@
 /* eslint-disable */
 import React, { useState, useMemo, useEffect } from 'react';
-import { Loader2, Save, Search, UserCircle, CheckCircle2, Database } from 'lucide-react';
+import { Loader2, Save, Search, UserCircle, CheckCircle2, Database, UploadCloud, X, Camera } from 'lucide-react';
 import { cn, formatDate } from '../lib/utils';
 import { FirebaseService } from '../lib/firebaseService';
 import { Storage } from '../lib/storage';
@@ -70,6 +70,11 @@ export const RosterManagementTab: React.FC<RosterManagementTabProps> = ({ onUpda
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
+
+  // Upload State
+  const [selectedHostForUpload, setSelectedHostForUpload] = useState<any>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const fetchUsers = async () => {
@@ -196,22 +201,56 @@ export const RosterManagementTab: React.FC<RosterManagementTabProps> = ({ onUpda
       : host[field];
   };
 
-  const hasUnsavedChanges = Object.keys(editedHosts).length > 0;
+  const handlePhotoClick = (host: any) => {
+    setSelectedHostForUpload(host);
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !selectedHostForUpload) return;
+    
+    setIsUploading(true);
+    try {
+      const id = selectedHostForUpload.poppo_id || selectedHostForUpload.poppoId || selectedHostForUpload.id;
+      const name = selectedHostForUpload.nickname || selectedHostForUpload.name;
+      const role = selectedHostForUpload.role || 'host';
+      
+      const downloadURL = await FirebaseService.uploadProfilePhoto(file, id, name, role);
+      
+      // Update local state instantly so the UI reflects the change without a full refetch
+      setUsers(prev => prev.map(u => 
+        (u.poppo_id || u.poppoId || u.id) === id 
+          ? { ...u, photoUrl: downloadURL } 
+          : u
+      ));
+      
+      setSelectedHostForUpload(null);
+      if (auditLogAction) {
+        await auditLogAction('UPLOAD_PROFILE_PHOTO', null, { hostId: id, url: downloadURL });
+      }
+    } catch (error: any) {
+      alert("Failed to upload photo: " + (error.message || String(error)));
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-[#1A1A28] p-4 rounded-2xl border border-white/5">
-        <div className="flex flex-col w-full sm:w-auto">
-          <div className="flex flex-wrap gap-4 w-full sm:w-auto">
-            {/* Search */}
+      <div className="flex justify-between items-center bg-[#1A1A28] p-4 rounded-2xl border border-white/5">
+        <div className="flex items-center gap-3">
+          {/* Search */}
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[#A09E9A]/50" size={16} />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[#A09E9A]/50" size={14} />
             <input
               type="text"
-              placeholder="Search by ID or Nickname..."
+              placeholder="Search ID or Name..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-9 pr-4 py-2 bg-black/20 border border-white/10 rounded-xl text-xs text-[#F0EFE8] focus:outline-none focus:border-indigo-500/50 w-full sm:w-64"
+              className="pl-8 pr-3 py-1.5 bg-black/20 border border-white/10 rounded-lg text-[11px] text-[#F0EFE8] focus:outline-none focus:border-indigo-500/50 w-48"
             />
           </div>
 
@@ -220,7 +259,7 @@ export const RosterManagementTab: React.FC<RosterManagementTabProps> = ({ onUpda
             title="Filter by Role"
             value={roleFilter}
             onChange={(e) => setRoleFilter(e.target.value)}
-            className="bg-black/20 border border-white/10 rounded-xl px-4 py-2 text-xs text-[#F0EFE8] focus:outline-none focus:border-indigo-500/50"
+            className="bg-black/20 border border-white/10 rounded-lg px-3 py-1.5 text-[11px] text-[#F0EFE8] focus:outline-none focus:border-indigo-500/50"
           >
             <option value="All">All Roles</option>
             <option value="Host">Host</option>
@@ -228,13 +267,13 @@ export const RosterManagementTab: React.FC<RosterManagementTabProps> = ({ onUpda
             <option value="Agent">Agent</option>
             <option value="Head Admin">Head Admin</option>
           </select>
-        </div>
-        <div className="mt-2 text-xs text-[#A09E9A]/60 font-mono">
-          System Diagnostics: Total Raw Users Fetched: {users.length} | Visible After Filters: {filteredHosts.length}
-        </div>
+          
+          <div className="text-[10px] text-[#A09E9A]/60 font-mono ml-2">
+            ({filteredHosts.length} users)
+          </div>
         </div>
 
-        <div className="flex items-center gap-3 w-full sm:w-auto justify-end min-h-[36px]">
+        <div className="flex items-center gap-3 justify-end min-h-[36px]">
           {saveSuccess && (
             <span className="text-emerald-400 text-xs font-bold flex items-center gap-1 animate-pulse">
               <CheckCircle2 size={14} /> Saved!
@@ -306,13 +345,22 @@ export const RosterManagementTab: React.FC<RosterManagementTabProps> = ({ onUpda
 
                       <td className="px-6 py-3 sticky left-0 z-10 bg-[#1A1A28] border-r border-white/5 shadow-[4px_0_10px_rgba(0,0,0,0.2)] w-[120px] min-w-[120px]">
                         <div className="flex items-center gap-3">
-                          {host.photoUrl ? (
-                            <img src={host.photoUrl} alt="" className="w-8 h-8 rounded-full border border-white/10" />
-                          ) : (
-                            <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center border border-white/10 flex-shrink-0">
-                              <UserCircle size={16} className="text-[#A09E9A]/50" />
+                          <button 
+                            onClick={() => handlePhotoClick(host)}
+                            className="relative group w-8 h-8 rounded-full border border-white/10 flex-shrink-0 overflow-hidden cursor-pointer bg-white/5 hover:border-indigo-400 transition-colors"
+                            title="Update Profile Photo"
+                          >
+                            {host.photoUrl ? (
+                              <img src={host.photoUrl} alt="" className="w-full h-full object-cover" />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center">
+                                <UserCircle size={16} className="text-[#A09E9A]/50 group-hover:text-indigo-400" />
+                              </div>
+                            )}
+                            <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                              <Camera size={14} className="text-white" />
                             </div>
-                          )}
+                          </button>
                           <span className="font-bold text-[#F0EFE8] truncate">{host.nickname || host.name}</span>
                         </div>
                       </td>
@@ -409,6 +457,87 @@ export const RosterManagementTab: React.FC<RosterManagementTabProps> = ({ onUpda
           </table>
         </div>
       </div>
+
+      {/* Hidden File Input */}
+      <input 
+        type="file" 
+        ref={fileInputRef} 
+        onChange={handleFileChange} 
+        accept="image/*" 
+        className="hidden" 
+      />
+
+      {/* Upload Spotlight Modal */}
+      {selectedHostForUpload && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="bg-[#13131E] border border-white/10 rounded-3xl w-full max-w-md flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className="p-5 border-b border-white/5 flex justify-between items-start">
+              <div>
+                <h3 className="text-lg font-black text-white">Update Profile Photo</h3>
+                <p className="text-xs text-[#A09E9A] mt-1 font-mono">
+                  ID: {selectedHostForUpload.poppo_id || selectedHostForUpload.poppoId || selectedHostForUpload.id}
+                </p>
+              </div>
+              <button 
+                onClick={() => !isUploading && setSelectedHostForUpload(null)}
+                className="p-1.5 rounded-lg hover:bg-white/10 text-[#A09E9A] hover:text-white transition-colors disabled:opacity-50"
+                disabled={isUploading}
+              >
+                <X size={18} />
+              </button>
+            </div>
+            
+            <div className="p-8 flex flex-col items-center">
+              <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-indigo-500/30 mb-6 bg-black/50 relative group">
+                {selectedHostForUpload.photoUrl ? (
+                  <img src={selectedHostForUpload.photoUrl} alt="" className={cn("w-full h-full object-cover transition-opacity", isUploading && "opacity-50")} />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center">
+                    <UserCircle size={64} className="text-[#A09E9A]/30" />
+                  </div>
+                )}
+                
+                {isUploading && (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 backdrop-blur-sm">
+                    <Loader2 size={24} className="text-indigo-400 animate-spin mb-2" />
+                    <span className="text-[10px] font-bold text-white uppercase tracking-wider">Uploading...</span>
+                  </div>
+                )}
+              </div>
+
+              <div className="text-center space-y-4">
+                <p className="text-sm text-[#F0EFE8]">
+                  Select a new profile photo for <strong className="text-indigo-400">{selectedHostForUpload.nickname || selectedHostForUpload.name}</strong>.
+                </p>
+                <p className="text-xs text-[#A09E9A]">
+                  The image will be automatically optimized for SEO and saved to their official profile.
+                </p>
+              </div>
+            </div>
+
+            <div className="p-5 border-t border-white/5 bg-[#1A1A28] flex justify-end gap-3">
+              <button
+                onClick={() => setSelectedHostForUpload(null)}
+                className="px-4 py-2 rounded-xl text-xs font-bold text-[#A09E9A] hover:text-white hover:bg-white/5 transition-colors"
+                disabled={isUploading}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isUploading}
+                className={cn(
+                  "px-6 py-2 rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-2 transition-all",
+                  isUploading ? "bg-white/5 text-[#A09E9A]/50 cursor-not-allowed" : "bg-indigo-500 hover:bg-indigo-400 text-white shadow-[0_0_15px_rgba(99,102,241,0.3)]"
+                )}
+              >
+                {isUploading ? <Loader2 size={16} className="animate-spin" /> : <UploadCloud size={16} />}
+                {isUploading ? 'Processing...' : 'Select File'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
