@@ -18,8 +18,8 @@ export const PublicLayout = () => {
               alt="Nine Talent Management" 
               className="w-8 h-8 rounded-full border border-[#D4AF37]/30 shadow-md object-cover" 
             />
-            <span className="font-black tracking-widest text-[#D4AF37] text-sm uppercase">
-              NINE TALENT
+            <span className="font-black tracking-widest text-[#D4AF37] text-[11px] md:text-sm uppercase">
+              NINE TALENT MANAGEMENT
             </span>
           </Link>
           <Link 

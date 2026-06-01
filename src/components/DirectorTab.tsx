@@ -42,8 +42,6 @@ import {
 } from '../types';
 import { cn, formatMonth, formatDate } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
-import Papa from 'papaparse';
-import * as XLSX from 'xlsx';
 import { FirebaseService } from '../lib/firebaseService';
 import { MANAGERS, BASE_SALARY_POLICIES } from '../lib/constants';
 import { SystemLogsViewer } from './SystemLogsViewer';
@@ -238,15 +236,20 @@ export const DirectorTab = () => {
         parsedYear = parseInt(r2);
         parsedMonth = r1;
       } else if (r1) {
-        // Otherwise, it's a date (e.g. "2024-05-01" or "05/01/2024")
+        // Otherwise, it's a date (e.g. "2024-05-01", "05/01/2024", or "20/05/24")
         const d = new Date(r1);
         if (!isNaN(d.getTime())) {
           parsedYear = d.getFullYear();
           parsedMonth = `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, '0')}`;
         } else {
-          // Fallback: try to find a year in the string
-          const match = r1.match(/\b(20\d{2})\b/);
-          if (match) parsedYear = parseInt(match[1]);
+          // Fallback: try to find a 4-digit year or 2-digit year at the end
+          const match4 = r1.match(/\b(20\d{2})\b/);
+          const match2 = r1.match(/\/(\d{2})$/);
+          if (match4) {
+            parsedYear = parseInt(match4[1]);
+          } else if (match2) {
+            parsedYear = 2000 + parseInt(match2[1]);
+          }
           parsedMonth = r1;
         }
       }
@@ -1774,11 +1777,7 @@ export const DirectorTab = () => {
                     </div>
                     <textarea
                       id="bulk-ledger-paste"
-                      placeholder={
-                        financialTab === 'monthly'
-                          ? "Paste monthly columns (tab-separated):\nPoppoID\tMonth\tYear\tNickname\tLiveHours\tPartyHours\tTotalPoints\tAgentCommission\tLiveEarnings\tPartyEarnings\tPrivateChat\tTips\tPlatformReward\tOtherEarnings\tHourlySalary\tSuperSalary\tSuperRank\tLevel"
-                          : "Paste weekly columns (tab-separated):\nPoppoID\tFromDate\tToDate\tNickname\tLiveHours\tPartyHours\tTotalPoints\tAgentCommission\tLiveEarnings\tPartyEarnings\tPrivateChat\tTips\tPlatformReward\tOtherEarnings\tHourlySalary\tSuperSalary\tSuperRank\tLevel"
-                      }
+                      placeholder="Paste columns here (tab-separated)..."
                       className="w-full h-32 glass-input font-mono text-[10px] resize-none focus:ring-1 focus:ring-[#D4AF37] text-[#F0EFE8] bg-[#0D0D14] border border-white/10 rounded-xl p-4 shadow-inner"
                     />
                     <button
@@ -2140,12 +2139,6 @@ export const DirectorTab = () => {
             {activeView === 'roster_management' && (
               <motion.div key="roster_management" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
                 <RosterManagementTab onUpdate={loadData} auditLogAction={auditLogAction} hosts={hosts} />
-              </motion.div>
-            )}
-
-            {activeView === 'financials' && (
-              <motion.div key="financials" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
-                <FinancialUpload onUploadSuccess={loadData} />
               </motion.div>
             )}
 

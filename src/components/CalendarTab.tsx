@@ -452,6 +452,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
       created_by_role: auth.role,
       visibility: formData.get('visibility') as any || 'All',
       participants: [...selectedParticipants],
+      participantIds: [...selectedParticipants], // alias for Firestore array-contains queries
       timestamp: new Date().toISOString()
     };
     
@@ -1137,10 +1138,10 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                   </div>
                 </div>
 
-                {/* Niners Participants selector */}
+                {/* Niners Participants selector — filtered to hosts only */}
                 <div className="space-y-1.5">
                   <label htmlFor="event-participants-add" className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">
-                    Niners Participants ({selectedParticipants.length} / 9)
+                    Niners Participants ({selectedParticipants.length} selected)
                   </label>
                   <select
                     id="event-participants-add"
@@ -1148,34 +1149,38 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                     title="Add Niners Participants"
                     onChange={(e) => {
                       const val = e.target.value;
-                      if (val && selectedParticipants.length < 9 && !selectedParticipants.includes(val)) {
+                      if (val && !selectedParticipants.includes(val)) {
                         setSelectedParticipants([...selectedParticipants, val]);
                       }
                     }}
-                    disabled={selectedParticipants.length >= 9}
-                    className="w-full bg-[#0A0B0E] border border-slate-800 rounded-xl px-4 py-3 text-sm focus:border-[#D4AF37] outline-none text-white font-bold cursor-pointer disabled:opacity-40"
+                    className="w-full bg-[#0A0B0E] border border-slate-800 rounded-xl px-4 py-3 text-sm focus:border-[#D4AF37] outline-none text-white font-bold cursor-pointer"
                   >
-                    <option value="">-- Add Participant Host --</option>
-                    {(hosts || []).map(h => (
-                      <option key={h.id} value={h.id} className="bg-[#0f1117] text-white">
-                        {h.nickname || h.name} (#{h.id})
-                      </option>
-                    ))}
+                    <option value="">— Select a host to add —</option>
+                    {(hosts || [])
+                      .filter(h => h.role === 'Talent' || h.role === 'Host' || (h as any).role === 'talent' || (h as any).role === 'host')
+                      .filter(h => !selectedParticipants.includes(h.id))
+                      .sort((a, b) => (a.nickname || a.name || '').localeCompare(b.nickname || b.name || ''))
+                      .map(h => (
+                        <option key={h.id} value={h.id} className="bg-[#0f1117] text-white">
+                          {h.id} — {h.nickname || h.name}
+                        </option>
+                      ))}
                   </select>
                   
-                  {/* Stacking visual blocks display below */}
+                  {/* Selected participants chips */}
                   {selectedParticipants.length > 0 && (
-                    <div className="flex flex-wrap gap-2 pt-1">
+                    <div className="flex flex-wrap gap-2 pt-2">
                       {selectedParticipants.map(poppoId => {
                         const pHost = (hosts || []).find(h => h.id === poppoId);
-                        const dispName = pHost ? `${pHost.nickname || pHost.name} (#${poppoId})` : `#${poppoId}`;
+                        const nick = pHost?.nickname || pHost?.name || poppoId;
                         return (
-                          <span key={poppoId} className="bg-slate-800 border border-slate-700 rounded-xl px-2.5 py-1 text-[10px] font-black text-white flex items-center gap-1.5 shadow-sm">
-                            <span>{dispName}</span>
+                          <span key={poppoId} className="bg-slate-800 border border-[#D4AF37]/20 rounded-xl px-2.5 py-1.5 text-[10px] font-black text-white flex items-center gap-2 shadow-sm">
+                            <span className="text-[#D4AF37] font-mono">{poppoId}</span>
+                            <span className="text-white/70">{nick}</span>
                             <button
                               type="button"
                               onClick={() => setSelectedParticipants(selectedParticipants.filter(id => id !== poppoId))}
-                              className="text-slate-400 hover:text-red-400 font-extrabold text-[10px] transition-colors shrink-0"
+                              className="text-slate-400 hover:text-red-400 font-extrabold text-[10px] transition-colors ml-1 shrink-0"
                             >
                               ✕
                             </button>
@@ -1185,6 +1190,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                     </div>
                   )}
                 </div>
+
 
                 <div className="space-y-1.5">
                   <label htmlFor="event-description" className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">Description / Notes</label>

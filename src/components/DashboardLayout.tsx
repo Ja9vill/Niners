@@ -64,9 +64,9 @@ export const DashboardLayout = () => {
       {/* Mobile Header */}
       <header className="md:hidden flex items-center justify-between p-4 bg-[#11111A] border-b border-white/5 shrink-0 z-20">
         <div className="flex items-center gap-3">
-          <img src={appLogo} alt="Nine Dashboard" className="w-8 h-8 rounded-full border border-white/10" />
-          <div>
-            <h1 className="text-sm font-black uppercase tracking-widest text-[#F0EFE8]">NINE</h1>
+          <img src={appLogo} alt="Nine Dashboard" className="w-8 h-8 rounded-full border border-white/10 shrink-0" />
+          <div className="flex flex-col">
+            <h1 className="text-[11px] font-black uppercase tracking-widest text-[#F0EFE8] leading-tight">NINE TALENT MANAGEMENT</h1>
             <div className="text-[10px] text-[#A09E9A] capitalize">{authState.role || 'Guest'}</div>
           </div>
         </div>
@@ -82,10 +82,9 @@ export const DashboardLayout = () => {
           !isSidebarOpen && "-translate-x-full md:translate-x-0"
         )}>
           <div className="p-6 hidden md:flex items-center gap-3 border-b border-white/5">
-            <img src={appLogo} alt="Nine Dashboard" className="w-10 h-10 rounded-full border border-[#D4AF37]/30" />
-            <div>
-              <h1 className="text-base font-black uppercase tracking-widest text-[#F0EFE8]">NINE</h1>
-              <div className="text-[10px] text-[#D4AF37] uppercase tracking-widest font-bold">Talent Mgmt</div>
+            <img src={appLogo} alt="Nine Dashboard" className="w-10 h-10 rounded-full border border-[#D4AF37]/30 shrink-0" />
+            <div className="flex flex-col">
+              <h1 className="text-[11px] font-black uppercase tracking-widest text-[#F0EFE8] leading-tight mt-1">NINE TALENT MANAGEMENT</h1>
             </div>
           </div>
 

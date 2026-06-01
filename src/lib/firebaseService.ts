@@ -119,34 +119,63 @@ export const FirebaseService = {
     try {
       if (!file || !id) throw new Error("File and ID are required.");
       
-      // Create SEO friendly filename based on nickname
-      const extension = file.name.split('.').pop()?.toLowerCase() || 'jpg';
       const cleanName = (name || id).replace(/[^a-zA-Z0-9-]/g, '-').toLowerCase();
-      const fileName = `${cleanName}-${id}.${extension}`;
-      const storageRef = ref(storage, `profile_photos/${fileName}`);
+      const fileName = `${cleanName}-${id}.jpg`; // Always save as jpg after compression
 
-      // Set SEO optimized metadata
-      const metadata = {
-        contentType: file.type,
-        cacheControl: 'public,max-age=31536000',
-        customMetadata: {
-          alt: `${name} - Nine Dashboard Profile`,
-          description: `Profile photo for ${name} (${role}) on Nine Dashboard.`,
-          'og:image': 'true',
-          uploadedAt: new Date().toISOString()
-        }
-      };
+      // Compress image using canvas before uploading (reduces payload from ~5MB to ~100KB)
+      const compressedBase64 = await new Promise<string>((resolve, reject) => {
+        const img = new Image();
+        const objectUrl = URL.createObjectURL(file);
+        img.onload = () => {
+          const MAX = 800;
+          let { width, height } = img;
+          if (width > MAX || height > MAX) {
+            if (width > height) { height = Math.round((height * MAX) / width); width = MAX; }
+            else { width = Math.round((width * MAX) / height); height = MAX; }
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d')!;
+          ctx.drawImage(img, 0, 0, width, height);
+          URL.revokeObjectURL(objectUrl);
+          resolve(canvas.toDataURL('image/jpeg', 0.8));
+        };
+        img.onerror = reject;
+        img.src = objectUrl;
+      });
 
-      // Upload the file
-      await uploadBytes(storageRef, file, metadata);
+      console.log(`[UPLOAD] Sending compressed photo for ${id} to /api/upload-profile-photo`);
+
+      // Send to our backend proxy which bypasses Firebase CORS and Storage Rules
+      const response = await fetch('/api/upload-profile-photo', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fileData: compressedBase64,
+          fileName,
+          contentType: 'image/jpeg'
+        })
+      });
+
+      console.log(`[UPLOAD] Server responded with status: ${response.status}`);
+
+      if (!response.ok) {
+        const errText = await response.text().catch(() => 'No response body');
+        console.error(`[UPLOAD] Server error body:`, errText);
+        throw new Error(`Upload failed with status ${response.status}: ${errText}`);
+      }
+
+      const { url } = await response.json();
       
-      // Get the direct download URL
-      const downloadURL = await getDownloadURL(storageRef);
+      if (!url) {
+        throw new Error("Failed to retrieve upload URL from server.");
+      }
 
       // Update both the specific role collection and the main 'users' collection
-      await this.updateRoleMetadata(role, id, { photoUrl: downloadURL });
+      await this.updateRoleMetadata(role, id, { photoUrl: url });
 
-      return downloadURL;
+      return url;
     } catch (error: any) {
       console.error(`[UPLOAD] Profile photo upload failed for ID: ${id}`, error);
       throw error;
@@ -799,6 +828,45 @@ export const FirebaseService = {
       await batch.commit();
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, path);
+    }
+  },
+
+  /**
+   * Fetch all performance_reports documents.
+   * Doc ID format: {poppoId}_{MonthName}_{Year} e.g. 19157913_March_2025
+   * Falls back to reading poppoId field if present in the document.
+   */
+  async getAllPerformanceReports(): Promise<any[]> {
+    const path = 'performance_reports';
+    try {
+      const snapshot = await getDocs(collection(db, path));
+      return snapshot.docs.map(docSnap => {
+        const data = docSnap.data();
+        // Parse poppoId from doc ID: format is {poppoId}_{MonthName}_{Year}
+        const parts = docSnap.id.split('_');
+        const poppoIdFromId = parts[0] || '';
+        // Also try to get month/year from doc ID if not in data
+        const monthNameFromId = parts[1] || '';
+        const yearFromId = parts[2] ? parseInt(parts[2]) : 0;
+
+        const MONTH_MAP: Record<string,number> = {
+          January:1,February:2,March:3,April:4,May:5,June:6,
+          July:7,August:8,September:9,October:10,November:11,December:12
+        };
+
+        return {
+          docId: docSnap.id,
+          ...data,
+          // Prefer fields in the doc, fallback to parsed from doc ID
+          poppoId: data.poppoId || poppoIdFromId,
+          monthName: data.monthName || monthNameFromId,
+          month: data.month || MONTH_MAP[monthNameFromId] || 0,
+          year: data.year || yearFromId,
+        };
+      });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.LIST, path);
+      return [];
     }
   },
 };

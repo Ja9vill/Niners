@@ -47,9 +47,7 @@ service cloud.firestore {
 
     // 1. users and Role-Based Collections Rules
     match /users/{userId} {
-      allow read: if isLeadership() || isAdmin() || (
-        (isManager() || isAgent()) && (request.auth.uid == userId || (resource != null && resource.data.assignedManagerId == request.auth.uid))
-      ) || (isSignedIn() && request.auth.uid == userId);
+      allow read: if true;
       
       allow create: if isLeadership();
       allow update: if isLeadership() || (
@@ -62,34 +60,32 @@ service cloud.firestore {
     }
 
     match /host/{userId} {
-      allow read: if isLeadership() || isAdmin() || (
-        (isManager() || isAgent()) && (request.auth.uid == userId || (resource != null && resource.data.assignedManagerId == request.auth.uid))
-      ) || (isSignedIn() && request.auth.uid == userId);
+      allow read: if true;
       allow create, delete: if isLeadership();
       allow update: if isLeadership() || (isSignedIn() && request.auth.uid == userId);
     }
     match /manager/{userId} {
-      allow read: if isLeadership() || isAdmin() || isManager() || (isSignedIn() && request.auth.uid == userId);
+      allow read: if true;
       allow create, delete: if isLeadership();
       allow update: if isLeadership() || (isSignedIn() && request.auth.uid == userId);
     }
     match /admin/{userId} {
-      allow read: if isLeadership() || isAdmin() || (isSignedIn() && request.auth.uid == userId);
+      allow read: if true;
       allow create, delete: if isLeadership();
       allow update: if isLeadership() || (isSignedIn() && request.auth.uid == userId);
     }
     match /head_admin/{userId} {
-      allow read: if isLeadership() || (isSignedIn() && request.auth.uid == userId);
+      allow read: if true;
       allow create, delete: if isLeadership();
       allow update: if isLeadership() || (isSignedIn() && request.auth.uid == userId);
     }
     match /agent/{userId} {
-      allow read: if isLeadership() || isAdmin() || isAgent() || (isSignedIn() && request.auth.uid == userId);
+      allow read: if true;
       allow create, delete: if isLeadership();
       allow update: if isLeadership() || (isSignedIn() && request.auth.uid == userId);
     }
     match /director/{userId} {
-      allow read: if isLeadership() || (isSignedIn() && request.auth.uid == userId);
+      allow read: if true;
       allow create, delete: if isLeadership();
       allow update: if isLeadership() || (isSignedIn() && request.auth.uid == userId);
     }

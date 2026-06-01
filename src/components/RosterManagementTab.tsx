@@ -93,7 +93,15 @@ export const RosterManagementTab: React.FC<RosterManagementTabProps> = ({ hosts,
             setFetchError("getAllRoleMetadata returned 0 users. Likely a permissions issue or empty database.");
           }
           const mappedUsers = fetchedUsers.map(u => ({ ...u, id: u.poppo_id || u.poppoId || u.id }));
-          setUsers(mappedUsers);
+          // Deduplicate by resolved ID — prevents duplicate key warnings when users exist in multiple collections
+          const seen = new Set<string>();
+          const dedupedUsers = mappedUsers.filter(u => {
+            const uid = String(u.id || '');
+            if (!uid || seen.has(uid)) return false;
+            seen.add(uid);
+            return true;
+          });
+          setUsers(dedupedUsers);
         } catch (error: any) {
           console.error("Error fetching users:", error);
           setFetchError(error.message || String(error));
@@ -112,9 +120,9 @@ export const RosterManagementTab: React.FC<RosterManagementTabProps> = ({ hosts,
       .map(h => ({ id: h.poppo_id || h.poppoId || h.id, name: h.nickname || h.name }));
   }, [users]);
 
-  // Filter out Directors and apply search/role filters
+  // Filter out Directors, apply search/role filters, and sort completed hosts to the bottom
   const filteredHosts = useMemo(() => {
-    return users.filter(h => {
+    const filtered = users.filter(h => {
       if (h.role?.toLowerCase() === 'director') return false;
       
       const hostId = String(h.poppo_id || h.poppoId || h.id || '');
@@ -126,7 +134,50 @@ export const RosterManagementTab: React.FC<RosterManagementTabProps> = ({ hosts,
 
       return matchesSearch && matchesRole;
     });
-  }, [users, searchTerm, roleFilter]);
+
+    const isHostComplete = (host: any) => {
+      const getVal = (field: string) => {
+        const id = host.poppo_id || host.poppoId || host.id;
+        return editedHosts[id]?.[field] !== undefined ? editedHosts[id][field] : host[field];
+      };
+      
+      const role = String(getVal('role') || 'Host').toLowerCase();
+      
+      const nickname = getVal('nickname') || getVal('name');
+      const status = getVal('status');
+      const team_anchor = getVal('team_anchor') || getVal('anchor_type');
+      const tier_pay = getVal('tier_pay') || getVal('tier') || getVal('base_salary_category');
+      const manager = getVal('assigned_manager_poppo_id') || getVal('manager');
+      const photoUrl = getVal('photoUrl');
+
+      const isValidString = (s: any) => typeof s === 'string' && s.trim() !== '' && s.trim() !== 'N/A' && s.trim() !== 'Unassigned' && s.trim() !== 'No Manager' && s.trim() !== 'No ID';
+
+      if (!isValidString(nickname)) return false;
+      if (!isValidString(status)) return false;
+      if (!isValidString(team_anchor)) return false;
+      if (!isValidString(tier_pay)) return false;
+      if (!isValidString(photoUrl)) return false;
+
+      if (role === 'host') {
+        if (!isValidString(manager)) return false;
+      }
+
+      return true;
+    };
+
+    const hostsWithCompletion = filtered.map(h => ({
+      ...h,
+      isComplete: isHostComplete(h)
+    }));
+
+    return hostsWithCompletion.sort((a, b) => {
+      if (a.isComplete === b.isComplete) {
+        return String(a.nickname || a.name || a.id).localeCompare(String(b.nickname || b.name || b.id));
+      }
+      return a.isComplete ? 1 : -1; // Incomplete first (-1), Complete last (1)
+    });
+
+  }, [users, searchTerm, roleFilter, editedHosts]);
 
   const handleFieldChange = (hostId: string, field: string, value: any) => {
     setEditedHosts(prev => ({
@@ -341,11 +392,12 @@ export const RosterManagementTab: React.FC<RosterManagementTabProps> = ({ hosts,
                 filteredHosts.map(host => {
                   const isHostRole = (getDisplayValue(host, 'role') as string)?.toLowerCase() === 'host';
                   const isEdited = !!editedHosts[host.id];
+                  const isComplete = host.isComplete;
                   
                   return (
                     <tr key={host.id} className={cn(
                       "transition-colors",
-                      isEdited ? "bg-indigo-500/[0.03]" : "hover:bg-white/[0.02]"
+                      isEdited ? "bg-indigo-500/[0.08]" : isComplete ? "bg-emerald-500/[0.05] hover:bg-emerald-500/[0.08]" : "hover:bg-white/[0.02]"
                     )}>
                       <td className="px-6 py-3 bg-[#1A1A28] border-r border-white/5 w-[80px] min-w-[80px]">
                         <span className="font-mono text-[11px] text-indigo-400 font-bold">{host.id}</span>

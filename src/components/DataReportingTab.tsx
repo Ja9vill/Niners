@@ -15,6 +15,26 @@ const getUUID = () => {
   return Math.random().toString(36).substring(2) + Date.now().toString(36);
 };
 
+const CustomTooltip = ({ active, payload, label }: any) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-[#1A1A28] border border-white/5 p-3 rounded-xl shadow-2xl">
+        <p className="text-[#F0EFE8] font-bold text-xs mb-2">{label}</p>
+        {payload.map((p: any, i: number) => (
+          <p
+            key={i}
+            style={{ color: p.color }}
+            className="text-[10px] font-black uppercase tracking-wider"
+          >
+            {p.name}: {p.value}
+          </p>
+        ))}
+      </div>
+    );
+  }
+  return null;
+};
+
 export const DataReportingTab = () => {
   const auth = Storage.getAuthState();
   const isTalent = auth.role === 'Talent';
@@ -540,29 +560,7 @@ export const DataReportingTab = () => {
   };
   const chartData = getChartData();
 
-  const CustomTooltip = ({ active, payload, label }: any) => {
-    if (active && payload && payload.length) {
-      return (
-        <div className="bg-[#1A1A28] border border-white/5 p-3 rounded-xl shadow-2xl">
-          <p className="text-[#F0EFE8] font-bold text-xs mb-2">{label}</p>
-          {payload.map((p: any, i: number) => {
-            return (
-              <p
-                key={i}
-                ref={(el) => {
-                  if (el) el.style.color = p.color;
-                }}
-                className="text-[10px] font-black uppercase tracking-wider"
-              >
-                {p.name}: {p.value}
-              </p>
-            );
-          })}
-        </div>
-      );
-    }
-    return null;
-  };
+
 
   return (
     <div className="space-y-8 max-w-4xl mx-auto">

@@ -209,10 +209,26 @@ export const RosterTab: React.FC<RosterTabProps> = ({ isReadOnly = false }) => {
                 <div className="text-[#A09E9A] text-xs font-mono">ID: {host.id}</div>
                 
                 <div className="mt-2 flex items-center gap-3">
-                  <div className="flex items-center gap-1 text-[10px] text-amber-400 font-bold bg-amber-400/10 px-2 py-1 rounded-md border border-amber-400/20">
-                    <Star size={10} />
-                    {(host as any).tier_pay || host.base_salary_category || host.baseSalary || 'N/A'}
-                  </div>
+                  {(() => {
+                    const tier = String((host as any).tier_pay || host.base_salary_category || host.baseSalary || 'N/A');
+                    
+                    const getTierStyle = (t: string) => {
+                      const lower = t.toLowerCase();
+                      if (lower.includes('star')) return 'text-yellow-400 bg-yellow-400/10 border-yellow-400/30';
+                      if (lower.includes('rocket')) return 'text-cyan-400 bg-cyan-400/10 border-cyan-400/30';
+                      if (lower.includes('s idol')) return 'text-pink-500 bg-pink-500/10 border-pink-500/30';
+                      if (lower.includes('esports')) return 'text-[#00f2fe] bg-[#00f2fe]/10 border-[#00f2fe]/30 shadow-[0_0_8px_rgba(0,242,254,0.4)]';
+                      if (lower.includes('regular')) return 'text-emerald-400 bg-emerald-400/10 border-emerald-400/30';
+                      return 'text-[#A09E9A] bg-white/5 border-white/10';
+                    };
+
+                    return (
+                      <div className={cn("flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-md border", getTierStyle(tier))}>
+                        <Star size={10} />
+                        {tier}
+                      </div>
+                    );
+                  })()}
                   {host.status === 'Active' && (
                     <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"></div>
                   )}
@@ -223,121 +239,123 @@ export const RosterTab: React.FC<RosterTabProps> = ({ isReadOnly = false }) => {
         </div>
       )}
 
-      {/* SPOTLIGHT MODAL */}
-      {selectedHost && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <div className="bg-[#13131E] border border-white/10 rounded-3xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+    {/* SPOTLIGHT MODAL */}
+    {selectedHost && (
+      <div className="fixed inset-0 z-[100] flex items-start justify-center pt-24 sm:pt-32 pb-8 px-4 sm:px-8 bg-black/80 backdrop-blur-sm overflow-hidden">
+        <div className="bg-[#13131E] border border-white/10 rounded-3xl w-full max-w-3xl max-h-[calc(100vh-10rem)] sm:max-h-[calc(100vh-12rem)] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+          
+          {/* Header */}
+          <div className="p-4 sm:p-6 border-b border-white/5 bg-gradient-to-r from-indigo-500/10 to-transparent relative">
             
-            {/* Header */}
-            <div className="p-6 border-b border-white/5 flex justify-between items-start bg-gradient-to-r from-indigo-500/10 to-transparent">
-              <div className="flex items-center gap-6">
-                <div className="w-24 h-24 rounded-2xl bg-black/40 border border-white/10 overflow-hidden shadow-xl">
-                  {selectedHost.photoUrl ? (
-                    <img src={selectedHost.photoUrl} alt="" className="w-full h-full object-cover" />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-[#A09E9A]/30">
-                      <Users size={32} />
-                    </div>
-                  )}
-                </div>
-                <div>
-                  <h2 className="text-3xl font-black text-white tracking-tight">{selectedHost.nickname || selectedHost.name}</h2>
-                  <div className="flex items-center gap-3 mt-2">
-                    <span className="font-mono text-indigo-400 text-sm">{selectedHost.id}</span>
-                    <span className="px-3 py-1 rounded-full bg-white/10 text-white/70 text-xs font-bold uppercase tracking-wider">
-                      {selectedHost.role || 'Host'}
-                    </span>
+            <button 
+              onClick={closeSpotlight}
+              title="Close Spotlight"
+              aria-label="Close Spotlight"
+              className="absolute top-4 right-4 sm:top-6 sm:right-6 p-2 rounded-xl hover:bg-white/10 text-[#A09E9A] hover:text-white transition-colors z-10 bg-black/20 sm:bg-transparent"
+            >
+              <X size={20} />
+            </button>
+
+            <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 sm:gap-6 w-full pt-6 sm:pt-0">
+              <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl bg-black/40 border border-white/10 overflow-hidden shadow-xl shrink-0">
+                {selectedHost.photoUrl ? (
+                  <img src={selectedHost.photoUrl} alt="" className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-[#A09E9A]/30">
+                    <Users size={32} />
                   </div>
-                  {/* Social Links rendering */}
-                  {selectedHost.social_links && (
-                    <div className="flex items-center gap-3 mt-4">
-                      {selectedHost.social_links.fb && (
-                        <a href={selectedHost.social_links.fb} target="_blank" rel="noopener noreferrer" className="p-1.5 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 rounded-lg transition-colors" title="Facebook">
-                          <Facebook size={16} />
-                        </a>
-                      )}
-                      {selectedHost.social_links.ig && (
-                        <a href={selectedHost.social_links.ig.startsWith('http') ? selectedHost.social_links.ig : `https://instagram.com/${selectedHost.social_links.ig.replace('@','')}`} target="_blank" rel="noopener noreferrer" className="p-1.5 bg-pink-500/10 text-pink-400 hover:bg-pink-500/20 rounded-lg transition-colors" title="Instagram">
-                          <Instagram size={16} />
-                        </a>
-                      )}
-                      {selectedHost.social_links.tiktok && (
-                        <a href={selectedHost.social_links.tiktok.startsWith('http') ? selectedHost.social_links.tiktok : `https://tiktok.com/@${selectedHost.social_links.tiktok.replace('@','')}`} target="_blank" rel="noopener noreferrer" className="p-1.5 bg-[#00f2fe]/10 text-[#00f2fe] hover:bg-[#00f2fe]/20 rounded-lg transition-colors" title="TikTok">
-                          <Music size={16} />
-                        </a>
-                      )}
-                      {selectedHost.social_links.whatsapp && (
-                        <a href={selectedHost.social_links.whatsapp.startsWith('http') ? selectedHost.social_links.whatsapp : `https://wa.me/${selectedHost.social_links.whatsapp.replace(/[^0-9]/g, '')}`} target="_blank" rel="noopener noreferrer" className="p-1.5 bg-green-500/10 text-green-400 hover:bg-green-500/20 rounded-lg transition-colors" title="WhatsApp">
-                          <Phone size={16} />
-                        </a>
-                      )}
-                    </div>
-                  )}
-                </div>
+                )}
               </div>
-              <button 
-                onClick={closeSpotlight}
-                title="Close Spotlight"
-                aria-label="Close Spotlight"
-                className="p-2 rounded-xl hover:bg-white/10 text-[#A09E9A] hover:text-white transition-colors"
-              >
-                <X size={20} />
-              </button>
+              <div className="flex flex-col items-center sm:items-start text-center sm:text-left pr-0 sm:pr-12 w-full">
+                <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight break-all">{selectedHost.nickname || selectedHost.name}</h2>
+                <div className="flex flex-wrap justify-center sm:justify-start items-center gap-2 mt-2">
+                  <span className="font-mono text-indigo-400 text-xs sm:text-sm">{selectedHost.id}</span>
+                  <span className="px-3 py-1 rounded-full bg-white/10 text-white/70 text-[10px] sm:text-xs font-bold uppercase tracking-wider">
+                    {selectedHost.role || 'Host'}
+                  </span>
+                </div>
+                {/* Social Links rendering */}
+                {selectedHost.social_links && (
+                  <div className="flex flex-wrap justify-center sm:justify-start items-center gap-3 mt-3 sm:mt-4">
+                    {selectedHost.social_links.fb && (
+                      <a href={selectedHost.social_links.fb} target="_blank" rel="noopener noreferrer" className="p-1.5 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 rounded-lg transition-colors" title="Facebook">
+                        <Facebook size={16} />
+                      </a>
+                    )}
+                    {selectedHost.social_links.ig && (
+                      <a href={selectedHost.social_links.ig.startsWith('http') ? selectedHost.social_links.ig : `https://instagram.com/${selectedHost.social_links.ig.replace('@','')}`} target="_blank" rel="noopener noreferrer" className="p-1.5 bg-pink-500/10 text-pink-400 hover:bg-pink-500/20 rounded-lg transition-colors" title="Instagram">
+                        <Instagram size={16} />
+                      </a>
+                    )}
+                    {selectedHost.social_links.tiktok && (
+                      <a href={selectedHost.social_links.tiktok.startsWith('http') ? selectedHost.social_links.tiktok : `https://tiktok.com/@${selectedHost.social_links.tiktok.replace('@','')}`} target="_blank" rel="noopener noreferrer" className="p-1.5 bg-[#00f2fe]/10 text-[#00f2fe] hover:bg-[#00f2fe]/20 rounded-lg transition-colors" title="TikTok">
+                        <Music size={16} />
+                      </a>
+                    )}
+                    {selectedHost.social_links.whatsapp && (
+                      <a href={selectedHost.social_links.whatsapp.startsWith('http') ? selectedHost.social_links.whatsapp : `https://wa.me/${selectedHost.social_links.whatsapp.replace(/[^0-9]/g, '')}`} target="_blank" rel="noopener noreferrer" className="p-1.5 bg-green-500/10 text-green-400 hover:bg-green-500/20 rounded-lg transition-colors" title="WhatsApp">
+                        <Phone size={16} />
+                      </a>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
+          </div>
 
             {/* Content Body */}
-            <div className="p-6 overflow-y-auto custom-scrollbar flex-1 space-y-8">
+            <div className="p-4 sm:p-6 overflow-y-auto custom-scrollbar flex-1 space-y-6 sm:space-y-8">
               
               {/* Bio Section */}
               {selectedHost.bio && (
-                <div className="bg-[#11111A] border border-white/5 p-5 rounded-2xl relative overflow-hidden">
+                <div className="bg-[#11111A] border border-white/5 p-4 sm:p-5 rounded-2xl relative overflow-hidden">
                   <div className="absolute top-0 left-0 w-1 h-full bg-indigo-500" />
                   <p className="text-[#F0EFE8] text-sm leading-relaxed whitespace-pre-wrap italic">"{selectedHost.bio}"</p>
                 </div>
               )}
               
               {/* Primary Info Grid */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                <div className="bg-[#1A1A28] border border-white/5 p-4 rounded-2xl">
-                  <div className="text-[10px] font-black text-[#A09E9A] uppercase tracking-wider mb-1">Assigned Manager</div>
-                  <div className="text-[#F0EFE8] font-bold text-sm">{(selectedHost as any).assigned_manager_nickname || selectedHost.manager || 'N/A'}</div>
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                <div className="bg-[#1A1A28] border border-white/5 p-3 sm:p-4 rounded-2xl">
+                  <div className="text-[9px] sm:text-[10px] font-black text-[#A09E9A] uppercase tracking-wider mb-1">Assigned Manager</div>
+                  <div className="text-[#F0EFE8] font-bold text-xs sm:text-sm">{(selectedHost as any).assigned_manager_nickname || selectedHost.manager || 'N/A'}</div>
                 </div>
-                <div className="bg-[#1A1A28] border border-white/5 p-4 rounded-2xl">
-                  <div className="text-[10px] font-black text-[#A09E9A] uppercase tracking-wider mb-1">Team Anchor</div>
-                  <div className="text-[#F0EFE8] font-bold text-sm">{(selectedHost as any).team_anchor || selectedHost.anchor_type || 'N/A'}</div>
+                <div className="bg-[#1A1A28] border border-white/5 p-3 sm:p-4 rounded-2xl">
+                  <div className="text-[9px] sm:text-[10px] font-black text-[#A09E9A] uppercase tracking-wider mb-1">Team Anchor</div>
+                  <div className="text-[#F0EFE8] font-bold text-xs sm:text-sm">{(selectedHost as any).team_anchor || selectedHost.anchor_type || 'N/A'}</div>
                 </div>
-                <div className="bg-[#1A1A28] border border-white/5 p-4 rounded-2xl">
-                  <div className="text-[10px] font-black text-[#A09E9A] uppercase tracking-wider mb-1">Status</div>
+                <div className="bg-[#1A1A28] border border-white/5 p-3 sm:p-4 rounded-2xl">
+                  <div className="text-[9px] sm:text-[10px] font-black text-[#A09E9A] uppercase tracking-wider mb-1">Status</div>
                   <div className={cn(
-                    "font-bold text-sm",
+                    "font-bold text-xs sm:text-sm",
                     selectedHost.status === 'Active' ? 'text-emerald-400' : 'text-amber-400'
                   )}>
                     {selectedHost.status || 'Unknown'}
                   </div>
                 </div>
-                <div className="bg-[#1A1A28] border border-white/5 p-4 rounded-2xl">
-                  <div className="text-[10px] font-black text-[#A09E9A] uppercase tracking-wider mb-1">Poppo Level</div>
-                  <div className="text-white font-black text-xl">{selectedHost.level || 0}</div>
+                <div className="bg-[#1A1A28] border border-white/5 p-3 sm:p-4 rounded-2xl">
+                  <div className="text-[9px] sm:text-[10px] font-black text-[#A09E9A] uppercase tracking-wider mb-1">Poppo Level</div>
+                  <div className="text-white font-black text-lg sm:text-xl">{selectedHost.level || 0}</div>
                 </div>
               </div>
 
               {/* Fanbase Metrics */}
               <div>
-                <h3 className="text-sm font-black text-[#F0EFE8] uppercase tracking-widest flex items-center gap-2 mb-4">
+                <h3 className="text-xs sm:text-sm font-black text-[#F0EFE8] uppercase tracking-widest flex items-center gap-2 mb-3 sm:mb-4">
                   <Users className="text-pink-500" size={16} /> Fanbase Metrics
                 </h3>
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="bg-gradient-to-br from-pink-500/10 to-transparent border border-pink-500/20 p-4 rounded-2xl">
-                    <div className="text-xs text-pink-400 font-bold mb-1">Followers</div>
-                    <div className="text-2xl font-black text-white">{selectedHost.followers_count?.toLocaleString() || '0'}</div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+                  <div className="bg-gradient-to-br from-pink-500/10 to-transparent border border-pink-500/20 p-3 sm:p-4 rounded-2xl flex flex-row sm:flex-col justify-between items-center sm:items-start">
+                    <div className="text-xs text-pink-400 font-bold">Followers</div>
+                    <div className="text-xl sm:text-2xl font-black text-white">{selectedHost.followers_count?.toLocaleString() || '0'}</div>
                   </div>
-                  <div className="bg-gradient-to-br from-purple-500/10 to-transparent border border-purple-500/20 p-4 rounded-2xl">
-                    <div className="text-xs text-purple-400 font-bold mb-1">FC Subscribers</div>
-                    <div className="text-2xl font-black text-white">{(selectedHost as any).fc_subscribers?.toLocaleString() || '0'}</div>
+                  <div className="bg-gradient-to-br from-purple-500/10 to-transparent border border-purple-500/20 p-3 sm:p-4 rounded-2xl flex flex-row sm:flex-col justify-between items-center sm:items-start">
+                    <div className="text-xs text-purple-400 font-bold">FC Subscribers</div>
+                    <div className="text-xl sm:text-2xl font-black text-white">{(selectedHost as any).fc_subscribers?.toLocaleString() || '0'}</div>
                   </div>
-                  <div className="bg-gradient-to-br from-blue-500/10 to-transparent border border-blue-500/20 p-4 rounded-2xl">
-                    <div className="text-xs text-blue-400 font-bold mb-1">FC Members</div>
-                    <div className="text-2xl font-black text-white">{(selectedHost as any).fc_members?.toLocaleString() || '0'}</div>
+                  <div className="bg-gradient-to-br from-blue-500/10 to-transparent border border-blue-500/20 p-3 sm:p-4 rounded-2xl flex flex-row sm:flex-col justify-between items-center sm:items-start">
+                    <div className="text-xs text-blue-400 font-bold">FC Members</div>
+                    <div className="text-xl sm:text-2xl font-black text-white">{(selectedHost as any).fc_members?.toLocaleString() || '0'}</div>
                   </div>
                 </div>
               </div>

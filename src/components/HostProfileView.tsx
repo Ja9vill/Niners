@@ -1,7 +1,7 @@
 /* eslint-disable */
 /* eslint-disable */
-import React, { useState, useEffect } from 'react';
-import { X, Calendar, ChevronLeft, Edit2, Loader2 } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { X, Calendar, ChevronLeft, Edit2, Loader2, Save, Instagram, Twitter, Facebook } from 'lucide-react';
 import { Host, CommissionEntry, CalendarEvent } from '../types';
 import { FirebaseService } from '../lib/firebaseService';
 import { Storage } from '../lib/storage';
@@ -9,7 +9,7 @@ import { cn, formatNumber } from '../lib/utils';
 import { MANAGERS, BASE_SALARY_POLICIES } from '../lib/constants';
 import { collection, query, where, getDocs, Timestamp } from 'firebase/firestore';
 import { db } from '../lib/firebase';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, BarChart, Bar, Cell } from 'recharts';
 
 interface HostProfileViewProps {
   host: Host;
@@ -47,6 +47,18 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
   const [editLevel, setEditLevel] = useState<number>(host.level || 1);
   const [isSaving, setIsSaving] = useState(false);
   const [isProcessingPhoto, setIsProcessingPhoto] = useState(false);
+
+  // Host self-edit panel (bio, social, streaming hours)
+  const [isSelfEditing, setIsSelfEditing] = useState(false);
+  const [selfBio, setSelfBio] = useState(host.bio || host.description || '');
+  const [selfSocialIg, setSelfSocialIg] = useState(host.social_links?.ig || '');
+  const [selfSocialTk, setSelfSocialTk] = useState(host.social_links?.tiktok || '');
+  const [selfSocialFb, setSelfSocialFb] = useState(host.social_links?.fb || '');
+  const [selfSocialWa, setSelfSocialWa] = useState(host.social_links?.whatsapp || '');
+  const [selfStreamSlots, setSelfStreamSlots] = useState<{ from: string; to: string }[]>(
+    host.streaming_hours?.length ? host.streaming_hours : [{ from: '', to: '' }]
+  );
+  const [isSavingSelf, setIsSavingSelf] = useState(false);
 
   // RPK Reporting States
   const [isRpkFormOpen, setIsRpkFormOpen] = useState(false);
@@ -90,15 +102,31 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
     const loadProfileData = async () => {
       setIsLoading(true);
       try {
-        // Section 1: Query performance_reports by poppoId
+        // Section 1: Query performance_reports by poppoId field
+        // Supports both old format (poppoId_year_monthly_month) and new (poppoId_MonthName_Year)
         const perfQuery = query(
           collection(db, 'performance_reports'), 
           where('poppoId', '==', host.id)
         );
         const perfSnap = await getDocs(perfQuery);
         const perfList: any[] = [];
+        const MONTH_MAP: Record<string,number> = {
+          January:1,February:2,March:3,April:4,May:5,June:6,
+          July:7,August:8,September:9,October:10,November:11,December:12
+        };
         perfSnap.forEach(doc => {
-          perfList.push({ id: doc.id, ...doc.data() });
+          const data = doc.data();
+          // Parse month/year from doc ID if not in data fields
+          const parts = doc.id.split('_');
+          const monthNameFromId = parts[1] || '';
+          const yearFromId = parts[2] ? parseInt(parts[2]) : 0;
+          perfList.push({
+            id: doc.id,
+            ...data,
+            monthName: data.monthName || monthNameFromId,
+            month: data.month || MONTH_MAP[monthNameFromId] || 0,
+            year: data.year || yearFromId,
+          });
         });
         perfList.sort((a, b) => {
           if (a.year !== b.year) return b.year - a.year;
@@ -106,16 +134,21 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
         });
         setPerformanceReports(perfList);
 
-        // Section 2: Query events collection using array-contains for specific poppoId in participantIds
-        const eventsQuery = query(
-          collection(db, 'events'), 
-          where('participantIds', 'array-contains', host.id)
-        );
-        const eventsSnap = await getDocs(eventsQuery);
+        // Section 2: Query events — check both participantIds (new) and participants (legacy) fields
+        const [eventsSnap1, eventsSnap2] = await Promise.all([
+          getDocs(query(collection(db, 'events'), where('participantIds', 'array-contains', host.id))),
+          getDocs(query(collection(db, 'events'), where('participants', 'array-contains', host.id)))
+        ]);
+        const seenEventIds = new Set<string>();
         const eventsList: any[] = [];
-        eventsSnap.forEach(doc => {
-          eventsList.push({ id: doc.id, ...doc.data() });
+        [...eventsSnap1.docs, ...eventsSnap2.docs].forEach(doc => {
+          if (!seenEventIds.has(doc.id)) {
+            seenEventIds.add(doc.id);
+            eventsList.push({ id: doc.id, ...doc.data() });
+          }
         });
+        // Sort by date descending
+        eventsList.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
         setParticipatedEvents(eventsList);
 
         // Load PK data from local or fallback to mockup stats
@@ -321,7 +354,256 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
     }
   };
 
+  // Save host's own bio/social/streaming edits
+  const handleSaveSelf = async () => {
+    setIsSavingSelf(true);
+    try {
+      const updatedHost: Host = {
+        ...host,
+        bio: selfBio,
+        description: selfBio,
+        social_links: { ig: selfSocialIg, tiktok: selfSocialTk, fb: selfSocialFb, whatsapp: selfSocialWa },
+        streaming_hours: selfStreamSlots.filter(s => s.from && s.to),
+        updated_at: new Date().toISOString()
+      };
+      await FirebaseService.updateHost(updatedHost);
+      // Update auth state if editing own profile
+      const currentAuth = Storage.getAuthState();
+      if (currentAuth.poppo_id === host.id) {
+        Storage.setAuthState({ ...currentAuth, bio: selfBio });
+      }
+      setIsSelfEditing(false);
+      if (onProfileUpdated) onProfileUpdated();
+    } catch (err) {
+      console.error('Failed to save self profile:', err);
+      alert('Failed to save. Please try again.');
+    } finally {
+      setIsSavingSelf(false);
+    }
+  };
+
+  // Flexible field reader (same logic as Overview page)
+  const pf = (r: any, ...keys: string[]): number => {
+    for (const k of keys) {
+      const v = r?.earningsBreakdown?.[k] ?? r?.[k];
+      if (v !== undefined && v !== null && v !== '') return Number(v);
+    }
+    return 0;
+  };
+
+  // Aggregate totals from all performance reports
+  const perfTotals = useMemo(() => {
+    const sum = (fn: (r: any) => number) => performanceReports.reduce((s, r) => s + fn(r), 0);
+    return {
+      liveHrs:       sum(r => pf(r, 'liveDurationMinutes','liveDuration','live_duration','live_hours')),
+      points:        sum(r => pf(r, 'totalEarningsOfPoints','total_earnings_of_points','totalPoints','total_points','points')),
+      liveEarnings:  sum(r => pf(r, 'liveEarnings','live_earnings')),
+      partyEarnings: sum(r => pf(r, 'partyEarnings','party_earnings')),
+      privateChat:   sum(r => pf(r, 'privateChatEarnings','private_chat_earnings','privateChat')),
+      tips:          sum(r => pf(r, 'tips')),
+      platformReward:sum(r => pf(r, 'platformReward','platform_reward')),
+      otherEarnings: sum(r => pf(r, 'otherEarnings','other_earnings')),
+      platformHourly:sum(r => pf(r, 'platformHourlySalary','platform_hourly_salary')),
+      superSalary:   sum(r => pf(r, 'superSalary','super_salary')),
+      superRank:     sum(r => pf(r, 'superRank','super_rank')),
+    };
+  }, [performanceReports]);
+
+  // Monthly bar chart data
+  const monthlyChartData = useMemo(() => {
+    const MONTH_ORDER = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    return [...performanceReports]
+      .sort((a, b) => {
+        if (a.year !== b.year) return a.year - b.year;
+        return (a.month || MONTH_ORDER.indexOf(a.monthName)+1) - (b.month || MONTH_ORDER.indexOf(b.monthName)+1);
+      })
+      .map(r => ({
+        label: `${r.monthName?.slice(0,3) || r.month}/${String(r.year).slice(2)}`,
+        points: pf(r, 'totalEarningsOfPoints','total_earnings_of_points','totalPoints','total_points','points'),
+      }));
+  }, [performanceReports]);
+
   const isSpotlight = !!onClose;
+
+  // Earnings breakdown tiles definition
+  const earningTiles = [
+    { label: 'Live\nHours',         value: perfTotals.liveHrs,        color: '#06b6d4',  fmt: (v: number) => v ? `${v}h` : '—' },
+    { label: 'Live\nEarnings',      value: perfTotals.liveEarnings,   color: '#3b82f6',  fmt: (v: number) => v ? v.toLocaleString() : '—' },
+    { label: 'Party\nEarnings',     value: perfTotals.partyEarnings,  color: '#8b5cf6',  fmt: (v: number) => v ? v.toLocaleString() : '—' },
+    { label: 'Private\nChat',       value: perfTotals.privateChat,    color: '#ec4899',  fmt: (v: number) => v ? v.toLocaleString() : '—' },
+    { label: 'Tips',                value: perfTotals.tips,           color: '#f59e0b',  fmt: (v: number) => v ? v.toLocaleString() : '—' },
+    { label: 'Platform\nReward',    value: perfTotals.platformReward, color: '#10b981',  fmt: (v: number) => v ? v.toLocaleString() : '—' },
+    { label: 'Other\nEarnings',     value: perfTotals.otherEarnings,  color: '#a78bfa',  fmt: (v: number) => v ? v.toLocaleString() : '—' },
+    { label: 'Platform\nHourly',    value: perfTotals.platformHourly, color: '#38bdf8',  fmt: (v: number) => v ? v.toLocaleString() : '—' },
+    { label: 'Super\nSalary',       value: perfTotals.superSalary,    color: '#D4AF37',  fmt: (v: number) => v ? v.toLocaleString() : '—' },
+    { label: 'Super\nRank',         value: perfTotals.superRank,      color: '#fb923c',  fmt: (v: number) => v ? v.toLocaleString() : '—' },
+  ];
+
+  const renderEarningsBreakdown = () => {
+    if (performanceReports.length === 0) return null;
+    return (
+      <div className="bg-[#1A1A28] border border-white/5 rounded-2xl p-4 shadow-md">
+        <p className="text-[9px] font-black text-[#A09E9A]/50 uppercase tracking-[0.2em] mb-3">Earnings Breakdown — All Time</p>
+        <div className="grid grid-cols-5 gap-2">
+          {earningTiles.map((tile, i) => (
+            <div key={i} className="bg-[#0D0D14] border border-white/5 rounded-xl p-2.5 flex flex-col items-center text-center hover:border-white/10 transition-all">
+              <p className="text-[7px] font-black uppercase tracking-wider leading-tight mb-1.5 whitespace-pre-line" style={{ color: tile.color + 'aa' }}>
+                {tile.label}
+              </p>
+              <p className="text-sm font-black leading-none" style={{ color: tile.color }}>
+                {tile.fmt(tile.value)}
+              </p>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
+  const renderMonthlyPointsTrend = () => {
+    if (monthlyChartData.length === 0) return null;
+    const COLORS = ['#D4AF37','#6366f1','#ec4899','#10b981','#f59e0b','#06b6d4','#a78bfa','#fb923c','#38bdf8','#34d399','#f472b6','#818cf8'];
+    return (
+      <div className="bg-[#1A1A28] border border-white/5 rounded-2xl p-4 shadow-md">
+        <div className="flex items-center gap-2 mb-4">
+          <p className="text-[9px] font-black text-[#A09E9A]/50 uppercase tracking-[0.2em]">Monthly Points Trend</p>
+          <span className="ml-auto text-[8px] text-[#A09E9A]/30 font-mono">{monthlyChartData.length} months</span>
+        </div>
+        <div className="h-44">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={monthlyChartData} margin={{ top: 5, right: 5, left: -25, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#ffffff08" vertical={false} />
+              <XAxis dataKey="label" tick={{ fontSize: 8, fill: '#A09E9A', fontWeight: 'bold' }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 8, fill: '#A09E9A' }} axisLine={false} tickLine={false}
+                tickFormatter={v => v >= 1000 ? `${(v/1000).toFixed(0)}K` : String(v)} />
+              <Tooltip
+                contentStyle={{ backgroundColor: '#13131E', borderColor: '#ffffff20', borderRadius: '12px', fontSize: '10px' }}
+                formatter={(v: number) => [v.toLocaleString() + ' pts', 'Points']}
+                labelStyle={{ color: '#D4AF37', fontWeight: 'bold', marginBottom: '4px' }}
+              />
+              <Bar dataKey="points" radius={[4, 4, 0, 0]}>
+                {monthlyChartData.map((_, idx) => (
+                  <Cell key={idx} fill={COLORS[idx % COLORS.length]} fillOpacity={0.85} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+    );
+  };
+
+  // Self-edit modal: bio, social links, streaming hours only
+  const renderSelfEditModal = () => {
+    if (!isSelfEditing) return null;
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+        <div className="bg-[#13131E] border border-white/10 rounded-2xl max-w-md w-full p-5 shadow-2xl relative max-h-[90vh] overflow-y-auto">
+          <button
+            title="Close"
+            onClick={() => setIsSelfEditing(false)}
+            className="absolute top-4 right-4 p-1.5 bg-[#1A1A28] border border-white/10 rounded-full text-[#A09E9A] hover:text-[#F0EFE8] cursor-pointer"
+          >
+            <X size={14} />
+          </button>
+
+          <h3 className="text-sm font-black uppercase tracking-wider text-[#F0EFE8] mb-0.5">Edit Your Profile</h3>
+          <p className="text-[10px] text-[#A09E9A] mb-4">Update bio, social media links and streaming schedule.</p>
+
+          <div className="space-y-4">
+            {/* Bio */}
+            <div className="space-y-1">
+              <label className="text-[9px] font-black uppercase tracking-wider text-[#A09E9A]">Bio</label>
+              <textarea
+                rows={3}
+                value={selfBio}
+                onChange={e => setSelfBio(e.target.value)}
+                placeholder="Introduce yourself to the agency..."
+                className="w-full bg-[#0D0D14] border border-white/10 rounded-xl px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37] resize-none"
+              />
+            </div>
+
+            {/* Social Links */}
+            <div className="space-y-2">
+              <label className="text-[9px] font-black uppercase tracking-wider text-[#A09E9A]">Social Media</label>
+              {[
+                { icon: '📸', label: 'Instagram', value: selfSocialIg, setter: setSelfSocialIg, placeholder: '@username or URL' },
+                { icon: '🎵', label: 'TikTok', value: selfSocialTk, setter: setSelfSocialTk, placeholder: '@username or URL' },
+                { icon: '📘', label: 'Facebook', value: selfSocialFb, setter: setSelfSocialFb, placeholder: 'URL or username' },
+                { icon: '💬', label: 'WhatsApp', value: selfSocialWa, setter: setSelfSocialWa, placeholder: '+63 9XX XXX XXXX' },
+              ].map(({ icon, label, value, setter, placeholder }) => (
+                <div key={label} className="flex items-center gap-2">
+                  <span className="text-sm w-6 text-center">{icon}</span>
+                  <div className="flex-1">
+                    <p className="text-[8px] text-[#A09E9A]/60 font-bold uppercase tracking-wider mb-0.5">{label}</p>
+                    <input
+                      type="text"
+                      value={value}
+                      onChange={e => setter(e.target.value)}
+                      placeholder={placeholder}
+                      className="w-full bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-1.5 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Streaming Schedule */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-[9px] font-black uppercase tracking-wider text-[#A09E9A]">Streaming Schedule</label>
+                <button
+                  type="button"
+                  onClick={() => setSelfStreamSlots([...selfStreamSlots, { from: '', to: '' }])}
+                  className="text-[8px] font-black text-[#D4AF37] border border-[#D4AF37]/30 rounded px-2 py-0.5 hover:bg-[#D4AF37]/10 transition-all cursor-pointer"
+                >
+                  + Add Slot
+                </button>
+              </div>
+              {selfStreamSlots.map((slot, idx) => (
+                <div key={idx} className="flex items-center gap-2">
+                  <input
+                    type="text" value={slot.from}
+                    onChange={e => { const s = [...selfStreamSlots]; s[idx] = { ...s[idx], from: e.target.value }; setSelfStreamSlots(s); }}
+                    placeholder="From (e.g. 20:00)"
+                    className="flex-1 bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-1.5 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
+                  />
+                  <span className="text-[#A09E9A]/40 text-xs">→</span>
+                  <input
+                    type="text" value={slot.to}
+                    onChange={e => { const s = [...selfStreamSlots]; s[idx] = { ...s[idx], to: e.target.value }; setSelfStreamSlots(s); }}
+                    placeholder="To (e.g. 23:00)"
+                    className="flex-1 bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-1.5 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
+                  />
+                  {selfStreamSlots.length > 1 && (
+                    <button type="button" onClick={() => setSelfStreamSlots(selfStreamSlots.filter((_, i) => i !== idx))} className="text-red-400 hover:text-red-300 cursor-pointer">
+                      <X size={12} />
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex gap-3 mt-5">
+            <button onClick={() => setIsSelfEditing(false)} className="flex-1 py-2.5 bg-[#1A1A28] border border-white/10 text-[#A09E9A] rounded-xl text-[9px] font-black uppercase tracking-wider hover:bg-[#222235] transition-all cursor-pointer">
+              Cancel
+            </button>
+            <button
+              onClick={handleSaveSelf}
+              disabled={isSavingSelf}
+              className="flex-[2] py-2.5 bg-[#D4AF37]/10 border border-[#D4AF37]/40 text-[#D4AF37] rounded-xl text-[9px] font-black uppercase tracking-wider hover:bg-[#D4AF37]/20 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+            >
+              {isSavingSelf ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
+              {isSavingSelf ? 'Saving...' : 'Save Changes'}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+
 
   const renderIdentityCard = () => (
     <div className="bg-[#1A1A28] border border-white/5 rounded-2xl p-4 flex gap-4 items-start shadow-md relative group/card">
@@ -1064,13 +1346,18 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
       ) : (
         <div className="flex items-center justify-between pb-4 border-b border-white/5 shrink-0">
           <div className="flex flex-col">
-            <span className="text-lg font-black text-[#F0EFE8] leading-tight tracking-[0.05em]">MY PROFILE & SETTINGS</span>
+            <span className="text-lg font-black text-[#F0EFE8] leading-tight tracking-[0.05em]">MY PROFILE &amp; SETTINGS</span>
             <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#D4AF37]">Niners App Portal</span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-[9px] font-black uppercase tracking-[0.2em] text-[#D4AF37]/80 bg-[#D4AF37]/10 border border-[#D4AF37]/20 px-3 py-1.5 rounded-full">
-              Authenticated Profile
-            </span>
+            <button
+              onClick={() => setIsSelfEditing(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-[#1A1A28] border border-white/10 hover:border-[#D4AF37]/40 text-[#A09E9A] hover:text-[#D4AF37] rounded-xl text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer"
+              title="Edit Profile"
+            >
+              <Edit2 size={11} />
+              Edit Profile
+            </button>
           </div>
         </div>
       )}
@@ -1091,6 +1378,8 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
               {renderIdentityCard()}
               {renderBiographyCard()}
               {renderSocialAndStreamingCard()}
+              {renderEarningsBreakdown()}
+              {renderMonthlyPointsTrend()}
               {renderPerformanceHistory()}
               {renderEarningsTrend()}
               <div className="flex flex-col md:flex-row gap-6">
@@ -1115,8 +1404,10 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
                 {renderSocialAndStreamingCard()}
               </div>
               
-              {/* Right Column (Metrics & Performance) */}
+              {/* Right Column (Performance Stats) */}
               <div className="space-y-6 lg:col-span-2">
+                {renderEarningsBreakdown()}
+                {renderMonthlyPointsTrend()}
                 {renderEarningsTrend()}
                 {renderPerformanceHistory()}
                 <div className="flex flex-col md:flex-row gap-6">
@@ -1131,6 +1422,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
       
       {renderRpkModal()}
       {renderFanbaseModal()}
+      {renderSelfEditModal()}
     </div>
   );
 };

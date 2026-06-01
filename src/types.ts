@@ -221,7 +221,8 @@ export interface CalendarEvent {
   type?: string;
   location?: string;
   event_host_id?: string;
-  participants?: string[];
+  participants?: string[];      // Poppo IDs of participants (display)
+  participantIds?: string[];    // Same data, used for Firestore array-contains queries
 }
 
 export interface LivehouseRequest {

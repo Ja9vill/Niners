@@ -43,9 +43,15 @@ export function getFirebaseAdminApp() {
         clientEmail,
         privateKey,
       }),
+      storageBucket: process.env.VITE_FIREBASE_STORAGE_BUCKET
     });
   }
   return getApp();
+}
+
+export function getAdminStorage() {
+  getFirebaseAdminApp();
+  return getStorage();
 }
 
 export function getAdminFirestore() {

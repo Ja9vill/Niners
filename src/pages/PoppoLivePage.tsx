@@ -1,6 +1,7 @@
 import React from 'react';
 import { Star } from 'lucide-react';
 import poppoLogo from '../poppo-logo.jpg';
+import { PoppoSEOArticle } from '../components/PoppoSEOArticle';
 
 export const PoppoLivePage = () => {
   return (
@@ -74,6 +75,9 @@ export const PoppoLivePage = () => {
           />
         </div>
       </section>
+
+      {/* 3. SEO Research Report Section */}
+      <PoppoSEOArticle />
 
     </div>
   );

@@ -3,8 +3,9 @@ import { useRoleGuard } from './RoleGuard';
 import { db } from '../lib/firebase';
 import { doc, setDoc } from 'firebase/firestore';
 import Papa from 'papaparse';
-import { FileUp, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
+import { FileUp, CheckCircle2, AlertCircle, Loader2, User } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { FirebaseService } from '../lib/firebaseService';
 
 interface FinancialUploadProps {
   onUploadSuccess?: () => void;
@@ -18,6 +19,7 @@ export const FinancialUpload: React.FC<FinancialUploadProps> = ({ onUploadSucces
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [stats, setStats] = useState<{ total: number; success: number; skipped: number } | null>(null);
+  const [successList, setSuccessList] = useState<{ id: string; name: string; points: number }[]>([]);
 
   if (!isDirector) {
     return (
@@ -61,9 +63,19 @@ export const FinancialUpload: React.FC<FinancialUploadProps> = ({ onUploadSucces
       skipEmptyLines: true,
       complete: async (results) => {
         try {
+          // Fetch existing roster to auto-match Poppo IDs to Host Names
+          const allHosts = await FirebaseService.getAllRoleMetadata();
+          const hostLookup = new Map<string, string>();
+          allHosts.forEach(h => {
+            const id = String(h.poppo_id || h.poppoId || h.id);
+            const name = String(h.nickname || h.name || 'Unknown');
+            hostLookup.set(id, name);
+          });
+
           const rows = results.data as any[];
           let successCount = 0;
           let skippedCount = 0;
+          const successfulUploads: { id: string; name: string; points: number }[] = [];
 
           for (const row of rows) {
             // Find appropriate keys (case insensitive, ignoring spaces)
@@ -83,7 +95,9 @@ export const FinancialUpload: React.FC<FinancialUploadProps> = ({ onUploadSucces
               continue;
             }
 
-            const docId = `${poppoId}_${year}_monthly_${month}`;
+            const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+            const monthName = MONTH_NAMES[month - 1] || `Month${month}`;
+            const docId = `${poppoId}_${monthName}_${year}`;
             const liveDurationMinutes = parseDuration(getVal(['live duration', 'liveduration', 'live hours']));
             const partyHostDurationMinutes = parseDuration(getVal(['party host duration', 'party duration', 'party hours']));
             const level = cleanNumber(getVal(['level', 'lvl']));
@@ -103,9 +117,14 @@ export const FinancialUpload: React.FC<FinancialUploadProps> = ({ onUploadSucces
               superRank: cleanNumber(getVal(['super rank']))
             };
 
+            const poppoIdStr = String(poppoId).trim();
+            const hostName = hostLookup.get(poppoIdStr) || 'Unknown Host';
+
             const reportData = {
-              poppoId: String(poppoId).trim(),
+              poppoId: poppoIdStr,
+              hostName, // Auto-matched owner
               month,
+              monthName,
               year,
               periodType: 'monthly',
               liveDurationMinutes,
@@ -119,6 +138,11 @@ export const FinancialUpload: React.FC<FinancialUploadProps> = ({ onUploadSucces
               const docRef = doc(db, 'performance_reports', docId);
               await setDoc(docRef, reportData, { merge: true });
               successCount++;
+              successfulUploads.push({
+                id: poppoIdStr,
+                name: hostName,
+                points: earningsBreakdown.totalEarningsOfPoints
+              });
             } catch (err) {
               console.error(`Failed to upsert row for ID: ${poppoId}`, err);
               skippedCount++;
@@ -126,6 +150,7 @@ export const FinancialUpload: React.FC<FinancialUploadProps> = ({ onUploadSucces
           }
 
           setStats({ total: rows.length, success: successCount, skipped: skippedCount });
+          setSuccessList(successfulUploads);
           setSuccessMsg(`Import Complete: Processed ${rows.length} rows.`);
           
           if (onUploadSuccess) {
@@ -163,14 +188,16 @@ export const FinancialUpload: React.FC<FinancialUploadProps> = ({ onUploadSucces
 
       <AnimatePresence>
         {errorMsg && (
-          <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-xl flex items-center gap-2">
+          <motion.div key="error-msg" initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-xl flex items-center gap-2">
             <AlertCircle size={14} className="text-red-400" />
             <span className="text-xs text-red-400 font-bold">{errorMsg}</span>
           </motion.div>
         )}
+      </AnimatePresence>
 
+      <AnimatePresence>
         {successMsg && stats && (
-          <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="mb-4 p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex flex-col gap-2">
+          <motion.div key="success-msg" initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="mb-4 p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex flex-col gap-2">
             <div className="flex items-center gap-2">
               <CheckCircle2 size={16} className="text-emerald-400" />
               <span className="text-sm text-emerald-400 font-bold">{successMsg}</span>
@@ -189,6 +216,30 @@ export const FinancialUpload: React.FC<FinancialUploadProps> = ({ onUploadSucces
                 <p className="text-lg font-bold text-rose-400">{stats.skipped}</p>
               </div>
             </div>
+
+            {successList.length > 0 && (
+              <div className="mt-4 border-t border-emerald-500/20 pt-4">
+                <p className="text-xs font-bold text-emerald-400 uppercase mb-2">Successfully Added Records:</p>
+                <div className="max-h-48 overflow-y-auto custom-scrollbar pr-2 space-y-1">
+                  {successList.map((item, idx) => (
+                    <div key={idx} className="flex items-center justify-between bg-black/20 p-2 rounded-lg border border-white/5">
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 rounded-full bg-emerald-500/10 flex items-center justify-center border border-emerald-500/20">
+                          <User size={12} className="text-emerald-400" />
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-white">{item.name}</p>
+                          <p className="text-[10px] text-[#A09E9A] font-mono">ID: {item.id}</p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-xs font-bold text-[#D4AF37]">{item.points.toLocaleString()} pts</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
