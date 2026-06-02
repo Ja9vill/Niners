@@ -18,7 +18,7 @@ export const DashboardLayout = () => {
   const handleLogout = async () => {
     await signOut(auth);
     Storage.clearAuthState();
-    navigate('/login');
+    navigate('/');
   };
 
   const getNavigationLinks = () => {
@@ -32,11 +32,12 @@ export const DashboardLayout = () => {
     
     if (role === 'director' || role === 'admin' || role === 'head admin') {
       links.push({ path: '/app/director', label: 'Hub', icon: Shield });
-      links.push({ path: '/app/profiles', label: 'Manager Hub', icon: Users });
+      links.push({ path: '/app/profiles', label: 'Members', icon: Users });
       links.push({ path: '/app/my-profile', label: 'My Profile', icon: User });
     } else if (role === 'manager' || role === 'agent') {
-      links.push({ path: '/app/profiles', label: 'Hub', icon: Users });
+      links.push({ path: '/app/hub', label: 'Hub', icon: Users });
     } else {
+      // talent / host
       links.push({ path: '/app/my-profile', label: 'Profile', icon: User });
     }
 

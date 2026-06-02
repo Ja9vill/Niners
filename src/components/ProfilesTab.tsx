@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Search, Filter, Loader2, Trophy, Star, Target, Users, LayoutGrid, X } from 'lucide-react';
+import { Search, Filter, Loader2, Star, Users, LayoutGrid } from 'lucide-react';
 import { FirebaseService } from '../lib/firebaseService';
-import { cn } from '../lib/utils';
-import { Host, EventsCalendarPublic, AgencyAward } from '../types';
+import { Host } from '../types';
+import { HostProfileView } from './HostProfileView';
 
 interface ProfilesTabProps {
   isReadOnly?: boolean;
@@ -20,54 +20,46 @@ export const ProfilesTab: React.FC<ProfilesTabProps> = ({ isReadOnly = false }) 
 
   // Spotlight State
   const [selectedHost, setSelectedHost] = useState<Host | null>(null);
-  const [isSpotlightLoading, setIsSpotlightLoading] = useState(false);
-  const [hostEvents, setHostEvents] = useState<EventsCalendarPublic[]>([]);
-  const [hostAwards, setHostAwards] = useState<AgencyAward[]>([]);
+
+  const fetchUsers = async () => {
+    setIsLoading(true);
+    try {
+      const users = await FirebaseService.getAllRoleMetadata();
+      setHosts(users.map(u => ({ ...u, id: u.poppo_id || u.poppoId || u.id } as Host)));
+    } catch (err: any) {
+      console.error("Failed to load users from Firebase:", err);
+      setError(err.message || 'Failed to connect to Database');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchUsers = async () => {
-      setIsLoading(true);
-      try {
-        const users = await FirebaseService.getAllRoleMetadata();
-        setHosts(users.map(u => ({ ...u, id: u.poppo_id || u.poppoId || u.id } as Host)));
-      } catch (err: any) {
-        console.error("Failed to load users from Firebase:", err);
-        setError(err.message || 'Failed to connect to Database');
-      } finally {
-        setIsLoading(false);
-      }
-    };
     fetchUsers();
   }, []);
 
-  const openSpotlight = async (host: Host) => {
+  const openSpotlight = (host: Host) => {
     setSelectedHost(host);
-    setIsSpotlightLoading(true);
-    try {
-      const [events, awards] = await Promise.all([
-        FirebaseService.getPublicCalendarEvents(),
-        FirebaseService.getAwards ? FirebaseService.getAwards(host.id) : Promise.resolve([])
-      ]);
-      
-      // Filter events where host might be involved
-      // Note: Assuming events have a 'hostIds' or similar property, otherwise just showing recent
-      const relatedEvents = events.filter(e => 
-        (e.hostId && e.hostId === host.id) || 
-        (e.title && e.title.includes(host.nickname || host.name))
-      );
-      setHostEvents(relatedEvents);
-      setHostAwards(awards || []);
-    } catch (err) {
-      console.error("Failed to fetch spotlight details", err);
-    } finally {
-      setIsSpotlightLoading(false);
-    }
   };
 
   const closeSpotlight = () => {
     setSelectedHost(null);
-    setHostEvents([]);
-    setHostAwards([]);
+  };
+
+  const handleProfileUpdated = async () => {
+    try {
+      const users = await FirebaseService.getAllRoleMetadata();
+      const updatedHosts = users.map(u => ({ ...u, id: u.poppo_id || u.poppoId || u.id } as Host));
+      setHosts(updatedHosts);
+      if (selectedHost) {
+        const updated = updatedHosts.find(h => h.id === selectedHost.id);
+        if (updated) {
+          setSelectedHost(updated);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to refresh users after profile update:", err);
+    }
   };
 
   const filteredHosts = useMemo(() => {
@@ -225,157 +217,13 @@ export const ProfilesTab: React.FC<ProfilesTabProps> = ({ isReadOnly = false }) 
 
       {/* SPOTLIGHT MODAL */}
       {selectedHost && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <div className="bg-[#13131E] border border-white/10 rounded-3xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-            
-            {/* Header */}
-            <div className="p-6 border-b border-white/5 flex justify-between items-start bg-gradient-to-r from-indigo-500/10 to-transparent">
-              <div className="flex items-center gap-6">
-                <div className="w-24 h-24 rounded-2xl bg-black/40 border border-white/10 overflow-hidden shadow-xl">
-                  {selectedHost.photoUrl ? (
-                    <img src={selectedHost.photoUrl} alt="" className="w-full h-full object-cover" />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-[#A09E9A]/30">
-                      <Users size={32} />
-                    </div>
-                  )}
-                </div>
-                <div>
-                  <h2 className="text-3xl font-black text-white tracking-tight">{selectedHost.nickname || selectedHost.name}</h2>
-                  <div className="flex items-center gap-3 mt-2">
-                    <span className="font-mono text-indigo-400 text-sm">{selectedHost.id}</span>
-                    <span className="px-3 py-1 rounded-full bg-white/10 text-white/70 text-xs font-bold uppercase tracking-wider">
-                      {selectedHost.role || 'Host'}
-                    </span>
-                  </div>
-                </div>
-              </div>
-              <button 
-                onClick={closeSpotlight}
-                title="Close Spotlight"
-                aria-label="Close Spotlight"
-                className="p-2 rounded-xl hover:bg-white/10 text-[#A09E9A] hover:text-white transition-colors"
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            {/* Content Body */}
-            <div className="p-6 overflow-y-auto custom-scrollbar flex-1 space-y-8">
-              
-              {/* Primary Info Grid */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                <div className="bg-[#1A1A28] border border-white/5 p-4 rounded-2xl">
-                  <div className="text-[10px] font-black text-[#A09E9A] uppercase tracking-wider mb-1">Assigned Manager</div>
-                  <div className="text-[#F0EFE8] font-bold text-sm">{(selectedHost as any).assigned_manager_nickname || selectedHost.manager || 'N/A'}</div>
-                </div>
-                <div className="bg-[#1A1A28] border border-white/5 p-4 rounded-2xl">
-                  <div className="text-[10px] font-black text-[#A09E9A] uppercase tracking-wider mb-1">Team Anchor</div>
-                  <div className="text-[#F0EFE8] font-bold text-sm">{(selectedHost as any).team_anchor || selectedHost.anchor_type || 'N/A'}</div>
-                </div>
-                <div className="bg-[#1A1A28] border border-white/5 p-4 rounded-2xl">
-                  <div className="text-[10px] font-black text-[#A09E9A] uppercase tracking-wider mb-1">Status</div>
-                  <div className={cn(
-                    "font-bold text-sm",
-                    selectedHost.status === 'Active' ? 'text-emerald-400' : 'text-amber-400'
-                  )}>
-                    {selectedHost.status || 'Unknown'}
-                  </div>
-                </div>
-                <div className="bg-[#1A1A28] border border-white/5 p-4 rounded-2xl">
-                  <div className="text-[10px] font-black text-[#A09E9A] uppercase tracking-wider mb-1">Poppo Level</div>
-                  <div className="text-white font-black text-xl">{selectedHost.level || 0}</div>
-                </div>
-              </div>
-
-              {/* Fanbase Metrics */}
-              <div>
-                <h3 className="text-sm font-black text-[#F0EFE8] uppercase tracking-widest flex items-center gap-2 mb-4">
-                  <Users className="text-pink-500" size={16} /> Fanbase Metrics
-                </h3>
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="bg-gradient-to-br from-pink-500/10 to-transparent border border-pink-500/20 p-4 rounded-2xl">
-                    <div className="text-xs text-pink-400 font-bold mb-1">Followers</div>
-                    <div className="text-2xl font-black text-white">{selectedHost.followers_count?.toLocaleString() || '0'}</div>
-                  </div>
-                  <div className="bg-gradient-to-br from-purple-500/10 to-transparent border border-purple-500/20 p-4 rounded-2xl">
-                    <div className="text-xs text-purple-400 font-bold mb-1">FC Subscribers</div>
-                    <div className="text-2xl font-black text-white">{(selectedHost as any).fc_subscribers?.toLocaleString() || '0'}</div>
-                  </div>
-                  <div className="bg-gradient-to-br from-blue-500/10 to-transparent border border-blue-500/20 p-4 rounded-2xl">
-                    <div className="text-xs text-blue-400 font-bold mb-1">FC Members</div>
-                    <div className="text-2xl font-black text-white">{(selectedHost as any).fc_members?.toLocaleString() || '0'}</div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Exposures & Awards Split */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                
-                {/* Exposures */}
-                <div>
-                  <h3 className="text-sm font-black text-[#F0EFE8] uppercase tracking-widest flex items-center gap-2 mb-4">
-                    <Target className="text-emerald-500" size={16} /> Exposures
-                  </h3>
-                  <div className="bg-[#1A1A28] border border-white/5 rounded-2xl p-4 min-h-[200px]">
-                    {isSpotlightLoading ? (
-                      <div className="flex justify-center py-8"><Loader2 size={24} className="animate-spin text-emerald-500/50" /></div>
-                    ) : hostEvents.length > 0 ? (
-                      <div className="space-y-3">
-                        {hostEvents.map((evt, i) => (
-                          <div key={i} className="bg-white/5 border border-white/10 p-3 rounded-xl">
-                            <div className="flex justify-between items-start mb-1">
-                              <h4 className="font-bold text-[#F0EFE8] text-sm">{evt.title}</h4>
-                              <span className="text-[10px] font-mono text-emerald-400 bg-emerald-400/10 px-2 py-0.5 rounded border border-emerald-400/20">{evt.status}</span>
-                            </div>
-                            <div className="text-xs text-[#A09E9A]">{new Date(evt.startDate).toLocaleDateString()} - {evt.type}</div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="text-center py-12 text-[#A09E9A]/40 text-xs italic">
-                        No upcoming or past events logged.
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Badges & Awards */}
-                <div>
-                  <h3 className="text-sm font-black text-[#F0EFE8] uppercase tracking-widest flex items-center gap-2 mb-4">
-                    <Trophy className="text-amber-500" size={16} /> Agency Badges & Awards
-                  </h3>
-                  <div className="bg-[#1A1A28] border border-white/5 rounded-2xl p-4 min-h-[200px]">
-                    {isSpotlightLoading ? (
-                      <div className="flex justify-center py-8"><Loader2 size={24} className="animate-spin text-amber-500/50" /></div>
-                    ) : hostAwards.length > 0 ? (
-                      <div className="flex flex-wrap gap-3">
-                        {hostAwards.map((award, i) => (
-                          <div key={i} className="flex flex-col items-center gap-2 bg-gradient-to-b from-amber-500/10 to-transparent border border-amber-500/20 p-3 rounded-xl w-[100px] text-center">
-                            <div className="w-12 h-12 rounded-full bg-amber-500/20 flex items-center justify-center border border-amber-500/40">
-                              <Trophy size={20} className="text-amber-400" />
-                            </div>
-                            <div className="text-[10px] font-bold text-amber-100 leading-tight">
-                              {award.title}
-                            </div>
-                            <div className="text-[9px] font-mono text-amber-500/50">
-                              {new Date(award.awardedAt).getFullYear()}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="text-center py-12 text-[#A09E9A]/40 text-xs italic">
-                        No awards received yet.
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-              </div>
-              
-            </div>
-          </div>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm overflow-y-auto">
+          <HostProfileView 
+            host={selectedHost} 
+            isReadOnly={isReadOnly} 
+            onClose={closeSpotlight} 
+            onProfileUpdated={handleProfileUpdated}
+          />
         </div>
       )}
     </div>

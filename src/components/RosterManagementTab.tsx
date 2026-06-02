@@ -1,6 +1,6 @@
 /* eslint-disable */
 import React, { useState, useMemo, useEffect } from 'react';
-import { Loader2, Save, Search, UserCircle, CheckCircle2, Database, UploadCloud, X, Camera } from 'lucide-react';
+import { Loader2, Save, Search, UserCircle, CheckCircle2, Database, UploadCloud, X, Camera, RotateCcw } from 'lucide-react';
 import { cn, formatDate } from '../lib/utils';
 import { FirebaseService } from '../lib/firebaseService';
 import { Storage } from '../lib/storage';
@@ -57,9 +57,10 @@ interface RosterManagementTabProps {
   hosts?: Host[];
   onUpdate: () => void;
   auditLogAction: (actionType: string, beforeValue: any, afterValue: any) => Promise<void>;
+  onResetAccountAccess?: (poppoId: string) => void;
 }
 
-export const RosterManagementTab: React.FC<RosterManagementTabProps> = ({ hosts, onUpdate, auditLogAction }) => {
+export const RosterManagementTab: React.FC<RosterManagementTabProps> = ({ hosts, onUpdate, auditLogAction, onResetAccountAccess }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('All');
   const [users, setUsers] = useState<any[]>([]);
@@ -367,6 +368,7 @@ export const RosterManagementTab: React.FC<RosterManagementTabProps> = ({ hosts,
                 <th className="px-6 py-4">Tier / Pay</th>
                 <th className="px-6 py-4">Assigned Manager (Name)</th>
                 <th className="px-6 py-4">Manager Poppo ID</th>
+                {onResetAccountAccess && <th className="px-6 py-4">Account Access</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
@@ -509,6 +511,19 @@ export const RosterManagementTab: React.FC<RosterManagementTabProps> = ({ hosts,
                           <span className="text-[#A09E9A]/40 text-[10px] px-2 italic">N/A</span>
                         )}
                       </td>
+                      {onResetAccountAccess && (
+                        <td className="px-6 py-3">
+                          <button
+                            type="button"
+                            onClick={() => onResetAccountAccess(host.id)}
+                            className="p-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 hover:border-red-500/30 transition-all flex items-center gap-1.5 font-bold cursor-pointer"
+                            title="Reset Account Access"
+                          >
+                            <RotateCcw size={13} />
+                            <span className="text-[10px] uppercase tracking-wider">Reset</span>
+                          </button>
+                        </td>
+                      )}
                     </tr>
                   );
                 })

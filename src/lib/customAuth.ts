@@ -1,4 +1,5 @@
-import { getAuth, signInWithCustomToken, signOut, updatePassword, User, UserCredential } from "firebase/auth";
+import { signInWithCustomToken, signOut, updatePassword, User, UserCredential } from "firebase/auth";
+import { auth } from "./firebase";
 import { Storage } from "./storage";
 
 export interface AuthSuccessState {
@@ -20,9 +21,109 @@ interface BackendLoginResponse {
   user?: any;
 }
 
+/**
+ * Utility helper to execute a fetch request with a strict client-side timeout limit.
+ * Utilizes AbortController to abort requests that exceed the specified timeout.
+ */
+async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutMs = 5000): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal
+    });
+    return response;
+  } catch (err: any) {
+    if (err.name === 'AbortError') {
+      throw new Error(`Connection timed out. The server did not respond within ${timeoutMs}ms.`);
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export class PoppoAuthService {
-  private auth = getAuth();
+  private auth = auth;
   private backendUrl = '/api/auth/login-with-poppo';
+
+  /**
+   * Phase 1: Checks if a Poppo ID exists and whether it is a first-time account.
+   * Returns { exists, is_first_login } — no auth token needed.
+   */
+  public async checkUsername(poppoId: string): Promise<{ exists: boolean; is_first_login: boolean; blocked?: boolean }> {
+    const response = await fetchWithTimeout('/api/auth/check-username', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ poppoId }),
+    });
+    
+    const text = await response.text();
+    let data: any = null;
+    if (text) {
+      try {
+        data = JSON.parse(text);
+      } catch (e) {
+        // Not JSON
+      }
+    }
+
+    if (!response.ok) {
+      throw new Error(data?.error || `Server error (${response.status}): ${text || 'Empty response'}`);
+    }
+    return data;
+  }
+
+  /**
+   * Phase 2a: Sets a first-time user's password and automatically logs them in.
+   * Calls /api/auth/set-initial-password, then signs into Firebase with the returned custom token.
+   */
+  public async setInitialPassword(
+    poppoId: string,
+    newPassword: string,
+    confirmPassword: string
+  ): Promise<AuthServiceResponse> {
+    const response = await fetchWithTimeout('/api/auth/set-initial-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ poppoId, newPassword, confirmPassword }),
+    });
+    
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.error || 'Identity registration failed.');
+    }
+
+    // Sign into Firebase with the returned custom token
+    let userCredential;
+    try {
+      userCredential = await signInWithCustomToken(this.auth, data.customToken);
+    } catch (fbError: any) {
+      throw this.translateFirebaseError(fbError);
+    }
+
+    const user = userCredential.user;
+
+    if (data.user) {
+      const u = data.user;
+      Storage.setAuthState({
+        level: u.level,
+        role: u.role,
+        name: u.nickname || 'Member',
+        poppo_id: u.poppo_id,
+        nickname: u.nickname,
+        position: u.position,
+        status: u.status,
+        manager_assigned: u.manager_assigned,
+        anchor_team: u.anchor_team,
+        profile_photo: u.profile_photo,
+        token: u.token,
+      });
+    }
+
+    return { status: 'SUCCESS', user };
+  }
 
   /**
    * Orchestrates the complete authentication flow.
@@ -134,7 +235,7 @@ export class PoppoAuthService {
 
       // Sync state with backend
       try {
-        const response = await fetch('/api/auth/mark-migration-complete', {
+        const response = await fetchWithTimeout('/api/auth/mark-migration-complete', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -142,9 +243,18 @@ export class PoppoAuthService {
           },
         });
 
+        const text = await response.text();
+        let data: any = null;
+        if (text) {
+          try {
+            data = JSON.parse(text);
+          } catch (e) {
+            // Not JSON
+          }
+        }
+
         if (!response.ok) {
-          const errData = await response.json();
-          throw new Error(errData?.error || `Server responded with status ${response.status}`);
+          throw new Error(data?.error || `Server error (${response.status}): ${text || 'Empty response'}`);
         }
 
         return {
@@ -175,13 +285,21 @@ export class PoppoAuthService {
   ): Promise<BackendLoginResponse> {
     for (let attempt = 1; attempt <= retries; attempt++) {
       try {
-        const response = await fetch(this.backendUrl, {
+        const response = await fetchWithTimeout(this.backendUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ poppoId, tempPassword }),
         });
 
-        const data = await response.json();
+        const text = await response.text();
+        let data: any = null;
+        if (text) {
+          try {
+            data = JSON.parse(text);
+          } catch (e) {
+            // Not JSON
+          }
+        }
 
         if (response.ok) {
           return data as BackendLoginResponse;
@@ -197,9 +315,9 @@ export class PoppoAuthService {
           throw new Error(data?.error || 'Too many login attempts. Please try again in 15 minutes.');
         }
 
-        throw new Error(data?.error || `Server returned code: ${response.status}`);
+        throw new Error(data?.error || `Server returned code: ${response.status} - ${text || 'Empty response'}`);
       } catch (err: any) {
-        if (err.message.includes('Invalid') || err.message.includes('Too many') || err.message.includes('format')) {
+        if (err.message.includes('Invalid') || err.message.includes('Too many') || err.message.includes('format') || err.message.includes('Server returned code')) {
           throw err;
         }
 
@@ -221,9 +339,12 @@ export class PoppoAuthService {
   private async checkMigrationStatus(user: User): Promise<boolean> {
     try {
       const tokenResult = await user.getIdTokenResult(true);
-      return !!tokenResult.claims.tempPasswordRequired;
-    } catch {
-      return true;
+      // Only require migration when the backend explicitly set tempPasswordRequired = true
+      return tokenResult.claims.tempPasswordRequired === true;
+    } catch (err) {
+      // If token refresh fails, do NOT block login — just skip migration check
+      console.warn('[PoppoAuthService] checkMigrationStatus token refresh failed (non-fatal):', err);
+      return false;
     }
   }
 

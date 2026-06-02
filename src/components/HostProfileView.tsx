@@ -1,7 +1,7 @@
 /* eslint-disable */
 /* eslint-disable */
 import React, { useState, useEffect, useMemo } from 'react';
-import { X, Calendar, ChevronLeft, Edit2, Loader2, Save, Instagram, Twitter, Facebook } from 'lucide-react';
+import { X, Calendar, ChevronLeft, Edit2, Loader2, Save, Instagram, Twitter, Facebook, TrendingUp, TrendingDown, Minus, Award, MessageSquare, Star } from 'lucide-react';
 import { Host, CommissionEntry, CalendarEvent } from '../types';
 import { FirebaseService } from '../lib/firebaseService';
 import { Storage } from '../lib/storage';
@@ -85,6 +85,23 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
     notes: ''
   });
 
+  // Fanbase latest report (loaded from Firestore)
+  const [fanbaseLatest, setFanbaseLatest] = useState<any>(null);
+
+  // AI Analysis States
+  const [aiReport, setAiReport] = useState<{
+    summary: string;
+    journey: string;
+    recommendations: string[];
+  } | null>(null);
+  const [isGeneratingAI, setIsGeneratingAI] = useState(false);
+  const [aiError, setAiError] = useState('');
+
+  // Enhanced metrics state
+  const [awards, setAwards] = useState<any[]>([]);
+  const [agentNotes, setAgentNotes] = useState<any[]>([]);
+  const [weeklyLiveData, setWeeklyLiveData] = useState<any[]>([]);
+
   useEffect(() => {
     // Reset edit values when host changes
     setEditNickname(host.nickname || host.name || '');
@@ -134,6 +151,65 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
         });
         setPerformanceReports(perfList);
 
+        // FALLBACK: If Firestore performance_reports is empty, load from
+        // the commission flat-file data (Firebase Storage) that the Director tab uses.
+        // This ensures all metric panels show for hosts whose data is in the legacy system.
+        if (perfList.length === 0) {
+          try {
+            const monthlyData = await FirebaseService.fetchFinancials('monthly');
+            const hostCommissions = (monthlyData || []).filter(
+              (c: any) => String(c.poppo_id).trim() === String(host.id).trim()
+            );
+            if (hostCommissions.length > 0) {
+              const MONTH_MAP2: Record<string, number> = {
+                January:1,February:2,March:3,April:4,May:5,June:6,
+                July:7,August:8,September:9,October:10,November:11,December:12
+              };
+              const mapped = hostCommissions.map((c: any) => {
+                // month field is like "2024-05" or "May" 
+                let monthNum = 0;
+                let yearNum = c.year || 0;
+                if (c.month && String(c.month).includes('-')) {
+                  const parts = String(c.month).split('-');
+                  yearNum = parseInt(parts[0]) || yearNum;
+                  monthNum = parseInt(parts[1]) || 0;
+                } else if (c.month) {
+                  monthNum = MONTH_MAP2[c.month] || parseInt(c.month) || 0;
+                }
+                return {
+                  id: `${c.poppo_id}_${c.month}`,
+                  poppoId: c.poppo_id,
+                  monthName: c.month,
+                  month: monthNum,
+                  year: yearNum,
+                  earningsBreakdown: {
+                    totalEarningsOfPoints: c.total_points || c.total_earnings || 0,
+                    liveEarnings: c.live_earnings || 0,
+                    partyEarnings: c.party_earnings || 0,
+                    privateChatEarnings: c.private_chat || 0,
+                    tips: c.tips || 0,
+                    platformReward: c.platform_reward || 0,
+                    otherEarnings: c.other_earnings || 0,
+                    platformHourlySalary: c.platform_hourly_salary || 0,
+                    superSalary: c.super_salary || 0,
+                    superRank: c.super_rank || 0,
+                  },
+                  liveDurationMinutes: (c.live_duration || 0) * 60,
+                  liveDuration: c.live_duration || 0,
+                  ...c,
+                };
+              });
+              mapped.sort((a: any, b: any) => {
+                if (a.year !== b.year) return b.year - a.year;
+                return b.month - a.month;
+              });
+              setPerformanceReports(mapped);
+            }
+          } catch (e) {
+            console.warn('Fallback commission load failed:', e);
+          }
+        }
+
         // Section 2: Query events — check both participantIds (new) and participants (legacy) fields
         const [eventsSnap1, eventsSnap2] = await Promise.all([
           getDocs(query(collection(db, 'events'), where('participantIds', 'array-contains', host.id))),
@@ -160,6 +236,39 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
             sessions: localPks[0].sessions
           });
         }
+
+        // Section 3: Load latest fanbase report from subcollection
+        try {
+          const fanbaseSnap = await getDocs(collection(db, 'host', host.id, 'fanbase_report'));
+          if (!fanbaseSnap.empty) {
+            const reports = fanbaseSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+            // Sort by timestamp descending and take the latest
+            reports.sort((a: any, b: any) => (b.timestamp || '').localeCompare(a.timestamp || ''));
+            setFanbaseLatest(reports[0]);
+          }
+        } catch (e) {
+          console.warn('Could not load fanbase report:', e);
+        }
+
+        // Load awards
+        try {
+          const awardsData = await FirebaseService.getAwards(host.id);
+          setAwards(awardsData || []);
+        } catch (e) { console.warn('Could not load awards:', e); }
+
+        // Load agent notes
+        try {
+          const notesData = await FirebaseService.getNotesByHost(host.id);
+          setAgentNotes(notesData.slice(0, 5));
+        } catch (e) { console.warn('Could not load notes:', e); }
+
+        // Load weekly live data
+        try {
+          const wldSnap = await getDocs(query(collection(db, 'weekly_live_data'), where('poppo_id', '==', host.id)));
+          const wldList: any[] = wldSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+          wldList.sort((a, b) => (b.from_date || '').localeCompare(a.from_date || ''));
+          setWeeklyLiveData(wldList.slice(0, 8));
+        } catch (e) { console.warn('Could not load weekly live data:', e); }
       } catch (err) {
         console.error("Failed to load host profile data:", err);
       } finally {
@@ -170,6 +279,8 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
   }, [host.id]);
 
 
+
+  // (handleGenerateAI defined after perfTotals – see below)
 
   // Profile photo file uploader
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -409,6 +520,72 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
     };
   }, [performanceReports]);
 
+  // AI Report Generator — defined here so perfTotals is in scope
+  const handleGenerateAI = async () => {
+    setIsGeneratingAI(true);
+    setAiError('');
+    setAiReport(null);
+    try {
+      const last6 = [...performanceReports].slice(0, 6).map(r => ({
+        period: `${r.monthName || r.month}/${r.year}`,
+        points: r.earningsBreakdown?.totalEarningsOfPoints || r.totalEarningsOfPoints || r.total_points || 0,
+        liveHrs: r.liveDurationMinutes ? (r.liveDurationMinutes / 60).toFixed(1) : (r.liveDuration || 0),
+      }));
+
+      const prompt = `You are an AI analyst for Nine Talent Management, a live streaming agency.
+Analyze the following host data and return EXACTLY three sections with these exact labels on their own lines:
+[SUMMARY]
+[JOURNEY]
+[RECOMMENDATIONS]
+
+Host: ${host.nickname || host.name} (Poppo ID: ${host.id})
+Status: ${host.status || 'Unknown'} | Tier: ${host.tier || 'X'} | Level: ${host.level || 1}
+Role: ${host.role || 'Talent'} | Manager: ${host.manager || 'N/A'} | Team: ${host.team || 'N/A'}
+Total Live Earnings: ${perfTotals.liveEarnings.toLocaleString()} | Party Earnings: ${perfTotals.partyEarnings.toLocaleString()}
+Total Points Earned (all time): ${perfTotals.points.toLocaleString()}
+Live Hours (all time): ${perfTotals.liveHrs}h
+Events Participated: ${participatedEvents.length}
+PK Win Rate: ${pkData.win_percentage}% over ${pkData.sessions} sessions
+Fanbase: ${fanbaseLatest ? `${fanbaseLatest.total_followers || 0} followers, ${fanbaseLatest.fanclub_subscribers || 0} FC subs, ${fanbaseLatest.fanclub_gc_members || 0} GC members` : 'No fanbase data'}
+Monthly Performance (last 6): ${JSON.stringify(last6)}
+
+[SUMMARY] Write a 2-3 sentence performance summary of this host. Be specific and data-driven.
+[JOURNEY] Write a 2-3 sentence narrative about their streamer career journey and growth trajectory.
+[RECOMMENDATIONS] List 3-5 specific, actionable bullet points to help this host improve. Use "• " prefix for each.`;
+
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: prompt })
+      });
+
+      if (!res.ok) throw new Error(`API error ${res.status}`);
+      const { text } = await res.json();
+
+      const extractSection = (label: string, nextLabel?: string): string => {
+        const startIdx = text.indexOf(label);
+        if (startIdx === -1) return '';
+        const contentStart = startIdx + label.length;
+        const endIdx = nextLabel ? text.indexOf(nextLabel, contentStart) : text.length;
+        return text.slice(contentStart, endIdx === -1 ? text.length : endIdx).trim();
+      };
+
+      const summary = extractSection('[SUMMARY]', '[JOURNEY]');
+      const journey = extractSection('[JOURNEY]', '[RECOMMENDATIONS]');
+      const recsRaw = extractSection('[RECOMMENDATIONS]');
+      const recommendations = recsRaw
+        .split('\n')
+        .map((l: string) => l.replace(/^[•\-\*]\s*/, '').trim())
+        .filter((l: string) => l.length > 0);
+
+      setAiReport({ summary, journey, recommendations });
+    } catch (err: any) {
+      setAiError(err.message || 'Failed to generate AI report.');
+    } finally {
+      setIsGeneratingAI(false);
+    }
+  };
+
   // Monthly bar chart data
   const monthlyChartData = useMemo(() => {
     const MONTH_ORDER = ['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -421,6 +598,39 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
         label: `${r.monthName?.slice(0,3) || r.month}/${String(r.year).slice(2)}`,
         points: pf(r, 'totalEarningsOfPoints','total_earnings_of_points','totalPoints','total_points','points'),
       }));
+  }, [performanceReports]);
+
+  // Consistency Score (0-100): active months / total span months
+  const consistencyScore = useMemo(() => {
+    if (performanceReports.length === 0) return 0;
+    const sorted = [...performanceReports].sort((a, b) => {
+      if (a.year !== b.year) return a.year - b.year;
+      return (a.month || 0) - (b.month || 0);
+    });
+    const oldest = sorted[0];
+    const newest = sorted[sorted.length - 1];
+    const totalMonths = (newest.year - oldest.year) * 12 + ((newest.month || 0) - (oldest.month || 0)) + 1;
+    if (totalMonths <= 0) return 100;
+    return Math.min(100, Math.round((performanceReports.length / totalMonths) * 100));
+  }, [performanceReports]);
+
+  // Trend: latest month vs 3-month rolling avg
+  const trendData = useMemo(() => {
+    if (performanceReports.length < 2) return { trend: 'New', pct: 0 };
+    const sorted = [...performanceReports].sort((a, b) => {
+      if (a.year !== b.year) return b.year - a.year;
+      return (b.month || 0) - (a.month || 0);
+    });
+    const latest = pf(sorted[0], 'totalEarningsOfPoints', 'total_earnings_of_points', 'totalPoints', 'total_points', 'points');
+    const prev3 = sorted.slice(1, 4);
+    const avg = prev3.length > 0
+      ? prev3.reduce((s, r) => s + pf(r, 'totalEarningsOfPoints', 'total_earnings_of_points', 'totalPoints', 'total_points', 'points'), 0) / prev3.length
+      : 0;
+    if (avg === 0) return { trend: 'New', pct: 0 };
+    const pct = Math.round(((latest - avg) / avg) * 100);
+    if (pct >= 10) return { trend: 'Growing', pct };
+    if (pct <= -10) return { trend: 'Declining', pct };
+    return { trend: 'Stable', pct };
   }, [performanceReports]);
 
   const isSpotlight = !!onClose;
@@ -437,6 +647,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
     { label: 'Platform\nHourly',    value: perfTotals.platformHourly, color: '#38bdf8',  fmt: (v: number) => v ? v.toLocaleString() : '—' },
     { label: 'Super\nSalary',       value: perfTotals.superSalary,    color: '#D4AF37',  fmt: (v: number) => v ? v.toLocaleString() : '—' },
     { label: 'Super\nRank',         value: perfTotals.superRank,      color: '#fb923c',  fmt: (v: number) => v ? v.toLocaleString() : '—' },
+    { label: 'Earn\nPer Hour',      value: perfTotals.liveHrs > 0 ? Math.round(perfTotals.liveEarnings / perfTotals.liveHrs) : 0, color: '#22d3ee', fmt: (v: number) => v ? `${v.toLocaleString()}/h` : '—' },
   ];
 
   const renderEarningsBreakdown = () => {
@@ -1091,6 +1302,103 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
     </div>
   );
 
+  const renderFanbaseBlock = () => (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between px-1">
+        <h4 className="text-[10px] font-black uppercase tracking-[0.15em] text-[#A09E9A] font-outfit">Fanbase Health</h4>
+        {fanbaseLatest?.timestamp && (
+          <span className="text-[8px] font-bold text-indigo-400 border border-indigo-500/20 bg-indigo-500/5 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+            {new Date(fanbaseLatest.timestamp).toLocaleDateString()}
+          </span>
+        )}
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 bg-[#1A1A28]/50 border border-white/5 p-3 rounded-2xl">
+        {[
+          { label: 'Followers', value: fanbaseLatest?.total_followers != null ? formatNumber(fanbaseLatest.total_followers) : '—', color: 'text-[#D4AF37]' },
+          { label: 'FC Subscribers', value: fanbaseLatest?.fanclub_subscribers != null ? formatNumber(fanbaseLatest.fanclub_subscribers) : '—', color: 'text-indigo-400' },
+          { label: 'GC Members', value: fanbaseLatest?.fanclub_gc_members != null ? formatNumber(fanbaseLatest.fanclub_gc_members) : '—', color: 'text-emerald-400' },
+          { label: 'Host GC Posts', value: fanbaseLatest?.gc_activity_count_host != null ? formatNumber(fanbaseLatest.gc_activity_count_host) : '—', color: 'text-pink-400' },
+        ].map((cell, idx) => (
+          <div key={idx} className="bg-[#222235]/40 border border-white/5 p-3 rounded-xl flex flex-col justify-between min-h-[78px] hover:border-[#D4AF37]/20 transition-colors">
+            <span className="text-[8px] font-black text-[#A09E9A] uppercase tracking-widest leading-none">{cell.label}</span>
+            <span className={`text-sm font-black tracking-tight mt-2.5 block ${cell.color}`}>{cell.value}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
+  const renderAIAnalysis = () => (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between px-1">
+        <h4 className="text-[10px] font-black uppercase tracking-[0.15em] text-[#A09E9A] font-outfit">AI Performance Analysis</h4>
+        <span className="text-[8px] font-bold text-[#D4AF37] border border-[#D4AF37]/20 bg-[#D4AF37]/5 px-2.5 py-0.5 rounded-full uppercase tracking-wider">Gemini AI</span>
+      </div>
+
+      {/* Generate button */}
+      {!isGeneratingAI && !aiReport && (
+        <button
+          onClick={handleGenerateAI}
+          className="w-full py-3.5 rounded-2xl border border-[#D4AF37]/30 bg-gradient-to-r from-[#D4AF37]/10 to-[#D4AF37]/5 text-[#D4AF37] font-black text-xs uppercase tracking-widest hover:from-[#D4AF37]/20 hover:border-[#D4AF37]/50 transition-all active:scale-[0.99] cursor-pointer flex items-center justify-center gap-2.5 shadow-lg shadow-[#D4AF37]/5"
+        >
+          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z"/></svg>
+          Generate AI Report
+        </button>
+      )}
+
+      {/* Loading state */}
+      {isGeneratingAI && (
+        <div className="w-full py-8 rounded-2xl border border-[#D4AF37]/20 bg-[#D4AF37]/5 flex flex-col items-center gap-3">
+          <div className="w-6 h-6 border-2 border-[#D4AF37]/20 border-t-[#D4AF37] rounded-full animate-spin" />
+          <p className="text-[10px] font-black uppercase tracking-widest text-[#D4AF37]/60">Analyzing performance data...</p>
+        </div>
+      )}
+
+      {/* Error */}
+      {aiError && (
+        <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-xs font-bold">{aiError}</div>
+      )}
+
+      {/* Report output */}
+      {aiReport && (
+        <div className="space-y-3">
+          {/* Summary */}
+          <div className="bg-[#1A1A28]/70 border border-[#D4AF37]/15 rounded-2xl p-4 space-y-1.5">
+            <p className="text-[9px] font-black uppercase tracking-widest text-[#D4AF37]/70">Performance Summary</p>
+            <p className="text-xs text-[#F0EFE8]/90 leading-relaxed font-medium">{aiReport.summary}</p>
+          </div>
+          {/* Journey */}
+          <div className="bg-[#1A1A28]/70 border border-indigo-500/15 rounded-2xl p-4 space-y-1.5">
+            <p className="text-[9px] font-black uppercase tracking-widest text-indigo-400/70">Career Journey</p>
+            <p className="text-xs text-[#F0EFE8]/90 leading-relaxed font-medium">{aiReport.journey}</p>
+          </div>
+          {/* Recommendations */}
+          {aiReport.recommendations.length > 0 && (
+            <div className="bg-[#1A1A28]/70 border border-emerald-500/15 rounded-2xl p-4 space-y-2">
+              <p className="text-[9px] font-black uppercase tracking-widest text-emerald-400/70">Recommendations</p>
+              <ul className="space-y-1.5">
+                {aiReport.recommendations.map((rec, i) => (
+                  <li key={i} className="flex items-start gap-2">
+                    <span className="text-emerald-400 mt-0.5 shrink-0">›</span>
+                    <span className="text-xs text-[#F0EFE8]/85 leading-relaxed font-medium">{rec}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {/* Re-generate */}
+          <button
+            onClick={handleGenerateAI}
+            className="text-[9px] font-black uppercase tracking-widest text-[#A09E9A]/60 hover:text-[#D4AF37] transition-colors cursor-pointer w-full text-right pr-1"
+          >
+            ↻ Regenerate Report
+          </button>
+        </div>
+      )}
+    </div>
+  );
+
+
   const renderRpkModal = () => {
     if (!isRpkFormOpen) return null;
     
@@ -1304,6 +1612,159 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
     );
   };
 
+  const renderTrendBadge = () => {
+    if (performanceReports.length < 2) return null;
+    const { trend, pct } = trendData;
+    const cfg: Record<string, { icon: React.ReactNode; color: string; bg: string; border: string; label: string }> = {
+      Growing:   { icon: <TrendingUp size={14} />,  color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20', label: `+${pct}% vs 3-mo avg` },
+      Declining: { icon: <TrendingDown size={14} />, color: 'text-red-400',     bg: 'bg-red-500/10',     border: 'border-red-500/20',     label: `${pct}% vs 3-mo avg` },
+      Stable:    { icon: <Minus size={14} />,        color: 'text-amber-400',   bg: 'bg-amber-500/10',   border: 'border-amber-500/20',   label: `${pct >= 0 ? '+' : ''}${pct}% vs 3-mo avg` },
+      New:       { icon: <Star size={14} />,         color: 'text-indigo-400',  bg: 'bg-indigo-500/10',  border: 'border-indigo-500/20',  label: 'New host — tracking started' },
+    };
+    const c = cfg[trend] || cfg.Stable;
+    return (
+      <div className={`flex items-center gap-3 px-4 py-3 ${c.bg} border ${c.border} rounded-2xl shadow-md`}>
+        <span className={c.color}>{c.icon}</span>
+        <div>
+          <p className={`text-xs font-black uppercase tracking-wider leading-none ${c.color}`}>{trend}</p>
+          <p className="text-[9px] text-[#A09E9A] font-bold mt-0.5">{c.label}</p>
+        </div>
+        <span className="ml-auto text-[8px] font-black uppercase tracking-[0.15em] text-[#A09E9A]/40">Trend</span>
+      </div>
+    );
+  };
+
+  const renderConsistencyScore = () => {
+    if (performanceReports.length === 0) return null;
+    const score = consistencyScore;
+    const radius = 38;
+    const circumference = 2 * Math.PI * radius;
+    const offset = circumference - (score / 100) * circumference;
+    const scoreColor = score >= 75 ? '#10b981' : score >= 50 ? '#D4AF37' : score >= 25 ? '#f59e0b' : '#ef4444';
+    const scoreLabel = score >= 75 ? 'Excellent' : score >= 50 ? 'Good' : score >= 25 ? 'Fair' : 'Low';
+    return (
+      <div className="bg-[#1A1A28] border border-white/5 rounded-2xl p-4 flex items-center gap-4 shadow-md">
+        <div className="relative shrink-0 w-24 h-24">
+          <svg width="96" height="96" viewBox="0 0 96 96">
+            <circle cx="48" cy="48" r={radius} fill="none" stroke="#ffffff08" strokeWidth="8" />
+            <circle
+              cx="48" cy="48" r={radius} fill="none"
+              stroke={scoreColor} strokeWidth="8"
+              strokeDasharray={circumference}
+              strokeDashoffset={offset}
+              strokeLinecap="round"
+              transform="rotate(-90 48 48)"
+              style={{ transition: 'stroke-dashoffset 1.2s ease' }}
+            />
+          </svg>
+          <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+            <span className="text-xl font-black leading-none" style={{ color: scoreColor }}>{score}</span>
+            <span className="text-[8px] text-[#A09E9A] font-bold">/100</span>
+          </div>
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-[9px] font-black text-[#A09E9A]/50 uppercase tracking-[0.2em] mb-1">Consistency Score</p>
+          <p className="text-sm font-black" style={{ color: scoreColor }}>{scoreLabel}</p>
+          <p className="text-[10px] text-[#A09E9A] mt-1">{performanceReports.length} months active</p>
+        </div>
+      </div>
+    );
+  };
+
+  const renderAwardsBlock = () => {
+    if (awards.length === 0) return null;
+    const ICON_MAP: Record<string, string> = { trophy: '🏆', star: '⭐', medal: '🥇', crown: '👑', badge: '🎖️' };
+    return (
+      <div className="bg-[#1A1A28] border border-white/5 rounded-2xl p-4 shadow-md space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Award size={12} className="text-[#D4AF37]/60" />
+            <p className="text-[9px] font-black text-[#A09E9A]/50 uppercase tracking-[0.2em]">Agency Awards & Badges</p>
+          </div>
+          <span className="text-[8px] font-bold text-[#D4AF37] border border-[#D4AF37]/20 bg-[#D4AF37]/5 px-2 py-0.5 rounded-full uppercase tracking-wider">{awards.length} earned</span>
+        </div>
+        <div className="flex flex-wrap gap-2.5">
+          {awards.map((award: any, i: number) => (
+            <div key={i} className="flex flex-col items-center gap-1.5 bg-[#0D0D14] border border-[#D4AF37]/15 rounded-xl p-3 w-[88px] text-center hover:border-[#D4AF37]/40 transition-all group">
+              <span className="text-2xl group-hover:scale-110 transition-transform inline-block">{ICON_MAP[award.iconType] || '🎖️'}</span>
+              <p className="text-[8px] font-black text-[#F0EFE8] leading-tight">{award.title}</p>
+              {(award.dateAwarded || award.awardedAt) && (
+                <p className="text-[7px] text-[#A09E9A]/40 font-mono">{new Date(award.dateAwarded || award.awardedAt).getFullYear()}</p>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
+  const renderWeeklyLiveStats = () => {
+    if (weeklyLiveData.length === 0) return null;
+    return (
+      <div className="bg-[#1A1A28] border border-white/5 rounded-2xl p-4 shadow-md space-y-3">
+        <div className="flex items-center justify-between">
+          <p className="text-[9px] font-black text-[#A09E9A]/50 uppercase tracking-[0.2em]">Weekly Live Stats</p>
+          <span className="text-[8px] font-bold text-emerald-400 border border-emerald-500/20 bg-emerald-500/5 px-2 py-0.5 rounded-full uppercase tracking-wider">{weeklyLiveData.length} weeks</span>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="border-b border-white/5 text-[#A09E9A] font-black text-[8px] uppercase tracking-wider">
+                <th className="py-2 px-1">Period</th>
+                <th className="py-2 px-1 text-right">Avg Viewers</th>
+                <th className="py-2 px-1 text-right">New Fans</th>
+                <th className="py-2 px-1 text-right">Gifting</th>
+                <th className="py-2 px-1 text-right">Points</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-white/5">
+              {weeklyLiveData.map((w: any, i: number) => (
+                <tr key={i} className="hover:bg-white/[0.02] transition-colors">
+                  <td className="py-2 px-1 text-[9px] text-[#A09E9A] font-mono whitespace-nowrap">{w.from_date} → {w.to_date}</td>
+                  <td className="py-2 px-1 text-[10px] text-right font-black text-cyan-400">{Number(w.avg_online_users || 0).toLocaleString()}</td>
+                  <td className="py-2 px-1 text-[10px] text-right font-black text-pink-400">{Number(w.new_fans || 0).toLocaleString()}</td>
+                  <td className="py-2 px-1 text-[10px] text-right font-black text-amber-400">{Number(w.gifting_count || 0).toLocaleString()}</td>
+                  <td className="py-2 px-1 text-[10px] text-right font-black text-emerald-400">{Number(w.total_points || 0).toLocaleString()}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
+  };
+
+  const renderAgentNotes = () => {
+    if (agentNotes.length === 0) return null;
+    const TYPE_STYLES: Record<string, string> = {
+      Note:     'text-indigo-400 border-indigo-500/20 bg-indigo-500/5',
+      Task:     'text-amber-400 border-amber-500/20 bg-amber-500/5',
+      Feedback: 'text-emerald-400 border-emerald-500/20 bg-emerald-500/5',
+    };
+    return (
+      <div className="bg-[#1A1A28] border border-white/5 rounded-2xl p-4 shadow-md space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <MessageSquare size={12} className="text-indigo-400/60" />
+            <p className="text-[9px] font-black text-[#A09E9A]/50 uppercase tracking-[0.2em]">Agent Notes</p>
+          </div>
+          <span className="text-[8px] font-bold text-indigo-400 border border-indigo-500/20 bg-indigo-500/5 px-2 py-0.5 rounded-full uppercase tracking-wider">Read-Only</span>
+        </div>
+        <div className="space-y-2 max-h-48 overflow-y-auto custom-scrollbar">
+          {agentNotes.map((note: any, i: number) => (
+            <div key={i} className="bg-[#0D0D14] border border-white/5 rounded-xl p-3 space-y-1.5">
+              <div className="flex items-center gap-2">
+                <span className={`text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded border ${TYPE_STYLES[note.type] || TYPE_STYLES.Note}`}>{note.type || 'Note'}</span>
+                <span className="text-[8px] font-mono text-[#A09E9A]/40 ml-auto">{note.createdAt ? new Date(note.createdAt).toLocaleDateString() : ''}</span>
+              </div>
+              <p className="text-[10px] text-[#F0EFE8]/80 leading-relaxed">{note.content}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className={cn(
       "w-full text-[#F0EFE8] flex flex-col",
@@ -1386,6 +1847,13 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
                 {renderRandomPK()}
                 {renderEventExposure()}
               </div>
+              {renderFanbaseBlock()}
+              {renderAwardsBlock()}
+              {renderTrendBadge()}
+              {renderConsistencyScore()}
+              {renderWeeklyLiveStats()}
+              {renderAgentNotes()}
+              {renderAIAnalysis()}
               {onClose && (
                 <button
                   onClick={onClose}
@@ -1414,6 +1882,15 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
                   {renderRandomPK()}
                   {renderEventExposure()}
                 </div>
+                {renderFanbaseBlock()}
+                {renderAwardsBlock()}
+                <div className="flex flex-col sm:flex-row gap-4">
+                  {renderTrendBadge()}
+                  {renderConsistencyScore()}
+                </div>
+                {renderWeeklyLiveStats()}
+                {renderAgentNotes()}
+                {renderAIAnalysis()}
               </div>
             </>
           )}

@@ -1,8 +1,9 @@
 import React from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
-import { Trophy, Users, Calendar, PlayCircle } from 'lucide-react';
+import { Home, Trophy, Calendar, PlayCircle } from 'lucide-react';
 import { cn } from '../lib/utils';
 import appLogo from '../logo.jpg';
+
 
 export const PublicLayout = () => {
   const location = useLocation();
@@ -42,29 +43,32 @@ export const PublicLayout = () => {
       {/* Native Bottom Tab Bar */}
       <footer className="shrink-0 z-40 w-full bg-[#11111A] border-t border-white/5 min-h-[56px] pt-1 pb-[calc(0.5rem+env(safe-area-inset-bottom))]">
         <div className="w-full px-2 flex items-center justify-around">
-          <Link 
-            to="/roster" 
-            className="flex flex-col items-center justify-center gap-1 text-[#A09E9A] hover:text-[#D4AF37] transition-colors flex-1 py-1"
-          >
-            <Trophy size={20} className={cn(location.pathname === '/roster' && 'text-[#D4AF37]')} />
-            <span className={cn("text-[9px] font-bold uppercase tracking-wider", location.pathname === '/roster' && 'text-[#D4AF37]')}>Roster</span>
-          </Link>
-          <Link 
-            to="/calendar" 
-            className="flex flex-col items-center justify-center gap-1 text-[#A09E9A] hover:text-[#D4AF37] transition-colors flex-1 py-1"
-          >
-            <Calendar size={20} className={cn(location.pathname === '/calendar' && 'text-[#D4AF37]')} />
-            <span className={cn("text-[9px] font-bold uppercase tracking-wider", location.pathname === '/calendar' && 'text-[#D4AF37]')}>Calendar</span>
-          </Link>
-          <Link 
-            to="/poppo-live" 
-            className="flex flex-col items-center justify-center gap-1 text-[#A09E9A] hover:text-[#D4AF37] transition-colors flex-1 py-1"
-          >
-            <PlayCircle size={20} className={cn(location.pathname === '/poppo-live' && 'text-[#D4AF37]')} />
-            <span className={cn("text-[9px] font-bold uppercase tracking-wider", location.pathname === '/poppo-live' && 'text-[#D4AF37]')}>Poppo</span>
-          </Link>
+          {[
+            { to: '/', icon: Home, label: 'Home' },
+            { to: '/roster', icon: Trophy, label: 'Roster' },
+            { to: '/calendar', icon: Calendar, label: 'Calendar' },
+            { to: '/poppo-live', icon: PlayCircle, label: 'Poppo' },
+          ].map(({ to, icon: Icon, label }) => {
+            const isActive = to === '/' ? location.pathname === '/' : location.pathname.startsWith(to);
+            return (
+              <Link
+                key={to}
+                to={to}
+                className={cn(
+                  'flex flex-col items-center justify-center gap-1 transition-colors flex-1 py-1',
+                  isActive ? 'text-[#D4AF37]' : 'text-[#A09E9A] hover:text-[#D4AF37]'
+                )}
+              >
+                <Icon size={20} />
+                <span className={cn('text-[9px] font-bold uppercase tracking-wider', isActive && 'text-[#D4AF37]')}>
+                  {label}
+                </span>
+              </Link>
+            );
+          })}
         </div>
       </footer>
     </div>
   );
 };
+

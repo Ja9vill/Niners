@@ -100,6 +100,10 @@ export const DirectorTab = () => {
   const [selectedHostForPasswordId, setSelectedHostForPasswordId] = useState<string>('');
   const [targetPassword, setTargetPassword] = useState<string>('');
 
+  // Account access reset states
+  const [resetConfirmTarget, setResetConfirmTarget] = useState<string | null>(null);
+  const [isResettingAccess, setIsResettingAccess] = useState(false);
+
   // Commission editing states
   const [editingCommissionId, setEditingCommissionId] = useState<string | null>(null);
   const [editPoppoName, setEditPoppoName] = useState<string>('');
@@ -422,6 +426,56 @@ export const DirectorTab = () => {
   const showSuccess = (msg: string) => {
     setSuccessMessage(msg);
     setTimeout(() => setSuccessMessage(''), 4000);
+  };
+
+  const handleResetAccountAccess = (poppoId: string) => {
+    if (localAuth.level < 5) {
+      setErrorMessage("Only Directors are authorized to reset account access.");
+      return;
+    }
+    setResetConfirmTarget(poppoId);
+  };
+
+  const handleConfirmReset = async () => {
+    if (!resetConfirmTarget) return;
+    if (localAuth.level < 5) {
+      setErrorMessage("Only Directors are authorized to reset account access.");
+      setResetConfirmTarget(null);
+      return;
+    }
+
+    setIsResettingAccess(true);
+    setErrorMessage(null);
+
+    try {
+      const response = await fetch('/api/admin/reset-account-access', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localAuth.token}`,
+        },
+        body: JSON.stringify({ poppoId: resetConfirmTarget }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data?.error || 'Failed to reset account access.');
+      }
+
+      showSuccess(`Account access successfully reset for Poppo ID: ${resetConfirmTarget}`);
+      
+      // Log audit trail
+      await auditLogAction('RESET_ACCOUNT_ACCESS', { poppoId: resetConfirmTarget }, { resetComplete: true });
+
+      // Reload data
+      loadData();
+    } catch (err: any) {
+      console.error("Reset access failed:", err);
+      setErrorMessage(err.message || "Failed to reset account access.");
+    } finally {
+      setIsResettingAccess(false);
+      setResetConfirmTarget(null);
+    }
   };
 
   // --- AI RECOMMENDATIONS ENGINE ---
@@ -2138,7 +2192,12 @@ export const DirectorTab = () => {
 
             {activeView === 'roster_management' && (
               <motion.div key="roster_management" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
-                <RosterManagementTab onUpdate={loadData} auditLogAction={auditLogAction} hosts={hosts} />
+                <RosterManagementTab 
+                  onUpdate={loadData} 
+                  auditLogAction={auditLogAction} 
+                  hosts={hosts} 
+                  onResetAccountAccess={handleResetAccountAccess}
+                />
               </motion.div>
             )}
 
@@ -2150,6 +2209,63 @@ export const DirectorTab = () => {
 
           </AnimatePresence>
         )}
+        {/* Reset Account Access Custom Modal */}
+        {resetConfirmTarget && (
+          <div className="fixed inset-0 bg-[#0D0D14]/80 backdrop-blur-sm z-[9999] flex items-center justify-center p-4 overflow-y-auto">
+            <div className="bg-[#1A1A28] border border-white/10 max-w-md w-full rounded-3xl p-6 space-y-6 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+              <div className="flex items-center justify-between border-b border-white/5 pb-3">
+                <div className="flex items-center gap-2">
+                  <AlertCircle className="text-red-400" size={20} />
+                  <h3 className="text-md font-black text-[#F0EFE8] uppercase tracking-wider">Reset Account Access</h3>
+                </div>
+                <button 
+                  onClick={() => !isResettingAccess && setResetConfirmTarget(null)} 
+                  className="text-slate-400 hover:text-white transition-colors"
+                  disabled={isResettingAccess}
+                  title="Close modal"
+                  aria-label="Close modal"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="space-y-3">
+                <p className="text-xs text-slate-300 leading-relaxed">
+                  Are you sure you want to reset account access credentials for Poppo ID <strong className="text-[#D4AF37] font-mono">{resetConfirmTarget}</strong>?
+                </p>
+                <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl space-y-1">
+                  <p className="text-[10px] font-black text-red-400 uppercase tracking-wider">⚠️ Action Consequences</p>
+                  <ul className="text-[9px] text-[#A09E9A] list-disc list-inside space-y-0.5">
+                    <li>This will remove the current password from the database.</li>
+                    <li>The user will be logged out of all active dashboard sessions.</li>
+                    <li>On their next login, they will be forced to set a new password.</li>
+                  </ul>
+                </div>
+              </div>
+
+              <div className="flex gap-4 pt-2 justify-end">
+                <button
+                  type="button"
+                  onClick={() => setResetConfirmTarget(null)}
+                  disabled={isResettingAccess}
+                  className="px-4 py-2 bg-[#1A1A28] hover:bg-[#222235] border border-white/10 rounded-xl text-xs font-black uppercase tracking-wider text-[#A09E9A] hover:text-[#F0EFE8] transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmReset}
+                  disabled={isResettingAccess}
+                  className="px-5 py-2 bg-red-550 hover:bg-red-650 disabled:bg-red-500/20 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer shadow-[0_0_15px_rgba(239,68,68,0.2)]"
+                >
+                  {isResettingAccess && <Loader2 size={12} className="animate-spin" />}
+                  {isResettingAccess ? 'Resetting...' : 'Confirm Reset'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {showMergeModal && existingHost && incomingHost && (
           <div className="fixed inset-0 bg-[#0D0D14]/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
             <div className="bg-[#1A1A28] border border-white/5 max-w-3xl w-full rounded-3xl p-6 space-y-6 shadow-2xl max-h-[90vh] overflow-y-auto custom-scrollbar">

@@ -3,7 +3,6 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { DashboardLayout } from './components/DashboardLayout';
 import { RequireAuth } from './components/RequireAuth';
 import { RoleGuard } from './components/RoleGuard';
-import { Storage } from './lib/storage';
 
 // Pages & Tabs
 import { Login } from './pages/Login';
@@ -13,78 +12,94 @@ import { CalendarTab } from './components/CalendarTab';
 import { DirectorTab } from './components/DirectorTab';
 import { ManagerDashboard } from './components/ManagerDashboard';
 import { HostProfileEditor } from './components/HostProfileEditor';
+import { ProfilesTab } from './components/ProfilesTab';
 import { PublicLayout } from './components/PublicLayout';
 import { LandingPage } from './pages/LandingPage';
 import { PublicRoster } from './pages/PublicRoster';
 import { PublicCalendar } from './pages/PublicCalendar';
 import { PoppoLivePage } from './pages/PoppoLivePage';
+
 export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* Public Routes */}
+
+        {/* ── Public Routes ───────────────────────────────────────── */}
         <Route path="/" element={<PublicLayout />}>
           <Route index element={<LandingPage />} />
           <Route path="login" element={<Login />} />
-          {/* New Public Routes */}
           <Route path="roster" element={<PublicRoster />} />
           <Route path="calendar" element={<PublicCalendar />} />
           <Route path="poppo-live" element={<PoppoLivePage />} />
-          
-          {/* Legacy Placeholder Routes */}
+          {/* Legacy redirects */}
           <Route path="become-an-agent" element={<Navigate to="/poppo-live" replace />} />
           <Route path="leaderboards" element={<Navigate to="/roster" replace />} />
         </Route>
 
-        {/* Protected Dashboard Routes */}
-        <Route 
-          path="/app" 
+        {/* ── Protected Dashboard ──────────────────────────────────── */}
+        <Route
+          path="/app"
           element={
             <RequireAuth>
               <DashboardLayout />
             </RequireAuth>
           }
         >
-          <Route index element={<Navigate to="/dashboard" replace />} />
+          {/* Default landing */}
+          <Route index element={<Navigate to="/app/dashboard" replace />} />
+
+          {/* Shared tabs (all authenticated roles) */}
           <Route path="dashboard" element={<Overview />} />
-          <Route path="roster" element={<RosterTab />} />
-          <Route path="calendar" element={<CalendarTab />} />
-          
-          <Route 
-            path="my-profile" 
+          <Route path="roster"    element={<RosterTab />} />
+          <Route path="calendar"  element={<CalendarTab />} />
+
+          {/* Host self-profile — Talent / Host roles */}
+          <Route
+            path="my-profile"
             element={
-              <RoleGuard roles={['talent', 'host']}>
+              <RoleGuard roles={['host']}>
                 <HostProfileEditor />
               </RoleGuard>
-            } 
+            }
           />
 
-          <Route 
-            path="profiles" 
+          {/* All-member profile browser — directors, managers, agents */}
+          <Route path="profiles" element={<ProfilesTab />} />
+
+          {/* Manager operational hub */}
+          <Route
+            path="hub"
             element={
               <RoleGuard roles={['director', 'manager', 'agent']}>
                 <ManagerDashboard />
               </RoleGuard>
-            } 
+            }
           />
 
-          <Route 
-            path="director" 
+          {/* Director-only control centre */}
+          <Route
+            path="director"
             element={
               <RoleGuard roles={['director']}>
                 <DirectorTab />
               </RoleGuard>
-            } 
+            }
           />
 
-          {/* Catch-all */}
-          <Route path="unauthorized" element={
-            <div className="flex items-center justify-center h-full">
-              <h2 className="text-xl font-bold text-red-400">Unauthorized Access</h2>
-            </div>
-          } />
-          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          {/* Error pages */}
+          <Route
+            path="unauthorized"
+            element={
+              <div className="flex items-center justify-center h-full">
+                <h2 className="text-xl font-bold text-red-400">Unauthorized Access</h2>
+              </div>
+            }
+          />
+
+          {/* Catch-all inside /app */}
+          <Route path="*" element={<Navigate to="/app/dashboard" replace />} />
         </Route>
+
       </Routes>
     </BrowserRouter>
   );

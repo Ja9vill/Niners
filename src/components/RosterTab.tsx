@@ -12,7 +12,7 @@ export const RosterTab: React.FC<RosterTabProps> = ({ isReadOnly = false }) => {
   const [hosts, setHosts] = useState<Host[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
+
   // Filters
   const [roleFilter, setRoleFilter] = useState<'All Members' | 'Show hosts' | 'Show team leaders'>('All Members');
   const [tierFilter, setTierFilter] = useState<string>('All Tiers');
@@ -48,11 +48,11 @@ export const RosterTab: React.FC<RosterTabProps> = ({ isReadOnly = false }) => {
         FirebaseService.getPublicCalendarEvents(),
         FirebaseService.getAwards ? FirebaseService.getAwards(host.id) : Promise.resolve([])
       ]);
-      
+
       // Filter events where host might be involved
       // Note: Assuming events have a 'hostIds' or similar property, otherwise just showing recent
-      const relatedEvents = events.filter(e => 
-        (e.hostId && e.hostId === host.id) || 
+      const relatedEvents = events.filter(e =>
+        (e.hostId && e.hostId === host.id) ||
         (e.title && e.title.includes(host.nickname || host.name))
       );
       setHostEvents(relatedEvents);
@@ -116,7 +116,7 @@ export const RosterTab: React.FC<RosterTabProps> = ({ isReadOnly = false }) => {
     <div className="space-y-6 relative">
       {/* FILTER MENU BLOCKS */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-[#1A1A28] p-4 rounded-2xl border border-white/5 sticky top-0 z-10">
-        
+
         {/* Search Block */}
         <div className="relative w-full">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[#A09E9A]/50" size={16} />
@@ -196,7 +196,7 @@ export const RosterTab: React.FC<RosterTabProps> = ({ isReadOnly = false }) => {
                   </div>
                 )}
               </div>
-              
+
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1">
                   <h3 className="text-[#F0EFE8] font-bold text-lg truncate">
@@ -207,11 +207,11 @@ export const RosterTab: React.FC<RosterTabProps> = ({ isReadOnly = false }) => {
                   </span>
                 </div>
                 <div className="text-[#A09E9A] text-xs font-mono">ID: {host.id}</div>
-                
+
                 <div className="mt-2 flex items-center gap-3">
                   {(() => {
                     const tier = String((host as any).tier_pay || host.base_salary_category || host.baseSalary || 'N/A');
-                    
+
                     const getTierStyle = (t: string) => {
                       const lower = t.toLowerCase();
                       if (lower.includes('star')) return 'text-yellow-400 bg-yellow-400/10 border-yellow-400/30';
@@ -239,73 +239,73 @@ export const RosterTab: React.FC<RosterTabProps> = ({ isReadOnly = false }) => {
         </div>
       )}
 
-    {/* SPOTLIGHT MODAL */}
-    {selectedHost && (
-      <div className="fixed inset-0 z-[100] flex items-start justify-center pt-24 sm:pt-32 pb-8 px-4 sm:px-8 bg-black/80 backdrop-blur-sm overflow-hidden">
-        <div className="bg-[#13131E] border border-white/10 rounded-3xl w-full max-w-3xl max-h-[calc(100vh-10rem)] sm:max-h-[calc(100vh-12rem)] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-          
-          {/* Header */}
-          <div className="p-4 sm:p-6 border-b border-white/5 bg-gradient-to-r from-indigo-500/10 to-transparent relative">
-            
-            <button 
-              onClick={closeSpotlight}
-              title="Close Spotlight"
-              aria-label="Close Spotlight"
-              className="absolute top-4 right-4 sm:top-6 sm:right-6 p-2 rounded-xl hover:bg-white/10 text-[#A09E9A] hover:text-white transition-colors z-10 bg-black/20 sm:bg-transparent"
-            >
-              <X size={20} />
-            </button>
+      {/* SPOTLIGHT MODAL */}
+      {selectedHost && (
+        <div className="fixed inset-0 z-[100] flex items-start justify-center pt-24 sm:pt-32 pb-8 px-4 sm:px-8 bg-black/80 backdrop-blur-sm overflow-hidden">
+          <div className="bg-[#13131E] border border-white/10 rounded-3xl w-full max-w-3xl max-h-[calc(100vh-10rem)] sm:max-h-[calc(100vh-12rem)] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
 
-            <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 sm:gap-6 w-full pt-6 sm:pt-0">
-              <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl bg-black/40 border border-white/10 overflow-hidden shadow-xl shrink-0">
-                {selectedHost.photoUrl ? (
-                  <img src={selectedHost.photoUrl} alt="" className="w-full h-full object-cover" />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-[#A09E9A]/30">
-                    <Users size={32} />
-                  </div>
-                )}
-              </div>
-              <div className="flex flex-col items-center sm:items-start text-center sm:text-left pr-0 sm:pr-12 w-full">
-                <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight break-all">{selectedHost.nickname || selectedHost.name}</h2>
-                <div className="flex flex-wrap justify-center sm:justify-start items-center gap-2 mt-2">
-                  <span className="font-mono text-indigo-400 text-xs sm:text-sm">{selectedHost.id}</span>
-                  <span className="px-3 py-1 rounded-full bg-white/10 text-white/70 text-[10px] sm:text-xs font-bold uppercase tracking-wider">
-                    {selectedHost.role || 'Host'}
-                  </span>
+            {/* Header */}
+            <div className="p-4 sm:p-6 border-b border-white/5 bg-gradient-to-r from-indigo-500/10 to-transparent relative">
+
+              <button
+                onClick={closeSpotlight}
+                title="Close Spotlight"
+                aria-label="Close Spotlight"
+                className="absolute top-4 right-4 sm:top-6 sm:right-6 p-2 rounded-xl hover:bg-white/10 text-[#A09E9A] hover:text-white transition-colors z-10 bg-black/20 sm:bg-transparent"
+              >
+                <X size={20} />
+              </button>
+
+              <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 sm:gap-6 w-full pt-6 sm:pt-0">
+                <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl bg-black/40 border border-white/10 overflow-hidden shadow-xl shrink-0">
+                  {selectedHost.photoUrl ? (
+                    <img src={selectedHost.photoUrl} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-[#A09E9A]/30">
+                      <Users size={32} />
+                    </div>
+                  )}
                 </div>
-                {/* Social Links rendering */}
-                {selectedHost.social_links && (
-                  <div className="flex flex-wrap justify-center sm:justify-start items-center gap-3 mt-3 sm:mt-4">
-                    {selectedHost.social_links.fb && (
-                      <a href={selectedHost.social_links.fb} target="_blank" rel="noopener noreferrer" className="p-1.5 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 rounded-lg transition-colors" title="Facebook">
-                        <Facebook size={16} />
-                      </a>
-                    )}
-                    {selectedHost.social_links.ig && (
-                      <a href={selectedHost.social_links.ig.startsWith('http') ? selectedHost.social_links.ig : `https://instagram.com/${selectedHost.social_links.ig.replace('@','')}`} target="_blank" rel="noopener noreferrer" className="p-1.5 bg-pink-500/10 text-pink-400 hover:bg-pink-500/20 rounded-lg transition-colors" title="Instagram">
-                        <Instagram size={16} />
-                      </a>
-                    )}
-                    {selectedHost.social_links.tiktok && (
-                      <a href={selectedHost.social_links.tiktok.startsWith('http') ? selectedHost.social_links.tiktok : `https://tiktok.com/@${selectedHost.social_links.tiktok.replace('@','')}`} target="_blank" rel="noopener noreferrer" className="p-1.5 bg-[#00f2fe]/10 text-[#00f2fe] hover:bg-[#00f2fe]/20 rounded-lg transition-colors" title="TikTok">
-                        <Music size={16} />
-                      </a>
-                    )}
-                    {selectedHost.social_links.whatsapp && (
-                      <a href={selectedHost.social_links.whatsapp.startsWith('http') ? selectedHost.social_links.whatsapp : `https://wa.me/${selectedHost.social_links.whatsapp.replace(/[^0-9]/g, '')}`} target="_blank" rel="noopener noreferrer" className="p-1.5 bg-green-500/10 text-green-400 hover:bg-green-500/20 rounded-lg transition-colors" title="WhatsApp">
-                        <Phone size={16} />
-                      </a>
-                    )}
+                <div className="flex flex-col items-center sm:items-start text-center sm:text-left pr-0 sm:pr-12 w-full">
+                  <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight break-all">{selectedHost.nickname || selectedHost.name}</h2>
+                  <div className="flex flex-wrap justify-center sm:justify-start items-center gap-2 mt-2">
+                    <span className="font-mono text-indigo-400 text-xs sm:text-sm">{selectedHost.id}</span>
+                    <span className="px-3 py-1 rounded-full bg-white/10 text-white/70 text-[10px] sm:text-xs font-bold uppercase tracking-wider">
+                      {selectedHost.role || 'Host'}
+                    </span>
                   </div>
-                )}
+                  {/* Social Links rendering */}
+                  {selectedHost.social_links && (
+                    <div className="flex flex-wrap justify-center sm:justify-start items-center gap-3 mt-3 sm:mt-4">
+                      {selectedHost.social_links.fb && (
+                        <a href={selectedHost.social_links.fb} target="_blank" rel="noopener noreferrer" className="p-1.5 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 rounded-lg transition-colors" title="Facebook">
+                          <Facebook size={16} />
+                        </a>
+                      )}
+                      {selectedHost.social_links.ig && (
+                        <a href={selectedHost.social_links.ig.startsWith('http') ? selectedHost.social_links.ig : `https://instagram.com/${selectedHost.social_links.ig.replace('@', '')}`} target="_blank" rel="noopener noreferrer" className="p-1.5 bg-pink-500/10 text-pink-400 hover:bg-pink-500/20 rounded-lg transition-colors" title="Instagram">
+                          <Instagram size={16} />
+                        </a>
+                      )}
+                      {selectedHost.social_links.tiktok && (
+                        <a href={selectedHost.social_links.tiktok.startsWith('http') ? selectedHost.social_links.tiktok : `https://tiktok.com/@${selectedHost.social_links.tiktok.replace('@', '')}`} target="_blank" rel="noopener noreferrer" className="p-1.5 bg-[#00f2fe]/10 text-[#00f2fe] hover:bg-[#00f2fe]/20 rounded-lg transition-colors" title="TikTok">
+                          <Music size={16} />
+                        </a>
+                      )}
+                      {selectedHost.social_links.whatsapp && (
+                        <a href={selectedHost.social_links.whatsapp.startsWith('http') ? selectedHost.social_links.whatsapp : `https://wa.me/${selectedHost.social_links.whatsapp.replace(/[^0-9]/g, '')}`} target="_blank" rel="noopener noreferrer" className="p-1.5 bg-green-500/10 text-green-400 hover:bg-green-500/20 rounded-lg transition-colors" title="WhatsApp">
+                          <Phone size={16} />
+                        </a>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
 
             {/* Content Body */}
             <div className="p-4 sm:p-6 overflow-y-auto custom-scrollbar flex-1 space-y-6 sm:space-y-8">
-              
+
               {/* Bio Section */}
               {selectedHost.bio && (
                 <div className="bg-[#11111A] border border-white/5 p-4 sm:p-5 rounded-2xl relative overflow-hidden">
@@ -313,7 +313,7 @@ export const RosterTab: React.FC<RosterTabProps> = ({ isReadOnly = false }) => {
                   <p className="text-[#F0EFE8] text-sm leading-relaxed whitespace-pre-wrap italic">"{selectedHost.bio}"</p>
                 </div>
               )}
-              
+
               {/* Primary Info Grid */}
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
                 <div className="bg-[#1A1A28] border border-white/5 p-3 sm:p-4 rounded-2xl">
@@ -380,7 +380,7 @@ export const RosterTab: React.FC<RosterTabProps> = ({ isReadOnly = false }) => {
 
               {/* Exposures & Awards Split */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                
+
                 {/* Exposures */}
                 <div>
                   <h3 className="text-sm font-black text-[#F0EFE8] uppercase tracking-widest flex items-center gap-2 mb-4">
@@ -394,10 +394,10 @@ export const RosterTab: React.FC<RosterTabProps> = ({ isReadOnly = false }) => {
                         {hostEvents.map((evt, i) => (
                           <div key={i} className="bg-white/5 border border-white/10 p-3 rounded-xl">
                             <div className="flex justify-between items-start mb-1">
-                              <h4 className="font-bold text-[#F0EFE8] text-sm">{evt.title}</h4>
-                              <span className="text-[10px] font-mono text-emerald-400 bg-emerald-400/10 px-2 py-0.5 rounded border border-emerald-400/20">{evt.status}</span>
+                              <h4 className="font-bold text-[#F0EFE8] text-sm">{(evt as any).eventTitle || (evt as any).title || 'Event'}</h4>
+                              <span className="text-[10px] font-mono text-emerald-400 bg-emerald-400/10 px-2 py-0.5 rounded border border-emerald-400/20">{(evt as any).status || 'Scheduled'}</span>
                             </div>
-                            <div className="text-xs text-[#A09E9A]">{new Date(evt.startDate).toLocaleDateString()} - {evt.type}</div>
+                            <div className="text-xs text-[#A09E9A]">{(evt as any).eventDate || (evt as any).startDate || ''} • {(evt as any).eventType || (evt as any).type || ''}</div>
                           </div>
                         ))}
                       </div>
@@ -428,7 +428,7 @@ export const RosterTab: React.FC<RosterTabProps> = ({ isReadOnly = false }) => {
                               {award.title}
                             </div>
                             <div className="text-[9px] font-mono text-amber-500/50">
-                              {new Date(award.awardedAt).getFullYear()}
+                              {award.dateAwarded || (award as any).awardedAt ? new Date((award.dateAwarded || (award as any).awardedAt)).getFullYear() : '—'}
                             </div>
                           </div>
                         ))}
@@ -442,7 +442,7 @@ export const RosterTab: React.FC<RosterTabProps> = ({ isReadOnly = false }) => {
                 </div>
 
               </div>
-              
+
             </div>
           </div>
         </div>

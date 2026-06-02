@@ -1,4 +1,3 @@
-// import { getStaticHosts } from "../lib/staticHosts"; // Disabled static hosts import
 import { Router } from "express";
 import { initializeApp, cert, getApps, getApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
@@ -296,6 +295,177 @@ router.post("/login", async (req, res) => {
     return res.status(500).json({ error: error?.message || "Internal server error" });
   }
 });
+
+
+
+/**
+ * POST /api/auth/check-username
+ * Phase 1 of the two-step login flow.
+ * Checks if a Poppo ID exists and whether it requires first-time password setup.
+ * Returns { exists, is_first_login } — no auth token required.
+ */
+router.post("/check-username", async (req: any, res: any) => {
+  const poppoId = String(req.body?.poppoId || "").trim();
+  if (!poppoId) {
+    return res.status(400).json({ error: "Poppo ID is required." });
+  }
+
+  // Director 19157913 always routes to standard password login
+  if (poppoId === "19157913") {
+    return res.json({ exists: true, is_first_login: false });
+  }
+
+  try {
+    const db = getAdminFirestore();
+    const snap = await withTimeout(db.collection("users").doc(poppoId).get(), 3000);
+
+    if (!snap.exists) {
+      const staticHosts = getStaticHosts();
+      const found = staticHosts.find((h: any) => h.id === poppoId);
+      if (!found) return res.json({ exists: false });
+      return res.json({ exists: true, is_first_login: false });
+    }
+
+    const data = snap.data()!;
+
+    if (data.isActive === false || data.isActive === "false") {
+      return res.json({ exists: true, is_first_login: false, blocked: true });
+    }
+
+    const isFirstLogin =
+      data.is_first_login === true ||
+      data.is_temp_password === true ||
+      !data.password ||
+      data.password === null;
+
+    return res.json({ exists: true, is_first_login: isFirstLogin });
+  } catch (err: any) {
+    console.error("[check-username] failed:", err);
+    return res.status(500).json({ error: err.message || "Failed to check username." });
+  }
+});
+
+/**
+ * POST /api/auth/set-initial-password
+ * Phase 2a of the two-step login flow — first-time users only.
+ * Validates and hashes the chosen password, flips is_first_login to false,
+ * mints a Firebase custom token, and returns a full session (auto-login).
+ * Body: { poppoId, newPassword, confirmPassword }
+ */
+router.post("/set-initial-password", loginRateLimiter, async (req: any, res: any) => {
+  const { poppoId, newPassword, confirmPassword } = req.body;
+
+  if (!poppoId) {
+    return res.status(400).json({ error: "poppoId is required." });
+  }
+
+  const cleanId = String(poppoId).trim();
+
+  try {
+    const db = getAdminFirestore();
+    const userDocRef = db.collection('users').doc(cleanId);
+    const userSnapshot = await withTimeout(userDocRef.get(), 3000);
+
+    // THE CRITICAL GATE: Drop request if document is absent from Firestore
+    if (!userSnapshot.exists) {
+      return res.status(403).json({ 
+        error: "Please ask your manager to request account registration with the Director." 
+      });
+    }
+
+    const dbUser = userSnapshot.data()!;
+
+    if (!newPassword || !confirmPassword) {
+      return res.status(400).json({ error: "poppoId, newPassword, and confirmPassword are required." });
+    }
+
+    if (newPassword !== confirmPassword) {
+      return res.status(400).json({ error: "Passwords do not match." });
+    }
+
+    if (newPassword.length < 8) {
+      return res.status(400).json({ error: "Password must be at least 8 characters long." });
+    }
+    if (!/[A-Z]/.test(newPassword)) {
+      return res.status(400).json({ error: "Password must contain at least one uppercase letter." });
+    }
+    if (!/[0-9]/.test(newPassword)) {
+      return res.status(400).json({ error: "Password must contain at least one number." });
+    }
+
+    const isFirstLogin =
+      dbUser.is_first_login === true ||
+      dbUser.is_temp_password === true ||
+      !dbUser.password ||
+      dbUser.password === null;
+
+    if (!isFirstLogin) {
+      // Return 403 and do NOT reveal that the account has an existing password
+      return res.status(403).json({ error: "This account is not eligible for password setup." });
+    }
+
+    const adminAuth = getAuth(getFirebaseAdminApp());
+    const hashPassword = async (pwd: string) => bcrypt.hash(pwd, BCRYPT_ROUNDS);
+
+    try {
+      // 1. Verify existence or create the core identity inside Firebase Authentication first
+      try {
+        await adminAuth.getUser(cleanId);
+      } catch (firebaseError: any) {
+        if (firebaseError.code === 'auth/user-not-found') {
+          // Provision the missing core authentication node using Poppo ID as the root UID
+          await adminAuth.createUser({
+            uid: cleanId,
+            displayName: dbUser?.name || `User ${cleanId}`
+          });
+        } else {
+          throw firebaseError;
+        }
+      }
+
+      // 2. Hash the new password and update the target Firestore document fields
+      const hashed = await hashPassword(newPassword);
+      await userDocRef.update({
+        password: hashed,
+        password_hash: hashed,
+        is_first_login: false,
+        is_temp_password: false // Safely deprecate legacy keys
+      });
+
+      // 3. Assign structural application roles now that the Auth target record exists
+      const userRole = dbUser?.role || 'agent';
+      const accessLevel = getRoleLevel(userRole); // Reference internal role mapping matrix
+      await adminAuth.setCustomUserClaims(cleanId, { role: userRole, level: accessLevel });
+
+    } catch (pipelineError: any) {
+      console.error("❌ Auth Pipeline Sync Failure:", pipelineError);
+      return res.status(500).json({ error: "Internal authentication configuration sync failure." });
+    }
+
+    const userRole = dbUser?.role || 'agent';
+    const customToken = await adminAuth.createCustomToken(cleanId, {
+      role: userRole,
+      isSuperAdmin: userRole === "director",
+      tempPasswordRequired: false,
+    });
+
+    const fullData = { ...dbUser, id: cleanId, is_first_login: false };
+    const userPayload = buildUserPayload(fullData);
+    const jwtToken = jwt.sign(userPayload, JWT_SECRET, { expiresIn: "7d" });
+
+    console.log(`🔐 Initial password set and claims synced for Poppo ID: ${cleanId}`);
+    return res.json({
+      success: true,
+      customToken,
+      poppoId: cleanId,
+      user: { ...userPayload, token: jwtToken },
+    });
+  } catch (err: any) {
+    console.error("[set-initial-password] failed:", err);
+    return res.status(500).json({ error: err.message || "Failed to set password." });
+  }
+});
+
 
 router.post("/google-login", async (req, res) => {
   try {
@@ -648,7 +818,6 @@ router.post(
   [
     body("poppoId").isString().trim().isAlphanumeric().isLength({ min: 1, max: 128 }).withMessage("Poppo ID must be alphanumeric and max 128 characters"),
     body("nickname").isString().trim().notEmpty().withMessage("Nickname is required"),
-    body("temporaryPassword").isString().isLength({ min: 6 }).withMessage("Temporary password must be at least 6 characters"),
     body("role").isString().trim().toLowerCase().isIn(["head admin", "admin", "manager", "agent", "host"]).withMessage("Invalid app role"),
     body("tierPay").optional({ nullable: true }).isString()
   ],
@@ -666,7 +835,7 @@ router.post(
         return res.status(400).json({ error: "Validation failed", details: errors.array() });
       }
 
-      const { poppoId, nickname, temporaryPassword, role, tierPay } = req.body;
+      const { poppoId, nickname, role } = req.body;
 
       const db = getAdminFirestore();
       const userRef = db.collection("users").doc(poppoId);
@@ -677,7 +846,7 @@ router.post(
       }
 
       const authInstance = getAuth(getFirebaseAdminApp());
-      
+
       // Check if user exists in Firebase Auth
       try {
         await authInstance.getUser(poppoId);
@@ -688,31 +857,37 @@ router.post(
         }
       }
 
-      // Step 4: Use Firebase Admin SDK to create the user account
+      // Step 4: Create Firebase Auth user — no password (first-login flow)
       await authInstance.createUser({
         uid: poppoId,
-        password: temporaryPassword,
         displayName: nickname,
       });
 
-      // Set custom claims
+      // Set custom claims — user will set their own password
       await authInstance.setCustomUserClaims(poppoId, {
         role: role,
         isSuperAdmin: role === "director",
-        tempPasswordRequired: true
+        tempPasswordRequired: false,
       });
 
-      // Step 5: Save newly provisioned user record
-      const hashedPassword = await bcrypt.hash(temporaryPassword, BCRYPT_ROUNDS);
+      // Step 5: Save provisioned user with is_first_login=true, password=null
       const now = new Date().toISOString();
       const creatorPoppoId = req.firebaseUser?.uid || "admin";
 
-      const userData = {
+      const userData: any = {
+        id: poppoId,
         poppo_id: poppoId,
         nickname: nickname,
+        name: nickname,
         role: role,
-        is_temp_password: true,
-        password: hashedPassword
+        is_first_login: true,
+        is_temp_password: false,
+        password: null,
+        status: 'Active',
+        isActive: true,
+        created_at: now,
+        updated_at: now,
+        created_by: creatorPoppoId,
       };
       await db.collection("users").doc(poppoId).set(userData);
 
@@ -786,6 +961,51 @@ router.delete("/delete-user/:poppoId", verifyAdminRole, async (req: any, res: an
   } catch (error: any) {
     console.error("Delete user endpoint failed:", error);
     return res.status(500).json({ error: "Failed to delete user from database." });
+  }
+});
+
+/**
+ * POST /api/admin/reset-account-access
+ * Director-only: clears a user's password and sets is_first_login=true,
+ * forcing them to create a new password on next login.
+ * Body: { poppoId }
+ * Auth: Bearer JWT, level >= 5 (Director only)
+ */
+router.post("/reset-account-access", requireAuth(5), async (req: any, res: any) => {
+  const { poppoId } = req.body;
+  if (!poppoId) {
+    return res.status(400).json({ error: "poppoId is required." });
+  }
+
+  const cleanId = String(poppoId).trim();
+
+  try {
+    const db = getAdminFirestore();
+    const userRef = db.collection("users").doc(cleanId);
+    const snap = await userRef.get();
+
+    if (!snap.exists) {
+      return res.status(404).json({ error: `User '${cleanId}' not found.` });
+    }
+
+    const data = snap.data()!;
+
+    await userRef.update({
+      password: null,
+      is_first_login: true,
+      is_temp_password: false,
+      updated_at: new Date().toISOString(),
+      access_reset_by: req.adminUser?.poppo_id || "director",
+      access_reset_at: new Date().toISOString(),
+    });
+
+    await syncCustomClaims(cleanId, data.role || "host", false);
+
+    console.log(`🔄 Account access reset for ${cleanId} by ${req.adminUser?.poppo_id}`);
+    return res.json({ ok: true, message: `Account access for '${cleanId}' has been reset. They must set a new password on next login.` });
+  } catch (err: any) {
+    console.error("[reset-account-access] failed:", err);
+    return res.status(500).json({ error: err.message || "Failed to reset account access." });
   }
 });
 

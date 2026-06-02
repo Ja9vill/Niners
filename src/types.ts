@@ -244,7 +244,8 @@ export interface AgencyAward {
   id: string;
   hostId: string;
   title: string;
-  dateAwarded: string;
+  dateAwarded?: string;   // new field name
+  awardedAt?: string;     // legacy alias — some docs use this
   iconType: 'trophy' | 'star' | 'medal' | 'crown' | 'badge';
   description?: string;
 }
@@ -284,16 +285,27 @@ export interface TopNinersEarningsSummary {
 }
 
 export interface EventsCalendarPublic {
-  eventId: string;
-  eventTitle: string;
-  eventDate: string; // YYYY-MM-DD
-  eventDay: number;
-  eventMonth: number;
-  eventYear: number;
-  eventStartTime: string; // HH:MM
-  eventEndTime: string; // HH:MM
-  locationOrPlatform: string;
-  isPublished: boolean;
+  // Primary schema (structured calendar events)
+  eventId?: string;
+  eventTitle?: string;
+  eventDate?: string; // YYYY-MM-DD
+  eventDay?: number;
+  eventMonth?: number;
+  eventYear?: number;
+  eventStartTime?: string; // HH:MM
+  eventEndTime?: string; // HH:MM
+  locationOrPlatform?: string;
+  isPublished?: boolean;
+  // Alternative schema (general events collection)
+  id?: string;
+  title?: string;
+  description?: string;
+  startDate?: string;
+  date?: string;
+  type?: string;
+  eventType?: string;
+  status?: string;
+  hostId?: string;
 }
 
 export interface ReportingSubmissionPayload {
@@ -356,5 +368,46 @@ export interface ActivityAuditLog {
   actionType: string;
   beforeValue: string; // String/JSON
   afterValue: string; // String/JSON
+}
+
+export interface EventsCalendarPublic {
+  id: string;
+  eventType?: string;
+  description?: string;
+  date?: string;
+  eventDate?: string;
+  timeslot?: string;
+  status?: string;
+  participantIds?: string[];
+  participants?: string[];
+  [key: string]: any;
+}
+
+export interface FanbaseHealthEntry {
+  id?: string;
+  poppo_id?: string;
+  timestamp?: string;
+  from_date?: string;
+  to_date?: string;
+  total_followers?: number;
+  fanclub_subscribers?: number;
+  fanclub_gc_members?: number;
+  gc_activity_count_host?: number;
+  gc_activity_count_fans?: number;
+  notes?: string;
+  reporter_id?: string;
+  reporter_name?: string;
+  [key: string]: any;
+}
+
+export interface ExposureEntry {
+  id?: string;
+  poppo_id?: string;
+  event_type?: string;
+  description?: string;
+  date?: string;
+  status?: string;
+  notes?: string;
+  [key: string]: any;
 }
 

@@ -9,8 +9,21 @@ import auditRouter from "./src/server/auditRouter";
 import { google } from "googleapis";
 import { initFirebaseSecrets } from "./src/server/secrets";
 import { logSystemEvent } from "./src/server/Logger";
+import net from "net";
 
 dotenv.config();
+
+/** Returns the first available TCP port starting from `start`. */
+function findFreePort(start: number): Promise<number> {
+  return new Promise((resolve) => {
+    const server = net.createServer();
+    server.listen(start, "0.0.0.0", () => {
+      const addr = server.address() as net.AddressInfo;
+      server.close(() => resolve(addr.port));
+    });
+    server.on("error", () => resolve(findFreePort(start + 1)));
+  });
+}
 
 async function startServer() {
   await initFirebaseSecrets();
@@ -385,24 +398,32 @@ Rules:
     }
   });
 
-  if (process.env.NODE_ENV !== "production") {
+  const isDev = process.env.NODE_ENV !== 'production';
+  console.log(`\n🔧 Mode: ${isDev ? 'DEVELOPMENT (Vite middleware)' : 'PRODUCTION (static dist)'}\n`);
+
+  if (isDev) {
+    // Auto-find a free HMR port so Vite never crashes on 24678 being in use
+    const hmrPort = await findFreePort(24678);
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: { middlewareMode: true, hmr: { port: hmrPort } },
       appType: "spa",
     });
-
     app.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), "dist");
     app.use(express.static(distPath));
-
     app.get("*", (_req, res) => {
       res.sendFile(path.join(distPath, "index.html"));
     });
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+  // Auto-find a free main port — never crash on EADDRINUSE
+  const freePort = await findFreePort(PORT);
+  if (freePort !== PORT) {
+    console.warn(`⚠️  Port ${PORT} is in use — using port ${freePort} instead.`);
+  }
+  app.listen(freePort, "0.0.0.0", () => {
+    console.log(`\n✅ Dev server running at: \x1b[36mhttp://localhost:${freePort}\x1b[0m\n`);
   });
 }
 

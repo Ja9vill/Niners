@@ -525,6 +525,64 @@ export const FirebaseService = {
     }
   },
 
+  async getPublicCalendarEvents(): Promise<EventsCalendarPublic[]> {
+    const path = 'events';
+    try {
+      const snapshot = await getDocs(collection(db, path));
+      return snapshot.docs.map(d => ({ id: d.id, ...d.data() } as EventsCalendarPublic));
+    } catch (error) {
+      console.warn('[FirebaseService] getPublicCalendarEvents failed:', error);
+      return [];
+    }
+  },
+
+  async getAwards(hostId: string): Promise<any[]> {
+    try {
+      // Try host/{id}/agency_awards subcollection first
+      const subSnap = await getDocs(collection(db, 'host', hostId, 'agency_awards'));
+      if (!subSnap.empty) {
+        return subSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+      }
+      // Fallback: top-level agency_awards where poppoId == hostId
+      const topSnap = await getDocs(
+        query(collection(db, 'agency_awards'), where('poppoId', '==', hostId))
+      );
+      return topSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+    } catch (error) {
+      console.warn('[FirebaseService] getAwards failed for', hostId, error);
+      return [];
+    }
+  },
+
+  async getFanbaseHealth(hostId: string): Promise<FanbaseHealthEntry[]> {
+    try {
+      const snap = await getDocs(collection(db, 'host', hostId, 'fanbase_report'));
+      if (!snap.empty) {
+        return snap.docs.map(d => ({ id: d.id, ...d.data() } as FanbaseHealthEntry));
+      }
+      const fallback = await getDocs(
+        query(collection(db, 'fanbase_health'), where('poppo_id', '==', hostId))
+      );
+      return fallback.docs.map(d => d.data() as FanbaseHealthEntry);
+    } catch (error) {
+      console.warn('[FirebaseService] getFanbaseHealth failed for', hostId, error);
+      return [];
+    }
+  },
+
+  async getExposures(hostId: string): Promise<ExposureEntry[]> {
+    try {
+      const snap = await getDocs(
+        query(collection(db, 'exposures'), where('poppo_id', '==', hostId))
+      );
+      return snap.docs.map(d => d.data() as ExposureEntry);
+    } catch (error) {
+      console.warn('[FirebaseService] getExposures failed for', hostId, error);
+      return [];
+    }
+  },
+
+
   async saveLivehouseRequests(requests: LivehouseRequest[]) {
     const path = 'livehouse_requests';
     try {
@@ -658,16 +716,6 @@ export const FirebaseService = {
     }
   },
 
-  async getPublicCalendarEvents(): Promise<EventsCalendarPublic[]> {
-    const path = 'events_calendar_public';
-    try {
-      const snapshot = await getDocs(collection(db, path));
-      return snapshot.docs.map(d => d.data() as EventsCalendarPublic);
-    } catch (error) {
-      handleFirestoreError(error, OperationType.LIST, path);
-      return [];
-    }
-  },
 
   // Reporting Submissions
   async saveReportingSubmission(submission: ReportingSubmission) {
@@ -732,11 +780,6 @@ export const FirebaseService = {
       console.error("Failed to read system audit logs", error);
       return [];
     }
-  },
-
-  async getAwards(hostId: string): Promise<any[]> {
-    // Stub implementation to fix TS error. Can be implemented later.
-    return Promise.resolve([]);
   },
 
   /**

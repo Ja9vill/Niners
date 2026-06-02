@@ -1,10 +1,30 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { ArrowRight, Star, Users, ShieldCheck, Download, ExternalLink, Trophy } from 'lucide-react';
 import { cn } from '../lib/utils';
-
-const MOCK_TOP_PERFORMERS: any[] = [];
+import { collection, getDocs, query, where, limit } from 'firebase/firestore';
+import { db } from '../lib/firebase';
 
 export const LandingPage = () => {
+  const [topHosts, setTopHosts] = useState<any[]>([]);
+
+  useEffect(() => {
+    const loadTopHosts = async () => {
+      try {
+        const snap = await getDocs(
+          query(collection(db, 'host'), where('status', '==', 'Active'), limit(6))
+        );
+        const hosts = snap.docs
+          .map(d => ({ id: d.id, ...d.data() }))
+          .filter((h: any) => h.photoUrl && (h.nickname || h.name))
+          .slice(0, 6);
+        setTopHosts(hosts);
+      } catch (e) {
+        console.warn('Could not load top hosts:', e);
+      }
+    };
+    loadTopHosts();
+  }, []);
+
   return (
     <div className="w-full flex flex-col items-center">
       
@@ -89,6 +109,7 @@ export const LandingPage = () => {
       </section>
 
       {/* TOP PERFORMERS */}
+      {topHosts.length > 0 && (
       <section className="w-full py-24 bg-[#0A0A0F] border-b border-white/5 px-4 relative z-10" id="leaderboards">
         <div className="max-w-screen-xl mx-auto flex flex-col items-center">
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#D4AF37]/10 border border-[#D4AF37]/20 text-[#D4AF37] text-xs font-bold uppercase tracking-widest mb-6">
@@ -99,26 +120,27 @@ export const LandingPage = () => {
           <p className="text-[#A09E9A] text-center max-w-xl mb-16">Recognizing our agency's highest-achieving broadcasters of the month.</p>
           
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-8 w-full">
-            {MOCK_TOP_PERFORMERS.map((host) => (
+            {topHosts.map((host: any) => (
               <div key={host.id} className="group relative flex flex-col items-center p-8 rounded-3xl bg-[#11111A] border border-white/5 hover:border-[#D4AF37]/40 transition-all hover:-translate-y-2 shadow-xl overflow-hidden">
                 <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-transparent via-[#D4AF37]/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                 
                 <div className="w-24 h-24 rounded-full border-2 border-[#D4AF37]/30 mb-6 overflow-hidden relative group-hover:border-[#D4AF37] transition-colors shadow-[0_0_20px_rgba(212,175,55,0.1)]">
-                  <img src={host.avatar} alt={host.nickname} className="w-full h-full object-cover" />
+                  <img src={host.photoUrl} alt={host.nickname || host.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                 </div>
                 
-                <h3 className="text-xl font-black text-[#F0EFE8] mb-1">{host.nickname}</h3>
+                <h3 className="text-xl font-black text-[#F0EFE8] mb-1">{host.nickname || host.name}</h3>
                 <p className="text-xs text-[#A09E9A] font-mono mb-6">ID: {host.id}</p>
                 
                 <div className="w-full pt-6 border-t border-white/5 flex flex-col items-center gap-2">
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-[#D4AF37]">{host.metric}</span>
-                  <span className="text-2xl font-black text-white">{host.value}</span>
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-[#D4AF37]">Status</span>
+                  <span className="text-sm font-black text-emerald-400">{host.status}</span>
                 </div>
               </div>
             ))}
           </div>
         </div>
       </section>
+      )}
 
       {/* 3. CONVERSION MODULES */}
       <section className="w-full py-24 px-4 bg-[#0A0A0F] relative z-10" id="become-an-agent">
