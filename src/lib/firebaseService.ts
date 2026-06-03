@@ -62,15 +62,73 @@ function handleFirestoreError(error: unknown, operationType: OperationType, path
   throw new Error(JSON.stringify(errInfo));
 }
 
+const mapDocToHost = (d: any): Host => {
+  const data = d.data();
+  const id = d.id;
+  const name = data.name || data.nickname || '';
+  const nickname = data.nickname || data.name || '';
+  
+  let role = data.role || 'host';
+  const lowerRole = role.toLowerCase();
+  if (lowerRole === 'host') role = 'Talent';
+  else if (lowerRole === 'manager') role = 'Manager';
+  else if (lowerRole === 'agent') role = 'Agent';
+  else if (lowerRole === 'admin') role = 'Admin';
+  else if (lowerRole === 'head admin') role = 'Head Admin';
+  else if (lowerRole === 'director') role = 'Director';
+
+  let manager = 'Nine Management';
+  const assignedManager = data.assignedManagerId || data.manager;
+  if (assignedManager) {
+    if (typeof assignedManager === 'string') {
+      manager = assignedManager;
+    } else if (assignedManager._path?.segments) {
+      const segments = assignedManager._path.segments;
+      manager = segments[segments.length - 1];
+    } else if (assignedManager.id) {
+      manager = assignedManager.id;
+    }
+  }
+
+  const parseDate = (val: any) => {
+    if (!val) return new Date().toISOString();
+    if (typeof val === 'string') return val;
+    if (val.toDate && typeof val.toDate === 'function') return val.toDate().toISOString();
+    if (val._seconds) return new Date(val._seconds * 1000).toISOString();
+    return new Date().toISOString();
+  };
+
+  return {
+    id,
+    name,
+    nickname,
+    role,
+    team: data.team || '',
+    manager,
+    anchor_type: data.anchor_type || 'Nine Agency',
+    base_salary_category: data.base_salary_category || 'N/A',
+    status: data.status || 'Active',
+    level: data.level || 1,
+    tier: data.tier || 'X',
+    isActive: data.isActive ?? true,
+    created_at: parseDate(data.created_at || data.createdAt),
+    updated_at: parseDate(data.updated_at || data.updatedAt),
+    googleUid: data.googleUid,
+    googleEmail: data.googleEmail,
+    password: data.password,
+    is_temp_password: data.is_temp_password ?? false
+  } as Host;
+};
+
 export const FirebaseService = {
-  // Hosts management
+  // Hosts management (pointing to 'users' collection)
   async saveHosts(hosts: Host[]) {
-    const path = 'hosts';
+    const path = 'users';
     try {
       const batch = writeBatch(db);
       hosts.forEach(h => {
         const docRef = doc(db, path, h.id);
-        batch.set(docRef, { ...h, updated_at: new Date().toISOString() });
+        batch.set(docRef, { ...h, poppoId: h.id, updated_at: new Date().toISOString() }, { merge: true });
       });
       await batch.commit();
     } catch (error) {
@@ -79,29 +137,29 @@ export const FirebaseService = {
   },
 
   async updateHost(host: Host) {
-    const path = `hosts/${host.id}`;
+    const path = `users/${host.id}`;
     try {
-      const docRef = doc(db, 'hosts', host.id);
-      await setDoc(docRef, { ...host, updated_at: new Date().toISOString() });
+      const docRef = doc(db, 'users', host.id);
+      await setDoc(docRef, { ...host, poppoId: host.id, updated_at: new Date().toISOString() }, { merge: true });
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, path);
     }
   },
 
   async deleteHost(hostId: string) {
-    const path = `hosts/${hostId}`;
+    const path = `users/${hostId}`;
     try {
-      await deleteDoc(doc(db, 'hosts', hostId));
+      await deleteDoc(doc(db, 'users', hostId));
     } catch (error) {
       handleFirestoreError(error, OperationType.DELETE, path);
     }
   },
 
   async getAllHosts(): Promise<Host[]> {
-    const path = 'hosts';
+    const path = 'users';
     try {
       const snapshot = await getDocs(collection(db, path));
-      return snapshot.docs.map(d => d.data() as Host);
+      return snapshot.docs.map(d => mapDocToHost(d));
     } catch (error) {
       handleFirestoreError(error, OperationType.LIST, path);
       return [];
@@ -110,11 +168,11 @@ export const FirebaseService = {
   
   // *** User credentials retrieval ***
   async getUserCredentials(): Promise<{ poppo_id: string; password?: string }[]> {
-    const path = 'hosts';
+    const path = 'users';
     try {
       const snapshot = await getDocs(collection(db, path));
       return snapshot.docs.map(d => {
-        const data = d.data() as Host;
+        const data = d.data();
         return { poppo_id: d.id, password: data.password };
       });
     } catch (error) {
@@ -549,15 +607,15 @@ export const FirebaseService = {
   },
 
   /**
-   * Subscribe to real-time updates on the hosts collection via Firestore onSnapshot.
+   * Subscribe to real-time updates on the users collection via Firestore onSnapshot.
    * Returns an unsubscribe function — call it on component unmount to stop listening.
    */
   subscribeToHosts(callback: (hosts: Host[]) => void): () => void {
-    const path = 'hosts';
+    const path = 'users';
     const unsubscribe = onSnapshot(
       collection(db, path),
       (snapshot) => {
-        const hosts = snapshot.docs.map(d => d.data() as Host);
+        const hosts = snapshot.docs.map(d => mapDocToHost(d));
         callback(hosts);
       },
       (error) => {
@@ -574,9 +632,9 @@ export const FirebaseService = {
    * @param patch - Object with only the fields to update
    */
   async patchHost(poppoId: string, patch: Partial<Host>): Promise<void> {
-    const path = `hosts/${poppoId}`;
+    const path = `users/${poppoId}`;
     try {
-      const docRef = doc(db, 'hosts', poppoId);
+      const docRef = doc(db, 'users', poppoId);
       await updateDoc(docRef, { ...patch, updated_at: new Date().toISOString() });
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, path);
@@ -641,12 +699,12 @@ export interface HostRosterUser {
 }
 
 /**
- * Listens to the 'hosts' collection in real-time.
+ * Listens to the 'users' collection in real-time.
  * poppo_id is pulled from docSnap.id (the document key).
  * Returns an unsubscribe function — call it in useEffect cleanup.
  */
 export const subscribeToHosts = (callback: (hosts: HostRosterUser[]) => void): (() => void) => {
-  const q = query(collection(db, 'hosts'));
+  const q = query(collection(db, 'users'));
   return onSnapshot(
     q,
     (snapshot) => {
@@ -676,7 +734,7 @@ export const patchHost = async (
   poppoId: string,
   updates: Partial<Omit<HostRosterUser, 'poppo_id'>>
 ): Promise<{ success: true }> => {
-  const hostDocRef = doc(db, 'hosts', poppoId);
+  const hostDocRef = doc(db, 'users', poppoId);
   await updateDoc(hostDocRef, { ...updates, updated_at: new Date().toISOString() });
   return { success: true };
 };

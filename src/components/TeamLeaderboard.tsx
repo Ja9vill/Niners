@@ -1,11 +1,11 @@
 import React, { useMemo } from 'react';
-import { HostUser } from '../types';
+import { Host } from '../types';
 import { Trophy, TrendingUp, TrendingDown, Minus, Star } from 'lucide-react';
 import { formatNumber } from '../lib/utils';
 import { motion } from 'motion/react';
 
 interface TeamLeaderboardProps {
-  managedHosts: HostUser[];
+  managedHosts: Host[];
   performanceReports: any[];
 }
 

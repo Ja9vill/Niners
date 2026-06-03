@@ -72,27 +72,15 @@ async function verifyDirector() {
     if (userDoc.exists) {
       const userData = userDoc.data();
       console.log(`✅ User doc found in 'users' collection. role=${userData?.role}, is_temp_password=${userData?.is_temp_password}`);
-      if (userData?.is_temp_password !== false) {
-        console.log("🔧 Fixing 'users' doc is_temp_password -> false...");
-        await db.collection("users").doc(poppoId).update({ is_temp_password: false });
-      }
-    } else {
-      console.log("⚠️ User doc NOT found in 'users' collection! Bootstrapping...");
-    }
-
-    const hostDoc = await db.collection("hosts").doc(poppoId).get();
-    if (hostDoc.exists) {
-      const hostData = hostDoc.data();
-      console.log(`✅ Host doc found in 'hosts' collection. role=${hostData?.role}, is_temp_password=${hostData?.is_temp_password}, isActive=${hostData?.isActive}`);
-      if (hostData?.is_temp_password !== false || hostData?.isActive !== true) {
-        console.log("🔧 Fixing 'hosts' doc settings...");
-        await db.collection("hosts").doc(poppoId).update({ 
+      if (userData?.is_temp_password !== false || userData?.isActive !== true) {
+        console.log("🔧 Fixing 'users' doc is_temp_password -> false, isActive -> true...");
+        await db.collection("users").doc(poppoId).update({ 
           is_temp_password: false,
           isActive: true
         });
       }
     } else {
-      console.log("⚠️ Host doc NOT found in 'hosts' collection!");
+      console.log("⚠️ User doc NOT found in 'users' collection! Bootstrapping...");
     }
 
     console.log("🎉 Emergency verification and recovery completed successfully.");

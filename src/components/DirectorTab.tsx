@@ -45,6 +45,7 @@ import { MANAGERS, BASE_SALARY_POLICIES } from '../lib/constants';
 import { FinancialUpload } from './FinancialUpload';
 import { SystemLogsViewer } from './SystemLogsViewer';
 import { CreateMemberForm } from './CreateMemberForm';
+import { RosterManagementTab } from './RosterManagementTab';
 
 // --- Types for AI Recommendations ---
 interface AIInsight {
@@ -72,8 +73,8 @@ export const DirectorTab = () => {
   const isDirector = localAuth.role?.toLowerCase() === 'director';
   const hasAccess = isDirector;
 
-  // Sidebar views: overview, awards, tasks, roster_admin, financials, system_logs, create_user
-  const [activeView, setActiveView] = useState<'overview' | 'awards' | 'tasks' | 'roster_admin' | 'financials' | 'system_logs' | 'create_user'>('overview');
+  // Sidebar views: roster_management, financials, system_logs, create_user
+  const [activeView, setActiveView] = useState<'roster_management' | 'financials' | 'system_logs' | 'create_user'>('roster_management');
   
   // Data State
   const [hosts, setHosts] = useState<Host[]>([]);
@@ -383,37 +384,53 @@ export const DirectorTab = () => {
   const loadData = async () => {
     setIsLoading(true);
     setErrorMessage(null);
-    try {
-      const fetchPromise = Promise.all([
-        FirebaseService.getAllHosts(),
-        FirebaseService.getTasks(),
-        FirebaseService.getActivityLogs(),
-        FirebaseService.getTopNinersSummary(selectedMonth),
-        FirebaseService.fetchFinancials('monthly'),
-        FirebaseService.fetchFinancials('weekly')
-      ]);
-      const timeoutPromise = new Promise<[Host[], Task[], ActivityAuditLog[], TopNinersEarningsSummary[], any[], any[]]>((_, reject) =>
-        setTimeout(() => reject(new Error("Director data fetch timed out")), 5000)
-      );
-      const [hList, tList, aList, summaries, storedMonthly, storedWeekly] = await Promise.race([fetchPromise, timeoutPromise]);
-      setHosts(hList.length > 0 ? hList : Storage.getHosts());
-      setTasks(tList);
-      
-      // Sort logs descending
-      const sortedLogs = aList.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
-      setAuditLogs(sortedLogs);
-      setEarningsSummaries(summaries);
 
-      // Populate flat-file storage financials states
-      setMonthlyLedger(storedMonthly || []);
-      setWeeklyLedger(storedWeekly || []);
-      setCommissions(storedMonthly || []); // map commissions to monthly flat-file data for overview analytics
-    } catch (err) {
-      console.error("Failed to load director data", err);
-      setErrorMessage("Failed to load databases from cloud network. Local fallback used.");
-      setHosts(Storage.getHosts());
-      setCommissions(Storage.getCommission());
-      setAuditLogs(Storage.getLogs());
+    // 1. Fetch Hosts (critical for Roster Management)
+    let fetchedHosts: Host[] = [];
+    try {
+      fetchedHosts = await FirebaseService.getAllHosts();
+    } catch (hostsErr) {
+      console.error("Failed to fetch hosts from Firestore:", hostsErr);
+      setErrorMessage("Failed to connect to users database. Local fallback active.");
+    }
+
+    // Set hosts immediately with fallback to cached
+    if (fetchedHosts && fetchedHosts.length > 0) {
+      setHosts(fetchedHosts);
+      Storage.setHosts(fetchedHosts);
+    } else {
+      const cached = Storage.getHosts();
+      setHosts(cached || []);
+    }
+
+    // 2. Fetch non-critical datasets individually
+    try {
+      FirebaseService.getTasks()
+        .then(setTasks)
+        .catch(err => console.warn("Failed to fetch tasks:", err));
+
+      FirebaseService.getActivityLogs()
+        .then(logs => setAuditLogs((logs || []).sort((a, b) => b.timestamp.localeCompare(a.timestamp))))
+        .catch(err => console.warn("Failed to fetch activity logs:", err));
+
+      FirebaseService.getTopNinersSummary(selectedMonth)
+        .then(setEarningsSummaries)
+        .catch(err => console.warn("Failed to fetch earnings summaries:", err));
+
+      FirebaseService.fetchFinancials('monthly')
+        .then(monthly => {
+          setMonthlyLedger(monthly || []);
+          setCommissions(monthly || []);
+        })
+        .catch(err => console.warn("Failed to fetch monthly financials:", err));
+
+      FirebaseService.fetchFinancials('weekly')
+        .then(weekly => {
+          setWeeklyLedger(weekly || []);
+        })
+        .catch(err => console.warn("Failed to fetch weekly financials:", err));
+    } catch (backgroundErr) {
+      console.warn("Background data load encountered an issue:", backgroundErr);
     } finally {
       setIsLoading(false);
     }
@@ -675,10 +692,7 @@ export const DirectorTab = () => {
         </div>
 
         {[
-          { id: 'overview', label: 'Overview', icon: LayoutDashboard },
-          { id: 'awards', label: 'Awards & Badges', icon: Award },
-          { id: 'tasks', label: 'AI Tasks', icon: CheckCircle2 },
-          { id: 'roster_admin', label: 'Roster Admin', icon: Users },
+          { id: 'roster_management', label: 'Roster Management', icon: Clipboard },
           { id: 'create_user', label: 'Provision User', icon: UserPlus },
           { id: 'financials', label: 'Financial Data', icon: FileUp },
           { id: 'system_logs', label: 'System Logs', icon: AlertCircle },
@@ -740,6 +754,16 @@ export const DirectorTab = () => {
         {!isLoading && (
           <AnimatePresence mode="wait">
             
+            {activeView === 'roster_management' && (
+              <motion.div key="roster_management" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
+                <RosterManagementTab 
+                  hosts={hosts} 
+                  onUpdate={loadData} 
+                  auditLogAction={auditLogAction} 
+                />
+              </motion.div>
+            )}
+
             {/* MODULE 1: OVERVIEW & AI RECOMMENDATIONS */}
             {activeView === 'overview' && (
               <motion.div key="overview" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
@@ -2572,3 +2596,4 @@ export const DirectorTab = () => {
     }
   }
 };
+

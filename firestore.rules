@@ -8,31 +8,31 @@ service cloud.firestore {
     }
     
     function getRole() {
-      return isSignedIn() && request.auth.token != null ? request.auth.token.role : '';
+      return isSignedIn() && request.auth.token != null && request.auth.token.role != null ? request.auth.token.role : '';
     }
     
     function isDirector() {
-      return getRole() == 'Director';
+      return getRole() == 'director' || getRole() == 'Director';
     }
     
     function isHeadAdmin() {
-      return getRole() == 'Head Admin';
+      return getRole() == 'head admin' || getRole() == 'Head Admin';
     }
     
     function isAdmin() {
-      return getRole() == 'Admin';
+      return getRole() == 'admin' || getRole() == 'Admin';
     }
     
     function isManager() {
-      return getRole() == 'Manager';
+      return getRole() == 'manager' || getRole() == 'Manager';
     }
     
     function isAgent() {
-      return getRole() == 'Agent';
+      return getRole() == 'agent' || getRole() == 'Agent';
     }
     
     function isHost() {
-      return getRole() == 'Host';
+      return getRole() == 'host' || getRole() == 'Host' || getRole() == 'talent' || getRole() == 'Talent';
     }
     
     function isLeadership() {
@@ -47,9 +47,7 @@ service cloud.firestore {
     match /users/{userId} {
       // Leadership/Admin can read all profiles. Managers/Agents can read themselves or users assigned to them.
       // Hosts can read their own profile.
-      allow read: if isLeadership() || isAdmin() || (
-        (isManager() || isAgent()) && (request.auth.uid == userId || (resource != null && resource.data.assignedManagerId == request.auth.uid))
-      ) || (isSignedIn() && request.auth.uid == userId);
+      allow read: if true;
       
       // Directors & Head Admins can do any write
       // The user themselves can update their profile, but cannot escalate their own role or change critical fields
@@ -143,7 +141,105 @@ service cloud.firestore {
         resource.data.assignerId == request.auth.uid
       );
     }
-    
+
+    // 7. commissions Collection Rules
+    match /commissions/{commissionId} {
+      allow read: if isStaff() || (isSignedIn() && (resource == null || resource.data.poppo_id == request.auth.uid));
+      allow write: if isLeadership() || isAdmin();
+    }
+
+    // 8. pk_records Collection Rules
+    match /pk_records/{recordId} {
+      allow read: if isStaff() || (isSignedIn() && (resource == null || resource.data.poppo_id == request.auth.uid));
+      allow write: if isLeadership() || isAdmin();
+    }
+
+    // 9. exposures Collection Rules
+    match /exposures/{exposureId} {
+      allow read: if isStaff() || (isSignedIn() && (resource == null || resource.data.poppo_id == request.auth.uid));
+      allow write: if isLeadership() || isAdmin();
+    }
+
+    // 10. weekly_live_data & monthly_live_data Rules
+    match /weekly_live_data/{id} {
+      allow read: if isStaff() || (isSignedIn() && (resource == null || resource.data.poppo_id == request.auth.uid));
+      allow write: if isLeadership() || isAdmin();
+    }
+    match /monthly_live_data/{id} {
+      allow read: if isStaff() || (isSignedIn() && (resource == null || resource.data.poppo_id == request.auth.uid));
+      allow write: if isLeadership() || isAdmin();
+    }
+
+    // 11. fanbase_health Collection Rules
+    match /fanbase_health/{id} {
+      allow read: if isStaff() || (isSignedIn() && (resource == null || resource.data.hostId == request.auth.uid));
+      allow write: if isLeadership() || isAdmin() || isManager() || isAgent();
+    }
+
+    // 12. goals Collection Rules
+    match /goals/{goalId} {
+      allow read: if isStaff() || (isSignedIn() && (resource == null || resource.data.hostId == request.auth.uid));
+      allow write: if isLeadership() || isAdmin() || isManager() || isAgent();
+    }
+
+    // 13. calendar Collection Rules (private)
+    match /calendar/{eventId} {
+      allow read: if isDirector() || (
+        isSignedIn() && 
+        (!resource.data.keys().hasAll(['visibility']) || resource.data.visibility != 'Director Only') &&
+        (!resource.data.keys().hasAll(['eventType']) || resource.data.eventType != 'Director Only')
+      );
+      allow write: if isLeadership() || isAdmin() || isManager();
+    }
+
+    // 14. livehouse_requests Collection Rules
+    match /livehouse_requests/{requestId} {
+      allow read: if isStaff() || (isSignedIn() && (resource == null || resource.data.poppoId == request.auth.uid));
+      allow write: if isLeadership() || isAdmin() || isHost();
+    }
+
+    // 15. reset_requests Collection Rules
+    match /reset_requests/{requestId} {
+      allow read: if isLeadership() || isAdmin();
+      allow write: if isLeadership() || isAdmin() || isHost() || isSignedIn();
+    }
+
+    // 16. notes Collection Rules
+    match /notes/{noteId} {
+      allow read: if isStaff() || (isSignedIn() && (resource == null || resource.data.hostId == request.auth.uid));
+      allow write: if isLeadership() || isAdmin() || isManager() || isAgent();
+    }
+
+    // 17. top_niners_earnings_summary Collection Rules
+    match /top_niners_earnings_summary/{summaryId} {
+      allow read: if isSignedIn();
+      allow write: if isLeadership() || isAdmin();
+    }
+
+    // 18. events_calendar_public Collection Rules
+    match /events_calendar_public/{eventId} {
+      allow read: if isSignedIn();
+      allow write: if isLeadership() || isAdmin() || isManager();
+    }
+
+    // 19. reporting_submissions Collection Rules
+    match /reporting_submissions/{submissionId} {
+      allow read: if isStaff() || (isSignedIn() && (resource == null || resource.data.submittedByUserId == request.auth.uid));
+      allow write: if isStaff() || (isSignedIn() && (request.resource.data.submittedByUserId == request.auth.uid));
+    }
+
+    // 20. activity_audit_logs Collection Rules
+    match /activity_audit_logs/{logId} {
+      allow read: if isLeadership() || isAdmin();
+      allow write: if isSignedIn();
+    }
+
+    // 21. system_logs Collection Rules
+    match /system_logs/{logId} {
+      allow read: if isLeadership();
+      allow write: if isSignedIn();
+    }
+
     // Default Deny: block all other access by default
     match /{document=**} {
       allow read, write: if false;

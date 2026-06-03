@@ -1,6 +1,6 @@
 export type Role = 'Talent' | 'Manager' | 'Admin' | 'Head Admin' | 'Director' | 'Agent';
 export type BaseSalaryTier = 'N/A' | 'Rocket Host' | 'Star Host' | 'S idol' | 'ESport Host' | 'Regular Host';
-export type HostStatus = 'Active' | 'Inconsistent' | 'Released' | 'Inactive';
+export type HostStatus = 'Active' | 'Inconsistent' | 'Released' | 'Inactive' | 'Releasing';
 export type AnchorType = 'Nine Agency' | 'Sub Agency' | 'External';
 export type Tier = 'S' | 'A' | 'B' | 'C' | 'X';
 export type EventType = 'Solo Livehouse' | 'Party Livehouse' | 'Poppo Official Event' | 'Niners Day' | 'Agency Event' | 'External Event' | 'PK Tournament' | 'Platform Feature' | 'Collaboration' | 'Broadcast Block' | 'Staff Meeting';

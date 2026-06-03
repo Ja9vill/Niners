@@ -7,7 +7,7 @@ async function run() {
   try {
     await initFirebaseSecrets();
     const db = getAdminFirestore();
-    const doc = await db.collection('hosts').doc('19157913').get();
+    const doc = await db.collection('users').doc('19157913').get();
     console.log("Doc Exists:", doc.exists);
     if (doc.exists) {
       console.log("Data:", JSON.stringify(doc.data(), null, 2));

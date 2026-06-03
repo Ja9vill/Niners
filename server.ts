@@ -233,7 +233,7 @@ Rules:
         return res.status(400).json({ error: "No reCAPTCHA token provided" });
       }
 
-      const projectId = process.env.FIREBASE_PROJECT_ID || "nine-dashboard-733997";
+      const projectId = process.env.FIREBASE_PROJECT_ID || "gen-lang-client-0222945352";
       const siteKey = "6LfqX-wsAAAAAGeVHsRVuRvGgnT5e_ubHVNZQbvj";
       const apiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY || "";
 

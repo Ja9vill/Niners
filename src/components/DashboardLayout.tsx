@@ -17,7 +17,7 @@ export const DashboardLayout = () => {
 
   const handleLogout = async () => {
     await signOut(auth);
-    Storage.purge();
+    Storage.clearAuthState();
     navigate('/login');
   };
 

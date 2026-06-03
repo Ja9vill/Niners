@@ -9,15 +9,20 @@ export function formatNumber(num: number): string {
   return new Intl.NumberFormat('en-US').format(num);
 }
 
-export function formatDate(date: Date | string): string {
+export function formatDate(date: Date | string | undefined | null): string {
+  if (!date) return 'N/A';
   const d = typeof date === 'string' ? new Date(date) : date;
-  if (isNaN(d.getTime()) && typeof date === 'string') {
-    // Handle YYYY-MM specifically
-    const [year, month] = date.split('-');
-    if (year && month) {
-      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-      return `${monthNames[parseInt(month)-1]} ${year}`;
+  if (!d || isNaN(d.getTime())) {
+    if (typeof date === 'string') {
+      // Handle YYYY-MM specifically
+      const [year, month] = date.split('-');
+      const monthVal = parseInt(month || '');
+      if (year && !isNaN(monthVal) && monthVal >= 1 && monthVal <= 12) {
+        const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        return `${monthNames[monthVal - 1]} ${year}`;
+      }
     }
+    return 'N/A';
   }
   return d.toLocaleDateString('en-US', {
     month: 'short',

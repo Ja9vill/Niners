@@ -24,16 +24,6 @@ async function runBootstrap() {
     // 3. Insert/Update the record in users collection
     await db.collection("users").doc(poppoId).set({
       poppoId: poppoId,
-      nickname: "Miss Nine",
-      role: "director",
-      is_temp_password: false,
-      tempPassword: hashedPassword,
-      updated_at: now,
-      created_at: now
-    }, { merge: true });
-
-    // 4. Insert/Update the record in hosts collection (since the app queries hosts on auth and rendering)
-    await db.collection("hosts").doc(poppoId).set({
       id: poppoId,
       name: "Miss Nine",
       nickname: "Miss Nine",
@@ -49,8 +39,8 @@ async function runBootstrap() {
       isActive: true,
       is_temp_password: false,
       password: hashedPassword,
-      created_at: now,
-      updated_at: now
+      updated_at: now,
+      created_at: now
     }, { merge: true });
 
     // 5. Ensure user exists in Firebase Authentication

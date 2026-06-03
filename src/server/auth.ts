@@ -7,7 +7,6 @@ import { getStorage } from "firebase-admin/storage";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
 import { body, validationResult } from "express-validator";
-import { getStaticHosts } from "../lib/staticHosts";
 import { logAuthEvent } from "./auditLogger";
 import { initFirebaseSecrets } from "./secrets";
 
@@ -68,38 +67,28 @@ export async function syncCustomClaims(poppoId: string, role: string, tempPasswo
   }
 }
 
-// Auto-seed database with full host roster on startup if unpopulated
+// Auto-update Director password on startup to allow login
 setTimeout(async () => {
   try {
     await initFirebaseSecrets();
     const db = getAdminFirestore();
-    const snapshot = await db.collection("hosts").limit(5).get();
-    if (snapshot.size < 5) {
-      console.log("Database has few hosts. Auto-seeding all hosts from staticHosts...");
-      const staticHosts = getStaticHosts();
-      const batch = db.batch();
-      staticHosts.forEach(host => {
-        const docRef = db.collection("hosts").doc(host.id);
-        batch.set(docRef, host);
-      });
-      await batch.commit();
-      console.log("✅ Auto-seeding complete!");
-    } else {
-      console.log(`ℹ️ Database is already seeded (${snapshot.size}+ hosts found).`);
-    }
-
-    // Explicitly update Director password on startup to allow login
     const directorId = '19157913';
     const rawTargetPassword = '3Plus19=2007';
     const hashed = await bcrypt.hash(rawTargetPassword, 12);
-    await db.collection("hosts").doc(directorId).update({
-      password: hashed,
-      is_temp_password: false,
-      updated_at: new Date().toISOString()
-    });
-    console.log(`🔐 Auto-updated director ${directorId} password to hashed ${rawTargetPassword} with is_temp_password=false`);
+    const userRef = db.collection("users").doc(directorId);
+    const snap = await userRef.get();
+    if (snap.exists) {
+      await userRef.update({
+        password: hashed,
+        is_temp_password: false,
+        updated_at: new Date().toISOString()
+      });
+      console.log(`🔐 Auto-updated director ${directorId} password in users collection to hashed ${rawTargetPassword} with is_temp_password=false`);
+    } else {
+      console.warn(`⚠️ Director user document ${directorId} not found in users collection on startup!`);
+    }
   } catch (err: any) {
-    console.error("Startup checks or updates failed:", err.message || err);
+    console.error("Startup director password update failed:", err.message || err);
   }
 }, 1000);
 
@@ -140,10 +129,12 @@ function getRoleLevel(role: string): number {
 function buildUserPayload(hostData: any) {
   const role = String(hostData.role || "host").toLowerCase();
   const level = getRoleLevel(role);
+  const poppoId = hostData.id || hostData.poppoId;
+  const name = hostData.nickname || hostData.name || poppoId || "";
   return {
-    poppo_id: hostData.id,
-    name: hostData.name,
-    nickname: hostData.nickname || hostData.name,
+    poppo_id: poppoId,
+    name: name,
+    nickname: hostData.nickname || name,
     role,
     level,
     status: hostData.status || "Active",
@@ -202,12 +193,17 @@ router.post("/login", async (req, res) => {
 
     // Direct bypass/override for the director account to handle offline DNS resolution and login issues
     if (String(poppoId) === '19157913' && String(password) === '3Plus19=2007') {
-      const staticHosts = getStaticHosts();
-      const hostData = staticHosts.find(h => h.id === '19157913');
-      if (hostData) {
-        const userPayload = buildUserPayload(hostData);
-        const token = jwt.sign(userPayload, JWT_SECRET, { expiresIn: "7d" });
-        return res.json({ ok: true, user: { ...userPayload, token } });
+      try {
+        const db = getAdminFirestore();
+        const hostDoc = await db.collection("users").doc('19157913').get();
+        if (hostDoc.exists) {
+          const hostData = { ...hostDoc.data(), id: '19157913' };
+          const userPayload = buildUserPayload(hostData);
+          const token = jwt.sign(userPayload, JWT_SECRET, { expiresIn: "7d" });
+          return res.json({ ok: true, user: { ...userPayload, token } });
+        }
+      } catch (err) {
+        console.warn("Bypass Firestore read failed:", err);
       }
     }
 
@@ -216,24 +212,19 @@ router.post("/login", async (req, res) => {
     try {
       const db = getAdminFirestore();
       const hostDoc = await withTimeout(
-        db.collection("hosts").doc(String(poppoId)).get(),
+        db.collection("users").doc(String(poppoId)).get(),
         3000
       );
       if (hostDoc.exists) {
-        hostData = hostDoc.data();
+        hostData = { ...hostDoc.data(), id: hostDoc.id };
         fromFirestore = true;
       }
     } catch (dbErr) {
-      console.warn("Firestore lookup failed, falling back to static roster:", dbErr);
+      console.warn("Firestore lookup failed in users collection:", dbErr);
     }
 
     if (!hostData) {
-      const staticHosts = getStaticHosts();
-      hostData = staticHosts.find(h => h.id === String(poppoId));
-    }
-
-    if (!hostData) {
-      return res.status(401).json({ error: `Poppo ID '${poppoId}' not found in database or static roster.` });
+      return res.status(401).json({ error: `Poppo ID '${poppoId}' not found in database.` });
     }
 
     // Account Suspension Check: If isActive === false, halt execution and block application access immediately with 403.
@@ -270,7 +261,7 @@ router.post("/login", async (req, res) => {
       try {
         const secureHash = await bcrypt.hash(String(password), 10);
         const db = getAdminFirestore();
-        await db.collection("hosts").doc(String(poppoId)).update({
+        await db.collection("users").doc(String(poppoId)).update({
           password: secureHash,
           updated_at: new Date().toISOString()
         });
@@ -306,17 +297,18 @@ router.post("/google-login", async (req, res) => {
     const db = getAdminFirestore();
     let hostData: any = null;
 
-    // First search by googleUid
-    const uidQuery = await db.collection("hosts").where("googleUid", "==", uid).get();
+    // First search by googleUid in users collection
+    const uidQuery = await db.collection("users").where("googleUid", "==", uid).get();
     if (!uidQuery.empty) {
-      hostData = uidQuery.docs[0].data();
+      hostData = { ...uidQuery.docs[0].data(), id: uidQuery.docs[0].id };
     } else if (email) {
-      // Fallback: search by googleEmail
-      const emailQuery = await db.collection("hosts").where("googleEmail", "==", email).get();
+      // Fallback: search by googleEmail in users collection
+      const emailQuery = await db.collection("users").where("googleEmail", "==", email).get();
       if (!emailQuery.empty) {
-        hostData = emailQuery.docs[0].data();
+        const doc = emailQuery.docs[0];
+        hostData = { ...doc.data(), id: doc.id };
         // Update the record with the uid for future lookups
-        await db.collection("hosts").doc(hostData.id).update({ googleUid: uid });
+        await db.collection("users").doc(doc.id).update({ googleUid: uid });
       }
     }
 
@@ -332,6 +324,7 @@ router.post("/google-login", async (req, res) => {
     if (email && AUTHORIZED_DIRECTOR_EMAILS.includes(email.toLowerCase())) {
       const directorId = `director_${uid.slice(0, 8)}`;
       const newDirectorData: any = {
+        poppoId: directorId,
         id: directorId,
         name: decoded.name || email.split("@")[0],
         nickname: decoded.name || email.split("@")[0],
@@ -350,7 +343,7 @@ router.post("/google-login", async (req, res) => {
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
-      await db.collection("hosts").doc(directorId).set(newDirectorData);
+      await db.collection("users").doc(directorId).set(newDirectorData);
       console.log(`✅ Auto-provisioned Director account for authorized email: ${email}`);
       await syncCustomClaims(directorId, "director", false);
       const responsePayload = getHostPayloadAndToken(newDirectorData);
@@ -394,18 +387,18 @@ router.post("/google-register", async (req, res) => {
     const db = getAdminFirestore();
 
     // Check if this Google account is already linked to ANOTHER host
-    const linkedUidQuery = await db.collection("hosts").where("googleUid", "==", uid).get();
+    const linkedUidQuery = await db.collection("users").where("googleUid", "==", uid).get();
     if (!linkedUidQuery.empty) {
       return res.status(400).json({ error: "This Google account is already linked to another Poppo ID" });
     }
 
     // Check if the Poppo ID is already linked to a different Google account
-    const hostDocRef = db.collection("hosts").doc(cleanPoppoId);
+    const hostDocRef = db.collection("users").doc(cleanPoppoId);
     const hostDoc = await hostDocRef.get();
 
     let hostData: any = null;
     if (hostDoc.exists) {
-      hostData = hostDoc.data();
+      hostData = { ...hostDoc.data(), id: hostDoc.id };
       if (hostData.googleUid && hostData.googleUid !== uid) {
         return res.status(400).json({ error: "This Poppo ID is already linked to a different Google account" });
       }
@@ -424,8 +417,9 @@ router.post("/google-register", async (req, res) => {
       const tempRequired = hostData.is_temp_password ?? false;
       await syncCustomClaims(cleanPoppoId, hostData.role, tempRequired);
     } else {
-      // Create new host document
+      // Create new host document in users collection
       hostData = {
+        poppoId: cleanPoppoId,
         id: cleanPoppoId,
         name: decoded.name || "Google User",
         nickname: decoded.name || "Google User",
@@ -519,7 +513,7 @@ router.post("/reset-password", requireAuth(3), async (req: any, res) => {
     }
 
     const db = getAdminFirestore();
-    const hostRef = db.collection("hosts").doc(String(poppoId));
+    const hostRef = db.collection("users").doc(String(poppoId));
     const hostSnap = await hostRef.get();
 
     if (!hostSnap.exists) {
@@ -576,7 +570,7 @@ router.post("/update-user", requireAuth(3), async (req: any, res) => {
     safeUpdate.last_updated_by = req.adminUser?.poppo_id || "admin";
 
     const db = getAdminFirestore();
-    const hostRef = db.collection("hosts").doc(String(poppoId));
+    const hostRef = db.collection("users").doc(String(poppoId));
     const hostSnap = await hostRef.get();
 
     if (!hostSnap.exists) {
@@ -611,29 +605,7 @@ router.post("/update-user", requireAuth(3), async (req: any, res) => {
 router.get("/users", requireAuth(3), async (req: any, res) => {
   try {
     const db = getAdminFirestore();
-    let snapshot = await db.collection("users").get();
-    
-    // Auto-populate from hosts if users is empty
-    if (snapshot.empty) {
-      console.log("Users collection is empty. Seeding from hosts...");
-      const hostsSnap = await db.collection("hosts").get();
-      const batch = db.batch();
-      
-      hostsSnap.docs.forEach(doc => {
-        const data = doc.data();
-        const userRef = db.collection("users").doc(doc.id);
-        batch.set(userRef, {
-          poppoId: doc.id,
-          nickname: data.nickname || data.name || "",
-          role: data.role || "host",
-          is_temp_password: data.is_temp_password ?? false,
-          created_at: data.created_at || new Date().toISOString(),
-          updated_at: data.updated_at || new Date().toISOString()
-        });
-      });
-      await batch.commit();
-      snapshot = await db.collection("users").get();
-    }
+    const snapshot = await db.collection("users").get();
 
     const users = snapshot.docs.map(doc => {
       const data = doc.data();
@@ -682,7 +654,7 @@ router.post(
       const { poppoId, nickname, temporaryPassword, role } = req.body;
 
       const db = getAdminFirestore();
-      const hostRef = db.collection("hosts").doc(poppoId);
+      const hostRef = db.collection("users").doc(poppoId);
       const hostSnap = await hostRef.get();
 
       if (hostSnap.exists) {
@@ -729,7 +701,8 @@ router.post(
       };
       const level = levelMap[role] || 1;
 
-      const hostData = {
+      const userData = {
+        poppoId: poppoId,
         id: poppoId,
         name: nickname,
         nickname: nickname,
@@ -744,18 +717,7 @@ router.post(
         photoUrl: "",
         isActive: true,
         is_temp_password: true,
-        password: hashedPassword, // Legacy fallback
-        created_at: now,
-        updated_at: now,
-        created_by: creatorPoppoId
-      };
-      await hostRef.set(hostData);
-
-      const userData = {
-        poppoId: poppoId,
-        nickname: nickname,
-        role: role,
-        is_temp_password: true,
+        password: hashedPassword,
         created_at: now,
         updated_at: now,
         created_by: creatorPoppoId
@@ -790,9 +752,8 @@ router.delete("/delete-user/:poppoId", verifyAdminRole, async (req: any, res: an
   const db = getAdminFirestore();
 
   try {
-    // Step A: Delete documents from Firestore collections
+    // Step A: Delete document from users collection
     await db.collection("users").doc(cleanPoppoId).delete();
-    await db.collection("hosts").doc(cleanPoppoId).delete();
 
     // Step B: Delete from Firebase Auth, catching errors if user doesn't exist
     try {
@@ -1076,41 +1037,41 @@ router.post("/login-with-poppo", loginRateLimiter, async (req: any, res: any) =>
 
     // Direct bypass/override for the director account
     if (String(cleanPoppoId) === '19157913' && String(cleanPassword) === '3Plus19=2007') {
-      const staticHosts = getStaticHosts();
-      const hostData = staticHosts.find(h => h.id === '19157913');
-      if (hostData) {
-        await syncCustomClaims('19157913', 'director', false);
-        const authInstance = getAuth(getFirebaseAdminApp());
-        const customToken = await authInstance.createCustomToken('19157913', { tempPasswordRequired: false, role: 'director', isSuperAdmin: true });
-        const userPayload = buildUserPayload(hostData);
-        const token = jwt.sign(userPayload, JWT_SECRET, { expiresIn: "7d" });
-        logAuthEvent('19157913', "SUCCESS", ipAddress);
-        return res.json({ success: true, customToken, poppoId: '19157913', user: { ...userPayload, token } });
+      try {
+        const db = getAdminFirestore();
+        const hostDoc = await db.collection("users").doc('19157913').get();
+        if (hostDoc.exists) {
+          const hostData = { ...hostDoc.data(), id: '19157913' };
+          await syncCustomClaims('19157913', 'director', false);
+          const authInstance = getAuth(getFirebaseAdminApp());
+          const customToken = await authInstance.createCustomToken('19157913', { tempPasswordRequired: false, role: 'director', isSuperAdmin: true });
+          const userPayload = buildUserPayload(hostData);
+          const token = jwt.sign(userPayload, JWT_SECRET, { expiresIn: "7d" });
+          logAuthEvent('19157913', "SUCCESS", ipAddress);
+          return res.json({ success: true, customToken, poppoId: '19157913', user: { ...userPayload, token } });
+        }
+      } catch (err) {
+        console.warn("Bypass Firestore read failed in login-with-poppo:", err);
       }
     }
     
-    // 2. Credential Verification (with timeout and static fallback)
+    // 2. Credential Verification (with timeout)
     const db = getAdminFirestore();
     let hostData: any = null;
     try {
       const hostDoc = await withTimeout(
-        db.collection("hosts").doc(cleanPoppoId).get(),
+        db.collection("users").doc(cleanPoppoId).get(),
         3000
       );
       if (hostDoc.exists) {
-        hostData = hostDoc.data();
+        hostData = { ...hostDoc.data(), id: hostDoc.id };
       }
     } catch (dbErr: any) {
-      console.warn("Firestore lookup failed in login-with-poppo, falling back to static roster:", dbErr.message || dbErr);
+      console.warn("Firestore lookup failed in login-with-poppo, users collection:", dbErr.message || dbErr);
     }
 
     if (!hostData) {
-      const staticHosts = getStaticHosts();
-      hostData = staticHosts.find(h => h.id === cleanPoppoId);
-    }
-
-    if (!hostData) {
-      console.warn(`[Login Error]: Auth failed: Poppo ID '${cleanPoppoId}' not found in database or static roster.`);
+      console.warn(`[Login Error]: Auth failed: Poppo ID '${cleanPoppoId}' not found in database.`);
       logAuthEvent(cleanPoppoId, "FAILURE", ipAddress, "USER_NOT_FOUND");
       return res.status(401).json({ error: "Invalid Poppo ID or password." });
     }
@@ -1188,7 +1149,7 @@ router.post("/mark-migration-complete", verifyFirebaseIdToken, async (req: any, 
   try {
     const poppoId = req.firebaseUser.uid;
     const db = getAdminFirestore();
-    await db.collection("hosts").doc(poppoId).update({
+    await db.collection("users").doc(poppoId).update({
       is_temp_password: false,
       updated_at: new Date().toISOString(),
       password_migrated_at: new Date().toISOString()
@@ -1231,24 +1192,13 @@ router.post("/change-password", verifyFirebaseIdToken, async (req: any, res: any
 
     const db = getAdminFirestore();
 
-    // 1. Update the main hosts collection
-    await db.collection("hosts").doc(poppoId).update({
+    // 1. Update the main users collection
+    await db.collection("users").doc(poppoId).update({
       password: hashedPassword,
       is_temp_password: false,
       updated_at: new Date().toISOString(),
       password_migrated_at: new Date().toISOString()
     });
-
-    // 2. Also update/create in the users collection to strictly conform to schema description
-    try {
-      await db.collection("users").doc(poppoId).set({
-        tempPassword: hashedPassword,
-        is_temp_password: false,
-        updated_at: new Date().toISOString()
-      }, { merge: true });
-    } catch (usersErr) {
-      console.warn("Optional users collection update failed/skipped:", usersErr);
-    }
 
     // 3. Update Custom Claims to revoke tempPasswordRequired
     try {

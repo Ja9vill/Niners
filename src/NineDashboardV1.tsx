@@ -213,13 +213,7 @@ export default function App() {
         
         let finalHosts = firebaseHosts;
         if (finalHosts.length === 0) {
-          const cached = Storage.getHosts();
-          if (cached.length > 0) {
-            finalHosts = cached;
-          } else {
-            const { getStaticHosts } = await import('./lib/staticHosts');
-            finalHosts = getStaticHosts();
-          }
+          finalHosts = Storage.getHosts();
         }
         Storage.setHosts(finalHosts);
         setHosts(finalHosts);
@@ -230,12 +224,8 @@ export default function App() {
         }
       } catch (err) {
         console.warn("Could not sync with cloud database. Local storage will be used if available.", err);
-        let cachedHosts = Storage.getHosts();
+        const cachedHosts = Storage.getHosts();
         const cachedComms = Storage.getCommission();
-        if (cachedHosts.length === 0) {
-          const { getStaticHosts } = await import('./lib/staticHosts');
-          cachedHosts = getStaticHosts();
-        }
         setHosts(cachedHosts);
         Storage.setHosts(cachedHosts);
         if (cachedComms.length > 0) setCommission(cachedComms);
