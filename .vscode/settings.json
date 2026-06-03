@@ -10,7 +10,13 @@
     "**/build": true
   },
   "eslint.workingDirectories": [
-    { "mode": "auto" }
+    {
+      "mode": "auto"
+    }
   ],
-  "eslint.ignorePath": ".eslintignore"
+  "eslint.ignorePath": ".eslintignore",
+  "editor.renderRichScreenReaderContent": true,
+  "editor.renderLineHighlightOnlyWhenFocus": true,
+  "editor.scrollbar.scrollByPage": true,
+  "editor.scrollOnMiddleClick": true
 }

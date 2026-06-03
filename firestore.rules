@@ -8,8 +8,10 @@ service cloud.firestore {
     }
     
     function getRole() {
-      // Fetch the role dynamically from the users collection instead of custom claims
-      return isSignedIn() ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role : '';
+      return isSignedIn() ? (
+        request.auth.token != null && request.auth.token.role != null ? request.auth.token.role : 
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role : '')
+      ) : '';
     }
     
     function isDirector() {
@@ -17,7 +19,7 @@ service cloud.firestore {
     }
     
     function isHeadAdmin() {
-      return getRole() == 'Head Admin' || getRole() == 'head_admin' || getRole() == 'head admin';
+      return getRole() == 'Head Admin' || getRole() == 'head admin' || getRole() == 'head_admin' || getRole() == 'Head_Admin';
     }
     
     function isAdmin() {
@@ -37,8 +39,7 @@ service cloud.firestore {
     }
     
     function isLeadership() {
-      // Temporarily allow ANY logged in user to bypass rules for development and seeding purposes
-      return request.auth != null;
+      return isDirector() || isHeadAdmin();
     }
     
     function isStaff() {
@@ -125,17 +126,22 @@ service cloud.firestore {
       allow update, delete: if isLeadership() || isAdmin();
     }
 
-    // 5. events Collection Rules
-    match /events/{eventId} {
-      // Hidden events (marked as Director Only) can only be read by Directors
-      allow read: if isDirector() || (
-        isSignedIn() && 
-        (!resource.data.keys().hasAll(['visibility']) || resource.data.visibility != 'Director Only') &&
-        (!resource.data.keys().hasAll(['eventType']) || resource.data.eventType != 'Director Only')
-      );
-      
-      // Directors, Head Admins, Admins, and Managers can write events
-      allow write: if isLeadership() || isAdmin() || isManager();
+    // 5. attendance Collection Rules
+    match /attendance/{attendanceId} {
+      allow read: if isSignedIn();
+      allow write: if isDirector() || isHeadAdmin() || isAdmin();
+    }
+
+    // announcements Collection Rules
+    match /announcements/{announcementId} {
+      allow read: if isSignedIn();
+      allow write: if isDirector() || isHeadAdmin();
+    }
+
+    // calendar Collection Rules
+    match /calendar/{eventId} {
+      allow read: if true;
+      allow write: if isSignedIn();
     }
 
     // 6. tasks Collection Rules
@@ -184,6 +190,28 @@ service cloud.firestore {
     }
     match /financials_weekly/{docId} {
       allow read, write: if isLeadership();
+    }
+
+    // 8. Awards & Assignments
+    match /awards/{awardId} {
+      allow read: if isSignedIn();
+      allow write: if isDirector() || isHeadAdmin() || isLeadership();
+    }
+    match /award_assignments/{assignmentId} {
+      allow read: if isSignedIn();
+      allow write: if isDirector() || isHeadAdmin() || isLeadership();
+    }
+
+    // 9. Progress Notes
+    match /notes/{noteId} {
+      allow read, write: if isDirector() || isHeadAdmin() || isLeadership() || isStaff();
+    }
+
+    // 10. Host Intake Requests
+    match /host_requests/{requestId} {
+      allow read: if isDirector() || isHeadAdmin() || isLeadership() || isStaff();
+      allow create: if isStaff() || isDirector() || isHeadAdmin() || isLeadership();
+      allow update, delete: if isDirector() || isHeadAdmin() || isLeadership();
     }
 
     // Default Deny: block all other access by default

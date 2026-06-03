@@ -18,6 +18,7 @@ import { LandingPage } from './pages/LandingPage';
 import { PublicRoster } from './pages/PublicRoster';
 import { PublicCalendar } from './pages/PublicCalendar';
 import { PoppoLivePage } from './pages/PoppoLivePage';
+import { AdminHub } from './components/AdminHub';
 
 export default function App() {
   return (
@@ -63,8 +64,15 @@ export default function App() {
             }
           />
 
-          {/* All-member profile browser — directors, managers, agents */}
-          <Route path="profiles" element={<ProfilesTab />} />
+          {/* All-member profile browser — restricted to director and head admin */}
+          <Route
+            path="profiles"
+            element={
+              <RoleGuard roles={['director', 'head admin', 'head_admin']}>
+                <ProfilesTab />
+              </RoleGuard>
+            }
+          />
 
           {/* Manager operational hub */}
           <Route
@@ -76,12 +84,22 @@ export default function App() {
             }
           />
 
-          {/* Director-only control centre */}
+          {/* Director/Head Admin control centre */}
           <Route
             path="director"
             element={
-              <RoleGuard roles={['director']}>
+              <RoleGuard roles={['director', 'head admin', 'head_admin']}>
                 <DirectorTab />
+              </RoleGuard>
+            }
+          />
+
+          {/* Admin Hub page */}
+          <Route
+            path="admin-hub"
+            element={
+              <RoleGuard roles={['admin']}>
+                <AdminHub />
               </RoleGuard>
             }
           />

@@ -48,7 +48,7 @@ export const SystemLogsViewer: React.FC = () => {
   };
 
   return (
-    <div className="bg-[#1A1A28] border border-indigo-500/20 rounded-2xl p-6 shadow-2xl">
+    <div className="bg-[#1A1A28] border border-[#D4AF37]/15 rounded-2xl p-6 shadow-2xl">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
         <div>
           <h2 className="text-lg font-black text-[#F0EFE8] uppercase tracking-wider">System Stability Logs</h2>
@@ -62,7 +62,7 @@ export const SystemLogsViewer: React.FC = () => {
               placeholder="Search User ID..."
               value={filterUserId}
               onChange={(e) => setFilterUserId(e.target.value)}
-              className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-9 pr-3 py-2 text-xs text-white focus:ring-1 focus:ring-indigo-500 outline-none"
+              className="w-full bg-slate-900 border border-[#D4AF37]/25 rounded-xl pl-9 pr-3 py-2 text-xs text-white focus:ring-1 focus:ring-[#D4AF37]/50 outline-none"
             />
           </div>
           <div className="relative flex-1 md:w-40">
@@ -70,7 +70,7 @@ export const SystemLogsViewer: React.FC = () => {
             <select
               value={filterSeverity}
               onChange={(e) => setFilterSeverity(e.target.value as any)}
-              className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-9 pr-3 py-2 text-xs text-white focus:ring-1 focus:ring-indigo-500 outline-none appearance-none"
+              className="w-full bg-slate-900 border border-[#D4AF37]/25 rounded-xl pl-9 pr-3 py-2 text-xs text-white focus:ring-1 focus:ring-[#D4AF37]/50 outline-none appearance-none"
             >
               <option value="All">All Severities</option>
               <option value="Error">Errors</option>
@@ -81,14 +81,14 @@ export const SystemLogsViewer: React.FC = () => {
         </div>
       </div>
 
-      <div className="overflow-x-auto rounded-xl border border-slate-800">
+      <div className="overflow-x-auto rounded-xl border border-[#D4AF37]/15">
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-slate-900/50 text-slate-400 text-[10px] uppercase tracking-widest font-black">
-              <th className="p-4 border-b border-slate-800">Timestamp</th>
-              <th className="p-4 border-b border-slate-800">Severity</th>
-              <th className="p-4 border-b border-slate-800">User / Role</th>
-              <th className="p-4 border-b border-slate-800">Action Description</th>
+              <th className="p-4 border-b border-[#D4AF37]/15">Timestamp</th>
+              <th className="p-4 border-b border-[#D4AF37]/15">Severity</th>
+              <th className="p-4 border-b border-[#D4AF37]/15">User / Role</th>
+              <th className="p-4 border-b border-[#D4AF37]/15">Action Description</th>
             </tr>
           </thead>
           <tbody className="text-xs text-slate-300">
@@ -102,7 +102,7 @@ export const SystemLogsViewer: React.FC = () => {
               </tr>
             ) : (
               filteredLogs.map((log, i) => (
-                <tr key={i} className="border-b border-slate-800/50 hover:bg-slate-800/20 transition-colors">
+                <tr key={i} className="border-b border-[#D4AF37]/10 hover:bg-slate-800/20 transition-colors">
                   <td className="p-4 whitespace-nowrap">
                     {format(new Date(log.timestamp), 'MMM dd, HH:mm:ss')}
                   </td>

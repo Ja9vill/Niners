@@ -1,9 +1,9 @@
-export type Role = 'Talent' | 'Manager' | 'Admin' | 'Head Admin' | 'Director' | 'Agent';
+export type Role = 'Talent' | 'Host' | 'Manager' | 'Admin' | 'Head Admin' | 'Director' | 'Agent';
 export type BaseSalaryTier = 'N/A' | 'Rocket Host' | 'Star Host' | 'S idol' | 'ESport Host' | 'Regular Host';
 export type HostStatus = 'Active' | 'Inconsistent' | 'Released' | 'Inactive' | 'Releasing';
 export type AnchorType = 'Nine Agency' | 'Sub Agency' | 'External';
 export type Tier = 'S' | 'A' | 'B' | 'C' | 'X';
-export type EventType = 'Solo Livehouse' | 'Party Livehouse' | 'Poppo Official Event' | 'Niners Day' | 'Agency Event' | 'External Event' | 'PK Tournament' | 'Platform Feature' | 'Collaboration' | 'Broadcast Block' | 'Staff Meeting';
+export type EventType = 'OFFICIAL PK' | 'SOLO LIVEHOUSE' | 'PARTY LIVEHOUSE' | 'AGENCY EVENT' | 'POPPO EVENT' | 'EXTERNAL EVENT';
 export type Trend = 'Growing' | 'Declining' | 'Stable' | 'At Risk' | 'New' | 'Explosive';
 export type NoteType = 'Note' | 'Task' | 'Feedback';
 
@@ -77,6 +77,9 @@ export interface Host {
   // Google OAuth fields
   googleUid?: string;
   googleEmail?: string;
+  // Two-way relationship fields
+  assignedManagerId?: string | null;
+  assignedHosts?: string[] | null;
   // Legacy fields for compatibility during transition
   anchor?: AnchorType;
   baseSalary?: BaseSalaryTier;
@@ -237,6 +240,7 @@ export interface LivehouseRequest {
   proposedBy?: string;
   managerId: string; // Assigned manager's Poppo ID
   notes?: string;
+  livehouseType?: string;
   timestamp: string;
 }
 

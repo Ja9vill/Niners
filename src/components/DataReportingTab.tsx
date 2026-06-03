@@ -7,6 +7,7 @@ import { cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 import { FirebaseService } from '../lib/firebaseService';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { DateRangePicker } from './InteractiveDatePicker';
 
 const getUUID = () => {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
@@ -343,6 +344,7 @@ export const DataReportingTab = () => {
 
     try {
       await FirebaseService.saveReportingSubmission(submission);
+      await FirebaseService.logSystemActivity(`Saved draft codebase report of type "${activeTab}" for Host: ${nickname} (Poppo ID: ${poppoId.trim()})`, 'Info');
       setStatus('draft');
       setSuccessMsg('Draft saved successfully! Session stamped.');
       fetchPastSubmissions();
@@ -444,6 +446,8 @@ export const DataReportingTab = () => {
 
       // Trigger a window event so that other tabs reload data if needed
       window.dispatchEvent(new Event('data-updated'));
+
+      await FirebaseService.logSystemActivity(`Submitted and committed codebase report of type "${activeTab}" for Host: ${nickname} (Poppo ID: ${poppoId.trim()})`, 'Info');
 
       setStatus('submitted');
       setSuccessMsg('Report submitted and committed successfully! Form fields are now locked.');
@@ -752,28 +756,14 @@ export const DataReportingTab = () => {
                 {/* Subcategory B: Financial & Operational */}
                 <div className="space-y-4">
                   <h4 className="text-[11px] font-black text-[#D4AF37] uppercase tracking-widest border-b border-white/5 pb-1.5">Financial & Operational Performance Details</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-1.5">
-                      <label htmlFor="pk-start" className="text-[10px] font-bold text-[#A09E9A]">From Date</label>
-                      <input
-                        id="pk-start"
-                        type="date"
+                      <label className="text-[10px] font-bold text-[#A09E9A]">Date Range</label>
+                      <DateRangePicker
                         disabled={isLocked}
-                        value={pkStartDate}
-                        onChange={(e) => setPkStartDate(e.target.value)}
-                        className="w-full bg-[#1A1A28] border border-white/10 rounded-xl px-4 py-3 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37]/50"
-                        required
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <label htmlFor="pk-end" className="text-[10px] font-bold text-[#A09E9A]">To Date</label>
-                      <input
-                        id="pk-end"
-                        type="date"
-                        disabled={isLocked}
-                        value={pkEndDate}
-                        onChange={(e) => setPkEndDate(e.target.value)}
-                        className="w-full bg-[#1A1A28] border border-white/10 rounded-xl px-4 py-3 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37]/50"
+                        startDate={pkStartDate}
+                        endDate={pkEndDate}
+                        onChange={(start, end) => { setPkStartDate(start); setPkEndDate(end); }}
                         required
                       />
                     </div>
@@ -834,31 +824,15 @@ export const DataReportingTab = () => {
                 {/* Subcategory B: Financial & Operational */}
                 <div className="space-y-4">
                   <h4 className="text-[11px] font-black text-[#D4AF37] uppercase tracking-widest border-b border-white/5 pb-1.5">Financial & Operational Performance Details</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-1.5">
-                      <label htmlFor="fanbase-start" className="text-[10px] font-bold text-[#A09E9A]">Week Start Date</label>
-                      <input
-                        id="fanbase-start"
-                        type="date"
-                        disabled={isLocked}
-                        value={fanbaseStartDate}
-                        onChange={(e) => setFanbaseStartDate(e.target.value)}
-                        className="w-full bg-[#1A1A28] border border-white/10 rounded-xl px-4 py-3 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37]/50"
-                        required
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <label htmlFor="fanbase-end" className="text-[10px] font-bold text-[#A09E9A]">Week End Date</label>
-                      <input
-                        id="fanbase-end"
-                        type="date"
-                        disabled={isLocked}
-                        value={fanbaseEndDate}
-                        onChange={(e) => setFanbaseEndDate(e.target.value)}
-                        className="w-full bg-[#1A1A28] border border-white/10 rounded-xl px-4 py-3 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37]/50"
-                        required
-                      />
-                    </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold text-[#A09E9A]">Week Date Range</label>
+                    <DateRangePicker
+                      disabled={isLocked}
+                      startDate={fanbaseStartDate}
+                      endDate={fanbaseEndDate}
+                      onChange={(start, end) => { setFanbaseStartDate(start); setFanbaseEndDate(end); }}
+                      required
+                    />
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-1.5">
@@ -970,28 +944,14 @@ export const DataReportingTab = () => {
                 {/* Subcategory B: Financial & Operational */}
                 <div className="space-y-4">
                   <h4 className="text-[11px] font-black text-[#D4AF37] uppercase tracking-widest border-b border-white/5 pb-1.5">Financial & Operational Performance Details</h4>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                     <div className="space-y-1.5">
-                      <label htmlFor="live-start" className="text-[10px] font-bold text-[#A09E9A]">From Date</label>
-                      <input
-                        id="live-start"
-                        type="date"
+                      <label className="text-[10px] font-bold text-[#A09E9A]">Date Range</label>
+                      <DateRangePicker
                         disabled={isLocked}
-                        value={liveFromDate}
-                        onChange={(e) => setLiveFromDate(e.target.value)}
-                        className="w-full bg-[#1A1A28] border border-white/10 rounded-xl px-4 py-3 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37]/50"
-                        required
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <label htmlFor="live-end" className="text-[10px] font-bold text-[#A09E9A]">To Date</label>
-                      <input
-                        id="live-end"
-                        type="date"
-                        disabled={isLocked}
-                        value={liveToDate}
-                        onChange={(e) => setLiveToDate(e.target.value)}
-                        className="w-full bg-[#1A1A28] border border-white/10 rounded-xl px-4 py-3 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37]/50"
+                        startDate={liveFromDate}
+                        endDate={liveToDate}
+                        onChange={(start, end) => { setLiveFromDate(start); setLiveToDate(end); }}
                         required
                       />
                     </div>

@@ -83,7 +83,7 @@ export const TeamLeaderboard: React.FC<TeamLeaderboardProps> = React.memo(({ man
   if (leaderboardData.length === 0) return null;
 
   return (
-    <div className="bg-[#1A1A28]/50 border border-white/5 p-5 rounded-2xl space-y-4">
+    <div className="bg-[#1A1A28]/50 border border-[#D4AF37]/10 p-5 rounded-2xl space-y-4">
       <div className="flex items-center justify-between px-1">
         <h4 className="text-[10px] font-black uppercase tracking-[0.15em] text-[#A09E9A] font-outfit flex items-center gap-2">
           <Trophy size={14} className="text-[#D4AF37]" />
@@ -104,10 +104,10 @@ export const TeamLeaderboard: React.FC<TeamLeaderboardProps> = React.memo(({ man
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: idx * 0.1 }}
-              className="bg-[#222235]/40 border border-white/5 p-3 rounded-xl flex items-center justify-between hover:border-[#D4AF37]/20 transition-colors shadow-sm group"
+              className="bg-[#222235]/40 border border-[#D4AF37]/10 p-3 rounded-xl flex items-center justify-between hover:border-[#D4AF37]/20 transition-colors shadow-sm group"
             >
               <div className="flex items-center gap-4">
-                <div className="w-6 h-6 flex items-center justify-center rounded-full bg-black/30 border border-white/10 text-xs font-black text-[#A09E9A]">
+                <div className="w-6 h-6 flex items-center justify-center rounded-full bg-black/30 border border-[#D4AF37]/15 text-xs font-black text-[#A09E9A]">
                   #{host.currentRank}
                 </div>
                 <div>

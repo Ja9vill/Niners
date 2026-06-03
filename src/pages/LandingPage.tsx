@@ -124,7 +124,7 @@ export const LandingPage = () => {
               <div key={host.id} className="group relative flex flex-col items-center p-8 rounded-3xl bg-[#11111A] border border-white/5 hover:border-[#D4AF37]/40 transition-all hover:-translate-y-2 shadow-xl overflow-hidden">
                 <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-transparent via-[#D4AF37]/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                 
-                <div className="w-24 h-24 rounded-full border-2 border-[#D4AF37]/30 mb-6 overflow-hidden relative group-hover:border-[#D4AF37] transition-colors shadow-[0_0_20px_rgba(212,175,55,0.1)]">
+                <div className="w-24 h-24 rounded-2xl border-2 border-[#D4AF37]/30 mb-6 overflow-hidden relative group-hover:border-[#D4AF37] transition-colors shadow-[0_0_20px_rgba(212,175,55,0.1)]">
                   <img src={host.photoUrl} alt={host.nickname || host.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                 </div>
                 

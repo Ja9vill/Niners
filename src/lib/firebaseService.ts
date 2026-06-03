@@ -1,7 +1,7 @@
 import { auth, db, storage } from './firebase';
 import { ref, uploadString, getBytes, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { Storage } from './storage';
-import { doc, setDoc, getDoc, collection, query, where, getDocs, deleteDoc, writeBatch, Timestamp, onSnapshot, updateDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc, collection, query, where, getDocs, deleteDoc, writeBatch, Timestamp, onSnapshot, updateDoc, arrayUnion, arrayRemove, deleteField } from 'firebase/firestore';
 import { CommissionEntry, Host, PKEntry, ExposureEntry, FanbaseHealthEntry, WeeklyLiveDataEntry, MonthlyLiveDataEntry, TopNinersEarningsSummary, EventsCalendarPublic, ReportingSubmission, Task, ActivityAuditLog, CalendarEvent, LivehouseRequest } from '../types';
 
 export enum OperationType {
@@ -95,10 +95,43 @@ export const FirebaseService = {
       if (!id) throw new Error("ID is required for role metadata updates.");
       const safeRole = (role || 'host').toLowerCase().replace(/\s+/g, '_');
       
+      let managerIdToSync: string | null = undefined;
+      if (data.assignedManagerId !== undefined) {
+        managerIdToSync = data.assignedManagerId;
+      } else if (data.assigned_manager_poppo_id !== undefined) {
+        managerIdToSync = data.assigned_manager_poppo_id;
+        data.assignedManagerId = data.assigned_manager_poppo_id;
+      }
+
+      // Normalize bidirectional fields to prevent any format mismatch between UI-expected and legacy fields
+      const normalizedData = { ...data };
+      const managerName = data.manager || data.assigned_manager_nickname || data.assigned_manager || '';
+      const managerId = data.assignedManagerId || data.assigned_manager_poppo_id || '';
+      const teamName = data.team || data.team_anchor || '';
+      const salaryCategory = data.base_salary_category || data.tier_pay || '';
+
+      if (managerName) {
+        normalizedData.manager = managerName;
+        normalizedData.assigned_manager = managerName;
+        normalizedData.assigned_manager_nickname = managerName;
+      }
+      if (managerId) {
+        normalizedData.assignedManagerId = managerId;
+        normalizedData.assigned_manager_poppo_id = managerId;
+      }
+      if (teamName) {
+        normalizedData.team = teamName;
+        normalizedData.team_anchor = teamName;
+      }
+      if (salaryCategory) {
+        normalizedData.base_salary_category = salaryCategory;
+        normalizedData.tier_pay = salaryCategory;
+      }
+
       const roleRef = doc(db, safeRole, id);
       const userRef = doc(db, 'users', id);
       
-      const finalData = { ...data, updated_at: new Date().toISOString() };
+      const finalData = { ...normalizedData, updated_at: new Date().toISOString() };
       
       // Attempt to update the users collection first as the source of truth
       try {
@@ -109,6 +142,10 @@ export const FirebaseService = {
 
       await setDoc(roleRef, finalData, { merge: true });
       console.log(`[UPDATE] Role metadata updated for ${id} in ${safeRole}`);
+
+      if (managerIdToSync !== undefined) {
+        await this.syncHostManagerRelationship(id, managerIdToSync);
+      }
     } catch (error: any) {
       console.error(`[UPDATE] Role metadata error for ID: ${id}`, error);
       handleFirestoreError(error, OperationType.UPDATE, `role_metadata/${id}`);
@@ -192,7 +229,8 @@ export const FirebaseService = {
         snapshot.docs.forEach(d => {
           const id = d.id;
           const data = d.data();
-          metadataMap[id] = { ...metadataMap[id], poppo_id: id, ...data };
+          const collectionRole = col === 'users' ? 'host' : col;
+          metadataMap[id] = { role: collectionRole, ...metadataMap[id], poppo_id: id, ...data };
         });
       } catch (error: any) {
         console.warn(`Could not fetch metadata for collection: ${col}`, error);
@@ -200,7 +238,27 @@ export const FirebaseService = {
       }
     }
     
-    const allMetadata = Object.values(metadataMap);
+    const allMetadata = Object.values(metadataMap).map(item => {
+      const data = item as any;
+      const managerName = data.manager || data.assigned_manager_nickname || data.assigned_manager || 'Nine Management';
+      const managerId = data.assignedManagerId || data.assigned_manager_poppo_id || null;
+      const teamName = data.team || data.team_anchor || 'Unassigned';
+      const salaryCategory = data.base_salary_category || data.tier_pay || 'Regular Host';
+      return {
+        ...data,
+        id: data.id || data.poppo_id,
+        name: data.nickname || data.name || 'Unknown',
+        nickname: data.nickname || data.name || 'Unknown',
+        manager: managerName,
+        team: teamName,
+        base_salary_category: salaryCategory,
+        assignedManagerId: managerId,
+        assigned_manager_nickname: managerName,
+        assigned_manager_poppo_id: managerId,
+        team_anchor: teamName,
+        tier_pay: salaryCategory
+      };
+    });
     
     // If we have errors and NO data was fetched, throw the errors so the UI shows them
     if (errors.length > 0 && allMetadata.length === 0) {
@@ -213,11 +271,11 @@ export const FirebaseService = {
 
 
   async submitRpkReport(hostId: string, fromDate: string, toDate: string, data: any) {
-    const docId = `${fromDate}_${toDate}`;
-    const path = `host/${hostId}/rpk_reporting/${docId}`;
+    const docId = `${hostId}_${fromDate}_${toDate}`;
+    const path = `pk_reports/${docId}`;
     try {
-      const docRef = doc(db, 'host', hostId, 'rpk_reporting', docId);
-      await setDoc(docRef, { ...data, timestamp: new Date().toISOString() });
+      const docRef = doc(db, 'pk_reports', docId);
+      await setDoc(docRef, { ...data, poppo_id: hostId, timestamp: new Date().toISOString() });
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, path);
     }
@@ -226,11 +284,11 @@ export const FirebaseService = {
 
 
   async submitFanbaseReport(hostId: string, fromDate: string, toDate: string, data: any) {
-    const docId = `${fromDate}_${toDate}`;
-    const path = `host/${hostId}/fanbase_report/${docId}`;
+    const docId = `${hostId}_${fromDate}_${toDate}`;
+    const path = `fanbase_reports/${docId}`;
     try {
-      const docRef = doc(db, 'host', hostId, 'fanbase_report', docId);
-      await setDoc(docRef, { ...data, timestamp: new Date().toISOString() });
+      const docRef = doc(db, 'fanbase_reports', docId);
+      await setDoc(docRef, { ...data, poppo_id: hostId, timestamp: new Date().toISOString() });
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, path);
     }
@@ -251,11 +309,198 @@ export const FirebaseService = {
     }
   },
 
-  async updateHost(host: Host) {
-    const path = `hosts/${host.id}`;
+  async updateManagerHostFields(managerId: string, hostIdToAdd: string | null, hostIdToRemove: string | null, forceHosts?: string[]): Promise<void> {
+    const managerUserRef = doc(db, 'users', managerId);
+    const managerSnap = await getDoc(managerUserRef);
+    if (!managerSnap.exists()) return;
+
+    const mgrData = managerSnap.data();
+    const mgrRole = String(mgrData?.role || '').toLowerCase();
+    
+    let assignedHosts: string[] = forceHosts !== undefined 
+      ? forceHosts 
+      : (mgrData?.assignedHosts || []);
+
+    // Apply changes locally if not forced
+    if (forceHosts === undefined) {
+      if (hostIdToAdd && !assignedHosts.includes(hostIdToAdd)) {
+        assignedHosts.push(hostIdToAdd);
+      }
+      if (hostIdToRemove) {
+        assignedHosts = assignedHosts.filter(id => id !== hostIdToRemove);
+      }
+    }
+
+    // Prepare fields to update
+    const updateData: Record<string, any> = {
+      assignedHosts: assignedHosts
+    };
+
+    // Find any existing "Assigned Host X" keys to delete them
+    Object.keys(mgrData).forEach(key => {
+      if (key.startsWith('Assigned Host') || key.startsWith('Assigned host')) {
+        updateData[key] = deleteField();
+      }
+    });
+
+    // Generate new "Assigned Host X" fields
+    assignedHosts.forEach((hId, index) => {
+      updateData[`Assigned Host ${index + 1}`] = hId;
+    });
+
+    // Update both collections (users and manager/agent)
+    const batchUpdate = writeBatch(db);
+    batchUpdate.set(managerUserRef, updateData, { merge: true });
+
+    const col = mgrRole === 'agent' ? 'agent' : 'manager';
+    const roleRef = doc(db, col, managerId);
+    
+    // For the role collections, also delete old fields
     try {
-      const docRef = doc(db, 'users', host.id);
-      await setDoc(docRef, { ...host, updated_at: new Date().toISOString() });
+      const roleSnap = await getDoc(roleRef);
+      if (roleSnap.exists()) {
+        const roleData = roleSnap.data();
+        Object.keys(roleData).forEach(key => {
+          if (key.startsWith('Assigned Host') || key.startsWith('Assigned host')) {
+            if (!(key in updateData)) {
+              updateData[key] = deleteField();
+            }
+          }
+        });
+      }
+    } catch (e) {}
+
+    batchUpdate.set(roleRef, updateData, { merge: true });
+    await batchUpdate.commit();
+  },
+
+  async syncHostManagerRelationship(hostId: string, newManagerId: string | null): Promise<void> {
+    const hostUserRef = doc(db, 'users', hostId);
+    
+    // 1. Fetch current host document to find old manager
+    let oldManagerId: string | null = null;
+    try {
+      const hostSnap = await getDoc(hostUserRef);
+      if (hostSnap.exists()) {
+        const hostData = hostSnap.data();
+        oldManagerId = hostData?.assignedManagerId || hostData?.assigned_manager_poppo_id || null;
+      }
+    } catch (e) {
+      console.warn("Could not fetch current host to determine old manager:", e);
+    }
+
+    // 2. Fetch new manager's info to get name for host document update
+    let newManagerName = '';
+    if (newManagerId) {
+      try {
+        const newManagerUserRef = doc(db, 'users', newManagerId);
+        const newManagerUserSnap = await getDoc(newManagerUserRef);
+        if (newManagerUserSnap.exists()) {
+          const mgrData = newManagerUserSnap.data();
+          newManagerName = mgrData?.nickname || mgrData?.name || '';
+        }
+      } catch (e) {
+        console.error(`Failed to fetch new manager name ${newManagerId}:`, e);
+      }
+    }
+
+    // 3. Update host documents across users, host, and hosts collections
+    const hostFieldsToUpdate = {
+      manager: newManagerName || null,
+      assigned_manager: newManagerName || null,
+      assigned_manager_nickname: newManagerName || null,
+      assigned_manager_poppo_id: newManagerId || null,
+      assignedManagerId: newManagerId || null,
+      updated_at: new Date().toISOString()
+    };
+
+    const hostBatch = writeBatch(db);
+    hostBatch.set(hostUserRef, hostFieldsToUpdate, { merge: true });
+    for (const col of ['host', 'hosts']) {
+      try {
+        const ref = doc(db, col, hostId);
+        hostBatch.set(ref, hostFieldsToUpdate, { merge: true });
+      } catch (e) {}
+    }
+    await hostBatch.commit();
+
+    // 4. Update the new manager's assignedHosts and "Assigned Host X" fields
+    if (newManagerId) {
+      await this.updateManagerHostFields(newManagerId, hostId, null);
+    }
+
+    // 5. Update the old manager's assignedHosts and "Assigned Host X" fields
+    if (oldManagerId && oldManagerId !== newManagerId) {
+      await this.updateManagerHostFields(oldManagerId, null, hostId);
+    }
+  },
+
+  async updateHost(host: Host, oldRole?: string) {
+    const poppoId = host.id;
+    const path = `users/${poppoId}`;
+    try {
+      const managerName = host.manager || host.assigned_manager_nickname || host.assigned_manager || '';
+      const managerId = host.assignedManagerId || host.assigned_manager_poppo_id || '';
+      const teamName = host.team || host.team_anchor || '';
+      const salaryCategory = host.base_salary_category || host.tier_pay || '';
+
+      const updateData = {
+        ...host,
+        poppo_id: poppoId,
+        nickname: host.nickname || host.name,
+        manager: managerName,
+        assigned_manager: managerName,
+        assigned_manager_nickname: managerName,
+        assigned_manager_poppo_id: managerId || null,
+        assignedManagerId: managerId || null,
+        team: teamName,
+        team_anchor: teamName,
+        base_salary_category: salaryCategory,
+        tier_pay: salaryCategory,
+        updated_at: new Date().toISOString()
+      };
+
+      const getSafeRoleCollection = (r: string) => {
+        const norm = String(r || 'host').toLowerCase();
+        if (norm === 'talent' || norm === 'host') return 'host';
+        if (norm === 'head admin' || norm === 'head_admin') return 'head_admin';
+        return norm; // 'manager', 'admin', 'agent', 'director'
+      };
+
+      const newRoleCol = getSafeRoleCollection(host.role);
+      
+      // If oldRole is provided and has changed, delete the old role document
+      if (oldRole) {
+        const oldRoleCol = getSafeRoleCollection(oldRole);
+        if (oldRoleCol !== newRoleCol) {
+          try {
+            await deleteDoc(doc(db, oldRoleCol, poppoId));
+          } catch (e) {
+            console.warn(`Could not delete old role document from ${oldRoleCol} for ${poppoId}`);
+          }
+        }
+      }
+
+      // Write to new/current role collection
+      const roleDocRef = doc(db, newRoleCol, poppoId);
+      await setDoc(roleDocRef, updateData, { merge: true });
+
+      // If host, also write to legacy 'hosts' collection
+      if (newRoleCol === 'host') {
+        try {
+          const hostsDocRef = doc(db, 'hosts', poppoId);
+          await setDoc(hostsDocRef, updateData, { merge: true });
+        } catch (e) {}
+      }
+
+      // Write to users collection
+      const userDocRef = doc(db, 'users', poppoId);
+      await setDoc(userDocRef, updateData, { merge: true });
+
+      // Sync manager relationships if host
+      if (newRoleCol === 'host') {
+        await this.syncHostManagerRelationship(poppoId, host.assignedManagerId || null);
+      }
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, path);
     }
@@ -278,12 +523,24 @@ export const FirebaseService = {
         const snapshot = await getDocs(collection(db, col));
         const docs = snapshot.docs.map(d => {
           const data = d.data();
+          const managerName = data.manager || data.assigned_manager_nickname || data.assigned_manager || 'Nine Management';
+          const managerId = data.assignedManagerId || data.assigned_manager_poppo_id || null;
+          const teamName = data.team || data.team_anchor || 'Unassigned';
+          const salaryCategory = data.base_salary_category || data.tier_pay || 'Regular Host';
           return { 
             ...data, 
             id: d.id, 
             poppo_id: d.id,
             name: data.nickname || data.name || 'Unknown',
             nickname: data.nickname || data.name || 'Unknown',
+            manager: managerName,
+            team: teamName,
+            base_salary_category: salaryCategory,
+            assignedManagerId: managerId,
+            assigned_manager_nickname: managerName,
+            assigned_manager_poppo_id: managerId,
+            team_anchor: teamName,
+            tier_pay: salaryCategory,
           } as Host;
         });
         allHosts = allHosts.concat(docs);
@@ -526,7 +783,7 @@ export const FirebaseService = {
   },
 
   async getPublicCalendarEvents(): Promise<EventsCalendarPublic[]> {
-    const path = 'events';
+    const path = 'attendance';
     try {
       const snapshot = await getDocs(collection(db, path));
       return snapshot.docs.map(d => ({ id: d.id, ...d.data() } as EventsCalendarPublic));
@@ -912,6 +1169,24 @@ export const FirebaseService = {
       return [];
     }
   },
+
+  async logSystemActivity(actionDescription: string, severity: 'Info' | 'Warning' | 'Error' = 'Info') {
+    try {
+      const authState = Storage.getAuthState();
+      const logEntry = {
+        timestamp: new Date().toISOString(),
+        severity,
+        actionDescription,
+        userId: authState?.poppo_id || authState?.poppoId || 'System',
+        userRole: authState?.role || 'System',
+        stackTrace: ''
+      };
+      const newDocRef = doc(collection(db, 'system_logs'));
+      await setDoc(newDocRef, logEntry);
+    } catch (error) {
+      console.error('[FirebaseService] logSystemActivity failed:', error);
+    }
+  }
 };
 // ─── Roster Management types & standalone exports ─────────────────────────────
 // These are used by AppUsersTab for the admin roster management feature.
@@ -967,4 +1242,24 @@ export const patchHost = async (
   const hostDocRef = doc(db, 'users', poppoId);
   await updateDoc(hostDocRef, { ...updates, updated_at: new Date().toISOString() });
   return { success: true };
+};
+
+export const deleteUser = async (
+  poppoId: string,
+  role: string
+): Promise<void> => {
+  const getSafeRoleCollection = (r: string) => {
+    const norm = String(r || 'host').toLowerCase();
+    if (norm === 'talent' || norm === 'host') return 'host';
+    if (norm === 'head admin' || norm === 'head_admin') return 'head_admin';
+    return norm;
+  };
+  const safeRole = getSafeRoleCollection(role);
+  await deleteDoc(doc(db, 'users', poppoId));
+  await deleteDoc(doc(db, safeRole, poppoId));
+  if (safeRole === 'host') {
+    try {
+      await deleteDoc(doc(db, 'hosts', poppoId));
+    } catch (e) {}
+  }
 };

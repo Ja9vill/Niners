@@ -28,6 +28,8 @@ import {
   Shield
 } from 'lucide-react';
 import { AuthGate } from './components/AuthGate';
+import { useNavigate } from 'react-router-dom';
+import { LearningResourcesTab } from './components/LearningResourcesTab';
 import { Storage } from './lib/storage';
 import { FirebaseService } from './lib/firebaseService';
 import { CommissionEntry, Host } from './types';
@@ -70,7 +72,7 @@ import ChangePassword from './pages/ChangePassword';
 import UserManagement from './pages/UserManagement';
 import appLogo from './logo.jpg';
 
-type Tab = 'home' | 'overview' | 'roster' | 'profiles' | 'trends' | 'calendar' | 'events' | 'dashboard' | 'reporting' | 'glossary' | 'privacy' | 'terms' | 'agency-policy' | 'account' | 'app-users' | 'update-password' | 'user-management' | 'tasks';
+type Tab = 'home' | 'overview' | 'roster' | 'profiles' | 'trends' | 'calendar' | 'events' | 'dashboard' | 'reporting' | 'glossary' | 'privacy' | 'terms' | 'agency-policy' | 'account' | 'app-users' | 'update-password' | 'user-management' | 'tasks' | 'learning-resources';
 
 const PUBLIC_LINKS = [
   { label: 'Poppo Live', icon: Globe, href: 'https://invite=poppo.com/2kHNSf' },
@@ -199,6 +201,16 @@ export default function App() {
 
   // Initialize data from Firebase
   useEffect(() => {
+    // Run test performance reports cleanup on startup
+    fetch('/api/auth/cleanup-test-reports', { method: 'POST' })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.deletedIds && data.deletedIds.length > 0) {
+          console.log(`[Startup Cleanup] Cleaned up test reports:`, data.deletedIds);
+        }
+      })
+      .catch(err => console.warn('[Startup Cleanup] Failed to run database test report cleanup:', err));
+
     const loadData = async () => {
       setIsLoading(true);
       try {
@@ -238,6 +250,8 @@ export default function App() {
     loadData();
   }, [authState.level]);
 
+
+
   const handleLogout = async () => {
     try {
       await signOut(auth);
@@ -259,6 +273,9 @@ export default function App() {
     } catch (wipeErr) {
       console.warn("Could not execute security wipeLocalAuthState:", wipeErr);
     }
+
+    // Redirect to homepage
+    navigate('/');
   };
 
   const handleMigrationSuccess = () => {
@@ -395,6 +412,12 @@ export default function App() {
           <CalendarTab isReadOnly={false} hosts={hosts} />
         </AuthGate>
       );
+      case 'learning-resources':
+        return wrapProtected(
+          <AuthGate onAuthChange={refreshState}>
+            <LearningResourcesTab />
+          </AuthGate>
+        );
       case 'dashboard':
         if (authState.role?.toLowerCase() !== 'director') {
           return (
@@ -468,21 +491,20 @@ export default function App() {
     }
   };
 
-  const navItems = [
-    { id: 'home', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'reporting', label: 'Reporting', icon: BookOpen, protected: true },
-    { id: 'calendar', label: 'Calendar', icon: Calendar },
-    { id: 'events', label: 'Events', icon: Calendar, protected: true },
-    { id: 'dashboard', label: 'Director Hub', icon: Lock, protected: true },
-    { id: 'profiles', label: 'Management Hub', icon: Users, protected: true },
-    { id: 'account', label: 'Account', icon: User },
-    { id: 'overview', label: 'Analytics', icon: Activity, protected: true },
-    { id: 'roster', label: 'Roster', icon: Users, protected: true },
-    { id: 'trends', label: 'Trends', icon: TrendingUp, protected: true },
-    { id: 'glossary', label: 'Glossary', icon: BookOpen },
-    { id: 'update-password', label: 'Security', icon: Shield },
-    { id: 'user-management', label: 'User Management', icon: Users, protected: true },
-  ];
+  const navItems = [  { id: 'home', label: 'Dashboard', icon: LayoutDashboard },
+  { id: 'reporting', label: 'Reporting', icon: BookOpen, protected: true },
+  { id: 'calendar', label: 'Calendar', icon: Calendar },
+  { id: 'events', label: 'Events', icon: Calendar, protected: true },
+  { id: 'dashboard', label: 'Director Hub', icon: Lock, protected: true },
+  { id: 'profiles', label: 'Management Hub', icon: Users, protected: true },
+  { id: 'learning-resources', label: 'Learning Resources', icon: BookOpen, protected: true },
+  { id: 'account', label: 'Account', icon: User },
+  { id: 'overview', label: 'Analytics', icon: Activity, protected: true },
+  { id: 'roster', label: 'Roster', icon: Users, protected: true },
+  { id: 'trends', label: 'Trends', icon: TrendingUp, protected: true },
+  { id: 'glossary', label: 'Glossary', icon: BookOpen },
+  { id: 'update-password', label: 'Security', icon: Shield },
+  { id: 'user-management', label: 'User Management', icon: Users, protected: true }, ];
 
   return (
     <div className="flex flex-col h-screen overflow-hidden app-bg">
@@ -511,6 +533,13 @@ export default function App() {
               }}>
                 <div className="hidden" />
               </AuthGate>
+              {/* Fallback: redirect to dedicated login page */}
+              <button
+                onClick={() => navigate('/login')}
+                className="mt-2 w-full btn-gold py-3.5 rounded-xl text-xs font-black uppercase tracking-[0.25em] transition-all flex items-center justify-center gap-2"
+              >
+                Go to Login Page
+              </button>
               <button 
                 onClick={() => setShowLoginModal(false)}
                 className="absolute top-3 right-3 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white/60 hover:text-white transition-all"

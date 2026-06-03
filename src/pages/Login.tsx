@@ -8,7 +8,7 @@ import { Storage } from '../lib/storage';
 import { PoppoAuthService } from '../lib/customAuth';
 import appLogo from '../logo.jpg';
 
-type Phase = 'username' | 'password' | 'set-password';
+type Phase = 'username' | 'password' | 'set-password' | 'migrate-password';
 
 const authService = new PoppoAuthService();
 
@@ -40,6 +40,7 @@ export const Login = () => {
     setError('');
     const id = poppoId.trim();
     if (!id) { setError('Please enter your Poppo ID.'); return; }
+    if (!/^\d+$/.test(id)) { setError('Poppo ID must contain only numbers.'); return; }
     setIsSubmitting(true);
     try {
       const result = await authService.checkUsername(id);
@@ -65,34 +66,25 @@ export const Login = () => {
     if (!password.trim()) { setError('Please enter your password.'); return; }
     setIsSubmitting(true);
     try {
-      let success = false;
-      let errorMsg = '';
       const pw = password.trim();
+      const result = await authService.authenticateWithPoppo(poppoId.trim(), pw);
 
-      try {
-        await authService.authenticateWithPoppo(poppoId.trim(), pw);
-        success = true;
-      } catch (err: any) {
-        errorMsg = err.message || 'Invalid password';
-        // Leading-zero retry
-        if (errorMsg.includes('Invalid')) {
-          const alt = pw.startsWith('0') ? pw.replace(/^0+/, '') : '0' + pw;
-          if (alt) {
-            try { await authService.authenticateWithPoppo(poppoId.trim(), alt); success = true; }
-            catch (e2: any) { errorMsg = e2.message || errorMsg; }
-          }
-        }
+      if (result.status === 'MIGRATION_REQUIRED') {
+        setPhase('migrate-password');
+        setIsSubmitting(false);
+        return;
       }
 
-      if (success) {
-        const s = Storage.getAuthState();
-        Storage.addLog('Auth', `Logged in as ${s.nickname} (${s.role})`, s.nickname);
-        navigate(from, { replace: true });
-      } else {
-        setError(errorMsg);
-      }
+      const s = Storage.getAuthState();
+      Storage.addLog('Auth', `Logged in as ${s.nickname} (${s.role})`, s.nickname);
+      navigate(from, { replace: true });
     } catch (err: any) {
-      setError(err.message || 'Login failed. Please try again.');
+      let msg = err.message || 'Login failed. Please try again.';
+      if (msg.includes('Too many login attempts')) {
+        // Extract out explicit error for rate limiting
+        msg = 'Too many login attempts. Please wait 15 minutes before trying again.';
+      }
+      setError(msg);
     } finally {
       setIsSubmitting(false);
     }
@@ -122,6 +114,30 @@ export const Login = () => {
     }
   };
 
+  const handleMigratePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    if (!newPassword || !confirmPassword) { setError('Both fields are required.'); return; }
+    if (newPassword !== confirmPassword) { setError('Passwords do not match.'); return; }
+    if (newPassword.length < 8) { setError('Password must be at least 8 characters.'); return; }
+    if (!/[A-Z]/.test(newPassword)) { setError('Must include at least one uppercase letter.'); return; }
+    if (!/[0-9]/.test(newPassword)) { setError('Must include at least one number.'); return; }
+    setIsSubmitting(true);
+    try {
+      await authService.finalizePasswordMigration(newPassword);
+      setSuccess('Account secured! Redirecting...');
+      setTimeout(() => {
+        const s = Storage.getAuthState();
+        Storage.addLog('Auth', `Upgraded password security for ${s.nickname} (${s.role})`, s.nickname);
+        navigate(from, { replace: true });
+      }, 900);
+    } catch (err: any) {
+      setError(err.message || 'Failed to update password. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   // ── Shared styles ──────────────────────────────────────────────────────────
   const inputCls = 'w-full bg-[#0D0D14] border border-white/10 rounded-xl pl-4 pr-12 py-3 text-sm tracking-widest focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37]/50 outline-none transition-all text-[#F0EFE8] placeholder-white/20';
   const labelCls = 'text-[10px] font-black text-[#A09E9A]/60 uppercase tracking-[0.20em] ml-1 block';
@@ -145,18 +161,20 @@ export const Login = () => {
         {/* Title area */}
         <div className="flex flex-col items-center text-center space-y-3 py-1">
           <div className="flex items-center gap-2">
-            {phase === 'set-password'
+            {phase === 'set-password' || phase === 'migrate-password'
               ? <KeyRound className="text-[#D4AF37] w-6 h-6" strokeWidth={2} />
               : <Shield className="text-[#D4AF37] w-6 h-6" strokeWidth={2} />
             }
             <h1 className="text-lg font-black tracking-widest uppercase text-[#F0EFE8]">
-              {phase === 'set-password' ? 'SET YOUR PASSWORD' : 'MEMBER LOGIN'}
+              {phase === 'set-password' ? 'SET YOUR PASSWORD' : 
+               phase === 'migrate-password' ? 'UPGRADE PASSWORD' : 'MEMBER LOGIN'}
             </h1>
           </div>
           <p className="text-[#A09E9A]/80 text-xs px-4 leading-relaxed font-medium">
             {phase === 'username' && 'Enter your Poppo ID to continue.'}
             {phase === 'password' && 'Welcome back! Enter your password below.'}
             {phase === 'set-password' && "Welcome to the team! Choose a secure password to activate your account."}
+            {phase === 'migrate-password' && "Action required! Please upgrade to a secure password to continue."}
           </p>
         </div>
 
@@ -233,9 +251,9 @@ export const Login = () => {
           </form>
         )}
 
-        {/* ── PHASE 2a: Set Password ── */}
-        {phase === 'set-password' && (
-          <form onSubmit={handleSetPassword} className="space-y-5">
+        {/* ── PHASE 2a / 3: Set Password or Migrate Password ── */}
+        {(phase === 'set-password' || phase === 'migrate-password') && (
+          <form onSubmit={phase === 'set-password' ? handleSetPassword : handleMigratePassword} className="space-y-5">
             {/* Poppo ID context */}
             <div className="flex items-center gap-2 px-3 py-2 bg-[#D4AF37]/10 rounded-xl border border-[#D4AF37]/20">
               <ShieldCheck size={14} className="text-[#D4AF37] shrink-0" />

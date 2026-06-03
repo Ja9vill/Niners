@@ -10,6 +10,7 @@ import { MANAGERS, BASE_SALARY_POLICIES } from '../lib/constants';
 import { collection, query, where, getDocs, Timestamp, documentId, doc, setDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, BarChart, Bar, Cell } from 'recharts';
+import { SingleDatePicker, DateRangePicker } from './InteractiveDatePicker';
 
 interface HostProfileViewProps {
   host: Host;
@@ -45,6 +46,29 @@ const formatDateStandard = (dateInput: any): string => {
     const month = months[date.getMonth()];
     const year = date.getFullYear();
     return `${month} ${day}, ${year}`;
+  } catch (e) {
+    return '—';
+  }
+};
+
+const formatUpdateMetaDate = (timestampInput: any): string => {
+  if (!timestampInput) return '—';
+  try {
+    let date: Date;
+    if (timestampInput instanceof Timestamp) {
+      date = timestampInput.toDate();
+    } else if (timestampInput?.seconds) {
+      date = new Date(timestampInput.seconds * 1000);
+    } else {
+      date = new Date(timestampInput);
+    }
+    if (isNaN(date.getTime())) return '—';
+    const mm = String(date.getMonth() + 1).padStart(2, '0');
+    const dd = String(date.getDate()).padStart(2, '0');
+    const yy = String(date.getFullYear()).slice(-2);
+    const hh = String(date.getHours()).padStart(2, '0');
+    const min = String(date.getMinutes()).padStart(2, '0');
+    return `${mm}/${dd},${yy} ${hh}/${min}`;
   } catch (e) {
     return '—';
   }
@@ -90,10 +114,12 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
   const [performanceReports, setPerformanceReports] = useState<any[]>([]);
   const [participatedEvents, setParticipatedEvents] = useState<any[]>([]);
   const [pkData, setPkData] = useState<{ win_percentage: number; pk_score: number; sessions: number }>({
-    win_percentage: 73,
-    pk_score: 1800000,
-    sessions: 45
+    win_percentage: 0,
+    pk_score: 0,
+    sessions: 0
   });
+  const [attendedEvents, setAttendedEvents] = useState<any[]>([]);
+  const [totalAgencyEventsCount, setTotalAgencyEventsCount] = useState<number>(0);
   const [isLoading, setIsLoading] = useState(true);
   const [sortAscending, setSortAscending] = useState(true);
 
@@ -107,6 +133,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
           shadow: 'shadow-lg shadow-[#D4AF37]/15',
           badgeText: 'text-[#D4AF37]',
           accentColor: '#D4AF37',
+          topTrim: 'border-t-[#D4AF37] border-t-2',
         };
       }
       if (norm === 's idol') {
@@ -115,6 +142,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
           shadow: 'shadow-lg shadow-[#ec4899]/15',
           badgeText: 'text-[#ec4899]',
           accentColor: '#ec4899',
+          topTrim: 'border-t-[#ec4899] border-t-2',
         };
       }
       if (norm === 'rocket host') {
@@ -123,6 +151,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
           shadow: 'shadow-lg shadow-[#3b82f6]/15',
           badgeText: 'text-[#3b82f6]',
           accentColor: '#3b82f6',
+          topTrim: 'border-t-[#3b82f6] border-t-2',
         };
       }
       if (norm === 'esport host' || norm.includes('esport')) {
@@ -131,6 +160,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
           shadow: 'shadow-lg shadow-[#a855f7]/15',
           badgeText: 'text-[#a855f7]',
           accentColor: '#a855f7',
+          topTrim: 'border-t-[#a855f7] border-t-2',
         };
       }
       // Regular Host
@@ -139,24 +169,23 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
         shadow: 'shadow-md',
         badgeText: 'text-[#F0EFE8]',
         accentColor: '#ffffff',
+        topTrim: 'border-t-white/10 border-t-2',
       };
     };
     return getCategoryStyles(host.base_salary_category || '');
   }, [host.base_salary_category]);
 
   // Profile Edit States
-  const [isEditing, setIsEditing] = useState(false);
   const [editNickname, setEditNickname] = useState(host.nickname || host.name || '');
   const [editPhotoUrl, setEditPhotoUrl] = useState(host.photoUrl || '');
   const [editDescription, setEditDescription] = useState(host.description || '');
-  const [editRole, setEditRole] = useState<string>(host.role || 'Talent');
+  const [editRole, setEditRole] = useState<string>(host.role || 'Host');
   const [editTeam, setEditTeam] = useState<string>(host.team || 'Unassigned');
   const [editManager, setEditManager] = useState<string>(host.manager || 'Nine Management');
   const [editBaseSalaryCategory, setEditBaseSalaryCategory] = useState<string>(host.base_salary_category || 'N/A');
   const [editStatus, setEditStatus] = useState<string>(host.status || 'Active');
   const [editTier, setEditTier] = useState<string>(host.tier || 'X');
   const [editLevel, setEditLevel] = useState<number>(host.level || 1);
-  const [isSaving, setIsSaving] = useState(false);
   const [isProcessingPhoto, setIsProcessingPhoto] = useState(false);
   const [managersList, setManagersList] = useState<{ id: string; name: string }[]>([]);
 
@@ -211,13 +240,14 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
 
   // Enhanced metrics state
   const [awards, setAwards] = useState<any[]>([]);
+  const [activeAwards, setActiveAwards] = useState<any[]>([]);
   const [agentNotes, setAgentNotes] = useState<any[]>([]);
   const [weeklyLiveData, setWeeklyLiveData] = useState<any[]>([]);
 
   // New States for dropdown selections, RPK metadata, event form data, and AI reports triggers
   const [selectedPeriod, setSelectedPeriod] = useState<string>('all');
   const [eventFormData, setEventFormData] = useState({
-    eventType: 'Solo Livehouse',
+    eventType: 'SOLO LIVEHOUSE',
     eventDate: '',
     timeslot: '',
     description: ''
@@ -237,14 +267,13 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
     setEditNickname(host.nickname || host.name || '');
     setEditPhotoUrl(host.photoUrl || '');
     setEditDescription(host.description || '');
-    setEditRole(host.role || 'Talent');
+    setEditRole(host.role || 'Host');
     setEditTeam(host.team || 'Unassigned');
     setEditManager(host.manager || 'Nine Management');
     setEditBaseSalaryCategory(host.base_salary_category || 'N/A');
     setEditStatus(host.status || 'Active');
     setEditTier(host.tier || 'X');
     setEditLevel(host.level || 1);
-    setIsEditing(false);
     
     const loadProfileData = async () => {
       setIsLoading(true);
@@ -341,10 +370,10 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
           }
         }
 
-        // Section 2: Query events — check both participantIds (new) and participants (legacy) fields
+        // Section 2: Query exposures from 'calendar' collection
         const [eventsSnap1, eventsSnap2] = await Promise.all([
-          getDocs(query(collection(db, 'events'), where('participantIds', 'array-contains', host.id))),
-          getDocs(query(collection(db, 'events'), where('participants', 'array-contains', host.id)))
+          getDocs(query(collection(db, 'calendar'), where('participantIds', 'array-contains', host.id))),
+          getDocs(query(collection(db, 'calendar'), where('participants', 'array-contains', host.id)))
         ]);
         const seenEventIds = new Set<string>();
         const eventsList: any[] = [];
@@ -369,57 +398,101 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
         });
         setParticipatedEvents(eventsList);
 
-        // Load PK data from Firestore subcollection if available, else fallback
+        // Load PK data from top-level 'pk_reports' collection (deletes static mocks)
         try {
-          const rpkSnap = await getDocs(collection(db, 'host', host.id, 'rpk_reporting'));
-          if (!rpkSnap.empty) {
-            const reports = rpkSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-            reports.sort((a: any, b: any) => (b.timestamp || '').localeCompare(a.timestamp || ''));
+          const pkSnap = await getDocs(
+            query(
+              collection(db, 'pk_reports'),
+              where('poppo_id', '==', host.id)
+            )
+          );
+          if (!pkSnap.empty) {
+            const reports = pkSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+            reports.sort((a: any, b: any) => {
+              const getReportTime = (r: any) => {
+                if (r.timestamp) return new Date(r.timestamp).getTime();
+                if (r.submittedAt) {
+                  if (r.submittedAt instanceof Timestamp) return r.submittedAt.toDate().getTime();
+                  if (r.submittedAt.seconds) return r.submittedAt.seconds * 1000;
+                  return new Date(r.submittedAt).getTime();
+                }
+                if (r.from_date) return new Date(r.from_date).getTime();
+                return 0;
+              };
+              return getReportTime(b) - getReportTime(a);
+            });
             const latestRpk = reports[0];
             setPkData({
-              win_percentage: parseFloat(latestRpk.pk_wins_percent) || 0,
-              pk_score: parseInt(latestRpk.pk_points) || 0,
-              sessions: parseInt(latestRpk.pk_sessions) || 0
+              win_percentage: parseFloat(latestRpk.pk_wins_percent) || parseFloat(latestRpk.win_percentage) || 0,
+              pk_score: parseInt(latestRpk.pk_points) || parseInt(latestRpk.pk_score) || 0,
+              sessions: parseInt(latestRpk.pk_sessions) || parseInt(latestRpk.sessions) || 0
             });
             setRpkMetadata({
-              lastUpdated: latestRpk.timestamp,
-              updatedBy: latestRpk.reporter_name || latestRpk.reporter_id || 'Unknown'
+              lastUpdated: latestRpk.timestamp || latestRpk.submittedAt,
+              reporterRole: latestRpk.reporter_role || latestRpk.reporterRole || 'Staff',
+              reporterName: latestRpk.reporter_name || latestRpk.reporterName || 'Unknown',
+              reporterId: latestRpk.reporter_id || latestRpk.reporterId || 'Unknown'
             });
           } else {
-            const localPks = Storage.getPKData(host.id);
-            if (localPks && localPks.length > 0) {
-              setPkData({
-                win_percentage: localPks[0].win_percentage,
-                pk_score: localPks[0].pk_score,
-                sessions: localPks[0].sessions
-              });
-            }
+            setPkData({ win_percentage: 0, pk_score: 0, sessions: 0 });
             setRpkMetadata(null);
           }
         } catch (e) {
-          console.warn('Could not load RPK report:', e);
-          const localPks = Storage.getPKData(host.id);
-          if (localPks && localPks.length > 0) {
-            setPkData({
-              win_percentage: localPks[0].win_percentage,
-              pk_score: localPks[0].pk_score,
-              sessions: localPks[0].sessions
-            });
-          }
+          console.warn('Could not load PK report:', e);
+          setPkData({ win_percentage: 0, pk_score: 0, sessions: 0 });
           setRpkMetadata(null);
         }
 
-        // Section 3: Load latest fanbase report from subcollection
+        // Section 3: Load latest fanbase report from top-level 'fanbase_reports' collection
         try {
-          const fanbaseSnap = await getDocs(collection(db, 'host', host.id, 'fanbase_report'));
+          const fanbaseSnap = await getDocs(
+            query(
+              collection(db, 'fanbase_reports'),
+              where('poppo_id', '==', host.id)
+            )
+          );
           if (!fanbaseSnap.empty) {
             const reports = fanbaseSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-            // Sort by timestamp descending and take the latest
-            reports.sort((a: any, b: any) => (b.timestamp || '').localeCompare(a.timestamp || ''));
+            reports.sort((a: any, b: any) => {
+              const getReportTime = (r: any) => {
+                if (r.timestamp) return new Date(r.timestamp).getTime();
+                if (r.submittedAt) {
+                  if (r.submittedAt instanceof Timestamp) return r.submittedAt.toDate().getTime();
+                  if (r.submittedAt.seconds) return r.submittedAt.seconds * 1000;
+                  return new Date(r.submittedAt).getTime();
+                }
+                if (r.from_date) return new Date(r.from_date).getTime();
+                return 0;
+              };
+              return getReportTime(b) - getReportTime(a);
+            });
             setFanbaseLatest(reports[0]);
+          } else {
+            setFanbaseLatest(null);
           }
         } catch (e) {
           console.warn('Could not load fanbase report:', e);
+        }
+
+        // Section 4: Load attendance details for Agency Presence Rating
+        try {
+          const [attSnap, allAttSnap] = await Promise.all([
+            getDocs(query(collection(db, 'attendance'), where('attendeeIds', 'array-contains', host.id))),
+            getDocs(collection(db, 'attendance'))
+          ]);
+          const presenceList = attSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+          presenceList.sort((a: any, b: any) => {
+            const getEvtTime = (x: any) => {
+              if (x.eventDate) return new Date(x.eventDate).getTime();
+              if (x.timestamp) return new Date(x.timestamp).getTime();
+              return 0;
+            };
+            return getEvtTime(b) - getEvtTime(a);
+          });
+          setAttendedEvents(presenceList);
+          setTotalAgencyEventsCount(allAttSnap.size);
+        } catch (e) {
+          console.warn('Could not load attendance logs:', e);
         }
 
         // Load AI reports from Firestore
@@ -474,6 +547,22 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
           });
           setAwards(sortedAwards);
         } catch (e) { console.warn('Could not load awards:', e); }
+
+        // Load active award assignments
+        try {
+          const assignSnap = await getDocs(query(collection(db, 'award_assignments'), where('hostId', '==', host.id)));
+          const assignList: any[] = [];
+          const nowStr = new Date().toISOString().slice(0, 10);
+          assignSnap.forEach(d => {
+            const data = d.data();
+            if (data.startDate && data.endDate && nowStr >= data.startDate && nowStr <= data.endDate) {
+              assignList.push({ id: d.id, ...data });
+            }
+          });
+          setActiveAwards(assignList);
+        } catch (e) {
+          console.warn('Could not load active award assignments:', e);
+        }
 
         // Load agent notes
         try {
@@ -624,61 +713,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
     }
   };
 
-  // Save changes to Firestore and AuthState
-  const handleSaveChanges = async () => {
-    if (!editNickname.trim()) {
-      alert("Nickname cannot be empty.");
-      return;
-    }
-    setIsSaving(true);
-    try {
-      const selectedMgr = managersList.find(m => m.name === editManager);
-      const assignedManagerId = selectedMgr ? selectedMgr.id : null;
 
-      const truncatedDesc = editDescription.slice(0, 100);
-      const updatedHost: Host = {
-        ...host,
-        nickname: editNickname.trim(),
-        name: editNickname.trim() || host.name,
-        photoUrl: editPhotoUrl,
-        description: truncatedDesc,
-        bio: truncatedDesc,
-        role: editRole as any,
-        team: editTeam,
-        manager: editManager,
-        assignedManagerId: assignedManagerId,
-        base_salary_category: editBaseSalaryCategory as any,
-        status: editStatus as any,
-        tier: editTier as any,
-        level: Number(editLevel) || 1,
-        updated_at: new Date().toISOString()
-      };
-
-      await FirebaseService.updateHost(updatedHost);
-
-      // If editing current logged in user's profile, update authState
-      const currentAuth = Storage.getAuthState();
-      if (currentAuth.poppo_id === host.id) {
-        const newAuth = {
-          ...currentAuth,
-          name: editNickname.trim(),
-          nickname: editNickname.trim(),
-          profile_photo: editPhotoUrl
-        };
-        Storage.setAuthState(newAuth);
-      }
-
-      setIsEditing(false);
-      if (onProfileUpdated) {
-        onProfileUpdated();
-      }
-    } catch (err) {
-      console.error("Failed to update profile:", err);
-      alert("Failed to save changes. Please try again.");
-    } finally {
-      setIsSaving(false);
-    }
-  };
 
   // Submit RPK Report
   const handleRpkSubmit = async (e: React.FormEvent) => {
@@ -704,22 +739,37 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
       };
       
       await FirebaseService.submitRpkReport(host.id, rpkFormData.from_date, rpkFormData.to_date, reportData);
+      await FirebaseService.logSystemActivity(`Submitted RPK report for Host: ${host.nickname || host.name} (Poppo ID: ${host.id}) - Period: ${rpkFormData.from_date} to ${rpkFormData.to_date} - Win %: ${rpkFormData.pk_wins_percent}, Points: ${rpkFormData.pk_points}, Sessions: ${rpkFormData.pk_sessions}`, 'Info');
       
-      // Reload latest RPK report immediately
+      // Reload latest RPK report immediately from 'pk_reports'
       try {
-        const rpkSnap = await getDocs(collection(db, 'host', host.id, 'rpk_reporting'));
-        if (!rpkSnap.empty) {
-          const reports = rpkSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-          reports.sort((a: any, b: any) => (b.timestamp || '').localeCompare(a.timestamp || ''));
+        const pkSnap = await getDocs(
+          query(
+            collection(db, 'pk_reports'),
+            where('poppo_id', '==', host.id)
+          )
+        );
+        if (!pkSnap.empty) {
+          const reports = pkSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+          reports.sort((a: any, b: any) => {
+            const getReportTime = (r: any) => {
+              if (r.timestamp) return new Date(r.timestamp).getTime();
+              if (r.from_date) return new Date(r.from_date).getTime();
+              return 0;
+            };
+            return getReportTime(b) - getReportTime(a);
+          });
           const latestRpk = reports[0];
           setPkData({
-            win_percentage: parseFloat(latestRpk.pk_wins_percent) || 0,
-            pk_score: parseInt(latestRpk.pk_points) || 0,
-            sessions: parseInt(latestRpk.pk_sessions) || 0
+            win_percentage: parseFloat(latestRpk.pk_wins_percent) || parseFloat(latestRpk.win_percentage) || 0,
+            pk_score: parseInt(latestRpk.pk_points) || parseInt(latestRpk.pk_score) || 0,
+            sessions: parseInt(latestRpk.pk_sessions) || parseInt(latestRpk.sessions) || 0
           });
           setRpkMetadata({
-            lastUpdated: latestRpk.timestamp,
-            updatedBy: latestRpk.reporter_name || latestRpk.reporter_id || 'Unknown'
+            lastUpdated: latestRpk.timestamp || latestRpk.submittedAt,
+            reporterRole: latestRpk.reporter_role || latestRpk.reporterRole || 'Staff',
+            reporterName: latestRpk.reporter_name || latestRpk.reporterName || 'Unknown',
+            reporterId: latestRpk.reporter_id || latestRpk.reporterId || 'Unknown'
           });
         }
       } catch (e) {
@@ -740,41 +790,84 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
   // Submit Fanbase Report
   const handleFanbaseSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!fanbaseFormData.from_date || !fanbaseFormData.to_date) {
-      alert("From Date and To Date are required.");
-      return;
-    }
+    
     setIsSubmittingFanbase(true);
     try {
       const currentAuth = Storage.getAuthState();
-      const userRoleLower = String(currentAuth?.role || '').toLowerCase();
-      const isStaffUser = ['manager', 'agent', 'admin', 'head admin', 'director'].includes(userRoleLower);
+      const roleLower = String(currentAuth?.role || '').toLowerCase();
+      const isElevatedStaff = ['admin', 'head admin', 'head_admin', 'director'].includes(roleLower);
+      const isManagerAgent = ['manager', 'agent'].includes(roleLower);
+      const isOwnProfile = String(currentAuth?.poppo_id) === String(host.id);
+      const isAssignedManagerAgent = isManagerAgent && String(host.assignedManagerId) === String(currentAuth?.poppo_id);
+      const canSubmit = isOwnProfile || isAssignedManagerAgent || isElevatedStaff;
+
+      if (!canSubmit) {
+        alert("You are not authorized to submit reports for this host.");
+        setIsSubmittingFanbase(false);
+        return;
+      }
+
+      const fromDateVal = isElevatedStaff ? fanbaseFormData.from_date : new Date().toISOString();
+      const toDateVal = isElevatedStaff ? fanbaseFormData.to_date : new Date().toISOString();
+
+      if (!fromDateVal || !toDateVal) {
+        alert("From Date and To Date are required.");
+        setIsSubmittingFanbase(false);
+        return;
+      }
 
       const reportData = {
+        // snake_case fields for subcollection schema
         reporter_id: currentAuth?.poppo_id || "Unknown",
         reporter_name: currentAuth?.name || currentAuth?.nickname || "Unknown",
         reporter_role: currentAuth?.role || "Unknown",
         poppo_id: host.id,
         nickname: host.nickname || host.name,
-        from_date: fanbaseFormData.from_date,
-        to_date: fanbaseFormData.to_date,
+        from_date: fromDateVal,
+        to_date: toDateVal,
         total_followers: parseFloat(fanbaseFormData.total_followers) || 0,
         fanclub_subscribers: parseFloat(fanbaseFormData.fanclub_subscribers) || 0,
         fanclub_gc_members: parseFloat(fanbaseFormData.fanclub_gc_members) || 0,
-        // Exclude host gc posts and fans gc posts if not staff
-        gc_activity_count_host: isStaffUser ? (parseFloat(fanbaseFormData.gc_activity_count_host) || 0) : 0,
-        gc_activity_count_fans: isStaffUser ? (parseFloat(fanbaseFormData.gc_activity_count_fans) || 0) : 0,
-        notes: fanbaseFormData.notes
+        gc_activity_count_host: isElevatedStaff ? (parseFloat(fanbaseFormData.gc_activity_count_host) || 0) : 0,
+        gc_activity_count_fans: isElevatedStaff ? (parseFloat(fanbaseFormData.gc_activity_count_fans) || 0) : 0,
+        notes: fanbaseFormData.notes,
+
+        // camelCase fields for top-level schema compatibility
+        reporterId: currentAuth?.poppo_id || "Unknown",
+        reporterName: currentAuth?.name || currentAuth?.nickname || "Unknown",
+        reporterRole: currentAuth?.role || "Unknown",
+        poppoId: host.id,
+        currentFollowers: parseFloat(fanbaseFormData.total_followers) || 0,
+        fanclubSubscribers: parseFloat(fanbaseFormData.fanclub_subscribers) || 0,
+        fanclubGcMembers: parseFloat(fanbaseFormData.fanclub_gc_members) || 0,
+        gcUpdatesHost: isElevatedStaff ? (parseFloat(fanbaseFormData.gc_activity_count_host) || 0) : 0,
+        gcUpdatesFans: isElevatedStaff ? (parseFloat(fanbaseFormData.gc_activity_count_fans) || 0) : 0,
+        fromDate: fromDateVal,
+        toDate: toDateVal,
+        submittedAt: new Date().toISOString()
       };
 
-      await FirebaseService.submitFanbaseReport(host.id, fanbaseFormData.from_date, fanbaseFormData.to_date, reportData);
+      await FirebaseService.submitFanbaseReport(host.id, fromDateVal, toDateVal, reportData);
+      await FirebaseService.logSystemActivity(`Submitted codebase fanbase report for Host: ${host.nickname || host.name} (Poppo ID: ${host.id}) - Period: ${fromDateVal} to ${toDateVal} - Followers: ${fanbaseFormData.total_followers}, Subscribers: ${fanbaseFormData.fanclub_subscribers}, GC Members: ${fanbaseFormData.fanclub_gc_members}`, 'Info');
       
-      // Reload latest fanbase report immediately
+      // Reload latest fanbase report immediately from 'fanbase_reports'
       try {
-        const fanbaseSnap = await getDocs(collection(db, 'host', host.id, 'fanbase_report'));
+        const fanbaseSnap = await getDocs(
+          query(
+            collection(db, 'fanbase_reports'),
+            where('poppo_id', '==', host.id)
+          )
+        );
         if (!fanbaseSnap.empty) {
           const reports = fanbaseSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-          reports.sort((a: any, b: any) => (b.timestamp || '').localeCompare(a.timestamp || ''));
+          reports.sort((a: any, b: any) => {
+            const getReportTime = (r: any) => {
+              if (r.timestamp) return new Date(r.timestamp).getTime();
+              if (r.from_date) return new Date(r.from_date).getTime();
+              return 0;
+            };
+            return getReportTime(b) - getReportTime(a);
+          });
           setFanbaseLatest(reports[0]);
         }
       } catch (e) {
@@ -795,29 +888,81 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
     }
   };
 
-  // Save host's own bio/social/streaming edits
+  // Save host profile edits (both public self-profile and administrative fields if Director/Head Admin)
   const handleSaveSelf = async () => {
+    const currentAuth = Storage.getAuthState();
+    const isOwnProfile = currentAuth.poppo_id === host.id;
+    const userRoleLower = String(currentAuth?.role || '').toLowerCase();
+    const isDirectorOrHeadAdmin = ['director', 'head admin', 'head_admin'].includes(userRoleLower);
+
+    if (!(isOwnProfile && !isSpotlight) && !isDirectorOrHeadAdmin) {
+      alert("Unauthorized: Only the host themselves through their profile page, director, or head admin can edit profile info.");
+      return;
+    }
+
     setIsSavingSelf(true);
     try {
       const truncatedBio = selfBio.slice(0, 100);
-      const updatedHost: Host = {
-        ...host,
-        bio: truncatedBio,
-        description: truncatedBio,
-        social_links: { ig: selfSocialIg, tiktok: selfSocialTk, fb: selfSocialFb, whatsapp: selfSocialWa },
-        streaming_hours: selfStreamSlots.filter(s => s.from && s.to),
-        updated_at: new Date().toISOString()
-      };
-      await FirebaseService.updateHost(updatedHost);
-      // Update auth state if editing own profile
-      const currentAuth = Storage.getAuthState();
-      if (currentAuth.poppo_id === host.id) {
-        Storage.setAuthState({ ...currentAuth, bio: selfBio });
+      let updatedHost: Host;
+
+      if (isDirectorOrHeadAdmin) {
+        // Director/Head Admin can edit both administrative fields and public profile info
+        const selectedMgr = managersList.find(m => m.name === editManager);
+        const assignedManagerId = selectedMgr ? selectedMgr.id : null;
+
+        updatedHost = {
+          ...host,
+          nickname: editNickname.trim(),
+          name: editNickname.trim() || host.name,
+          photoUrl: editPhotoUrl,
+          description: truncatedBio,
+          bio: truncatedBio,
+          role: editRole as any,
+          team: editTeam,
+          manager: editManager,
+          assignedManagerId: assignedManagerId,
+          base_salary_category: editBaseSalaryCategory as any,
+          status: editStatus as any,
+          tier: editTier as any,
+          level: Number(editLevel) || 1,
+          social_links: { ig: selfSocialIg, tiktok: selfSocialTk, fb: selfSocialFb, whatsapp: selfSocialWa },
+          streaming_hours: selfStreamSlots.filter(s => s.from && s.to),
+          updated_at: new Date().toISOString()
+        };
+
+        await FirebaseService.updateHost(updatedHost, host.role);
+        await FirebaseService.logSystemActivity(`Admin edited profile metadata and public info for Host: ${host.nickname || host.name} (Poppo ID: ${host.id}) - New Nickname: ${editNickname.trim()}, Role: ${editRole}, Team: ${editTeam}, Manager: ${editManager}, Salary Category: ${editBaseSalaryCategory}, Status: ${editStatus}, Tier: ${editTier}, Level: ${editLevel}, Bio: "${truncatedBio}"`, 'Warning');
+      } else {
+        // Normal host self-edit
+        updatedHost = {
+          ...host,
+          bio: truncatedBio,
+          description: truncatedBio,
+          social_links: { ig: selfSocialIg, tiktok: selfSocialTk, fb: selfSocialFb, whatsapp: selfSocialWa },
+          streaming_hours: selfStreamSlots.filter(s => s.from && s.to),
+          updated_at: new Date().toISOString()
+        };
+
+        await FirebaseService.updateHost(updatedHost, host.role);
+        await FirebaseService.logSystemActivity(`Host edited self profile public info (Poppo ID: ${host.id}) - Bio: "${truncatedBio}", Socials: ${JSON.stringify(updatedHost.social_links)}, Streaming Slots: ${JSON.stringify(updatedHost.streaming_hours)}`, 'Info');
       }
+
+      // Update auth state if editing own profile
+      if (currentAuth.poppo_id === host.id) {
+        const newAuth = {
+          ...currentAuth,
+          name: updatedHost.nickname || updatedHost.name,
+          nickname: updatedHost.nickname || updatedHost.name,
+          profile_photo: updatedHost.photoUrl,
+          bio: updatedHost.bio
+        };
+        Storage.setAuthState(newAuth);
+      }
+
       setIsSelfEditing(false);
       if (onProfileUpdated) onProfileUpdated();
     } catch (err) {
-      console.error('Failed to save self profile:', err);
+      console.error('Failed to save profile:', err);
       alert('Failed to save. Please try again.');
     } finally {
       setIsSavingSelf(false);
@@ -854,12 +999,13 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
         timestamp: new Date().toISOString()
       };
 
-      await setDoc(doc(db, 'events', eventId), newEvent);
+      await setDoc(doc(db, 'attendance', eventId), newEvent);
+      await FirebaseService.logSystemActivity(`Added livehouse event details for Host: ${host.nickname || host.name} (Poppo ID: ${host.id}) - Date: ${eventFormData.eventDate}, Timeslot: ${eventFormData.timeslot}, Type: ${eventFormData.eventType}, Desc: "${eventFormData.description}"`, 'Info');
 
       // Refresh participated events list
       const [eventsSnap1, eventsSnap2] = await Promise.all([
-        getDocs(query(collection(db, 'events'), where('participantIds', 'array-contains', host.id))),
-        getDocs(query(collection(db, 'events'), where('participants', 'array-contains', host.id)))
+        getDocs(query(collection(db, 'attendance'), where('participantIds', 'array-contains', host.id))),
+        getDocs(query(collection(db, 'attendance'), where('participants', 'array-contains', host.id)))
       ]);
       const seenEventIds = new Set<string>();
       const eventsList: any[] = [];
@@ -885,7 +1031,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
 
       setIsAddEventFormOpen(false);
       setEventFormData({
-        eventType: 'Solo Livehouse',
+        eventType: 'SOLO LIVEHOUSE',
         eventDate: '',
         timeslot: '',
         description: ''
@@ -1051,15 +1197,17 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
         liveHrs: r.liveDurationMinutes ? (r.liveDurationMinutes / 60).toFixed(1) : (r.liveDuration || 0),
       }));
 
-      const prompt = `You are an AI analyst for Nine Talent Management, a live streaming agency.
-Analyze the following host data and return EXACTLY three sections with these exact labels on their own lines:
+      const prompt = `You are an AI analyst and mentor for Nine Talent Management, a live streaming agency.
+Analyze the following host data and write a performance report addressed DIRECTLY to the host. Use the second-person perspective ("you", "your", "yours") throughout the entire response. Do not use third-person (e.g. "this host", "she", "he", "their", "Miss Nine").
+
+Return EXACTLY three sections with these exact labels on their own lines:
 [SUMMARY]
 [JOURNEY]
 [RECOMMENDATIONS]
 
 Host: ${host.nickname || host.name} (Poppo ID: ${host.id})
 Status: ${host.status || 'Unknown'} | Tier: ${host.tier || 'X'} | Level: ${host.level || 1}
-Role: ${host.role || 'Talent'} | Manager: ${host.manager || 'N/A'} | Team: ${host.team || 'N/A'}
+Role: ${host.role || 'Host'} | Manager: ${host.manager || 'N/A'} | Team: ${host.team || 'N/A'}
 Total Live Earnings: ${perfTotals.liveEarnings.toLocaleString()} | Party Earnings: ${perfTotals.partyEarnings.toLocaleString()}
 Total Points Earned (all time): ${perfTotals.points.toLocaleString()}
 Live Hours (all time): ${perfTotals.liveHrs}h
@@ -1068,9 +1216,9 @@ PK Win Rate: ${pkData.win_percentage}% over ${pkData.sessions} sessions
 Fanbase: ${fanbaseLatest ? `${fanbaseLatest.total_followers || 0} followers, ${fanbaseLatest.fanclub_subscribers || 0} FC subs, ${fanbaseLatest.fanclub_gc_members || 0} GC members` : 'No fanbase data'}
 Monthly Performance (last 6): ${JSON.stringify(last6)}
 
-[SUMMARY] Write a 2-3 sentence performance summary of this host. Be specific and data-driven.
-[JOURNEY] Write a 2-3 sentence narrative about their streamer career journey and growth trajectory.
-[RECOMMENDATIONS] List 3-5 specific, actionable bullet points to help this host improve. Use "• " prefix for each.`;
+[SUMMARY] Write a 2-3 sentence performance summary addressed directly to you (the host) using "you" and "your". Be specific, supportive, and data-driven. If there are no performance records or fanbase records, or if there is not enough historical data (e.g., less than 3 monthly records), you MUST explicitly note in this summary that you (the host) should submit more data now to get a deep dive analysis.
+[JOURNEY] Write a 2-3 sentence narrative about your career journey and growth trajectory, addressed directly to you (the host).
+[RECOMMENDATIONS] List 3-5 specific, actionable recommendations and suggestions addressed directly to you (the host) to help you improve. Use "• " prefix for each.`;
 
       const res = await fetch('/api/chat', {
         method: 'POST',
@@ -1112,6 +1260,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
         isPosted: false
       };
       await setDoc(doc(db, 'ai_reports', reportId), newReportDoc);
+      await FirebaseService.logSystemActivity(`Generated AI performance review report for Host: ${host.nickname || host.name} (Poppo ID: ${host.id}) - Report ID: ${reportId}`, 'Info');
 
       setAiReport({ summary, journey, recommendations });
       setMyRecentAiReport(newReportDoc);
@@ -1130,6 +1279,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
     setIsPostingAiReport(true);
     try {
       await setDoc(doc(db, 'ai_reports', reportToPost.reportId), { isPosted: true }, { merge: true });
+      await FirebaseService.logSystemActivity(`Posted shared AI performance review report to Host profile page: Host: ${host.nickname || host.name} (Poppo ID: ${host.id}) - Report ID: ${reportToPost.reportId}`, 'Info');
       alert("Report posted successfully to host profile!");
       setAiReportReloadTrigger(prev => prev + 1);
     } catch (err: any) {
@@ -1221,7 +1371,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
   const renderEarningsBreakdown = () => {
     if (performanceReports.length === 0) return null;
     return (
-      <div className={cn("bg-[#1A1A28] border-2 rounded-2xl p-4 transition-all duration-300", styles.borderColor, styles.shadow)}>
+      <div className={cn("bg-[#1A1A28] border-2 rounded-2xl p-4 transition-all duration-300", styles.borderColor, styles.shadow, styles.topTrim)}>
         <div className="flex items-center justify-between mb-3">
           <p className="text-[9px] font-black text-[#A09E9A]/50 uppercase tracking-[0.2em]">
             {activeReport ? `PERFORMANCE ANALYTICS — ${formatPeriodShort(activeReport.monthName || activeReport.month, activeReport.year)}` : 'PERFORMANCE ANALYTICS — All Time'}
@@ -1267,7 +1417,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
     if (monthlyChartData.length === 0) return null;
     const COLORS = ['#D4AF37','#6366f1','#ec4899','#10b981','#f59e0b','#06b6d4','#a78bfa','#fb923c','#38bdf8','#34d399','#f472b6','#818cf8'];
     return (
-      <div className={cn("bg-[#1A1A28] border-2 rounded-2xl p-4 transition-all duration-300", styles.borderColor, styles.shadow)}>
+      <div className={cn("bg-[#1A1A28] border-2 rounded-2xl p-4 transition-all duration-300", styles.borderColor, styles.shadow, styles.topTrim)}>
         <div className="flex items-center gap-2 mb-4">
           <p className="text-[9px] font-black text-[#A09E9A]/50 uppercase tracking-[0.2em]">Monthly Points Trend</p>
           <span className="ml-auto text-[8px] text-[#A09E9A]/30 font-mono">{monthlyChartData.length} months</span>
@@ -1299,9 +1449,13 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
   // Self-edit modal: bio, social links, streaming hours only
   const renderSelfEditModal = () => {
     if (!isSelfEditing) return null;
+    const currentAuth = Storage.getAuthState();
+    const userRoleLower = String(currentAuth?.role || '').toLowerCase();
+    const isDirectorOrHeadAdmin = ['director', 'head admin', 'head_admin'].includes(userRoleLower);
+
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-        <div className="bg-[#13131E] border border-white/10 rounded-2xl max-w-md w-full p-5 shadow-2xl relative max-h-[90vh] overflow-y-auto">
+        <div className={cn("bg-[#13131E] border border-white/10 rounded-2xl w-full p-5 shadow-2xl relative max-h-[90vh] overflow-y-auto transition-all duration-300", isDirectorOrHeadAdmin ? "max-w-lg" : "max-w-md")}>
           <button
             title="Close"
             onClick={() => setIsSelfEditing(false)}
@@ -1310,10 +1464,123 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
             <X size={14} />
           </button>
 
-          <h3 className="text-sm font-black uppercase tracking-wider text-[#F0EFE8] mb-0.5">Edit Your Profile</h3>
-          <p className="text-[10px] text-[#A09E9A] mb-4">Update bio, social media links and streaming schedule.</p>
+          <h3 className="text-sm font-black uppercase tracking-wider text-[#F0EFE8] mb-0.5">
+            {isDirectorOrHeadAdmin ? 'Edit Host Profile' : 'Edit Your Profile'}
+          </h3>
+          <p className="text-[10px] text-[#A09E9A] mb-4">
+            {isDirectorOrHeadAdmin 
+              ? "Update host's administrative details, bio, social media links, and streaming schedule." 
+              : "Update bio, social media links and streaming schedule."}
+          </p>
 
           <div className="space-y-4">
+            {isDirectorOrHeadAdmin && (
+              <div className="bg-[#1A1A28] border border-white/5 p-4 rounded-xl space-y-3">
+                <div className="border-b border-white/5 pb-1">
+                  <span className="text-[9px] font-black text-[#D4AF37] uppercase tracking-wider">Administrative Fields</span>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-[8px] font-black text-[#A09E9A] uppercase tracking-widest block">Nickname</label>
+                    <input 
+                      type="text"
+                      value={editNickname}
+                      onChange={(e) => setEditNickname(e.target.value)}
+                      className="w-full bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-1.5 text-xs font-bold text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[8px] font-black text-[#A09E9A] uppercase tracking-widest block">Role</label>
+                    <select
+                      value={editRole}
+                      onChange={(e) => setEditRole(e.target.value)}
+                      className="w-full bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-1.5 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37] font-bold"
+                    >
+                      {['Host', 'Manager', 'Admin', 'Head Admin', 'Agent']
+                        .concat(host.role === 'Director' ? ['Director'] : [])
+                        .map(r => (
+                          <option key={r} value={r} className="bg-[#1A1A28] text-[#F0EFE8]">{r}</option>
+                        ))
+                      }
+                    </select>
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[8px] font-black text-[#A09E9A] uppercase tracking-widest block">Photo Upload & URL</label>
+                  <div className="flex gap-2 items-center">
+                    <label className="px-3 py-2 bg-[#222235] border border-white/10 hover:bg-[#2A2A3F] rounded-lg text-[9px] font-black uppercase tracking-wider cursor-pointer text-[#F0EFE8] whitespace-nowrap">
+                      {isProcessingPhoto ? 'Uploading...' : 'Choose File'}
+                      <input type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
+                    </label>
+                    <input 
+                      type="text" 
+                      placeholder="Or paste photo URL..." 
+                      value={editPhotoUrl}
+                      onChange={(e) => setEditPhotoUrl(e.target.value)}
+                      className="w-full bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-1.5 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-[8px] font-black text-[#A09E9A] uppercase tracking-widest block">Base Salary Category</label>
+                    <select
+                      value={editBaseSalaryCategory}
+                      onChange={(e) => setEditBaseSalaryCategory(e.target.value)}
+                      className="w-full bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-1.5 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37] font-bold"
+                    >
+                      {BASE_SALARY_POLICIES.map(policy => (
+                        <option key={policy} value={policy} className="bg-[#1A1A28] text-[#F0EFE8]">{policy}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[8px] font-black text-[#A09E9A] uppercase tracking-widest block">Assigned Manager</label>
+                    <select
+                      value={editManager}
+                      onChange={(e) => setEditManager(e.target.value)}
+                      className="w-full bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-1.5 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37] font-bold"
+                    >
+                      {!managersList.some(m => m.name === editManager) && editManager && (
+                        <option value={editManager} className="bg-[#1A1A28] text-[#F0EFE8]">{editManager}</option>
+                      )}
+                      {managersList.map(mgr => (
+                        <option key={mgr.id} value={mgr.name} className="bg-[#1A1A28] text-[#F0EFE8]">{mgr.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-[8px] font-black text-[#A09E9A] uppercase tracking-widest block">Team / Anchor Group</label>
+                    <input
+                      type="text"
+                      value={editTeam}
+                      onChange={(e) => setEditTeam(e.target.value)}
+                      className="w-full bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-1.5 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[8px] font-black text-[#A09E9A] uppercase tracking-widest block">Status</label>
+                    <select
+                      value={editStatus}
+                      onChange={(e) => setEditStatus(e.target.value)}
+                      className="w-full bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-1.5 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37] font-bold"
+                    >
+                      {['Active', 'Inconsistent', 'Released', 'Inactive'].map(s => (
+                        <option key={s} value={s} className="bg-[#1A1A28] text-[#F0EFE8]">{s}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+              </div>
+            )}
             {/* Host Public Message */}
             <div className="space-y-1">
               <div className="flex justify-between items-center">
@@ -1422,15 +1689,16 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
     const isOwnProfile = currentAuth.poppo_id === host.id;
     const userRoleLower = String(currentAuth?.role || '').toLowerCase();
     const isStaffUser = ['manager', 'agent', 'admin', 'head admin', 'director'].includes(userRoleLower);
+    const isDirectorOrHeadAdmin = ['director', 'head admin', 'head_admin'].includes(userRoleLower);
 
     return (
-      <div className={cn("bg-[#1A1A28] border-2 rounded-2xl p-4 flex flex-col gap-4 relative group/card transition-all duration-300", styles.borderColor, styles.shadow)}>
+      <div className={cn("bg-[#1A1A28] border-2 rounded-2xl p-4 flex flex-col gap-4 relative group/card transition-all duration-300", styles.borderColor, styles.shadow, styles.topTrim)}>
         {/* Top area: Photo + Nickname/PoppoID/Admin Fields */}
         <div className="flex gap-4 items-start">
           {/* Host Photo Section */}
-          <div className="flex flex-col items-center gap-1.5 shrink-0">
+          <div className="flex flex-col items-center gap-2 shrink-0">
             <span className="text-[8px] font-black text-[#A09E9A]/60 uppercase tracking-widest leading-none">HOST PHOTO</span>
-            <div className="w-16 h-16 rounded-full bg-[#0D0D14] border-2 flex items-center justify-center font-bold text-[#F0EFE8] overflow-hidden shadow-lg relative" style={{ borderColor: styles.accentColor }}>
+            <div className="w-28 h-28 sm:w-32 sm:h-32 rounded-2xl bg-[#0D0D14] border-2 flex items-center justify-center font-bold text-[#F0EFE8] overflow-hidden shadow-lg relative" style={{ borderColor: styles.accentColor }}>
               {isProcessingPhoto && (
                 <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
                   <Loader2 size={16} className="animate-spin text-[#D4AF37]" />
@@ -1439,76 +1707,9 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
               {editPhotoUrl ? (
                 <img src={editPhotoUrl} alt={host.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
               ) : (
-                <div className="text-lg text-[#A09E9A] font-bold">{editNickname?.[0]?.toUpperCase() || host.name?.[0] || 'JD'}</div>
+                <div className="text-3xl sm:text-4xl text-[#A09E9A] font-bold">{editNickname?.[0]?.toUpperCase() || host.name?.[0] || 'JD'}</div>
               )}
             </div>
-            
-            {isEditing && (
-              <div className="flex flex-col items-center gap-1 mt-1">
-                <label className="px-2 py-0.5 bg-[#222235] border border-white/10 hover:bg-[#2A2A3F] rounded text-[7px] font-black uppercase tracking-wider cursor-pointer text-[#F0EFE8]">
-                  Upload
-                  <input type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
-                </label>
-                <input 
-                  type="text" 
-                  placeholder="URL..." 
-                  value={editPhotoUrl}
-                  onChange={(e) => setEditPhotoUrl(e.target.value)}
-                  className="w-14 bg-[#0D0D14] border border-white/10 rounded px-1 py-0.5 text-[6.5px] text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
-                  title="Profile Photo URL"
-                />
-              </div>
-            )}
-
-            {/* Social Media (placed directly under profile photo) */}
-            {host.social_links && (host.social_links.ig || host.social_links.tiktok || host.social_links.fb || host.social_links.whatsapp) && (
-              <div className="flex gap-1.5 mt-2.5 justify-center">
-                {host.social_links.ig && (
-                  <a 
-                    href={host.social_links.ig.startsWith('http') ? host.social_links.ig : `https://instagram.com/${host.social_links.ig.replace('@', '')}`} 
-                    target="_blank" 
-                    rel="noopener noreferrer" 
-                    className="p-1 bg-pink-500/10 hover:bg-pink-500/20 border border-pink-500/20 text-pink-400 rounded-md transition-colors flex items-center justify-center"
-                    title="Instagram"
-                  >
-                    <Instagram size={11} />
-                  </a>
-                )}
-                {host.social_links.tiktok && (
-                  <a 
-                    href={host.social_links.tiktok.startsWith('http') ? host.social_links.tiktok : `https://tiktok.com/@${host.social_links.tiktok.replace('@', '')}`} 
-                    target="_blank" 
-                    rel="noopener noreferrer" 
-                    className="p-1 bg-[#00f2fe]/10 hover:bg-[#00f2fe]/20 border border-[#00f2fe]/20 text-[#00f2fe] rounded-md transition-colors flex items-center justify-center font-bold text-[9px] leading-none"
-                    title="TikTok"
-                  >
-                    <span>🎵</span>
-                  </a>
-                )}
-                {host.social_links.fb && (
-                  <a 
-                    href={host.social_links.fb.startsWith('http') ? host.social_links.fb : `https://facebook.com/${host.social_links.fb}`} 
-                    target="_blank" 
-                    rel="noopener noreferrer" 
-                    className="p-1 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 text-blue-400 rounded-md transition-colors flex items-center justify-center"
-                    title="Facebook"
-                  >
-                    <Facebook size={11} />
-                  </a>
-                )}
-                {host.social_links.whatsapp && (
-                  <a 
-                    href={`https://wa.me/${host.social_links.whatsapp.replace(/[^0-9]/g, '')}`}
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="p-1 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 text-emerald-400 rounded-md transition-colors flex items-center justify-center text-[10px] font-bold"
-                    title="WhatsApp"
-                  >
-                    <span>💬</span>
-                  </a>
-                )}
-              </div>
-            )}
           </div>
 
           {/* Identity Details */}
@@ -1516,19 +1717,27 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <span className="text-[8px] font-black text-[#A09E9A] uppercase tracking-widest block mb-0.5">NICKNAME</span>
-                {isEditing ? (
-                  <input 
-                    type="text"
-                    value={editNickname}
-                    onChange={(e) => setEditNickname(e.target.value)}
-                    className="w-full bg-[#0D0D14] border border-white/10 rounded px-2 py-1 text-xs font-bold text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
-                    required
-                    title="Nickname"
-                    placeholder="Nickname"
-                  />
-                ) : (
-                  <span className="text-sm font-black text-[#F0EFE8] truncate block leading-tight">{host.nickname || host.name}</span>
-                )}
+                <div className="flex flex-wrap items-center gap-1.5 min-w-0">
+                  <span className="text-sm font-black text-[#F0EFE8] truncate leading-tight">{host.nickname || host.name}</span>
+                  {activeAwards.map(a => {
+                    let badgeStyle = 'bg-amber-500/10 text-amber-400 border-amber-500/20'; // Gold default
+                    if (a.awardColor === 'Purple') badgeStyle = 'bg-purple-500/10 text-purple-400 border-purple-500/20';
+                    else if (a.awardColor === 'Emerald') badgeStyle = 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
+                    else if (a.awardColor === 'Blue') badgeStyle = 'bg-blue-500/10 text-blue-400 border-blue-500/20';
+                    else if (a.awardColor === 'Red') badgeStyle = 'bg-red-500/10 text-red-400 border-red-500/20';
+                    else if (a.awardColor === 'Orange') badgeStyle = 'bg-orange-500/10 text-orange-400 border-orange-500/20';
+
+                    return (
+                      <span 
+                        key={a.id} 
+                        className={cn("text-[8px] font-black uppercase px-1.5 py-0.5 rounded-full border shrink-0", badgeStyle)}
+                        title={`Active Award: ${a.awardName} (${a.startDate} to ${a.endDate})`}
+                      >
+                        {a.awardName}
+                      </span>
+                    );
+                  })}
+                </div>
               </div>
               <div>
                 <span className="text-[8px] font-black text-[#A09E9A] uppercase tracking-widest block mb-0.5">POPPO ID</span>
@@ -1536,127 +1745,28 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
               </div>
             </div>
 
-            {isEditing ? (
-              <div className="grid grid-cols-2 gap-3 pt-2 border-t border-white/5 text-[10px] text-[#A09E9A]">
-                <div className="space-y-1">
-                  <label htmlFor="edit-role" className="text-[#A09E9A] font-bold uppercase tracking-wider block">Role:</label>
-                  <select
-                    id="edit-role"
-                    value={editRole}
-                    onChange={(e) => setEditRole(e.target.value)}
-                    className="w-full bg-[#0D0D14] border border-white/10 rounded px-1.5 py-1 text-[11px] text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
-                  >
-                    {['Talent', 'Manager', 'Admin', 'Head Admin', 'Director', 'Agent'].map(r => (
-                      <option key={r} value={r} className="bg-[#1A1A28] text-[#F0EFE8]">{r}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="space-y-1">
-                  <label htmlFor="edit-sal" className="text-[#A09E9A] font-bold uppercase tracking-wider block">Base Salary Category:</label>
-                  <select
-                    id="edit-sal"
-                    value={editBaseSalaryCategory}
-                    onChange={(e) => setEditBaseSalaryCategory(e.target.value)}
-                    className="w-full bg-[#0D0D14] border border-white/10 rounded px-1.5 py-1 text-[11px] text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
-                  >
-                    {BASE_SALARY_POLICIES.map(policy => (
-                      <option key={policy} value={policy} className="bg-[#1A1A28] text-[#F0EFE8]">{policy}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="space-y-1">
-                  <label htmlFor="edit-mgr" className="text-[#A09E9A] font-bold uppercase tracking-wider block">Assigned Manager:</label>
-                  <select
-                    id="edit-mgr"
-                    value={editManager}
-                    onChange={(e) => setEditManager(e.target.value)}
-                    className="w-full bg-[#0D0D14] border border-white/10 rounded px-1.5 py-1 text-[11px] text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
-                  >
-                    {!managersList.some(m => m.name === editManager) && editManager && (
-                      <option value={editManager} className="bg-[#1A1A28] text-[#F0EFE8]">{editManager}</option>
-                    )}
-                    {managersList.map(mgr => (
-                      <option key={mgr.id} value={mgr.name} className="bg-[#1A1A28] text-[#F0EFE8]">{mgr.name}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="space-y-1">
-                  <label htmlFor="edit-team" className="text-[#A09E9A] font-bold uppercase tracking-wider block">Team / Anchor Group:</label>
-                  <input
-                    id="edit-team"
-                    type="text"
-                    value={editTeam}
-                    onChange={(e) => setEditTeam(e.target.value)}
-                    className="w-full bg-[#0D0D14] border border-white/10 rounded px-1.5 py-1 text-[11px] text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label htmlFor="edit-status" className="text-[#A09E9A] font-bold uppercase tracking-wider block">Status:</label>
-                  <select
-                    id="edit-status"
-                    value={editStatus}
-                    onChange={(e) => setEditStatus(e.target.value)}
-                    className="w-full bg-[#0D0D14] border border-white/10 rounded px-1.5 py-1 text-[11px] text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
-                  >
-                    {['Active', 'Inconsistent', 'Released', 'Inactive'].map(s => (
-                      <option key={s} value={s} className="bg-[#1A1A28] text-[#F0EFE8]">{s}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="space-y-1">
-                  <label htmlFor="edit-tier" className="text-[#A09E9A] font-bold uppercase tracking-wider block">Tier:</label>
-                  <select
-                    id="edit-tier"
-                    value={editTier}
-                    onChange={(e) => setEditTier(e.target.value)}
-                    className="w-full bg-[#0D0D14] border border-white/10 rounded px-1.5 py-1 text-[11px] text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
-                  >
-                    {['S', 'A', 'B', 'C', 'X'].map(t => (
-                      <option key={t} value={t} className="bg-[#1A1A28] text-[#F0EFE8]">{t}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="space-y-1">
-                  <label htmlFor="edit-lvl" className="text-[#A09E9A] font-bold uppercase tracking-wider block">Level Snap:</label>
-                  <input
-                    id="edit-lvl"
-                    type="number"
-                    value={editLevel}
-                    onChange={(e) => setEditLevel(parseInt(e.target.value) || 1)}
-                    className="w-full bg-[#0D0D14] border border-white/10 rounded px-1.5 py-1 text-[11px] text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
-                  />
-                </div>
+            <div className="space-y-1.5 pt-2 border-t border-white/5 text-[10px] text-[#A09E9A]">
+              <div className="flex items-center gap-1.5">
+                <span className="text-[#A09E9A] font-bold uppercase tracking-wider">Role:</span>
+                <span className="text-[#D4AF37] font-semibold">{host.role === 'Host' || host.role === 'Talent' ? 'Star Host' : host.role}</span>
               </div>
-            ) : (
-              <div className="space-y-1.5 pt-2 border-t border-white/5 text-[10px] text-[#A09E9A]">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[#A09E9A] font-bold uppercase tracking-wider">Role:</span>
-                  <span className="text-[#D4AF37] font-semibold">{host.role === 'Talent' ? 'Star Host' : host.role}</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[#A09E9A] font-bold uppercase tracking-wider">Base Salary Category:</span>
-                  <span className={cn("font-semibold", styles.badgeText)}>{host.base_salary_category || 'Regular Host'}</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[#A09E9A] font-bold uppercase tracking-wider">Assigned Manager:</span>
-                  <span className="text-[#F0EFE8] font-semibold">{host.manager}</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[#A09E9A] font-bold uppercase tracking-wider">Team / Anchor Group:</span>
-                  <span className="text-indigo-400 font-semibold">{host.team}</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[#A09E9A] font-bold uppercase tracking-wider">Status:</span>
-                  <span className={cn("font-semibold", host.status === 'Active' ? "text-emerald-400" : "text-amber-400")}>{host.status}</span>
-                </div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[#A09E9A] font-bold uppercase tracking-wider">Base Salary Category:</span>
+                <span className={cn("font-semibold", styles.badgeText)}>{host.base_salary_category || 'Regular Host'}</span>
               </div>
-            )}
+              <div className="flex items-center gap-1.5">
+                <span className="text-[#A09E9A] font-bold uppercase tracking-wider">Assigned Manager:</span>
+                <span className="text-[#F0EFE8] font-semibold">{host.manager}</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[#A09E9A] font-bold uppercase tracking-wider">Team / Anchor Group:</span>
+                <span className="text-indigo-400 font-semibold">{host.team}</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[#A09E9A] font-bold uppercase tracking-wider">Status:</span>
+                <span className={cn("font-semibold", host.status === 'Active' ? "text-emerald-400" : "text-amber-400")}>{host.status}</span>
+              </div>
+            </div>
 
             {/* Streaming Schedule (placed under edit button and details) */}
             {host.streaming_hours && host.streaming_hours.length > 0 && (
@@ -1683,54 +1793,15 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
         </div>
 
         {/* Edit / Save Options */}
-        {(!isReadOnly || isOwnProfile) && (
-          <div className="absolute top-4 right-4 z-10 flex gap-2">
-            {isOwnProfile && (
-              <button
-                onClick={() => setIsSelfEditing(true)}
-                className="px-2 py-1 bg-[#222235] hover:bg-[#2A2A3F] border border-white/10 text-[#A09E9A] hover:text-[#D4AF37] rounded-lg text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1 shadow-sm"
-                title="Edit Profile"
-              >
-                <Edit2 size={11} />
-                Edit Profile
-              </button>
-            )}
-            {!isReadOnly && isStaffUser && (
-              <>
-                {!isEditing ? (
-                  <button 
-                    onClick={() => setIsEditing(true)}
-                    className="p-1.5 bg-[#222235] hover:bg-[#2A2A3F] text-[#A09E9A] hover:text-[#D4AF37] rounded-lg transition-all border border-white/10 cursor-pointer shadow-sm"
-                    title="Admin Edit"
-                  >
-                    <Edit2 size={12} />
-                  </button>
-                ) : (
-                  <div className="flex gap-1.5">
-                    <button 
-                      onClick={handleSaveChanges}
-                      disabled={isSaving || isProcessingPhoto}
-                      className="px-2 py-1 bg-emerald-600/90 hover:bg-emerald-500 text-white rounded text-[8px] font-black uppercase tracking-wider transition-all disabled:opacity-50 cursor-pointer"
-                      title="Save Changes"
-                    >
-                      {isSaving ? '...' : 'Save'}
-                    </button>
-                    <button 
-                      onClick={() => {
-                        setIsEditing(false);
-                        setEditNickname(host.nickname || host.name || '');
-                        setEditPhotoUrl(host.photoUrl || '');
-                        setEditDescription(host.description || '');
-                      }}
-                      className="px-2 py-1 bg-[#222235] hover:bg-[#2A2A3F] text-[#A09E9A] hover:text-[#F0EFE8] rounded text-[8px] font-black uppercase tracking-wider transition-all cursor-pointer"
-                      title="Cancel"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                )}
-              </>
-            )}
+        {((!isReadOnly && isDirectorOrHeadAdmin) || (isOwnProfile && !isSpotlight)) && (
+          <div className="absolute top-4 right-4 z-10">
+            <button
+              onClick={() => setIsSelfEditing(true)}
+              className="p-1.5 bg-[#222235] hover:bg-[#2A2A3F] border border-white/10 text-[#A09E9A] hover:text-[#D4AF37] rounded-lg transition-all cursor-pointer shadow-sm"
+              title="Edit Profile"
+            >
+              <Edit2 size={12} />
+            </button>
           </div>
         )}
       </div>
@@ -1739,7 +1810,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
 
   const renderPerformanceHistory = () => {
     return (
-      <div className={cn("space-y-3 bg-[#1A1A28]/50 border-2 p-4 rounded-2xl transition-all duration-300", styles.borderColor, styles.shadow)}>
+      <div className={cn("space-y-3 bg-[#1A1A28]/50 border-2 p-4 rounded-2xl transition-all duration-300", styles.borderColor, styles.shadow, styles.topTrim)}>
         <div className="flex items-center justify-between px-1">
           <div className="flex items-center gap-2">
             <h4 className="text-[10px] font-black uppercase tracking-[0.15em] text-[#A09E9A] font-outfit">Earning Diversity</h4>
@@ -1828,7 +1899,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
     if (chartData.length === 0) return null;
 
     return (
-      <div className={cn("space-y-4 bg-[#1A1A28]/50 border-2 p-5 rounded-2xl transition-all duration-300", styles.borderColor, styles.shadow)}>
+      <div className={cn("space-y-4 bg-[#1A1A28]/50 border-2 p-5 rounded-2xl transition-all duration-300", styles.borderColor, styles.shadow, styles.topTrim)}>
         <div className="flex items-center justify-between px-1">
           <h4 className="text-[10px] font-black uppercase tracking-[0.15em] text-[#A09E9A] font-outfit">Earnings &amp; Duration Trend</h4>
           <div className="flex gap-3 text-[8px] font-bold">
@@ -1903,7 +1974,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
     const isStaffUser = ['manager', 'agent', 'admin', 'head admin', 'director'].includes(userRoleLower);
 
     return (
-      <div className={cn("space-y-3 flex-1 bg-[#1A1A28]/50 border-2 p-4 rounded-2xl transition-all duration-300", styles.borderColor, styles.shadow)}>
+      <div className={cn("space-y-3 flex-1 bg-[#1A1A28]/50 border-2 p-4 rounded-2xl transition-all duration-300", styles.borderColor, styles.shadow, styles.topTrim)}>
         <div className="flex items-center justify-between px-1">
           <h4 className="text-[10px] font-black uppercase tracking-[0.15em] text-[#A09E9A] font-outfit">RANDOM PK PERFORMANCE</h4>
           <div className="px-2.5 py-0.5 text-[8px] font-bold text-[#D4AF37] border border-[#D4AF37]/30 bg-[#D4AF37]/10 rounded-full uppercase tracking-wider">
@@ -1940,7 +2011,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
 
         {rpkMetadata && (
           <p className="text-[8px] text-[#A09E9A]/60 italic px-1">
-            Last updated: {formatDateStandard(rpkMetadata.lastUpdated)} by {rpkMetadata.updatedBy}
+            Last Update on {formatUpdateMetaDate(rpkMetadata.lastUpdated)} by {rpkMetadata.reporterRole} {rpkMetadata.reporterName} ({rpkMetadata.reporterId})
           </p>
         )}
       </div>
@@ -1951,7 +2022,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
     const currentAuth = Storage.getAuthState();
     const isOwnProfile = currentAuth.poppo_id === host.id;
     return (
-      <div className={cn("space-y-3 bg-[#1A1A28]/50 border-2 p-4 rounded-2xl flex-1 transition-all duration-300", styles.borderColor, styles.shadow)}>
+      <div className={cn("space-y-3 bg-[#1A1A28]/50 border-2 p-4 rounded-2xl flex-1 transition-all duration-300", styles.borderColor, styles.shadow, styles.topTrim)}>
         <div className="flex items-center justify-between px-1">
           <h4 className="text-[10px] font-black uppercase tracking-[0.15em] text-[#A09E9A] font-outfit">Event Exposure (Section 2)</h4>
           <div className="flex items-center gap-2">
@@ -1988,22 +2059,30 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
             <p className="text-xs text-[#A09E9A]/40 italic text-center py-6">No historical event participations found for this host.</p>
           )}
         </div>
+        {participatedEvents.length > 0 && (
+          <p className="text-[8px] text-[#A09E9A]/60 italic px-1 mt-2">
+            Last Update on {formatUpdateMetaDate(participatedEvents[0].timestamp || participatedEvents[0].eventDate || participatedEvents[0].date)} by {participatedEvents[0].created_by_role || 'Staff'} {participatedEvents[0].created_by_name || 'Unknown'} {participatedEvents[0].created_by_id ? `(${participatedEvents[0].created_by_id})` : ''}
+          </p>
+        )}
       </div>
     );
   };
 
   const renderFanbaseBlock = () => {
     const currentAuth = Storage.getAuthState();
-    const isOwnProfile = currentAuth.poppo_id === host.id;
-    const userRoleLower = String(currentAuth?.role || '').toLowerCase();
-    const isStaffUser = ['manager', 'agent', 'admin', 'head admin', 'director'].includes(userRoleLower);
+    const isOwnProfile = String(currentAuth?.poppo_id) === String(host.id);
+    const roleLower = String(currentAuth?.role || '').toLowerCase();
+    const isElevatedStaff = ['admin', 'head admin', 'head_admin', 'director'].includes(roleLower);
+    const isManagerAgent = ['manager', 'agent'].includes(roleLower);
+    const isAssignedManagerAgent = isManagerAgent && String(host.assignedManagerId) === String(currentAuth?.poppo_id);
+    const canSubmitFanbase = isOwnProfile || isAssignedManagerAgent || isElevatedStaff;
 
     return (
-      <div className={cn("space-y-3 bg-[#1A1A28]/50 border-2 p-4 rounded-2xl transition-all duration-300", styles.borderColor, styles.shadow)}>
+      <div className={cn("space-y-3 bg-[#1A1A28]/50 border-2 p-4 rounded-2xl transition-all duration-300", styles.borderColor, styles.shadow, styles.topTrim)}>
         <div className="flex items-center justify-between px-1">
           <h4 className="text-[10px] font-black uppercase tracking-[0.15em] text-[#A09E9A] font-outfit">Fanbase Health</h4>
           <div className="flex items-center gap-2">
-            {(isOwnProfile || isStaffUser) && (
+            {canSubmitFanbase && (
               <button 
                 onClick={() => setIsFanbaseFormOpen(true)}
                 className="px-2.5 py-1 bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 text-indigo-400 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer"
@@ -2037,6 +2116,11 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
             </div>
           ))}
         </div>
+        {fanbaseLatest?.timestamp && (
+          <p className="text-[8px] text-[#A09E9A]/60 italic px-1 mt-2">
+            Last Update on {formatUpdateMetaDate(fanbaseLatest.timestamp)} by {fanbaseLatest.reporter_role || 'Staff'} {fanbaseLatest.reporter_name || 'Unknown'} ({fanbaseLatest.reporter_id || 'Unknown'})
+          </p>
+        )}
       </div>
     );
   };
@@ -2052,7 +2136,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
       (userRoleLower === 'director');
 
     return (
-      <div className={cn("space-y-4 bg-[#1A1A28]/50 border-2 p-4 rounded-2xl transition-all duration-300", styles.borderColor, styles.shadow)}>
+      <div className={cn("space-y-4 bg-[#1A1A28]/50 border-2 p-4 rounded-2xl transition-all duration-300", styles.borderColor, styles.shadow, styles.topTrim)}>
         <div className="flex items-center justify-between px-1">
           <h4 className="text-[10px] font-black uppercase tracking-[0.15em] text-[#A09E9A] font-outfit">AI Performance Analysis</h4>
           <span className="text-[8px] font-bold text-[#D4AF37] border border-[#D4AF37]/20 bg-[#D4AF37]/5 px-2.5 py-0.5 rounded-full uppercase tracking-wider">Gemini AI</span>
@@ -2170,29 +2254,18 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
           <p className="text-[10px] text-[#A09E9A] mb-4">Submitting performance data for Host: <span className="text-[#D4AF37] font-bold">{host.nickname || host.name}</span></p>
 
           <form onSubmit={handleRpkSubmit} className="space-y-3">
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <label className="text-[9px] font-black uppercase tracking-wider text-[#A09E9A]">From Date (DD-MM-YYYY)</label>
-                <input 
-                  type="text" 
-                  required
-                  placeholder="DD-MM-YYYY"
-                  value={rpkFormData.from_date}
-                  onChange={(e) => setRpkFormData({...rpkFormData, from_date: e.target.value})}
-                  className="w-full bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-[9px] font-black uppercase tracking-wider text-[#A09E9A]">To Date (DD-MM-YYYY)</label>
-                <input 
-                  type="text" 
-                  required
-                  placeholder="DD-MM-YYYY"
-                  value={rpkFormData.to_date}
-                  onChange={(e) => setRpkFormData({...rpkFormData, to_date: e.target.value})}
-                  className="w-full bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
-                />
-              </div>
+            <div className="space-y-1">
+              <label className="text-[9px] font-black uppercase tracking-wider text-[#A09E9A]">Date Range</label>
+              <DateRangePicker 
+                required
+                startDate={rpkFormData.from_date}
+                endDate={rpkFormData.to_date}
+                onChange={(start, end) => setRpkFormData({...rpkFormData, from_date: start, to_date: end})}
+                dateFormat="dd-MM-yyyy"
+              />
+              <p className="text-[8.5px] text-[#D4AF37]/90 font-medium bg-[#D4AF37]/5 border border-[#D4AF37]/20 rounded-lg px-2.5 py-1.5 mt-1.5 leading-normal">
+                💡 <strong>Recommended:</strong> Date range should be weekly Monday to Sunday.
+              </p>
             </div>
 
             <div className="space-y-1">
@@ -2243,6 +2316,10 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
 
   const renderFanbaseModal = () => {
     if (!isFanbaseFormOpen) return null;
+
+    const currentAuth = Storage.getAuthState();
+    const roleLower = String(currentAuth?.role || '').toLowerCase();
+    const isElevatedStaff = ['admin', 'head admin', 'head_admin', 'director'].includes(roleLower);
     
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
@@ -2259,30 +2336,18 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
           <p className="text-[10px] text-[#A09E9A] mb-4">Submitting data for Host: <span className="text-indigo-400 font-bold">{host.nickname || host.name}</span></p>
 
           <form onSubmit={handleFanbaseSubmit} className="space-y-3">
-            <div className="grid grid-cols-2 gap-3">
+            {isElevatedStaff && (
               <div className="space-y-1">
-                <label className="text-[9px] font-black uppercase tracking-wider text-[#A09E9A]">From Date (DD-MM-YYYY)</label>
-                <input 
-                  type="text" 
+                <label className="text-[9px] font-black uppercase tracking-wider text-[#A09E9A]">Date Range</label>
+                <DateRangePicker 
                   required
-                  placeholder="DD-MM-YYYY"
-                  value={fanbaseFormData.from_date}
-                  onChange={(e) => setFanbaseFormData({...fanbaseFormData, from_date: e.target.value})}
-                  className="w-full bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-indigo-500"
+                  startDate={fanbaseFormData.from_date}
+                  endDate={fanbaseFormData.to_date}
+                  onChange={(start, end) => setFanbaseFormData({...fanbaseFormData, from_date: start, to_date: end})}
+                  dateFormat="dd-MM-yyyy"
                 />
               </div>
-              <div className="space-y-1">
-                <label className="text-[9px] font-black uppercase tracking-wider text-[#A09E9A]">To Date (DD-MM-YYYY)</label>
-                <input 
-                  type="text" 
-                  required
-                  placeholder="DD-MM-YYYY"
-                  value={fanbaseFormData.to_date}
-                  onChange={(e) => setFanbaseFormData({...fanbaseFormData, to_date: e.target.value})}
-                  className="w-full bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-indigo-500"
-                />
-              </div>
-            </div>
+            )}
 
             <div className="space-y-1">
               <label className="text-[9px] font-black uppercase tracking-wider text-[#A09E9A]">Total Followers</label>
@@ -2318,7 +2383,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
               </div>
             </div>
 
-            {isStaffUser && (
+            {isElevatedStaff && (
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <label className="text-[9px] font-black uppercase tracking-wider text-[#A09E9A]">GC Host Activity</label>
@@ -2392,31 +2457,30 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                 onChange={(e) => setEventFormData({...eventFormData, eventType: e.target.value})}
                 className="w-full bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-indigo-500"
               >
-                <option value="Solo Livehouse" className="bg-[#1A1A28]">Solo Livehouse</option>
-                <option value="Party Livehouse" className="bg-[#1A1A28]">Party Livehouse</option>
-                <option value="Official PK" className="bg-[#1A1A28]">Official PK</option>
-                <option value="Agency Event" className="bg-[#1A1A28]">Agency Event</option>
-                <option value="Other Event" className="bg-[#1A1A28]">Other Event</option>
+                <option value="SOLO LIVEHOUSE" className="bg-[#1A1A28]">SOLO LIVEHOUSE</option>
+                <option value="PARTY LIVEHOUSE" className="bg-[#1A1A28]">PARTY LIVEHOUSE</option>
+                <option value="OFFICIAL PK" className="bg-[#1A1A28]">OFFICIAL PK</option>
+                <option value="AGENCY EVENT" className="bg-[#1A1A28]">AGENCY EVENT</option>
+                <option value="POPPO EVENT" className="bg-[#1A1A28]">POPPO EVENT</option>
+                <option value="EXTERNAL EVENT" className="bg-[#1A1A28]">EXTERNAL EVENT</option>
               </select>
             </div>
 
             <div className="space-y-1">
               <label className="text-[9px] font-black uppercase tracking-wider text-[#A09E9A]">Event Date</label>
-              <input 
-                type="date" 
+              <SingleDatePicker 
                 required
                 value={eventFormData.eventDate}
-                onChange={(e) => setEventFormData({...eventFormData, eventDate: e.target.value})}
-                className="w-full bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-indigo-500"
+                onChange={(val) => setEventFormData({...eventFormData, eventDate: val})}
               />
             </div>
 
             <div className="space-y-1">
-              <label className="text-[9px] font-black uppercase tracking-wider text-[#A09E9A]">Timeslot (e.g. 20:00 - 22:00)</label>
+              <label className="text-[9px] font-black uppercase tracking-wider text-[#A09E9A]">Timeslot (e.g. 08:00 PM - 10:00 PM Manila Time)</label>
               <input 
                 type="text" 
                 required
-                placeholder="20:00 - 22:00"
+                placeholder="08:00 PM - 10:00 PM (Manila Time)"
                 value={eventFormData.timeslot}
                 onChange={(e) => setEventFormData({...eventFormData, timeslot: e.target.value})}
                 className="w-full bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-indigo-500"
@@ -2595,7 +2659,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
     const insights = generateCategorizedInsights();
 
     return (
-      <div className={cn("bg-[#1A1A28] border-2 rounded-2xl p-5 space-y-4 transition-all duration-300", styles.borderColor, styles.shadow)}>
+      <div className={cn("bg-[#1A1A28] border-2 rounded-2xl p-5 space-y-4 transition-all duration-300", styles.borderColor, styles.shadow, styles.topTrim)}>
         {/* Header with main badge */}
         <div className="flex items-center justify-between pb-3 border-b border-white/5">
           <div className="flex items-center gap-2">
@@ -2649,13 +2713,84 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
     );
   };
 
-  const renderConsistencyScore = () => null;
+  const renderPresenceRating = () => {
+    const attendedCount = attendedEvents.length;
+    const totalCount = totalAgencyEventsCount || 0;
+    const presenceRatio = totalCount > 0 ? (attendedCount / totalCount) : 0;
+    const presencePercentage = Math.round(presenceRatio * 100);
+
+    return (
+      <div className={cn("space-y-3 flex-1 bg-[#1A1A28]/50 border-2 p-4 rounded-2xl transition-all duration-300", styles.borderColor, styles.shadow, styles.topTrim)}>
+        <div className="flex items-center justify-between px-1">
+          <h4 className="text-[10px] font-black uppercase tracking-[0.15em] text-[#A09E9A] font-outfit">Agency Presence Rating</h4>
+          <span className="text-[8px] font-bold text-indigo-400 border border-indigo-500/20 bg-indigo-500/5 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+            Presence Score: {presencePercentage}%
+          </span>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2.5 bg-[#0D0D14]/40 border border-white/5 p-3 rounded-2xl">
+          {[
+            { label: 'Events Attended', value: `${attendedCount} / ${totalCount}`, subLabel: 'Total Agency' },
+            { label: 'Presence Score', value: `${presencePercentage}%`, subLabel: 'Consistency' },
+          ].map((cell, idx) => (
+            <div key={idx} className="bg-[#222235]/40 border border-white/5 p-3 rounded-xl flex flex-col justify-between min-h-[78px] hover:border-[#D4AF37]/20 transition-colors shadow-sm">
+              <span className="text-[8px] font-black text-[#A09E9A] uppercase tracking-widest leading-none">{cell.label}</span>
+              <span className="text-xs md:text-sm font-black text-[#F0EFE8] tracking-tight mt-2.5 block">
+                {cell.value}
+              </span>
+              <span className="text-[7px] font-bold text-[#A09E9A]/60 uppercase tracking-wider mt-1">{cell.subLabel}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* Progress Bar */}
+        <div className="px-1 space-y-1">
+          <div className="w-full bg-[#0D0D14]/60 rounded-full h-1.5 border border-white/5 overflow-hidden">
+            <div 
+              className="bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 h-1.5 rounded-full transition-all duration-500" 
+              style={{ width: `${Math.min(100, Math.max(0, presencePercentage))}%` }}
+            />
+          </div>
+        </div>
+
+        {/* Scrollable list of attended events */}
+        <div className="space-y-2 mt-2 max-h-48 overflow-y-auto custom-scrollbar">
+          {attendedEvents.length > 0 ? (
+            attendedEvents.map((e, idx) => {
+              const eventDate = formatDateStandard(e.eventDate || e.date);
+              return (
+                <div key={idx} className="bg-[#222235]/40 border border-white/5 p-3 rounded-xl hover:border-[#D4AF37]/20 transition-colors shadow-sm space-y-1">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-bold text-[#F0EFE8] leading-tight truncate">{e.eventTitle || e.eventType || 'Unnamed Event'}</p>
+                    <span className="text-[7px] font-black uppercase tracking-wider bg-[#1A1A28] border border-white/5 px-2 py-0.5 rounded text-indigo-400 shrink-0">
+                      Attended
+                    </span>
+                  </div>
+                  <p className="text-[8px] text-[#A09E9A] font-medium">{eventDate} • {e.timeslot || 'N/A'}</p>
+                  {e.eventFeedback && (
+                    <div className="bg-[#1A1A28]/80 border border-white/5 p-2 rounded-lg mt-1">
+                      <p className="text-[8px] text-[#A09E9A] leading-relaxed">
+                        <span className="font-bold text-[#F0EFE8]/70">Feedback: </span>
+                        {e.eventFeedback}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              );
+            })
+          ) : (
+            <p className="text-xs text-[#A09E9A]/40 italic text-center py-6">No attended agency events found for this host.</p>
+          )}
+        </div>
+      </div>
+    );
+  };
 
   const renderAwardsBlock = () => {
     if (awards.length === 0) return null;
     const ICON_MAP: Record<string, string> = { trophy: '🏆', star: '⭐', medal: '🥇', crown: '👑', badge: '🎖️' };
     return (
-      <div className={cn("bg-[#1A1A28] border-2 rounded-2xl p-4 space-y-3 transition-all duration-300", styles.borderColor, styles.shadow)}>
+      <div className={cn("bg-[#1A1A28] border-2 rounded-2xl p-4 space-y-3 transition-all duration-300", styles.borderColor, styles.shadow, styles.topTrim)}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Award size={12} className="text-[#D4AF37]/60" />
@@ -2681,7 +2816,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
   const renderWeeklyLiveStats = () => {
     if (weeklyLiveData.length === 0) return null;
     return (
-      <div className={cn("bg-[#1A1A28] border-2 rounded-2xl p-4 space-y-3 transition-all duration-300", styles.borderColor, styles.shadow)}>
+      <div className={cn("bg-[#1A1A28] border-2 rounded-2xl p-4 space-y-3 transition-all duration-300", styles.borderColor, styles.shadow, styles.topTrim)}>
         <div className="flex items-center justify-between">
           <p className="text-[9px] font-black text-[#A09E9A]/50 uppercase tracking-[0.2em]">Weekly Live Stats</p>
           <span className="text-[8px] font-bold text-emerald-400 border border-emerald-500/20 bg-emerald-500/5 px-2 py-0.5 rounded-full uppercase tracking-wider">{weeklyLiveData.length} weeks</span>
@@ -2722,7 +2857,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
       Feedback: 'text-emerald-400 border-emerald-500/20 bg-emerald-500/5',
     };
     return (
-      <div className={cn("bg-[#1A1A28] border-2 rounded-2xl p-4 space-y-3 transition-all duration-300", styles.borderColor, styles.shadow)}>
+      <div className={cn("bg-[#1A1A28] border-2 rounded-2xl p-4 space-y-3 transition-all duration-300", styles.borderColor, styles.shadow, styles.topTrim)}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <MessageSquare size={12} className="text-indigo-400/60" />
@@ -2811,9 +2946,10 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
               {renderMonthlyPointsTrend()}
               {renderPerformanceHistory()}
               {renderEarningsTrend()}
-              <div className="flex flex-col md:flex-row gap-6">
+              <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
                 {renderRandomPK()}
                 {renderEventExposure()}
+                {renderPresenceRating()}
               </div>
               {renderFanbaseBlock()}
               {renderAwardsBlock()}
@@ -2843,9 +2979,10 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                 {renderMonthlyPointsTrend()}
                 {renderEarningsTrend()}
                 {renderPerformanceHistory()}
-                <div className="flex flex-col md:flex-row gap-6">
+                <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
                   {renderRandomPK()}
                   {renderEventExposure()}
+                  {renderPresenceRating()}
                 </div>
                 {renderFanbaseBlock()}
                 {renderAwardsBlock()}

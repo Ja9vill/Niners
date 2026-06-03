@@ -69,7 +69,9 @@ async function deleteQueryBatch(db, query, resolve) {
     'top_niners_earnings_summary',
     'events_calendar_public',
     'reporting_submissions',
-    'activity_audit_logs'
+    'activity_audit_logs',
+    'attendance',
+    'fanbase_reports'
   ];
 
   for (const collection of collectionsToDelete) {

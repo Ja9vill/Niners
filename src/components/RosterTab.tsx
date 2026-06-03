@@ -4,9 +4,43 @@ import { FirebaseService } from '../lib/firebaseService';
 import { cn } from '../lib/utils';
 import { Host, EventsCalendarPublic, AgencyAward } from '../types';
 
-interface RosterTabProps {
-  isReadOnly?: boolean;
-}
+const getTierBlockStyles = (tierInput: string) => {
+  const norm = String(tierInput || '').toLowerCase();
+  if (norm.includes('star')) {
+    return {
+      border: 'border-[#D4AF37]/20 hover:border-[#D4AF37]/50',
+      bg: 'bg-gradient-to-br from-[#D4AF37]/8 via-transparent to-transparent'
+    };
+  }
+  if (norm.includes('s idol') || norm.includes('idol')) {
+    return {
+      border: 'border-[#ec4899]/20 hover:border-[#ec4899]/50',
+      bg: 'bg-gradient-to-br from-[#ec4899]/8 via-transparent to-transparent'
+    };
+  }
+  if (norm.includes('rocket')) {
+    return {
+      border: 'border-[#3b82f6]/20 hover:border-[#3b82f6]/50',
+      bg: 'bg-gradient-to-br from-[#3b82f6]/8 via-transparent to-transparent'
+    };
+  }
+  if (norm.includes('esports') || norm.includes('esport')) {
+    return {
+      border: 'border-[#a855f7]/20 hover:border-[#a855f7]/50',
+      bg: 'bg-gradient-to-br from-[#a855f7]/8 via-transparent to-transparent'
+    };
+  }
+  if (norm.includes('regular')) {
+    return {
+      border: 'border-[#10b981]/20 hover:border-[#10b981]/50',
+      bg: 'bg-gradient-to-br from-[#10b981]/8 via-transparent to-transparent'
+    };
+  }
+  return {
+    border: 'border-white/5 hover:border-indigo-500/30',
+    bg: 'bg-[#1A1A28]'
+  };
+};
 
 export const RosterTab: React.FC<RosterTabProps> = ({ isReadOnly = false }) => {
   const [hosts, setHosts] = useState<Host[]>([]);
@@ -181,13 +215,20 @@ export const RosterTab: React.FC<RosterTabProps> = ({ isReadOnly = false }) => {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {filteredHosts.map(host => (
-            <div
-              key={host.id}
-              onClick={() => openSpotlight(host)}
-              className="bg-[#1A1A28] border border-white/5 rounded-2xl p-4 flex items-center gap-4 cursor-pointer hover:bg-white/[0.02] hover:border-indigo-500/30 transition-all hover:scale-[1.01] shadow-lg shadow-black/20"
-            >
-              <div className="relative w-16 h-16 rounded-full overflow-hidden bg-black/40 border border-white/10 flex-shrink-0">
+          {filteredHosts.map(host => {
+            const tier = String(host.tier_pay || host.base_salary_category || host.baseSalary || 'N/A');
+            const blockStyles = getTierBlockStyles(tier);
+            return (
+              <div
+                key={host.id}
+                onClick={() => openSpotlight(host)}
+                className={cn(
+                  "border rounded-2xl p-4 flex items-center gap-4 cursor-pointer hover:bg-white/[0.02] transition-all hover:scale-[1.01] shadow-lg shadow-black/20",
+                  blockStyles.border,
+                  blockStyles.bg
+                )}
+              >
+              <div className="relative w-16 h-16 rounded-2xl overflow-hidden bg-black/40 border border-white/10 flex-shrink-0">
                 {host.photoUrl ? (
                   <img src={host.photoUrl} alt="" className="w-full h-full object-cover" />
                 ) : (
@@ -234,8 +275,9 @@ export const RosterTab: React.FC<RosterTabProps> = ({ isReadOnly = false }) => {
                   )}
                 </div>
               </div>
-            </div>
-          ))}
+              </div>
+            );
+          })}
         </div>
       )}
 

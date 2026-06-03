@@ -90,12 +90,22 @@ const hostsToCreate = [
 
       // Auth write
       const userRef = db.collection('users').doc(u.poppoId);
+      const nowStr = new Date().toISOString();
       await userRef.set({
+        poppoId: u.poppoId,
         poppo_id: u.poppoId,
         nickname: u.name.trim(),
         role: roleLower,
+        level: 1,
+        status: "active",
+        is_first_login: false,
         is_temp_password: true,
-        password: hashedPassword
+        createdAt: nowStr,
+        updatedAt: nowStr,
+        assignedManagerId: null,
+        assignedHosts: null,
+        password: hashedPassword,
+        password_hash: hashedPassword
       });
 
       // Role collection determination
@@ -115,28 +125,7 @@ const hostsToCreate = [
       
       await roleRef.set(roleData);
 
-      // Create performance_report top-level document
-      const performanceRef = db.collection('performance_reports').doc(`${u.poppoId}_1`);
-      await performanceRef.set({
-        poppo_id: u.poppoId,
-        nickname: u.name.trim(),
-        from_date: "",
-        to_date: "",
-        live_duration: "",
-        party_host_duration: "",
-        total_earnings_of_points: "",
-        agent_commission: "",
-        live_earnings: "",
-        party_earnings: "",
-        private_chat: "",
-        tips: "",
-        platform_reward: "",
-        other_earnings: "",
-        platform_hourly_salary: "",
-        super_salary: "",
-        super_rank: "",
-        level: ""
-      });
+
 
       console.log(`✅ Seeded Host: ${u.name.trim()}`);
     }

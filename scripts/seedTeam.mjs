@@ -48,14 +48,39 @@ const usersToCreate = [
       const hashedPassword = await bcrypt.hash(rawPassword, 10);
       const roleLower = u.role.toLowerCase();
 
+      let level = 1;
+      let assignedHosts = null;
+      let assignedManagerId = null;
+
+      if (roleLower === 'director') {
+        level = 5;
+      } else if (roleLower === 'head admin') {
+        level = 4;
+      } else if (roleLower === 'admin') {
+        level = 3;
+      } else if (roleLower === 'manager' || roleLower === 'agent') {
+        level = 2;
+        assignedHosts = [];
+      }
+
       // Auth write
       const userRef = db.collection('users').doc(u.poppoId);
+      const nowStr = new Date().toISOString();
       await userRef.set({
+        poppoId: u.poppoId,
         poppo_id: u.poppoId,
         nickname: u.name,
         role: roleLower,
+        level: level,
+        status: "active",
+        is_first_login: false,
         is_temp_password: true,
-        password: hashedPassword
+        createdAt: nowStr,
+        updatedAt: nowStr,
+        assignedManagerId: assignedManagerId,
+        assignedHosts: assignedHosts,
+        password: hashedPassword,
+        password_hash: hashedPassword
       });
 
       // Role collection determination
@@ -77,28 +102,7 @@ const usersToCreate = [
       
       await roleRef.set(roleData);
 
-      // Create performance_report top-level document
-      const performanceRef = db.collection('performance_reports').doc(`${u.poppoId}_1`);
-      await performanceRef.set({
-        poppo_id: u.poppoId,
-        nickname: u.name,
-        from_date: "",
-        to_date: "",
-        live_duration: "",
-        party_host_duration: "",
-        total_earnings_of_points: "",
-        agent_commission: "",
-        live_earnings: "",
-        party_earnings: "",
-        private_chat: "",
-        tips: "",
-        platform_reward: "",
-        other_earnings: "",
-        platform_hourly_salary: "",
-        super_salary: "",
-        super_rank: "",
-        level: ""
-      });
+
 
       console.log(`✅ Seeded user: ${u.name} (Role: ${u.role}, Collection: ${collectionName})`);
     }

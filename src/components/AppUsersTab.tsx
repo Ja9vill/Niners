@@ -1,6 +1,6 @@
 /* eslint-disable */
 import React, { useState, useEffect, useRef } from 'react';
-import { subscribeToHosts, patchHost, HostRosterUser, UserRole } from '../lib/firebaseService';
+import { subscribeToHosts, patchHost, deleteUser, FirebaseService, HostRosterUser, UserRole } from '../lib/firebaseService';
 import { Storage } from '../lib/storage';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -99,6 +99,7 @@ export const AppUsersTab: React.FC<AppUsersTabProps> = ({ currentUserRole }) => 
     if (newNickname === user.nickname) return;
     try {
       await patchHost(user.poppo_id, { nickname: newNickname });
+      await FirebaseService.logSystemActivity(`Admin changed user nickname for Poppo ID: ${user.poppo_id} from "${user.nickname}" to "${newNickname}"`, 'Warning');
       showToast('success', `Saved changes for Poppo ID: ${user.poppo_id}`);
     } catch {
       showToast('error', `Failed to update nickname for Poppo ID: ${user.poppo_id}`);
@@ -108,7 +109,10 @@ export const AppUsersTab: React.FC<AppUsersTabProps> = ({ currentUserRole }) => 
   // ── Role change handler ───────────────────────────────────────────────────
   const handleRoleChange = async (poppoId: string, newRole: UserRole) => {
     try {
+      const userObj = users.find(u => u.poppo_id === poppoId);
+      const oldRole = userObj ? userObj.role : 'Unknown';
       await patchHost(poppoId, { role: newRole });
+      await FirebaseService.logSystemActivity(`Admin changed user role for Poppo ID: ${poppoId} from "${oldRole}" to "${newRole}"`, 'Warning');
       showToast('success', `Saved changes for Poppo ID: ${poppoId}`);
     } catch {
       showToast('error', `Failed to update role for Poppo ID: ${poppoId}`);
@@ -119,6 +123,7 @@ export const AppUsersTab: React.FC<AppUsersTabProps> = ({ currentUserRole }) => 
   const handleToggleActive = async (user: HostRosterUser) => {
     try {
       await patchHost(user.poppo_id, { isActive: !user.isActive });
+      await FirebaseService.logSystemActivity(`Admin toggled user active status for Poppo ID: ${user.poppo_id} to ${!user.isActive ? 'Active' : 'Inactive'}`, 'Warning');
       showToast('success', `Saved changes for Poppo ID: ${user.poppo_id}`);
     } catch {
       showToast('error', `Failed to toggle status for Poppo ID: ${user.poppo_id}`);
@@ -147,10 +152,25 @@ export const AppUsersTab: React.FC<AppUsersTabProps> = ({ currentUserRole }) => 
       if (!res.ok) throw new Error(data?.error || 'Reset failed');
       // Clear field on success
       setPwStates(prev => ({ ...prev, [poppoId]: { value: '', loading: false } }));
+      await FirebaseService.logSystemActivity(`Admin generated new temporary password for user Poppo ID: ${poppoId}`, 'Warning');
       showToast('success', `Password reset for Poppo ID: ${poppoId}`);
     } catch (err: any) {
       setPwStates(prev => ({ ...prev, [poppoId]: { ...prev[poppoId], loading: false } }));
       showToast('error', `${err?.message || 'Password reset failed'} (Poppo ID: ${poppoId})`);
+    }
+  };
+
+  // ── Delete User handler ───────────────────────────────────────────────────
+  const handleDeleteUser = async (user: HostRosterUser) => {
+    const confirmDelete = window.confirm(`Are you sure you want to permanently delete user "${user.nickname || 'Unknown'}" (Poppo ID: ${user.poppo_id})? This will delete all user documents across collections.`);
+    if (!confirmDelete) return;
+
+    try {
+      await deleteUser(user.poppo_id, user.role);
+      await FirebaseService.logSystemActivity(`Admin deleted user account "${user.nickname || 'Unknown'}" (Poppo ID: ${user.poppo_id}) with role: "${user.role}"`, 'Warning');
+      showToast('success', `Successfully deleted user: ${user.poppo_id}`);
+    } catch (err: any) {
+      showToast('error', `Failed to delete user: ${err.message || 'Error'}`);
     }
   };
 
@@ -204,28 +224,29 @@ export const AppUsersTab: React.FC<AppUsersTabProps> = ({ currentUserRole }) => 
       </div>
 
       {/* ── Table ────────────────────────────────────────────────────────── */}
-      <div className="overflow-x-auto rounded-2xl border border-white/5 shadow-lg bg-[#13131E]">
+      <div className="overflow-x-auto rounded-2xl border border-[#D4AF37]/10 shadow-lg bg-[#13131E]">
         <table className="w-full text-left border-collapse">
           <thead>
-            <tr className="bg-[#1A1A28] border-b border-white/5 text-[9px] font-black text-[#A09E9A] uppercase tracking-[0.2em]">
+            <tr className="bg-[#1A1A28] border-b border-[#D4AF37]/10 text-[9px] font-black text-[#A09E9A] uppercase tracking-[0.2em]">
               <th className="px-4 py-3 w-32">Poppo ID</th>
               <th className="px-4 py-3">Nickname</th>
               <th className="px-4 py-3 w-44">System App Role</th>
               <th className="px-4 py-3 w-56">Password Assignment</th>
               <th className="px-4 py-3 w-36 text-center">Login Access</th>
+              <th className="px-4 py-3 w-28 text-center">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-white/5">
+          <tbody className="divide-y divide-[#D4AF37]/10 font-sans">
             {!isConnected && (
               <tr>
-                <td colSpan={5} className="px-4 py-12 text-center text-slate-400 text-sm">
+                <td colSpan={6} className="px-4 py-12 text-center text-slate-400 text-sm">
                   Connecting to Firebase…
                 </td>
               </tr>
             )}
             {isConnected && users.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-4 py-12 text-center text-slate-400 text-sm">
+                <td colSpan={6} className="px-4 py-12 text-center text-slate-400 text-sm">
                   No users found in the hosts collection.
                 </td>
               </tr>
@@ -234,7 +255,7 @@ export const AppUsersTab: React.FC<AppUsersTabProps> = ({ currentUserRole }) => 
               const pw = pwStates[user.poppo_id] ?? { value: '', loading: false };
 
               return (
-                <tr key={user.poppo_id} className="group hover:bg-white/[0.02] transition-colors border-b border-white/5">
+                <tr key={user.poppo_id} className="group hover:bg-white/[0.02] transition-colors border-b border-[#D4AF37]/10">
 
                   {/* ── Poppo ID (read-only, selectable) ───────────────── */}
                   <td className="px-4 py-2.5">
@@ -258,7 +279,7 @@ export const AppUsersTab: React.FC<AppUsersTabProps> = ({ currentUserRole }) => 
                       defaultValue={user.nickname}
                       key={user.nickname} // re-mount when live data changes to reset field
                       onBlur={e => handleNicknameBlur(user, e.target.value.trim())}
-                      className="w-full bg-transparent border border-transparent rounded-lg px-2 py-1 text-sm font-medium text-[#F0EFE8] placeholder-[#5A5865] focus:bg-[#2A2A40] focus:border-white/10 outline-none transition-all"
+                      className="w-full bg-transparent border border-transparent rounded-lg px-2 py-1 text-sm font-medium text-[#F0EFE8] placeholder-[#5A5865] focus:bg-[#2A2A40] focus:border-[#D4AF37]/35 outline-none transition-all"
                       placeholder="—"
                     />
                   </td>
@@ -269,13 +290,16 @@ export const AppUsersTab: React.FC<AppUsersTabProps> = ({ currentUserRole }) => 
                       <select
                         value={user.role}
                         onChange={e => handleRoleChange(user.poppo_id, e.target.value as UserRole)}
-                        className="w-full appearance-none bg-[#1A1A28] border border-white/10 text-[#F0EFE8] rounded-lg pl-2.5 pr-7 py-1.5 text-xs font-bold cursor-pointer outline-none focus:ring-1 focus:ring-[#D4AF37]/40 focus:border-[#D4AF37] transition-all"
+                        className="w-full appearance-none bg-[#1A1A28] border border-[#D4AF37]/15 text-[#F0EFE8] rounded-lg pl-2.5 pr-7 py-1.5 text-xs font-bold cursor-pointer outline-none focus:ring-1 focus:ring-[#D4AF37]/40 focus:border-[#D4AF37] transition-all"
                       >
-                        {ALLOWED_ROLES.map(r => (
-                          <option key={r} value={r} className="bg-[#1A1A28] text-[#F0EFE8]">
-                            {r.charAt(0).toUpperCase() + r.slice(1)}
-                          </option>
-                        ))}
+                        {ALLOWED_ROLES
+                          .filter(r => r !== 'director' || user.role === 'director')
+                          .map(r => (
+                            <option key={r} value={r} className="bg-[#1A1A28] text-[#F0EFE8]">
+                              {r.charAt(0).toUpperCase() + r.slice(1)}
+                            </option>
+                          ))
+                        }
                       </select>
                       {/* Role badge preview */}
                       <div className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2">
@@ -305,7 +329,7 @@ export const AppUsersTab: React.FC<AppUsersTabProps> = ({ currentUserRole }) => 
                         }))}
                         placeholder="••••••••"
                         autoComplete="new-password"
-                        className="flex-1 min-w-0 bg-[#0D0D14] border border-white/10 rounded-lg px-2.5 py-1.5 text-xs font-medium text-[#F0EFE8] placeholder-[#5A5865] focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37]/30 outline-none transition-all"
+                        className="flex-1 min-w-0 bg-[#0D0D14] border border-[#D4AF37]/15 rounded-lg px-2.5 py-1.5 text-xs font-medium text-[#F0EFE8] placeholder-[#5A5865] focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37]/30 outline-none transition-all"
                         onKeyDown={e => e.key === 'Enter' && handlePasswordSet(user.poppo_id)}
                       />
                       <button
@@ -343,7 +367,7 @@ export const AppUsersTab: React.FC<AppUsersTabProps> = ({ currentUserRole }) => 
                           'relative inline-flex h-6 w-11 rounded-full border-2 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-offset-1',
                           user.isActive
                             ? 'bg-emerald-500 border-emerald-500 focus:ring-emerald-300'
-                            : 'bg-[#1A1A28] border-white/10 focus:ring-[#5a5865]',
+                            : 'bg-[#1A1A28] border-[#D4AF37]/15 focus:ring-[#5a5865]',
                         ].join(' ')}
                         aria-pressed={user.isActive}
                         aria-label={`Toggle login access for ${user.poppo_id}`}
@@ -362,6 +386,17 @@ export const AppUsersTab: React.FC<AppUsersTabProps> = ({ currentUserRole }) => 
                         {user.isActive ? 'Active' : 'Inactive'}
                       </span>
                     </div>
+                  </td>
+
+                  {/* ── Actions (Delete User) ───────────────────────────── */}
+                  <td className="px-4 py-2.5 text-center">
+                    <button
+                      onClick={() => handleDeleteUser(user)}
+                      className="px-2.5 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500 hover:text-white transition-all cursor-pointer active:scale-95"
+                      title={`Delete user account ${user.poppo_id}`}
+                    >
+                      Delete
+                    </button>
                   </td>
 
                 </tr>

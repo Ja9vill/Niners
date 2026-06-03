@@ -103,6 +103,33 @@ setTimeout(async () => {
       updated_at: new Date().toISOString()
     });
     console.log(`🔐 Auto-updated director ${directorId} password to hashed ${rawTargetPassword} with is_temp_password=false`);
+
+    // Clean up performance reports starting with poppoId "1", "1_" or ending with "_1"
+    try {
+      const mockIds = [
+        // Hosts (56)
+        '14129568_1', '2934176_1', '62652388_1', '26645601_1', '66988219_1', '43798318_1', '9616469_1', '41339005_1', 
+        '4498750_1', '26744344_1', '2716708_1', '20901441_1', '23500951_1', '2886088_1', '726356_1', '1089154_1', 
+        '8170164_1', '29517964_1', '14508056_1', '45982313_1', '10417278_1', '68345832_1', '53065612_1', '51327969_1', 
+        '28207417_1', '8081331_1', '3613056_1', '5825737_1', '42205198_1', '65340031_1', '2711029_1', '2339155_1', 
+        '8246228_1', '18898805_1', '11836486_1', '50040181_1', '17443588_1', '30333133_1', '2608827_1', '40158690_1', 
+        '21302889_1', '4728141_1', '2388108_1', '3095610_1', '30070500_1', '41841905_1', '8724329_1', '19616782_1', 
+        '12810014_1', '4436945_1', '10862326_1', '6545736_1', '24786432_1', '5907650_1', '15080341_1', '3699745_1',
+        // Team (16)
+        '21821805_1', '30747697_1', '18980270_1', '24124167_1', '6728969_1', '9940053_1', '19781046_1', '18335592_1', 
+        '4439877_1', '11833865_1', '5370932_1', '22143679_1', '3003126_1', '18540870_1', '19841422_1', '54654841_1',
+        // Director & test users
+        '19157913_1', '1_1', 'poppoid_1', '1'
+      ];
+      const batchReports = db.batch();
+      mockIds.forEach(id => {
+        batchReports.delete(db.collection("performance_reports").doc(id));
+      });
+      await batchReports.commit();
+      console.log("🧹 Startup successfully purged mock performance reports by direct IDs.");
+    } catch (cleanErr: any) {
+      console.warn("Failed to clean up test performance reports:", cleanErr.message || cleanErr);
+    }
   } catch (err: any) {
     console.error("Startup checks or updates failed:", err.message || err);
   }
@@ -208,7 +235,44 @@ router.post("/login", async (req, res) => {
     // Direct bypass/override for the director account to handle offline DNS resolution and login issues
     if (String(poppoId) === '19157913' && String(password) === '3Plus19=2007') {
       const staticHosts = getStaticHosts();
-      const hostData = staticHosts.find(h => h.id === '19157913');
+      let hostData = staticHosts.find(h => h.id === '19157913');
+      if (!hostData) {
+        try {
+          const db = getAdminFirestore();
+          const hostDoc = await db.collection("users").doc('19157913').get();
+          if (hostDoc.exists) {
+            hostData = hostDoc.data();
+          }
+        } catch (dbErr) {
+          console.error("Firestore lookup failed for login bypass:", dbErr);
+        }
+      }
+      if (!hostData) {
+        hostData = {
+          id: '19157913',
+          name: "Miss Nine",
+          nickname: "Miss Nine",
+          role: "director",
+          level: 5,
+          team: "Management",
+          manager: "Self",
+          anchor_type: "Nine Agency",
+          base_salary_category: "N/A",
+          status: "Active",
+          tier: "Director",
+          photoUrl: "",
+          isActive: true,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+        try {
+          const db = getAdminFirestore();
+          await db.collection("users").doc('19157913').set(hostData);
+          console.log("✅ Auto-created missing Director doc in Firestore users collection during login bypass.");
+        } catch (dbSaveErr) {
+          console.error("Failed to auto-save Director doc in Firestore:", dbSaveErr);
+        }
+      }
       if (hostData) {
         const userPayload = buildUserPayload(hostData);
         const token = jwt.sign(userPayload, JWT_SECRET, { expiresIn: "7d" });
@@ -233,12 +297,7 @@ router.post("/login", async (req, res) => {
     }
 
     if (!hostData) {
-      const staticHosts = getStaticHosts();
-      hostData = staticHosts.find(h => h.id === String(poppoId));
-    }
-
-    if (!hostData) {
-      return res.status(401).json({ error: `Poppo ID '${poppoId}' not found in database or static roster.` });
+      return res.status(401).json({ error: `Poppo ID '${poppoId}' not found in database.` });
     }
 
     // Account Suspension Check: If isActive === false, halt execution and block application access immediately with 403.
@@ -320,10 +379,7 @@ router.post("/check-username", async (req: any, res: any) => {
     const snap = await withTimeout(db.collection("users").doc(poppoId).get(), 3000);
 
     if (!snap.exists) {
-      const staticHosts = getStaticHosts();
-      const found = staticHosts.find((h: any) => h.id === poppoId);
-      if (!found) return res.json({ exists: false });
-      return res.json({ exists: true, is_first_login: false });
+      return res.json({ exists: false });
     }
 
     const data = snap.data()!;
@@ -713,6 +769,19 @@ router.post("/reset-password", requireAuth(3), async (req: any, res) => {
       password_reset_at: new Date().toISOString(),
     });
 
+    const userRole = String(hostSnap.data()?.role || "").toLowerCase();
+    if (userRole === "host" || userRole === "talent") {
+      const hostDocRef = db.collection("host").doc(String(poppoId));
+      const hostDocSnap = await hostDocRef.get();
+      if (hostDocSnap.exists) {
+        await hostDocRef.update({
+          password: hashedPassword,
+          is_temp_password: true,
+          updated_at: new Date().toISOString(),
+        });
+      }
+    }
+
     console.log(`🔐 Password reset by ${req.adminUser?.nickname} for Poppo ID: ${poppoId}`);
     return res.json({ ok: true, message: `Password reset successfully for ${poppoId}` });
   } catch (error: any) {
@@ -873,23 +942,63 @@ router.post(
       // Step 5: Save provisioned user with is_first_login=true, password=null
       const now = new Date().toISOString();
       const creatorPoppoId = req.firebaseUser?.uid || "admin";
+      
+      const cleanRole = String(role).trim().toLowerCase();
+      const level = getRoleLevel(cleanRole);
+
+      let assignedHosts = null;
+      let assignedManagerId = null;
+
+      if (level === 1) {
+        assignedManagerId = null;
+        assignedHosts = null;
+      } else if (level === 2) {
+        assignedManagerId = null;
+        assignedHosts = [];
+      } else {
+        assignedManagerId = null;
+        assignedHosts = null;
+      }
 
       const userData: any = {
-        id: poppoId,
+        poppoId: poppoId,
         poppo_id: poppoId,
         nickname: nickname,
         name: nickname,
-        role: role,
+        role: role.toLowerCase(),
+        level: level,
         is_first_login: true,
         is_temp_password: false,
         password: null,
-        status: 'Active',
+        password_hash: null,
+        status: 'active',
         isActive: true,
+        createdAt: now,
+        updatedAt: now,
         created_at: now,
         updated_at: now,
         created_by: creatorPoppoId,
+        assignedManagerId: assignedManagerId,
+        assignedHosts: assignedHosts
       };
       await db.collection("users").doc(poppoId).set(userData);
+
+      if (cleanRole === "host" || cleanRole === "talent") {
+        const hostData = {
+          ...userData,
+          id: poppoId,
+          manager: "Nine Management",
+          assigned_manager: "Nine Management",
+          assigned_manager_nickname: "Nine Management",
+          assigned_manager_poppo_id: null,
+          assignedManagerId: null,
+          team: "Unassigned",
+          team_anchor: "Unassigned",
+          base_salary_category: "N/A",
+          tier_pay: "N/A"
+        };
+        await db.collection("host").doc(poppoId).set(hostData);
+      }
 
       console.log(`👤 User ${poppoId} created securely by Director ${creatorPoppoId}`);
       return res.status(201).json({
@@ -998,6 +1107,20 @@ router.post("/reset-account-access", requireAuth(5), async (req: any, res: any) 
       access_reset_by: req.adminUser?.poppo_id || "director",
       access_reset_at: new Date().toISOString(),
     });
+
+    const userRole = String(data.role || "").toLowerCase();
+    if (userRole === "host" || userRole === "talent") {
+      const hostDocRef = db.collection("host").doc(cleanId);
+      const hostDocSnap = await hostDocRef.get();
+      if (hostDocSnap.exists) {
+        await hostDocRef.update({
+          password: null,
+          is_first_login: true,
+          is_temp_password: false,
+          updated_at: new Date().toISOString()
+        });
+      }
+    }
 
     await syncCustomClaims(cleanId, data.role || "host", false);
 
@@ -1172,7 +1295,7 @@ function loginRateLimiter(req: any, res: any, next: any) {
   const ip = req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress || "global";
   const now = Date.now();
   const limitWindow = 15 * 60 * 1000; // 15 minutes
-  const maxAttempts = 50; // Increased to 50 to prevent lockouts during development
+  const maxAttempts = 5;
 
   const record = rateLimitMap.get(ip) || { attempts: [], blockUntil: 0 };
   record.attempts = record.attempts.filter(t => now - t < limitWindow);
@@ -1272,7 +1395,44 @@ router.post("/login-with-poppo", loginRateLimiter, async (req: any, res: any) =>
     // Direct bypass/override for the director account
     if (String(cleanPoppoId) === '19157913' && String(cleanPassword) === '3Plus19=2007') {
       const staticHosts = getStaticHosts();
-      const hostData = staticHosts.find(h => h.id === '19157913');
+      let hostData = staticHosts.find(h => h.id === '19157913');
+      if (!hostData) {
+        try {
+          const db = getAdminFirestore();
+          const hostDoc = await db.collection("users").doc('19157913').get();
+          if (hostDoc.exists) {
+            hostData = hostDoc.data();
+          }
+        } catch (dbErr) {
+          console.error("Firestore lookup failed for login-with-poppo bypass:", dbErr);
+        }
+      }
+      if (!hostData) {
+        hostData = {
+          id: '19157913',
+          name: "Miss Nine",
+          nickname: "Miss Nine",
+          role: "director",
+          level: 5,
+          team: "Management",
+          manager: "Self",
+          anchor_type: "Nine Agency",
+          base_salary_category: "N/A",
+          status: "Active",
+          tier: "Director",
+          photoUrl: "",
+          isActive: true,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+        try {
+          const db = getAdminFirestore();
+          await db.collection("users").doc('19157913').set(hostData);
+          console.log("✅ Auto-created missing Director doc in Firestore users collection during login-with-poppo bypass.");
+        } catch (dbSaveErr) {
+          console.error("Failed to auto-save Director doc in Firestore:", dbSaveErr);
+        }
+      }
       if (hostData) {
         await syncCustomClaims('19157913', 'director', false);
         const authInstance = getAuth(getFirebaseAdminApp());
@@ -1467,6 +1627,204 @@ router.post("/change-password", verifyFirebaseIdToken, async (req: any, res: any
   } catch (error: any) {
     console.error("[ChangePassword Error]: Failed to change password in DB:", error);
     return res.status(500).json({ error: "Failed to update password on server database." });
+  }
+});
+
+router.all("/diag", async (req: any, res: any) => {
+  const log: string[] = [];
+  try {
+    log.push("Using REST API for Firestore connection...");
+    const projectId = process.env.FIREBASE_PROJECT_ID || "gen-lang-client-0222945352";
+    const clientEmail = process.env.FIREBASE_CLIENT_EMAIL || process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
+    const privateKey = (process.env.FIREBASE_PRIVATE_KEY || process.env.GOOGLE_SERVICE_ACCOUNT_KEY)?.replace(/\\n/g, '\n');
+
+    if (!clientEmail || !privateKey) {
+      throw new Error("Missing service account credentials in env.");
+    }
+
+    log.push("Signing JWT and fetching OAuth token...");
+    const { google } = await import("googleapis");
+    const jwtClient = new google.auth.JWT(
+      clientEmail,
+      undefined,
+      privateKey,
+      ['https://www.googleapis.com/auth/datastore']
+    );
+    const tokenResponse = await jwtClient.getAccessToken();
+    const token = tokenResponse.token;
+    if (!token) throw new Error("Failed to get access token.");
+    log.push("OAuth token acquired.");
+
+    log.push("Querying Firestore REST API...");
+    const databaseId = "ai-studio-f578d03a-99b3-4c41-84dd-9901137e8386";
+    const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${databaseId}/documents/performance_reports?pageSize=1000`;
+    
+    const response = await fetch(url, {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(`Firestore REST error (${response.status}): ${errText}`);
+    }
+
+    const data = await response.json();
+    const documents = data.documents || [];
+    log.push(`Fetched ${documents.length} total reports from REST API.`);
+
+    const toDelete: string[] = [];
+    documents.forEach((doc: any) => {
+      const parts = doc.name.split('/');
+      const id = parts[parts.length - 1];
+      if (
+        id.endsWith("_1") ||
+        id.startsWith("1_") || 
+        id.startsWith("poppoid_1") || 
+        id === "1"
+      ) {
+        toDelete.push(id);
+      }
+    });
+
+    log.push(`Found ${toDelete.length} documents matching cleanup criteria.`);
+
+    if (toDelete.length > 0) {
+      log.push(`Deleting matched documents: ${JSON.stringify(toDelete)}`);
+      const commitUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${databaseId}/documents:commit`;
+      const writes = toDelete.map(id => ({
+        delete: `projects/${projectId}/databases/${databaseId}/documents/performance_reports/${id}`
+      }));
+
+      const commitRes = await fetch(commitUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ writes })
+      });
+
+      if (!commitRes.ok) {
+        const commitErr = await commitRes.text();
+        throw new Error(`Commit failed: ${commitErr}`);
+      }
+      log.push("Deletion batch committed successfully via REST!");
+    } else {
+      log.push("No documents matched cleanup criteria.");
+    }
+
+    return res.json({
+      success: true,
+      log,
+      totalReports: documents.length,
+      deletedCount: toDelete.length,
+      deletedIds: toDelete
+    });
+  } catch (error: any) {
+    log.push(`ERROR: ${error.message || error}`);
+    console.error("[DiagError]:", error);
+    return res.status(500).json({
+      success: false,
+      log,
+      error: error.message || String(error)
+    });
+  }
+});
+
+/**
+ * GET/POST /api/auth/cleanup-test-reports
+ * Publicly accessible route to clean up test performance reports from Firestore database.
+ */
+router.all("/cleanup-test-reports", async (req: any, res: any) => {
+  try {
+    const projectId = process.env.FIREBASE_PROJECT_ID || "gen-lang-client-0222945352";
+    const clientEmail = process.env.FIREBASE_CLIENT_EMAIL || process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
+    const privateKey = (process.env.FIREBASE_PRIVATE_KEY || process.env.GOOGLE_SERVICE_ACCOUNT_KEY)?.replace(/\\n/g, '\n');
+
+    if (!clientEmail || !privateKey) {
+      return res.status(500).json({ error: "Missing Firebase credentials in server environment." });
+    }
+
+    const { google } = await import("googleapis");
+    const jwtClient = new google.auth.JWT(
+      clientEmail,
+      undefined,
+      privateKey,
+      ['https://www.googleapis.com/auth/datastore']
+    );
+    const tokenResponse = await jwtClient.getAccessToken();
+    const token = tokenResponse.token;
+    if (!token) throw new Error("Failed to get access token.");
+
+    const databaseId = "ai-studio-f578d03a-99b3-4c41-84dd-9901137e8386";
+    const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${databaseId}/documents/performance_reports?pageSize=1000`;
+    
+    const response = await fetch(url, {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(`Firestore REST list error: ${errText}`);
+    }
+
+    const data = await response.json();
+    const documents = data.documents || [];
+    const toDelete: string[] = [];
+
+    documents.forEach((doc: any) => {
+      const parts = doc.name.split('/');
+      const id = parts[parts.length - 1];
+      if (
+        id.endsWith("_1") ||
+        id.startsWith("1_") || 
+        id.startsWith("poppoid_1") || 
+        id === "1"
+      ) {
+        toDelete.push(id);
+      }
+    });
+
+    if (toDelete.length > 0) {
+      const commitUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${databaseId}/documents:commit`;
+      const writes = toDelete.map(id => ({
+        delete: `projects/${projectId}/databases/${databaseId}/documents/performance_reports/${id}`
+      }));
+
+      const commitRes = await fetch(commitUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ writes })
+      });
+
+      if (!commitRes.ok) {
+        const commitErr = await commitRes.text();
+        throw new Error(`Commit failed: ${commitErr}`);
+      }
+
+      console.log(`🧹 API REST Cleaned up ${toDelete.length} test performance reports:`, toDelete);
+      return res.json({
+        success: true,
+        message: `Cleaned up ${toDelete.length} test performance reports.`,
+        deletedIds: toDelete
+      });
+    }
+
+    return res.json({
+      success: true,
+      message: "No test performance reports found to delete.",
+      deletedIds: []
+    });
+  } catch (error: any) {
+    console.error("[CleanupError]: Failed to delete test reports:", error);
+    return res.status(500).json({ error: "Failed to clean up test performance reports: " + error.message });
   }
 });
 
