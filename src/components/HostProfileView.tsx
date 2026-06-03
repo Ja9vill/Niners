@@ -123,7 +123,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
   const [isLoading, setIsLoading] = useState(true);
   const [sortAscending, setSortAscending] = useState(true);
 
-  // Dynamic styles based on base salary category
+  // Dynamic styles based on tier_pay category
   const styles = useMemo(() => {
     const getCategoryStyles = (category: string) => {
       const norm = String(category || '').trim().toLowerCase();
@@ -134,6 +134,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
           badgeText: 'text-[#D4AF37]',
           accentColor: '#D4AF37',
           topTrim: 'border-t-[#D4AF37] border-t-2',
+          gradientBg: 'bg-gradient-to-br from-[#D4AF37]/20 via-[#D4AF37]/5 to-[#1A1A28]/80',
         };
       }
       if (norm === 's idol') {
@@ -143,6 +144,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
           badgeText: 'text-[#ec4899]',
           accentColor: '#ec4899',
           topTrim: 'border-t-[#ec4899] border-t-2',
+          gradientBg: 'bg-gradient-to-br from-[#ec4899]/20 via-[#ec4899]/5 to-[#1A1A28]/80',
         };
       }
       if (norm === 'rocket host') {
@@ -152,6 +154,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
           badgeText: 'text-[#3b82f6]',
           accentColor: '#3b82f6',
           topTrim: 'border-t-[#3b82f6] border-t-2',
+          gradientBg: 'bg-gradient-to-br from-[#3b82f6]/20 via-[#3b82f6]/5 to-[#1A1A28]/80',
         };
       }
       if (norm === 'esport host' || norm.includes('esport')) {
@@ -161,6 +164,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
           badgeText: 'text-[#a855f7]',
           accentColor: '#a855f7',
           topTrim: 'border-t-[#a855f7] border-t-2',
+          gradientBg: 'bg-gradient-to-br from-[#a855f7]/20 via-[#a855f7]/5 to-[#1A1A28]/80',
         };
       }
       // Regular Host
@@ -170,10 +174,11 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
         badgeText: 'text-[#F0EFE8]',
         accentColor: '#ffffff',
         topTrim: 'border-t-white/10 border-t-2',
+        gradientBg: 'bg-gradient-to-br from-white/10 via-white/5 to-[#1A1A28]/80',
       };
     };
-    return getCategoryStyles(host.base_salary_category || '');
-  }, [host.base_salary_category]);
+    return getCategoryStyles(host.tier_pay || host.base_salary_category || '');
+  }, [host.tier_pay, host.base_salary_category]);
 
   // Profile Edit States
   const [editNickname, setEditNickname] = useState(host.nickname || host.name || '');
@@ -182,7 +187,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
   const [editRole, setEditRole] = useState<string>(host.role || 'Host');
   const [editTeam, setEditTeam] = useState<string>(host.team || 'Unassigned');
   const [editManager, setEditManager] = useState<string>(host.manager || 'Nine Management');
-  const [editBaseSalaryCategory, setEditBaseSalaryCategory] = useState<string>(host.base_salary_category || 'N/A');
+  const [editTierPay, setEditTierPay] = useState<string>(host.tier_pay || host.base_salary_category || 'N/A');
   const [editStatus, setEditStatus] = useState<string>(host.status || 'Active');
   const [editTier, setEditTier] = useState<string>(host.tier || 'X');
   const [editLevel, setEditLevel] = useState<number>(host.level || 1);
@@ -270,7 +275,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
     setEditRole(host.role || 'Host');
     setEditTeam(host.team || 'Unassigned');
     setEditManager(host.manager || 'Nine Management');
-    setEditBaseSalaryCategory(host.base_salary_category || 'N/A');
+    setEditTierPay(host.tier_pay || host.base_salary_category || 'N/A');
     setEditStatus(host.status || 'Active');
     setEditTier(host.tier || 'X');
     setEditLevel(host.level || 1);
@@ -921,7 +926,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
           team: editTeam,
           manager: editManager,
           assignedManagerId: assignedManagerId,
-          base_salary_category: editBaseSalaryCategory as any,
+          tier_pay: editTierPay as any,
           status: editStatus as any,
           tier: editTier as any,
           level: Number(editLevel) || 1,
@@ -1371,12 +1376,16 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
   const renderEarningsBreakdown = () => {
     if (performanceReports.length === 0) return null;
     return (
-      <div className={cn("bg-[#1A1A28] border-2 rounded-2xl p-4 transition-all duration-300", styles.borderColor, styles.shadow, styles.topTrim)}>
-        <div className="flex items-center justify-between mb-3">
-          <p className="text-[9px] font-black text-[#A09E9A]/50 uppercase tracking-[0.2em]">
-            {activeReport ? `PERFORMANCE ANALYTICS — ${formatPeriodShort(activeReport.monthName || activeReport.month, activeReport.year)}` : 'PERFORMANCE ANALYTICS — All Time'}
-          </p>
+      <div className={cn("space-y-4 bg-white/5 backdrop-blur-xl border border-white/10 p-5 rounded-3xl transition-all duration-300 hover:border-[#D4AF37]/30 group", styles.shadow)}>
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+             <div className="w-8 h-8 rounded-full bg-[#D4AF37]/20 flex items-center justify-center text-[#D4AF37] text-sm shadow-inner">📈</div>
+             <h4 className="text-xs font-black uppercase tracking-widest text-[#F0EFE8]">
+               {activeReport ? `Analytics: ${formatPeriodShort(activeReport.monthName || activeReport.month, activeReport.year)}` : 'Analytics: All Time'}
+             </h4>
+          </div>
           <select
+            title="Select Period"
             value={selectedPeriod}
             onChange={e => setSelectedPeriod(e.target.value)}
             className="bg-[#0D0D14] border border-white/10 rounded-xl px-2 py-0.5 text-[8px] font-black text-[#D4AF37] outline-none focus:border-[#D4AF37]/50 cursor-pointer transition-all uppercase tracking-wider"
@@ -1399,10 +1408,16 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                 : "text-xs md:text-sm";
             return (
               <div key={i} className="bg-[#09090e] border border-white/10 rounded-xl p-2.5 flex flex-col items-center text-center hover:border-white/20 transition-all">
-                <p className="text-[7px] font-black uppercase tracking-wider leading-tight mb-1.5 whitespace-pre-line" style={{ color: tile.color + 'aa' }}>
+                <p 
+                  className="text-[7px] font-black uppercase tracking-wider leading-tight mb-1.5 whitespace-pre-line"
+                  {...({ style: { color: tile.color + 'aa' } })}
+                >
                   {tile.label}
                 </p>
-                <p className={cn("font-black leading-none truncate max-w-full", textClass)} style={{ color: tile.color }}>
+                <p 
+                  className={cn("font-black leading-none truncate max-w-full", textClass)}
+                  {...({ style: { color: tile.color } })}
+                >
                   {valStr}
                 </p>
               </div>
@@ -1417,10 +1432,15 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
     if (monthlyChartData.length === 0) return null;
     const COLORS = ['#D4AF37','#6366f1','#ec4899','#10b981','#f59e0b','#06b6d4','#a78bfa','#fb923c','#38bdf8','#34d399','#f472b6','#818cf8'];
     return (
-      <div className={cn("bg-[#1A1A28] border-2 rounded-2xl p-4 transition-all duration-300", styles.borderColor, styles.shadow, styles.topTrim)}>
-        <div className="flex items-center gap-2 mb-4">
-          <p className="text-[9px] font-black text-[#A09E9A]/50 uppercase tracking-[0.2em]">Monthly Points Trend</p>
-          <span className="ml-auto text-[8px] text-[#A09E9A]/30 font-mono">{monthlyChartData.length} months</span>
+      <div className={cn("space-y-4 bg-white/5 backdrop-blur-xl border border-white/10 p-5 rounded-3xl transition-all duration-300 hover:border-indigo-500/30 group", styles.shadow)}>
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+             <div className="w-8 h-8 rounded-full bg-indigo-500/20 flex items-center justify-center text-indigo-400 text-sm shadow-inner">📊</div>
+             <h4 className="text-xs font-black uppercase tracking-widest text-[#F0EFE8]">Monthly Points Trend</h4>
+          </div>
+          <span className="px-3 py-1 text-[9px] font-black text-indigo-400 border border-indigo-500/30 bg-indigo-500/10 rounded-full uppercase tracking-widest shadow-[0_0_10px_rgba(99,102,241,0.2)]">
+            {monthlyChartData.length} months
+          </span>
         </div>
         <div className="h-44">
           <ResponsiveContainer width="100%" height="100%">
@@ -1485,6 +1505,8 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                     <label className="text-[8px] font-black text-[#A09E9A] uppercase tracking-widest block">Nickname</label>
                     <input 
                       type="text"
+                      title="Nickname"
+                      placeholder="Nickname"
                       value={editNickname}
                       onChange={(e) => setEditNickname(e.target.value)}
                       className="w-full bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-1.5 text-xs font-bold text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
@@ -1494,6 +1516,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                   <div className="space-y-1">
                     <label className="text-[8px] font-black text-[#A09E9A] uppercase tracking-widest block">Role</label>
                     <select
+                      title="Role"
                       value={editRole}
                       onChange={(e) => setEditRole(e.target.value)}
                       className="w-full bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-1.5 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37] font-bold"
@@ -1529,6 +1552,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                   <div className="space-y-1">
                     <label className="text-[8px] font-black text-[#A09E9A] uppercase tracking-widest block">Base Salary Category</label>
                     <select
+                      title="Base Salary Category"
                       value={editBaseSalaryCategory}
                       onChange={(e) => setEditBaseSalaryCategory(e.target.value)}
                       className="w-full bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-1.5 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37] font-bold"
@@ -1541,6 +1565,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                   <div className="space-y-1">
                     <label className="text-[8px] font-black text-[#A09E9A] uppercase tracking-widest block">Assigned Manager</label>
                     <select
+                      title="Assigned Manager"
                       value={editManager}
                       onChange={(e) => setEditManager(e.target.value)}
                       className="w-full bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-1.5 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37] font-bold"
@@ -1560,6 +1585,8 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                     <label className="text-[8px] font-black text-[#A09E9A] uppercase tracking-widest block">Team / Anchor Group</label>
                     <input
                       type="text"
+                      title="Team / Anchor Group"
+                      placeholder="Team / Anchor Group"
                       value={editTeam}
                       onChange={(e) => setEditTeam(e.target.value)}
                       className="w-full bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-1.5 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
@@ -1568,6 +1595,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                   <div className="space-y-1">
                     <label className="text-[8px] font-black text-[#A09E9A] uppercase tracking-widest block">Status</label>
                     <select
+                      title="Status"
                       value={editStatus}
                       onChange={(e) => setEditStatus(e.target.value)}
                       className="w-full bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-1.5 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37] font-bold"
@@ -1655,7 +1683,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                     className="flex-1 bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-1.5 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
                   />
                   {selfStreamSlots.length > 1 && (
-                    <button type="button" onClick={() => setSelfStreamSlots(selfStreamSlots.filter((_, i) => i !== idx))} className="text-red-400 hover:text-red-300 cursor-pointer">
+                    <button type="button" title="Remove Slot" onClick={() => setSelfStreamSlots(selfStreamSlots.filter((_, i) => i !== idx))} className="text-red-400 hover:text-red-300 cursor-pointer">
                       <X size={12} />
                     </button>
                   )}
@@ -1688,141 +1716,143 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
     const currentAuth = Storage.getAuthState();
     const isOwnProfile = currentAuth.poppo_id === host.id;
     const userRoleLower = String(currentAuth?.role || '').toLowerCase();
-    const isStaffUser = ['manager', 'agent', 'admin', 'head admin', 'director'].includes(userRoleLower);
     const isDirectorOrHeadAdmin = ['director', 'head admin', 'head_admin'].includes(userRoleLower);
 
     return (
-      <div className={cn("bg-[#1A1A28] border-2 rounded-2xl p-4 flex flex-col gap-4 relative group/card transition-all duration-300", styles.borderColor, styles.shadow, styles.topTrim)}>
-        {/* Top area: Photo + Nickname/PoppoID/Admin Fields */}
-        <div className="flex gap-4 items-start">
-          {/* Host Photo Section */}
-          <div className="flex flex-col items-center gap-2 shrink-0">
-            <span className="text-[8px] font-black text-[#A09E9A]/60 uppercase tracking-widest leading-none">HOST PHOTO</span>
-            <div className="w-28 h-28 sm:w-32 sm:h-32 rounded-2xl bg-[#0D0D14] border-2 flex items-center justify-center font-bold text-[#F0EFE8] overflow-hidden shadow-lg relative" style={{ borderColor: styles.accentColor }}>
-              {isProcessingPhoto && (
-                <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
-                  <Loader2 size={16} className="animate-spin text-[#D4AF37]" />
-                </div>
-              )}
-              {editPhotoUrl ? (
-                <img src={editPhotoUrl} alt={host.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-              ) : (
-                <div className="text-3xl sm:text-4xl text-[#A09E9A] font-bold">{editNickname?.[0]?.toUpperCase() || host.name?.[0] || 'JD'}</div>
-              )}
+      <div className={cn("backdrop-blur-xl border-2 rounded-3xl overflow-hidden flex flex-col relative group/card transition-all duration-300", styles.gradientBg, styles.borderColor, styles.shadow, styles.topTrim)}>
+        
+        {/* Full-width square profile photo acting as a header banner */}
+        <div className="w-full aspect-square relative bg-[#0D0D14]">
+          {isProcessingPhoto && (
+            <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-20">
+              <Loader2 size={24} className="animate-spin text-[#D4AF37]" />
             </div>
+          )}
+          {editPhotoUrl ? (
+            <img src={editPhotoUrl} alt={host.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center text-7xl text-[#A09E9A] font-black bg-gradient-to-br from-[#1A1A28] to-[#0D0D14]">
+              {editNickname?.[0]?.toUpperCase() || host.name?.[0] || 'JD'}
+            </div>
+          )}
+          
+          {/* Faded gradient overlay at the bottom 25% to merge with profile block */}
+          <div className="absolute bottom-0 inset-x-0 h-1/3 bg-gradient-to-t from-[#1A1A28] via-[#1A1A28]/60 to-transparent z-10" />
+          
+          {/* Absolute positioned badges overlaying the image */}
+          <div className="absolute top-4 right-4 z-20 flex flex-col items-end gap-2">
+             <span className={cn("text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full border backdrop-blur-md shadow-lg", 
+                host.status === 'Active' ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30" : "bg-amber-500/20 text-amber-400 border-amber-500/30")}>
+                {host.status || 'Active'}
+             </span>
+             {/* Tier Pay glowing badge */}
+             <span className={cn("text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full border backdrop-blur-md shadow-[0_0_15px_rgba(212,175,55,0.3)]", styles.badgeText, styles.borderColor, "bg-black/40")}>
+                {host.tier_pay || host.base_salary_category || 'Regular Host'}
+             </span>
           </div>
 
-          {/* Identity Details */}
-          <div className="flex-1 min-w-0 space-y-2.5 pr-16">
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <span className="text-[8px] font-black text-[#A09E9A] uppercase tracking-widest block mb-0.5">NICKNAME</span>
-                <div className="flex flex-wrap items-center gap-1.5 min-w-0">
-                  <span className="text-sm font-black text-[#F0EFE8] truncate leading-tight">{host.nickname || host.name}</span>
-                  {activeAwards.map(a => {
-                    let badgeStyle = 'bg-amber-500/10 text-amber-400 border-amber-500/20'; // Gold default
-                    if (a.awardColor === 'Purple') badgeStyle = 'bg-purple-500/10 text-purple-400 border-purple-500/20';
-                    else if (a.awardColor === 'Emerald') badgeStyle = 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
-                    else if (a.awardColor === 'Blue') badgeStyle = 'bg-blue-500/10 text-blue-400 border-blue-500/20';
-                    else if (a.awardColor === 'Red') badgeStyle = 'bg-red-500/10 text-red-400 border-red-500/20';
-                    else if (a.awardColor === 'Orange') badgeStyle = 'bg-orange-500/10 text-orange-400 border-orange-500/20';
-
-                    return (
-                      <span 
-                        key={a.id} 
-                        className={cn("text-[8px] font-black uppercase px-1.5 py-0.5 rounded-full border shrink-0", badgeStyle)}
-                        title={`Active Award: ${a.awardName} (${a.startDate} to ${a.endDate})`}
-                      >
-                        {a.awardName}
-                      </span>
-                    );
-                  })}
-                </div>
-              </div>
-              <div>
-                <span className="text-[8px] font-black text-[#A09E9A] uppercase tracking-widest block mb-0.5">POPPO ID</span>
-                <span className="text-sm font-black text-[#F0EFE8] truncate block leading-tight">{host.id}</span>
-              </div>
+          {/* Edit / Save Options overlaying the image bottom right */}
+          {((!isReadOnly && isDirectorOrHeadAdmin) || (isOwnProfile && !isSpotlight)) && (
+            <div className="absolute bottom-4 right-4 z-20 flex gap-2">
+              <button
+                onClick={() => setIsSelfEditing(true)}
+                className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-md border border-white/20 flex items-center justify-center text-white transition-all shadow-xl cursor-pointer"
+                title="Edit Profile"
+              >
+                <Edit2 size={16} />
+              </button>
             </div>
-
-            <div className="space-y-1.5 pt-2 border-t border-white/5 text-[10px] text-[#A09E9A]">
-              <div className="flex items-center gap-1.5">
-                <span className="text-[#A09E9A] font-bold uppercase tracking-wider">Role:</span>
-                <span className="text-[#D4AF37] font-semibold">{host.role === 'Host' || host.role === 'Talent' ? 'Star Host' : host.role}</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <span className="text-[#A09E9A] font-bold uppercase tracking-wider">Base Salary Category:</span>
-                <span className={cn("font-semibold", styles.badgeText)}>{host.base_salary_category || 'Regular Host'}</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <span className="text-[#A09E9A] font-bold uppercase tracking-wider">Assigned Manager:</span>
-                <span className="text-[#F0EFE8] font-semibold">{host.manager}</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <span className="text-[#A09E9A] font-bold uppercase tracking-wider">Team / Anchor Group:</span>
-                <span className="text-indigo-400 font-semibold">{host.team}</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <span className="text-[#A09E9A] font-bold uppercase tracking-wider">Status:</span>
-                <span className={cn("font-semibold", host.status === 'Active' ? "text-emerald-400" : "text-amber-400")}>{host.status}</span>
-              </div>
-            </div>
-
-            {/* Streaming Schedule (placed under edit button and details) */}
-            {host.streaming_hours && host.streaming_hours.length > 0 && (
-              <div className="pt-2.5 border-t border-white/5 space-y-1">
-                <span className="text-[8px] font-black text-[#A09E9A] uppercase tracking-widest block">STREAMING SCHEDULE</span>
-                <div className="grid grid-cols-2 gap-2">
-                  {host.streaming_hours.slice(0, 2).map((slot, idx) => (
-                    <div key={idx} className="bg-[#0D0D14] border border-white/5 rounded px-2 py-1 text-center">
-                      <span className="text-[9px] font-bold text-[#F0EFE8]">{slot.from} - {slot.to}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
+          )}
         </div>
 
-        {/* Host Public Message (Biography limited to 100 characters) */}
-        <div className="pt-3 border-t border-white/5 space-y-1">
-          <span className="text-[8px] font-black text-[#A09E9A] uppercase tracking-widest block">Host Public Message</span>
-          <p className="text-xs text-[#A09E9A] leading-relaxed italic whitespace-pre-wrap">
-            "{String(host.bio || host.description || 'No public message set.').slice(0, 100)}"
-          </p>
-        </div>
+        {/* Identity Details Block (merged below the photo) */}
+        <div className="px-6 pb-6 -mt-8 relative z-20 flex-1 flex flex-col space-y-5">
+          <div>
+            <h2 className="text-3xl md:text-4xl font-black text-[#F0EFE8] tracking-tight drop-shadow-md">{host.nickname || host.name}</h2>
+            <div className="flex items-center flex-wrap gap-2 mt-1.5">
+              <span className="text-xs font-mono font-bold text-[#A09E9A]">ID: {host.id}</span>
+              {activeAwards.map(a => {
+                let badgeStyle = 'bg-amber-500/10 text-amber-400 border-amber-500/20';
+                if (a.awardColor === 'Purple') badgeStyle = 'bg-purple-500/10 text-purple-400 border-purple-500/20';
+                else if (a.awardColor === 'Emerald') badgeStyle = 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
+                else if (a.awardColor === 'Blue') badgeStyle = 'bg-blue-500/10 text-blue-400 border-blue-500/20';
+                else if (a.awardColor === 'Red') badgeStyle = 'bg-red-500/10 text-red-400 border-red-500/20';
+                else if (a.awardColor === 'Orange') badgeStyle = 'bg-orange-500/10 text-orange-400 border-orange-500/20';
 
-        {/* Edit / Save Options */}
-        {((!isReadOnly && isDirectorOrHeadAdmin) || (isOwnProfile && !isSpotlight)) && (
-          <div className="absolute top-4 right-4 z-10">
-            <button
-              onClick={() => setIsSelfEditing(true)}
-              className="p-1.5 bg-[#222235] hover:bg-[#2A2A3F] border border-white/10 text-[#A09E9A] hover:text-[#D4AF37] rounded-lg transition-all cursor-pointer shadow-sm"
-              title="Edit Profile"
-            >
-              <Edit2 size={12} />
-            </button>
+                return (
+                  <span 
+                    key={a.id} 
+                    className={cn("text-[8px] font-black uppercase px-2 py-0.5 rounded-full border shrink-0 backdrop-blur-sm", badgeStyle)}
+                    title={`Active Award: ${a.awardName} (${a.startDate} to ${a.endDate})`}
+                  >
+                    {a.awardName}
+                  </span>
+                );
+              })}
+            </div>
           </div>
-        )}
+
+          <div className="grid grid-cols-2 gap-y-4 gap-x-4 pt-4 border-t border-white/5 text-xs text-[#A09E9A]">
+            <div className="flex flex-col">
+              <span className="text-[9px] font-black uppercase tracking-widest mb-1 text-white/40">Role</span>
+              <span className="text-[#D4AF37] font-black">{host.role === 'Host' || host.role === 'Talent' ? 'Star Host' : host.role}</span>
+            </div>
+            <div className="flex flex-col">
+              <span className="text-[9px] font-black uppercase tracking-widest mb-1 text-white/40">Tier Pay</span>
+              <span className={cn("font-black drop-shadow-sm text-sm", styles.badgeText)}>{host.tier_pay || host.base_salary_category || 'Regular Host'}</span>
+            </div>
+            <div className="flex flex-col">
+              <span className="text-[9px] font-black uppercase tracking-widest mb-1 text-white/40">Assigned Manager</span>
+              <span className="text-[#F0EFE8] font-bold">{host.manager}</span>
+            </div>
+            <div className="flex flex-col">
+              <span className="text-[9px] font-black uppercase tracking-widest mb-1 text-white/40">Team Group</span>
+              <span className="text-indigo-400 font-bold">{host.team}</span>
+            </div>
+          </div>
+
+          {host.streaming_hours && host.streaming_hours.length > 0 && (
+            <div className="pt-2 border-t border-white/5 space-y-2">
+              <span className="text-[9px] font-black text-white/40 uppercase tracking-widest block">Streaming Schedule</span>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {host.streaming_hours.slice(0, 2).map((slot, idx) => (
+                  <div key={idx} className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl px-3 py-2 text-center shadow-inner">
+                    <span className="text-[10px] font-bold text-white/90">{slot.from} - {slot.to}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Host Public Message */}
+          <div className="pt-2 border-t border-white/5 space-y-1.5">
+            <span className="text-[9px] font-black text-white/40 uppercase tracking-widest block">Host Public Message</span>
+            <p className="text-xs text-[#A09E9A] leading-relaxed italic whitespace-pre-wrap bg-black/20 p-3 rounded-xl border border-white/5">
+              "{String(host.bio || host.description || 'No public message set.').slice(0, 100)}"
+            </p>
+          </div>
+
+        </div>
       </div>
     );
   };
 
   const renderPerformanceHistory = () => {
     return (
-      <div className={cn("space-y-3 bg-[#1A1A28]/50 border-2 p-4 rounded-2xl transition-all duration-300", styles.borderColor, styles.shadow, styles.topTrim)}>
-        <div className="flex items-center justify-between px-1">
+      <div className={cn("space-y-4 bg-white/5 backdrop-blur-xl border border-white/10 p-5 rounded-3xl transition-all duration-300 hover:border-[#D4AF37]/30 group", styles.shadow)}>
+        <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <h4 className="text-[10px] font-black uppercase tracking-[0.15em] text-[#A09E9A] font-outfit">Earning Diversity</h4>
-            <button
+             <div className="w-8 h-8 rounded-full bg-[#D4AF37]/20 flex items-center justify-center text-[#D4AF37] text-sm shadow-inner">💰</div>
+             <h4 className="text-xs font-black uppercase tracking-widest text-[#F0EFE8]">Earning Diversity</h4>
+             <button
               onClick={() => setSortAscending(prev => !prev)}
-              className="p-1 hover:bg-white/5 rounded text-[#A09E9A] hover:text-[#D4AF37] transition-all cursor-pointer"
+              className="p-1.5 ml-1 bg-white/5 hover:bg-white/10 rounded-lg text-[#A09E9A] hover:text-[#D4AF37] transition-all cursor-pointer shadow-sm"
               title="Toggle Chronological Sort"
-            >
-              <ArrowUpDown size={11} />
-            </button>
+             >
+               <ArrowUpDown size={12} />
+             </button>
           </div>
-          <span className="text-[8px] font-bold text-[#D4AF37] border border-[#D4AF37]/20 bg-[#D4AF37]/5 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+          <span className="px-3 py-1 text-[9px] font-black text-[#D4AF37] border border-[#D4AF37]/30 bg-[#D4AF37]/10 rounded-full uppercase tracking-widest shadow-[0_0_10px_rgba(212,175,55,0.2)]">
             Performance Records
           </span>
         </div>
@@ -1899,12 +1929,15 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
     if (chartData.length === 0) return null;
 
     return (
-      <div className={cn("space-y-4 bg-[#1A1A28]/50 border-2 p-5 rounded-2xl transition-all duration-300", styles.borderColor, styles.shadow, styles.topTrim)}>
-        <div className="flex items-center justify-between px-1">
-          <h4 className="text-[10px] font-black uppercase tracking-[0.15em] text-[#A09E9A] font-outfit">Earnings &amp; Duration Trend</h4>
-          <div className="flex gap-3 text-[8px] font-bold">
-            <span className="text-[#D4AF37] uppercase">● Points</span>
-            <span className="text-[#06b6d4] uppercase">● Live Hours</span>
+      <div className={cn("space-y-4 bg-white/5 backdrop-blur-xl border border-white/10 p-5 rounded-3xl transition-all duration-300 hover:border-cyan-500/30 group", styles.shadow)}>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+             <div className="w-8 h-8 rounded-full bg-cyan-500/20 flex items-center justify-center text-cyan-400 text-sm shadow-inner">📉</div>
+             <h4 className="text-xs font-black uppercase tracking-widest text-[#F0EFE8]">Earnings & Duration Trend</h4>
+          </div>
+          <div className="flex gap-3 text-[9px] font-black uppercase tracking-widest">
+            <span className="text-[#D4AF37] drop-shadow-sm">● Points</span>
+            <span className="text-[#06b6d4] drop-shadow-sm">● Live Hours</span>
           </div>
         </div>
         
@@ -1974,46 +2007,49 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
     const isStaffUser = ['manager', 'agent', 'admin', 'head admin', 'director'].includes(userRoleLower);
 
     return (
-      <div className={cn("space-y-3 flex-1 bg-[#1A1A28]/50 border-2 p-4 rounded-2xl transition-all duration-300", styles.borderColor, styles.shadow, styles.topTrim)}>
-        <div className="flex items-center justify-between px-1">
-          <h4 className="text-[10px] font-black uppercase tracking-[0.15em] text-[#A09E9A] font-outfit">RANDOM PK PERFORMANCE</h4>
-          <div className="px-2.5 py-0.5 text-[8px] font-bold text-[#D4AF37] border border-[#D4AF37]/30 bg-[#D4AF37]/10 rounded-full uppercase tracking-wider">
-            PUBLIC SUMMARY
+      <div className={cn("space-y-4 flex-1 bg-white/5 backdrop-blur-xl border border-white/10 p-5 rounded-3xl transition-all duration-300 hover:border-amber-500/30 group", styles.shadow)}>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+             <div className="w-8 h-8 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-400 text-sm shadow-inner">⚔️</div>
+             <h4 className="text-xs font-black uppercase tracking-widest text-[#F0EFE8]">PK Performance</h4>
+          </div>
+          <div className="px-3 py-1 text-[9px] font-black text-amber-400 border border-amber-500/30 bg-amber-500/10 rounded-full uppercase tracking-widest shadow-[0_0_10px_rgba(251,191,36,0.2)]">
+            Summary
           </div>
         </div>
         
-        <div className="flex justify-end gap-2 mt-2">
-          {(isOwnProfile || isStaffUser) && (
-            <button 
-              onClick={() => setIsRpkFormOpen(true)}
-              className="px-3 py-1.5 bg-[#D4AF37]/10 hover:bg-[#D4AF37]/20 border border-[#D4AF37]/30 text-[#D4AF37] rounded-lg text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer"
-            >
-              Submit RPK Report
-            </button>
-          )}
-        </div>
-
-        <div className="grid grid-cols-3 gap-2.5 bg-[#0D0D14]/40 border border-white/5 p-3 rounded-2xl">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
           {[
-            { label: 'PK WIN %', value: `${pkData.win_percentage}%`, subLabel: 'Monthly' },
-            { label: 'PK SCORE', value: formatNumber(pkData.pk_score), subLabel: 'Monthly' },
-            { label: 'PK SESSIONS', value: String(pkData.sessions), subLabel: 'Weekly' },
+            { label: 'WIN %', value: `${pkData.win_percentage}%`, subLabel: 'Monthly', gradient: 'from-amber-500/20 to-orange-500/5', border: 'hover:border-amber-400/50', text: 'text-amber-400' },
+            { label: 'SCORE', value: formatNumber(pkData.pk_score), subLabel: 'Monthly', gradient: 'from-orange-500/20 to-red-500/5', border: 'hover:border-orange-400/50', text: 'text-orange-400' },
+            { label: 'SESSIONS', value: String(pkData.sessions), subLabel: 'Weekly', gradient: 'from-red-500/20 to-rose-500/5', border: 'hover:border-red-400/50', text: 'text-red-400' },
           ].map((cell, idx) => (
-            <div key={idx} className="bg-[#222235]/40 border border-white/5 p-3 rounded-xl flex flex-col justify-between min-h-[78px] hover:border-[#D4AF37]/20 transition-colors shadow-sm">
-              <span className="text-[8px] font-black text-[#A09E9A] uppercase tracking-widest leading-none">{cell.label}</span>
-              <span className="text-xs md:text-sm font-black text-[#F0EFE8] tracking-tight mt-2.5 block">
+            <div key={idx} className={`bg-gradient-to-br ${cell.gradient} border border-white/5 p-4 rounded-2xl flex flex-col justify-between min-h-[90px] transition-all duration-300 transform group-hover:translate-y-[-2px] shadow-lg ${cell.border}`}>
+              <span className="text-[9px] font-black text-white/50 uppercase tracking-widest leading-none">{cell.label}</span>
+              <span className={`text-xl md:text-2xl font-black tracking-tight mt-2 block drop-shadow-md ${cell.text}`}>
                 {cell.value}
               </span>
-              <span className="text-[7px] font-bold text-[#A09E9A]/60 uppercase tracking-wider mt-1">{cell.subLabel}</span>
+              <span className="text-[8px] font-bold text-white/30 uppercase tracking-wider mt-1">{cell.subLabel}</span>
             </div>
           ))}
         </div>
 
-        {rpkMetadata && (
-          <p className="text-[8px] text-[#A09E9A]/60 italic px-1">
-            Last Update on {formatUpdateMetaDate(rpkMetadata.lastUpdated)} by {rpkMetadata.reporterRole} {rpkMetadata.reporterName} ({rpkMetadata.reporterId})
-          </p>
-        )}
+        <div className="flex items-center justify-between mt-4 pt-4 border-t border-white/5">
+          {rpkMetadata ? (
+            <p className="text-[9px] text-[#A09E9A]/60 italic font-medium">
+              Updated: {formatUpdateMetaDate(rpkMetadata.lastUpdated)}
+            </p>
+          ) : <div />}
+          
+          {(isOwnProfile || isStaffUser) && (
+            <button 
+              onClick={() => setIsRpkFormOpen(true)}
+              className="px-4 py-2 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-400 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all cursor-pointer shadow-md hover:shadow-amber-500/20"
+            >
+              Submit Report
+            </button>
+          )}
+        </div>
       </div>
     );
   };
@@ -2022,46 +2058,49 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
     const currentAuth = Storage.getAuthState();
     const isOwnProfile = currentAuth.poppo_id === host.id;
     return (
-      <div className={cn("space-y-3 bg-[#1A1A28]/50 border-2 p-4 rounded-2xl flex-1 transition-all duration-300", styles.borderColor, styles.shadow, styles.topTrim)}>
-        <div className="flex items-center justify-between px-1">
-          <h4 className="text-[10px] font-black uppercase tracking-[0.15em] text-[#A09E9A] font-outfit">Event Exposure (Section 2)</h4>
+      <div className={cn("space-y-4 flex-1 bg-white/5 backdrop-blur-xl border border-white/10 p-5 rounded-3xl transition-all duration-300 hover:border-indigo-500/30 group", styles.shadow)}>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+             <div className="w-8 h-8 rounded-full bg-indigo-500/20 flex items-center justify-center text-indigo-400 text-sm shadow-inner">📅</div>
+             <h4 className="text-xs font-black uppercase tracking-widest text-[#F0EFE8]">Event Exposure</h4>
+          </div>
           <div className="flex items-center gap-2">
             {isOwnProfile && (
               <button
                 onClick={() => setIsAddEventFormOpen(true)}
-                className="px-2 py-1 bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 text-indigo-400 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer"
+                className="px-3 py-1.5 bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 text-indigo-400 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all cursor-pointer shadow-md"
               >
                 + Add Event
               </button>
             )}
-            <span className="text-[8px] font-bold text-indigo-400 border border-indigo-500/20 bg-indigo-500/5 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+            <span className="px-3 py-1 text-[9px] font-black text-indigo-400 border border-indigo-500/30 bg-indigo-500/10 rounded-full uppercase tracking-widest shadow-[0_0_10px_rgba(99,102,241,0.2)]">
               Total: {participatedEvents.length}
             </span>
           </div>
         </div>
-        <div className="space-y-2 mt-2 max-h-48 overflow-y-auto custom-scrollbar">
+        <div className="space-y-3 mt-4 max-h-48 overflow-y-auto custom-scrollbar pr-1">
           {participatedEvents.length > 0 ? (
             participatedEvents.map((e, idx) => {
               const eventDate = formatDateStandard(e.eventDate || e.date);
               return (
-                <div key={idx} className="bg-[#222235]/40 border border-white/5 p-3 rounded-xl flex items-center justify-between hover:border-[#D4AF37]/20 transition-colors shadow-sm">
-                  <div className="min-w-0">
-                    <p className="text-xs font-bold text-[#F0EFE8] leading-tight truncate">{e.description || e.eventType}</p>
-                    <p className="text-[8px] text-[#A09E9A] font-medium mt-1 truncate">{eventDate} • {e.timeslot}</p>
+                <div key={idx} className="bg-gradient-to-r from-white/5 to-white/[0.02] border border-white/10 p-4 rounded-2xl flex items-center justify-between hover:border-indigo-500/30 transition-all duration-300 shadow-sm group/item">
+                  <div className="min-w-0 pr-4">
+                    <p className="text-sm font-black text-[#F0EFE8] leading-tight truncate group-hover/item:text-indigo-300 transition-colors">{e.description || e.eventType}</p>
+                    <p className="text-[10px] text-white/50 font-bold mt-1.5 truncate tracking-wide">{eventDate} • {e.timeslot}</p>
                   </div>
-                  <span className="text-[8px] font-black uppercase tracking-wider bg-[#1A1A28] border border-white/5 px-2 py-0.5 rounded text-[#A09E9A] shrink-0">
+                  <span className="text-[9px] font-black uppercase tracking-widest bg-black/40 border border-white/10 px-3 py-1 rounded-full text-indigo-400 shrink-0 shadow-inner">
                     {e.status}
                   </span>
                 </div>
               );
             })
           ) : (
-            <p className="text-xs text-[#A09E9A]/40 italic text-center py-6">No historical event participations found for this host.</p>
+            <p className="text-xs text-white/30 italic text-center py-6 font-medium">No historical event participations found.</p>
           )}
         </div>
         {participatedEvents.length > 0 && (
-          <p className="text-[8px] text-[#A09E9A]/60 italic px-1 mt-2">
-            Last Update on {formatUpdateMetaDate(participatedEvents[0].timestamp || participatedEvents[0].eventDate || participatedEvents[0].date)} by {participatedEvents[0].created_by_role || 'Staff'} {participatedEvents[0].created_by_name || 'Unknown'} {participatedEvents[0].created_by_id ? `(${participatedEvents[0].created_by_id})` : ''}
+          <p className="text-[9px] text-[#A09E9A]/60 italic font-medium mt-4 pt-4 border-t border-white/5">
+            Updated by: {participatedEvents[0].created_by_name || 'Unknown'}
           </p>
         )}
       </div>
@@ -2078,49 +2117,55 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
     const canSubmitFanbase = isOwnProfile || isAssignedManagerAgent || isElevatedStaff;
 
     return (
-      <div className={cn("space-y-3 bg-[#1A1A28]/50 border-2 p-4 rounded-2xl transition-all duration-300", styles.borderColor, styles.shadow, styles.topTrim)}>
-        <div className="flex items-center justify-between px-1">
-          <h4 className="text-[10px] font-black uppercase tracking-[0.15em] text-[#A09E9A] font-outfit">Fanbase Health</h4>
+      <div className={cn("space-y-4 bg-white/5 backdrop-blur-xl border border-white/10 p-5 rounded-3xl transition-all duration-300 hover:border-pink-500/30 group", styles.shadow)}>
+        <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            {canSubmitFanbase && (
-              <button 
-                onClick={() => setIsFanbaseFormOpen(true)}
-                className="px-2.5 py-1 bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 text-indigo-400 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer"
-              >
-                Submit Fanbase Report
-              </button>
-            )}
-            {fanbaseLatest?.timestamp && (
-              <span className="text-[8px] font-bold text-indigo-400 border border-indigo-500/20 bg-indigo-500/5 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
-                {formatDateStandard(fanbaseLatest.timestamp)}
-              </span>
-            )}
+             <div className="w-8 h-8 rounded-full bg-pink-500/20 flex items-center justify-center text-pink-400 text-sm shadow-inner">💖</div>
+             <h4 className="text-xs font-black uppercase tracking-widest text-[#F0EFE8]">Fanbase Health</h4>
           </div>
+          {fanbaseLatest?.timestamp && (
+            <span className="text-[9px] font-bold text-pink-400 border border-pink-500/20 bg-pink-500/10 px-3 py-1 rounded-full uppercase tracking-widest shadow-[0_0_10px_rgba(244,114,182,0.2)]">
+              {formatDateStandard(fanbaseLatest.timestamp)}
+            </span>
+          )}
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 bg-[#1A1A28]/50 border border-white/5 p-3 rounded-2xl">
+
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
           {[
-            { label: 'Followers', value: fanbaseLatest?.total_followers != null ? formatNumber(fanbaseLatest.total_followers) : '—', color: 'text-[#D4AF37]' },
-            { label: 'FC Subscribers', value: fanbaseLatest?.fanclub_subscribers != null ? formatNumber(fanbaseLatest.fanclub_subscribers) : '—', color: 'text-indigo-400' },
-            { label: 'GC Members', value: fanbaseLatest?.fanclub_gc_members != null ? formatNumber(fanbaseLatest.fanclub_gc_members) : '—', color: 'text-emerald-400' },
+            { label: 'Followers', value: fanbaseLatest?.total_followers != null ? formatNumber(fanbaseLatest.total_followers) : '—', text: 'text-fuchsia-400', gradient: 'from-fuchsia-500/20 to-purple-500/5', border: 'hover:border-fuchsia-400/50' },
+            { label: 'FC Subs', value: fanbaseLatest?.fanclub_subscribers != null ? formatNumber(fanbaseLatest.fanclub_subscribers) : '—', text: 'text-purple-400', gradient: 'from-purple-500/20 to-indigo-500/5', border: 'hover:border-purple-400/50' },
+            { label: 'GC Members', value: fanbaseLatest?.fanclub_gc_members != null ? formatNumber(fanbaseLatest.fanclub_gc_members) : '—', text: 'text-indigo-400', gradient: 'from-indigo-500/20 to-blue-500/5', border: 'hover:border-indigo-400/50' },
             { 
-              label: 'GC Activeness', 
+              label: 'GC Activity', 
               value: fanbaseLatest && (fanbaseLatest.gc_activity_count_host != null || fanbaseLatest.gc_activity_count_fans != null)
                 ? formatNumber(Number(fanbaseLatest.gc_activity_count_host || 0) + Number(fanbaseLatest.gc_activity_count_fans || 0)) 
                 : '—', 
-              color: 'text-pink-400' 
+              text: 'text-blue-400', gradient: 'from-blue-500/20 to-cyan-500/5', border: 'hover:border-blue-400/50' 
             },
           ].map((cell, idx) => (
-            <div key={idx} className="bg-[#222235]/40 border border-white/5 p-3 rounded-xl flex flex-col justify-between min-h-[78px] hover:border-[#D4AF37]/20 transition-colors">
-              <span className="text-[8px] font-black text-[#A09E9A] uppercase tracking-widest leading-none">{cell.label}</span>
-              <span className={`text-sm font-black tracking-tight mt-2.5 block ${cell.color}`}>{cell.value}</span>
+            <div key={idx} className={`bg-gradient-to-br ${cell.gradient} border border-white/5 p-4 rounded-2xl flex flex-col justify-between min-h-[90px] transition-all duration-300 transform group-hover:translate-y-[-2px] shadow-lg ${cell.border}`}>
+              <span className="text-[9px] font-black text-white/50 uppercase tracking-widest leading-none">{cell.label}</span>
+              <span className={`text-lg sm:text-xl font-black tracking-tight mt-2 block drop-shadow-md ${cell.text}`}>{cell.value}</span>
             </div>
           ))}
         </div>
-        {fanbaseLatest?.timestamp && (
-          <p className="text-[8px] text-[#A09E9A]/60 italic px-1 mt-2">
-            Last Update on {formatUpdateMetaDate(fanbaseLatest.timestamp)} by {fanbaseLatest.reporter_role || 'Staff'} {fanbaseLatest.reporter_name || 'Unknown'} ({fanbaseLatest.reporter_id || 'Unknown'})
-          </p>
-        )}
+
+        <div className="flex items-center justify-between mt-4 pt-4 border-t border-white/5">
+          {fanbaseLatest?.timestamp ? (
+            <p className="text-[9px] text-[#A09E9A]/60 italic font-medium">
+              Updated by: {fanbaseLatest.reporter_name || 'Unknown'}
+            </p>
+          ) : <div />}
+          
+          {canSubmitFanbase && (
+            <button 
+              onClick={() => setIsFanbaseFormOpen(true)}
+              className="px-4 py-2 bg-pink-500/10 hover:bg-pink-500/20 border border-pink-500/30 text-pink-400 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all cursor-pointer shadow-md hover:shadow-pink-500/20"
+            >
+              Submit Report
+            </button>
+          )}
+        </div>
       </div>
     );
   };
@@ -2136,65 +2181,68 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
       (userRoleLower === 'director');
 
     return (
-      <div className={cn("space-y-4 bg-[#1A1A28]/50 border-2 p-4 rounded-2xl transition-all duration-300", styles.borderColor, styles.shadow, styles.topTrim)}>
-        <div className="flex items-center justify-between px-1">
-          <h4 className="text-[10px] font-black uppercase tracking-[0.15em] text-[#A09E9A] font-outfit">AI Performance Analysis</h4>
-          <span className="text-[8px] font-bold text-[#D4AF37] border border-[#D4AF37]/20 bg-[#D4AF37]/5 px-2.5 py-0.5 rounded-full uppercase tracking-wider">Gemini AI</span>
+      <div className={cn("space-y-4 bg-white/5 backdrop-blur-xl border border-white/10 p-5 rounded-3xl transition-all duration-300 hover:border-[#D4AF37]/30 group", styles.shadow)}>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+             <div className="w-8 h-8 rounded-full bg-[#D4AF37]/20 flex items-center justify-center text-[#D4AF37] text-sm shadow-inner">🤖</div>
+             <h4 className="text-xs font-black uppercase tracking-widest text-[#F0EFE8]">AI Performance Analysis</h4>
+          </div>
+          <span className="px-3 py-1 text-[9px] font-black text-[#D4AF37] border border-[#D4AF37]/30 bg-[#D4AF37]/10 rounded-full uppercase tracking-widest shadow-[0_0_10px_rgba(212,175,55,0.2)]">Gemini AI</span>
         </div>
 
         {/* Generate button (Only visible to managers/admins who can generate) */}
         {!isGeneratingAI && !aiReport && canGenerateAI && (
           <button
             onClick={handleGenerateAI}
-            className="w-full py-3.5 rounded-2xl border border-[#D4AF37]/30 bg-gradient-to-r from-[#D4AF37]/10 to-[#D4AF37]/5 text-[#D4AF37] font-black text-xs uppercase tracking-widest hover:from-[#D4AF37]/20 hover:border-[#D4AF37]/50 transition-all active:scale-[0.99] cursor-pointer flex items-center justify-center gap-2.5 shadow-lg shadow-[#D4AF37]/5"
+            className="w-full py-4 mt-2 rounded-2xl border border-[#D4AF37]/30 bg-gradient-to-r from-[#D4AF37]/20 to-[#D4AF37]/5 text-[#D4AF37] font-black text-xs uppercase tracking-widest hover:from-[#D4AF37]/30 hover:border-[#D4AF37]/50 transition-all active:scale-[0.99] cursor-pointer flex items-center justify-center gap-2.5 shadow-lg shadow-[#D4AF37]/10"
           >
-            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z"/></svg>
+            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z"/></svg>
             Generate AI Report
           </button>
         )}
 
         {/* Placeholder if no report exists and user cannot generate one */}
         {!isGeneratingAI && !aiReport && !canGenerateAI && (
-          <div className="bg-[#1A1A28]/50 border border-white/5 p-4 rounded-2xl text-center text-[#A09E9A]/40 italic text-xs">
+          <div className="bg-black/20 border border-white/5 p-6 rounded-2xl text-center text-white/40 italic text-xs font-medium">
             No AI performance analysis has been posted by management yet.
           </div>
         )}
 
         {/* Loading state */}
         {isGeneratingAI && (
-          <div className="w-full py-8 rounded-2xl border border-[#D4AF37]/20 bg-[#D4AF37]/5 flex flex-col items-center gap-3">
-            <div className="w-6 h-6 border-2 border-[#D4AF37]/20 border-t-[#D4AF37] rounded-full animate-spin" />
-            <p className="text-[10px] font-black uppercase tracking-widest text-[#D4AF37]/60">Analyzing performance data...</p>
+          <div className="w-full py-10 rounded-2xl border border-[#D4AF37]/20 bg-gradient-to-b from-[#D4AF37]/10 to-transparent flex flex-col items-center gap-4">
+            <div className="w-8 h-8 border-2 border-[#D4AF37]/20 border-t-[#D4AF37] rounded-full animate-spin shadow-[0_0_15px_rgba(212,175,55,0.5)]" />
+            <p className="text-[10px] font-black uppercase tracking-widest text-[#D4AF37] animate-pulse">Analyzing performance data...</p>
           </div>
         )}
 
         {/* Error */}
         {aiError && (
-          <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-xs font-bold">{aiError}</div>
+          <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-2xl text-red-400 text-xs font-black tracking-wide shadow-inner">{aiError}</div>
         )}
 
         {/* Report output */}
         {aiReport && (
-          <div className="space-y-3">
+          <div className="space-y-4 mt-4">
             {/* Summary */}
-            <div className="bg-[#1A1A28]/70 border border-[#D4AF37]/15 rounded-2xl p-4 space-y-1.5">
-              <p className="text-[9px] font-black uppercase tracking-widest text-[#D4AF37]/70">Performance Summary</p>
-              <p className="text-xs text-[#F0EFE8]/90 leading-relaxed font-medium">{aiReport.summary}</p>
+            <div className="bg-gradient-to-br from-white/5 to-transparent border border-[#D4AF37]/20 rounded-2xl p-5 space-y-2 shadow-lg">
+              <p className="text-[10px] font-black uppercase tracking-widest text-[#D4AF37]">Performance Summary</p>
+              <p className="text-sm text-white/90 leading-relaxed font-medium">{aiReport.summary}</p>
             </div>
             {/* Journey */}
-            <div className="bg-[#1A1A28]/70 border border-indigo-500/15 rounded-2xl p-4 space-y-1.5">
-              <p className="text-[9px] font-black uppercase tracking-widest text-indigo-400/70">Career Journey</p>
-              <p className="text-xs text-[#F0EFE8]/90 leading-relaxed font-medium">{aiReport.journey}</p>
+            <div className="bg-gradient-to-br from-white/5 to-transparent border border-indigo-500/20 rounded-2xl p-5 space-y-2 shadow-lg">
+              <p className="text-[10px] font-black uppercase tracking-widest text-indigo-400">Career Journey</p>
+              <p className="text-sm text-white/90 leading-relaxed font-medium">{aiReport.journey}</p>
             </div>
             {/* Recommendations */}
             {aiReport.recommendations && aiReport.recommendations.length > 0 && (
-              <div className="bg-[#1A1A28]/70 border border-emerald-500/15 rounded-2xl p-4 space-y-2">
-                <p className="text-[9px] font-black uppercase tracking-widest text-emerald-400/70">Recommendations</p>
-                <ul className="space-y-1.5">
+              <div className="bg-gradient-to-br from-white/5 to-transparent border border-emerald-500/20 rounded-2xl p-5 space-y-3 shadow-lg">
+                <p className="text-[10px] font-black uppercase tracking-widest text-emerald-400">Recommendations</p>
+                <ul className="space-y-2.5">
                   {aiReport.recommendations.map((rec, i) => (
-                    <li key={i} className="flex items-start gap-2">
-                      <span className="text-emerald-400 mt-0.5 shrink-0">›</span>
-                      <span className="text-xs text-[#F0EFE8]/85 leading-relaxed font-medium">{rec}</span>
+                    <li key={i} className="flex items-start gap-3">
+                      <span className="text-emerald-400 mt-1 shrink-0 text-sm">✦</span>
+                      <span className="text-sm text-white/80 leading-relaxed font-medium">{rec}</span>
                     </li>
                   ))}
                 </ul>
@@ -2206,16 +2254,16 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
               <button
                 onClick={handlePostAiReport}
                 disabled={isPostingAiReport}
-                className="w-full mt-2 py-2.5 rounded-xl border border-indigo-500/30 bg-indigo-500/10 text-indigo-400 hover:text-indigo-300 hover:bg-indigo-500/20 font-black text-xs uppercase tracking-widest transition-all cursor-pointer flex items-center justify-center gap-2 shadow-md"
+                className="w-full mt-4 py-3.5 rounded-2xl border border-indigo-500/30 bg-gradient-to-r from-indigo-500/20 to-indigo-500/5 text-indigo-300 hover:text-indigo-200 hover:from-indigo-500/30 hover:border-indigo-500/50 font-black text-xs uppercase tracking-widest transition-all cursor-pointer flex items-center justify-center gap-2 shadow-xl"
               >
-                {isPostingAiReport ? <Loader2 size={12} className="animate-spin" /> : null}
+                {isPostingAiReport ? <Loader2 size={14} className="animate-spin" /> : null}
                 Post Report to Host's Profile
               </button>
             )}
 
             {/* Posted status badge */}
             {myRecentAiReport?.isPosted && (
-              <div className="text-[10px] text-emerald-400 font-bold bg-emerald-500/10 border border-emerald-500/20 px-3 py-2 rounded-xl text-center">
+              <div className="text-[10px] text-emerald-400 font-black uppercase tracking-widest bg-emerald-500/10 border border-emerald-500/30 px-4 py-3 rounded-2xl text-center shadow-inner mt-4">
                 ✓ Report Posted to Host's Profile
               </div>
             )}
@@ -2224,7 +2272,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
             {canGenerateAI && (
               <button
                 onClick={handleGenerateAI}
-                className="text-[9px] font-black uppercase tracking-widest text-[#A09E9A]/60 hover:text-[#D4AF37] transition-colors cursor-pointer w-full text-right pr-1"
+                className="text-[10px] font-black uppercase tracking-widest text-white/30 hover:text-[#D4AF37] transition-colors cursor-pointer w-full text-right pr-2 pt-2"
               >
                 ↻ Regenerate Report
               </button>
@@ -2453,6 +2501,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
             <div className="space-y-1">
               <label className="text-[9px] font-black uppercase tracking-wider text-[#A09E9A]">Event Type</label>
               <select 
+                title="Event Type"
                 value={eventFormData.eventType}
                 onChange={(e) => setEventFormData({...eventFormData, eventType: e.target.value})}
                 className="w-full bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-indigo-500"
@@ -2720,11 +2769,14 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
     const presencePercentage = Math.round(presenceRatio * 100);
 
     return (
-      <div className={cn("space-y-3 flex-1 bg-[#1A1A28]/50 border-2 p-4 rounded-2xl transition-all duration-300", styles.borderColor, styles.shadow, styles.topTrim)}>
-        <div className="flex items-center justify-between px-1">
-          <h4 className="text-[10px] font-black uppercase tracking-[0.15em] text-[#A09E9A] font-outfit">Agency Presence Rating</h4>
-          <span className="text-[8px] font-bold text-indigo-400 border border-indigo-500/20 bg-indigo-500/5 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
-            Presence Score: {presencePercentage}%
+      <div className={cn("space-y-4 flex-1 bg-white/5 backdrop-blur-xl border border-white/10 p-5 rounded-3xl transition-all duration-300 hover:border-indigo-500/30 group", styles.shadow)}>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+             <div className="w-8 h-8 rounded-full bg-indigo-500/20 flex items-center justify-center text-indigo-400 text-sm shadow-inner">🎯</div>
+             <h4 className="text-xs font-black uppercase tracking-widest text-[#F0EFE8]">Agency Presence</h4>
+          </div>
+          <span className="px-3 py-1 text-[9px] font-black text-indigo-400 border border-indigo-500/30 bg-indigo-500/10 rounded-full uppercase tracking-widest shadow-[0_0_10px_rgba(99,102,241,0.2)]">
+            Score: {presencePercentage}%
           </span>
         </div>
 
@@ -2748,7 +2800,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
           <div className="w-full bg-[#0D0D14]/60 rounded-full h-1.5 border border-white/5 overflow-hidden">
             <div 
               className="bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 h-1.5 rounded-full transition-all duration-500" 
-              style={{ width: `${Math.min(100, Math.max(0, presencePercentage))}%` }}
+              {...({ style: { width: `${Math.min(100, Math.max(0, presencePercentage))}%` } })}
             />
           </div>
         </div>
@@ -2790,13 +2842,15 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
     if (awards.length === 0) return null;
     const ICON_MAP: Record<string, string> = { trophy: '🏆', star: '⭐', medal: '🥇', crown: '👑', badge: '🎖️' };
     return (
-      <div className={cn("bg-[#1A1A28] border-2 rounded-2xl p-4 space-y-3 transition-all duration-300", styles.borderColor, styles.shadow, styles.topTrim)}>
+      <div className={cn("space-y-4 bg-white/5 backdrop-blur-xl border border-white/10 p-5 rounded-3xl transition-all duration-300 hover:border-[#D4AF37]/30 group", styles.shadow)}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Award size={12} className="text-[#D4AF37]/60" />
-            <p className="text-[9px] font-black text-[#A09E9A]/50 uppercase tracking-[0.2em]">Agency Awards & Badges</p>
+             <div className="w-8 h-8 rounded-full bg-[#D4AF37]/20 flex items-center justify-center text-[#D4AF37] text-sm shadow-inner">🏆</div>
+             <h4 className="text-xs font-black uppercase tracking-widest text-[#F0EFE8]">Agency Awards</h4>
           </div>
-          <span className="text-[8px] font-bold text-[#D4AF37] border border-[#D4AF37]/20 bg-[#D4AF37]/5 px-2 py-0.5 rounded-full uppercase tracking-wider">{awards.length} earned</span>
+          <span className="px-3 py-1 text-[9px] font-black text-[#D4AF37] border border-[#D4AF37]/30 bg-[#D4AF37]/10 rounded-full uppercase tracking-widest shadow-[0_0_10px_rgba(212,175,55,0.2)]">
+            {awards.length} earned
+          </span>
         </div>
         <div className="flex flex-wrap gap-2.5">
           {awards.map((award: any, i: number) => (
@@ -2816,10 +2870,15 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
   const renderWeeklyLiveStats = () => {
     if (weeklyLiveData.length === 0) return null;
     return (
-      <div className={cn("bg-[#1A1A28] border-2 rounded-2xl p-4 space-y-3 transition-all duration-300", styles.borderColor, styles.shadow, styles.topTrim)}>
+      <div className={cn("space-y-4 bg-white/5 backdrop-blur-xl border border-white/10 p-5 rounded-3xl transition-all duration-300 hover:border-emerald-500/30 group", styles.shadow)}>
         <div className="flex items-center justify-between">
-          <p className="text-[9px] font-black text-[#A09E9A]/50 uppercase tracking-[0.2em]">Weekly Live Stats</p>
-          <span className="text-[8px] font-bold text-emerald-400 border border-emerald-500/20 bg-emerald-500/5 px-2 py-0.5 rounded-full uppercase tracking-wider">{weeklyLiveData.length} weeks</span>
+          <div className="flex items-center gap-2">
+             <div className="w-8 h-8 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-400 text-sm shadow-inner">📊</div>
+             <h4 className="text-xs font-black uppercase tracking-widest text-[#F0EFE8]">Weekly Live Stats</h4>
+          </div>
+          <span className="px-3 py-1 text-[9px] font-black text-emerald-400 border border-emerald-500/30 bg-emerald-500/10 rounded-full uppercase tracking-widest shadow-[0_0_10px_rgba(16,185,129,0.2)]">
+            {weeklyLiveData.length} weeks
+          </span>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
@@ -2857,13 +2916,15 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
       Feedback: 'text-emerald-400 border-emerald-500/20 bg-emerald-500/5',
     };
     return (
-      <div className={cn("bg-[#1A1A28] border-2 rounded-2xl p-4 space-y-3 transition-all duration-300", styles.borderColor, styles.shadow, styles.topTrim)}>
+      <div className={cn("space-y-4 bg-white/5 backdrop-blur-xl border border-white/10 p-5 rounded-3xl transition-all duration-300 hover:border-indigo-500/30 group", styles.shadow)}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <MessageSquare size={12} className="text-indigo-400/60" />
-            <p className="text-[9px] font-black text-[#A09E9A]/50 uppercase tracking-[0.2em]">Agent Notes</p>
+             <div className="w-8 h-8 rounded-full bg-indigo-500/20 flex items-center justify-center text-indigo-400 text-sm shadow-inner">📝</div>
+             <h4 className="text-xs font-black uppercase tracking-widest text-[#F0EFE8]">Agent Notes</h4>
           </div>
-          <span className="text-[8px] font-bold text-indigo-400 border border-indigo-500/20 bg-indigo-500/5 px-2 py-0.5 rounded-full uppercase tracking-wider">Read-Only</span>
+          <span className="px-3 py-1 text-[9px] font-black text-indigo-400 border border-indigo-500/30 bg-indigo-500/10 rounded-full uppercase tracking-widest shadow-[0_0_10px_rgba(99,102,241,0.2)]">
+            Read-Only
+          </span>
         </div>
         <div className="space-y-2 max-h-48 overflow-y-auto custom-scrollbar">
           {agentNotes.map((note: any, i: number) => (

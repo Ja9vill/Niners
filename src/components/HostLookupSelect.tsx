@@ -110,6 +110,7 @@ export const HostLookupSelect: React.FC<HostLookupSelectProps> = ({
         <div>
           <label className="block text-xs font-semibold text-slate-400 mb-1">Select Nickname</label>
           <select
+            title="Select Nickname"
             value={poppoId}
             onChange={handleDropdownChange}
             disabled={isLoading}

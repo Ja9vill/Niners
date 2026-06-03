@@ -790,6 +790,7 @@ export const CreateMemberForm = () => {
               </div>
               <button 
                 type="button"
+                title="Close"
                 onClick={() => setShowSpotlightModal(false)}
                 className="p-1.5 hover:bg-white/5 rounded-xl text-[#A09E9A] hover:text-white cursor-pointer transition-colors"
               >
@@ -803,6 +804,8 @@ export const CreateMemberForm = () => {
                 <label className="text-[10px] font-black text-[#A09E9A] uppercase tracking-widest ml-1">Poppo ID</label>
                 <input
                   type="text"
+                  title="Poppo ID"
+                  placeholder="Poppo ID"
                   value={spotlightPoppoId}
                   disabled
                   className="w-full bg-[#07070C] border border-white/5 rounded-xl px-4 py-3 text-xs text-white/50 outline-none font-mono cursor-not-allowed"
@@ -826,6 +829,7 @@ export const CreateMemberForm = () => {
               <div className="space-y-1.5">
                 <label className="text-[10px] font-black text-[#A09E9A] uppercase tracking-widest ml-1">Assign App Role</label>
                 <select
+                  title="App Role"
                   value={spotlightRole}
                   onChange={(e) => setSpotlightRole(e.target.value)}
                   className="w-full bg-[#0A0A0F] border border-white/10 rounded-xl px-4 py-3 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37]/50 font-bold cursor-pointer"

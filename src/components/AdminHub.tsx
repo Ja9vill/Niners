@@ -1347,6 +1347,7 @@ export const AdminHub: React.FC = () => {
           <div className="w-full max-w-md bg-[#13131E] border border-white/10 rounded-3xl p-6 shadow-2xl relative">
             <button
               type="button"
+              title="Close"
               onClick={() => setRequestEditTarget(null)}
               className="absolute top-4 right-4 text-[#A09E9A] hover:text-[#F0EFE8] cursor-pointer"
             >
@@ -1399,6 +1400,7 @@ export const AdminHub: React.FC = () => {
           <div className="w-full max-w-lg bg-[#13131E] border border-white/10 rounded-3xl p-6 shadow-2xl relative my-8">
             <button
               type="button"
+              title="Close"
               onClick={() => setEditTargetReport(null)}
               className="absolute top-4 right-4 text-[#A09E9A] hover:text-[#F0EFE8] cursor-pointer"
             >

@@ -14,7 +14,6 @@ import { ManagerDashboard } from './components/ManagerDashboard';
 import { HostProfileEditor } from './components/HostProfileEditor';
 import { ProfilesTab } from './components/ProfilesTab';
 import { PublicLayout } from './components/PublicLayout';
-import { LandingPage } from './pages/LandingPage';
 import { PublicRoster } from './pages/PublicRoster';
 import { PublicCalendar } from './pages/PublicCalendar';
 import { PoppoLivePage } from './pages/PoppoLivePage';
@@ -27,7 +26,7 @@ export default function App() {
 
         {/* ── Public Routes ───────────────────────────────────────── */}
         <Route path="/" element={<PublicLayout />}>
-          <Route index element={<LandingPage />} />
+          <Route index element={<Navigate to="/login" replace />} />
           <Route path="login" element={<Login />} />
           <Route path="roster" element={<PublicRoster />} />
           <Route path="calendar" element={<PublicCalendar />} />

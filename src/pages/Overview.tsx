@@ -307,6 +307,7 @@ export const Overview = () => {
         {/* Filters */}
         <div className="flex items-center gap-2">
           <select
+            title="Filter by Year"
             value={selectedYear}
             onChange={e => setSelectedYear(e.target.value)}
             className="bg-[#1A1A28] border border-[#D4AF37]/20 rounded-lg px-3 py-1.5 text-xs font-bold text-[#F0EFE8] outline-none focus:border-[#D4AF37] cursor-pointer"
@@ -315,6 +316,7 @@ export const Overview = () => {
             {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
           </select>
           <select
+            title="Filter by Month"
             value={selectedMonth}
             onChange={e => setSelectedMonth(e.target.value)}
             className="bg-[#1A1A28] border border-[#D4AF37]/20 rounded-lg px-3 py-1.5 text-xs font-bold text-[#F0EFE8] outline-none focus:border-[#D4AF37] cursor-pointer"
@@ -354,13 +356,13 @@ export const Overview = () => {
             >
               <p
                 className="text-[8px] font-black uppercase tracking-wider leading-tight mb-2 whitespace-pre-line"
-                style={{ color: item.color + 'aa' }}
+                {...({ style: { color: item.color + 'aa' } })}
               >
                 {item.label}
               </p>
               <p
                 className="text-sm font-black leading-none"
-                style={{ color: item.color }}
+                {...({ style: { color: item.color } })}
               >
                 {item.value > 0 ? formatPts(item.value) : '—'}
               </p>
@@ -413,7 +415,7 @@ export const Overview = () => {
                 <AreaChart
                   data={monthlyTrend}
                   margin={{ top: 5, right: 10, left: -20, bottom: 0 }}
-                  onClick={(state) => {
+                  onClick={(state: any) => {
                     if (state && state.activePayload && state.activePayload.length > 0) {
                       setSelectedMonthData(state.activePayload[0].payload);
                     }
@@ -442,7 +444,7 @@ export const Overview = () => {
                 <BarChart
                   data={monthlyTrend}
                   margin={{ top: 5, right: 5, left: -20, bottom: 0 }}
-                  onClick={(state) => {
+                  onClick={(state: any) => {
                     if (state && state.activePayload && state.activePayload.length > 0) {
                       setSelectedMonthData(state.activePayload[0].payload);
                     }
@@ -568,10 +570,10 @@ export const Overview = () => {
                   <div className="h-1 bg-white/5 rounded-full overflow-hidden">
                     <div
                       className="h-full rounded-full"
-                      style={{
+                      {...({ style: {
                         width: `${pct}%`,
                         background: idx === 0 ? '#D4AF37' : idx === 1 ? '#8b5cf6' : idx === 2 ? '#ec4899' : '#374151'
-                      }}
+                      } })}
                     />
                   </div>
                 </div>

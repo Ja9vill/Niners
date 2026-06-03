@@ -68,6 +68,7 @@ export const SystemLogsViewer: React.FC = () => {
           <div className="relative flex-1 md:w-40">
             <Filter className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={14} />
             <select
+              title="Filter by Severity"
               value={filterSeverity}
               onChange={(e) => setFilterSeverity(e.target.value as any)}
               className="w-full bg-slate-900 border border-[#D4AF37]/25 rounded-xl pl-9 pr-3 py-2 text-xs text-white focus:ring-1 focus:ring-[#D4AF37]/50 outline-none appearance-none"

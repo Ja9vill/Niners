@@ -6,28 +6,72 @@ import { FirebaseService } from '../lib/firebaseService';
 import { cn, formatNumber } from '../lib/utils';
 import { format, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay, addWeeks, subWeeks } from 'date-fns';
 import { motion, AnimatePresence } from 'motion/react';
+import { SingleDatePicker } from './InteractiveDatePicker';
+import { AddEventForm } from './AddEventForm';
 
-const EVENT_COLORS: Record<string, { bg: string; text: string; gradient: string }> = {
-  'Official PK': { bg: 'bg-[#f43f5e]/10 border-[#f43f5e]/20', text: 'text-[#f43f5e]', gradient: 'from-[#f43f5e] to-[#fda4af]' },
-  'Solo Livehouse': { bg: 'bg-[#f97316]/10 border-[#f97316]/20', text: 'text-[#f97316]', gradient: 'from-[#f97316] to-[#fdba74]' },
-  'Party Livehouse': { bg: 'bg-[#ec4899]/10 border-[#ec4899]/20', text: 'text-[#ec4899]', gradient: 'from-[#ec4899] to-[#fbcfe8]' },
-  'Agency Event': { bg: 'bg-[#10b981]/10 border-[#10b981]/20', text: 'text-[#10b981]', gradient: 'from-[#10b981] to-[#6ee7b7]' },
-  'Poppo Event': { bg: 'bg-[#3b82f6]/10 border-[#3b82f6]/20', text: 'text-[#3b82f6]', gradient: 'from-[#3b82f6] to-[#93c5fd]' },
-  'External Event': { bg: 'bg-[#8b5cf6]/10 border-[#8b5cf6]/20', text: 'text-[#8b5cf6]', gradient: 'from-[#8b5cf6] to-[#c084fc]' }
+const EVENT_COLORS: Record<string, { bg: string; text: string; gradient: string; cardGradient: string; border: string; borderHover: string }> = {
+  'OFFICIAL PK': { 
+    bg: 'bg-[#f43f5e]/10 border-[#f43f5e]/20', 
+    text: 'text-[#f43f5e]', 
+    gradient: 'from-[#f43f5e] to-[#fda4af]',
+    cardGradient: 'bg-gradient-to-br from-[#f43f5e]/10 via-[#f43f5e]/2 to-[#0F1117]',
+    border: 'border-[#f43f5e]/20',
+    borderHover: 'hover:border-[#f43f5e]/40'
+  },
+  'SOLO LIVEHOUSE': { 
+    bg: 'bg-[#f97316]/10 border-[#f97316]/20', 
+    text: 'text-[#f97316]', 
+    gradient: 'from-[#f97316] to-[#fdba74]',
+    cardGradient: 'bg-gradient-to-br from-[#f97316]/10 via-[#f97316]/2 to-[#0F1117]',
+    border: 'border-[#f97316]/20',
+    borderHover: 'hover:border-[#f97316]/40'
+  },
+  'PARTY LIVEHOUSE': { 
+    bg: 'bg-[#ec4899]/10 border-[#ec4899]/20', 
+    text: 'text-[#ec4899]', 
+    gradient: 'from-[#ec4899] to-[#fbcfe8]',
+    cardGradient: 'bg-gradient-to-br from-[#ec4899]/10 via-[#ec4899]/2 to-[#0F1117]',
+    border: 'border-[#ec4899]/20',
+    borderHover: 'hover:border-[#ec4899]/40'
+  },
+  'AGENCY EVENT': { 
+    bg: 'bg-[#10b981]/10 border-[#10b981]/20', 
+    text: 'text-[#10b981]', 
+    gradient: 'from-[#10b981] to-[#6ee7b7]',
+    cardGradient: 'bg-gradient-to-br from-[#10b981]/10 via-[#10b981]/2 to-[#0F1117]',
+    border: 'border-[#10b981]/20',
+    borderHover: 'hover:border-[#10b981]/40'
+  },
+  'POPPO EVENT': { 
+    bg: 'bg-[#3b82f6]/10 border-[#3b82f6]/20', 
+    text: 'text-[#3b82f6]', 
+    gradient: 'from-[#3b82f6] to-[#93c5fd]',
+    cardGradient: 'bg-gradient-to-br from-[#3b82f6]/10 via-[#3b82f6]/2 to-[#0F1117]',
+    border: 'border-[#3b82f6]/20',
+    borderHover: 'hover:border-[#3b82f6]/40'
+  },
+  'EXTERNAL EVENT': { 
+    bg: 'bg-[#8b5cf6]/10 border-[#8b5cf6]/20', 
+    text: 'text-[#8b5cf6]', 
+    gradient: 'from-[#8b5cf6] to-[#c084fc]',
+    cardGradient: 'bg-gradient-to-br from-[#8b5cf6]/10 via-[#8b5cf6]/2 to-[#0F1117]',
+    border: 'border-[#8b5cf6]/20',
+    borderHover: 'hover:border-[#8b5cf6]/40'
+  }
 };
 
 const TIMESLOTS = [
-  '09:00 - 10:00',
-  '10:00 - 11:00',
-  '11:00 - 12:00',
-  '14:00 - 15:00',
-  '15:00 - 16:00',
-  '16:00 - 17:00',
-  '17:00 - 18:00',
-  '19:00 - 20:00',
-  '20:00 - 21:00',
-  '21:00 - 22:00',
-  '22:00 - 23:00'
+  '09:00 AM - 10:00 AM (Manila Time)',
+  '10:00 AM - 11:00 AM (Manila Time)',
+  '11:00 AM - 12:00 PM (Manila Time)',
+  '02:00 PM - 03:00 PM (Manila Time)',
+  '03:00 PM - 04:00 PM (Manila Time)',
+  '04:00 PM - 05:00 PM (Manila Time)',
+  '05:00 PM - 06:00 PM (Manila Time)',
+  '07:00 PM - 08:00 PM (Manila Time)',
+  '08:00 PM - 09:00 PM (Manila Time)',
+  '09:00 PM - 10:00 PM (Manila Time)',
+  '10:00 PM - 11:00 PM (Manila Time)'
 ];
 
 interface CalendarTabProps {
@@ -43,7 +87,6 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
   
   // Modals States
   const [isAdding, setIsAdding] = useState(false);
-  const [isRequestingTimeslot, setIsRequestingTimeslot] = useState(false);
   
   // Multi-select Participants State
   const [selectedParticipants, setSelectedParticipants] = useState<string[]>([]);
@@ -57,19 +100,20 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
   const [reserveDate, setReserveDate] = useState(() => format(new Date(), 'yyyy-MM-dd'));
   const [reserveTimeslot, setReserveTimeslot] = useState('');
   const [reserveNotes, setReserveNotes] = useState('');
-  const [selectedLivehouseType, setSelectedLivehouseType] = useState<'Solo Livehouse' | 'Party Livehouse'>('Solo Livehouse');
+  const [selectedLivehouseType, setSelectedLivehouseType] = useState<'SOLO LIVEHOUSE' | 'PARTY LIVEHOUSE'>('SOLO LIVEHOUSE');
  
   // Proposal States (Alternative slot proposal by Manager/Admin)
   const [proposingRequestId, setProposingRequestId] = useState<string | null>(null);
   const [proposalDate, setProposalDate] = useState(() => format(new Date(), 'yyyy-MM-dd'));
   const [proposalTimeslot, setProposalTimeslot] = useState('');
+  const [eventDate, setEventDate] = useState(() => format(new Date(), 'yyyy-MM-dd'));
 
   // Reset selected participants when modal closes/opens
   useEffect(() => {
-    if (!isAdding && !isRequestingTimeslot) {
+    if (!isAdding) {
       setSelectedParticipants([]);
     }
-  }, [isAdding, isRequestingTimeslot]);
+  }, [isAdding]);
 
   // Load events & livehouse requests from Firestore on mount
   useEffect(() => {
@@ -159,41 +203,78 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
 
   // Livehouse Reservation availability checker
   const getTimeslotAvailability = (targetDate: string) => {
-    // Count approved events in the calendar of type Solo Livehouse or Party Livehouse
-    const calendarEventsCount = events.reduce((acc, event) => {
-      if (event.date === targetDate && (event.type === 'Solo Livehouse' || event.type === 'Party Livehouse')) {
-        const timeKey = event.time;
-        acc[timeKey] = (acc[timeKey] || 0) + 1;
-      }
+    // Find approved calendar events for targetDate of type Solo/Party Livehouse
+    const dayEvents = events.filter(event => {
+      if (event.date !== targetDate) return false;
+      const typeLower = String(event.type || '').toLowerCase();
+      return typeLower === 'solo livehouse' || typeLower === 'party livehouse';
+    });
+
+    const calendarEventsCount = dayEvents.reduce((acc, event) => {
+      const timeKey = event.time;
+      acc[timeKey] = (acc[timeKey] || 0) + 1;
       return acc;
     }, {} as Record<string, number>);
 
-    // Count approved livehouse requests in database
-    const approvedRequestsCount = livehouseRequests.reduce((acc, req) => {
-      if (req.date === targetDate && req.status === 'Approved') {
-        const timeKey = req.timeslot;
-        acc[timeKey] = (acc[timeKey] || 0) + 1;
-      }
+    // Find all approved livehouse requests in database
+    const approvedRequests = livehouseRequests.filter(req => req.date === targetDate && req.status === 'Approved');
+    const approvedRequestsCount = approvedRequests.reduce((acc, req) => {
+      const timeKey = req.timeslot;
+      acc[timeKey] = (acc[timeKey] || 0) + 1;
       return acc;
     }, {} as Record<string, number>);
+
+    // Find pending requests count
+    const pendingRequests = livehouseRequests.filter(req => req.date === targetDate && req.status === 'Pending Approval');
+    const pendingRequestsCount = pendingRequests.reduce((acc, req) => {
+      const timeKey = req.timeslot;
+      acc[timeKey] = (acc[timeKey] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+
+    // Collect event titles for each timeslot
+    const timeslotTitles = TIMESLOTS.reduce((acc, slot) => {
+      const titles: string[] = [];
+      dayEvents.forEach(e => {
+        if (e.time === slot && e.title) titles.push(e.title);
+      });
+      approvedRequests.forEach(r => {
+        if (r.timeslot === slot) {
+          const reqTitle = `Livehouse: ${r.name}`;
+          if (!titles.includes(reqTitle)) {
+            titles.push(reqTitle);
+          }
+        }
+      });
+      acc[slot] = titles;
+      return acc;
+    }, {} as Record<string, string[]>);
 
     return TIMESLOTS.map(slot => {
       const calendarCount = calendarEventsCount[slot] || 0;
       const requestCount = approvedRequestsCount[slot] || 0;
       const count = Math.max(calendarCount, requestCount);
       const isTaken = count >= 2;
+      const pendingCount = pendingRequestsCount[slot] || 0;
+      const eventTitles = timeslotTitles[slot] || [];
+
       return {
         slot,
         count,
         isTaken,
+        pendingCount,
+        eventTitles,
         label: isTaken ? `${slot} [Fully Booked / Taken]` : `${slot} (${2 - count} slots available)`
       };
     });
   };
-
-  // Submit new Livehouse Reservation Request
+  // Submit new Livehouse Scheduling Request
   const handleReserveLivehouse = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!reserveTimeslot) {
+      alert("Please select a timeslot block.");
+      return;
+    }
     const hostPoppoId = auth.poppo_id;
     const hostName = auth.nickname || auth.name || 'Niner Host';
 
@@ -204,7 +285,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
     const managerId = managerHost?.id || '19157913'; // fallback to director
 
     const newRequest: LivehouseRequest = {
-      id: crypto.randomUUID(),
+      id: crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 15),
       poppoId: hostPoppoId,
       name: hostName,
       date: reserveDate,
@@ -212,6 +293,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
       status: 'Pending Approval',
       managerId,
       notes: reserveNotes,
+      livehouseType: selectedLivehouseType,
       proposedBy: 'Host',
       timestamp: new Date().toISOString()
     };
@@ -222,6 +304,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
 
     try {
       await FirebaseService.saveLivehouseRequests(updatedRequests);
+      await FirebaseService.logSystemActivity(`Host requested livehouse timeslot: ${reserveTimeslot} on ${reserveDate} (Host: ${hostName}, Poppo ID: ${hostPoppoId}, Type: ${selectedLivehouseType}, Notes: "${reserveNotes}")`, 'Info');
     } catch (err) {
       console.error("Firestore sync failed for reservation request:", err);
     }
@@ -250,22 +333,23 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
     );
     setLivehouseRequests(updatedRequests);
     Storage.setLivehouseRequests(updatedRequests);
-
     // Create Calendar Event
     const newEvent: CalendarEvent = {
-      event_id: crypto.randomUUID(),
+      event_id: crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 15),
       poppo_id: req.poppoId,
       event_host_id: req.poppoId,
       title: `Livehouse: ${req.name}`,
       description: req.notes || 'Livehouse timeslot approved.',
       date: req.date,
       time: req.timeslot,
-      type: selectedLivehouseType,
+      type: (req.livehouseType || 'SOLO LIVEHOUSE') as EventType,
       location: 'VIRTUAL ROOM (LIVEHOUSE)',
-      created_by_name: auth.name,
-      created_by_role: auth.role,
+      created_by_name: auth.nickname || auth.name || 'Admin',
+      created_by_role: auth.role || 'Admin',
+      created_by_id: auth.poppo_id || auth.userId || 'Unknown',
       visibility: 'All',
-      participants: [],
+      participants: [req.poppoId],
+      participantIds: [req.poppoId],
       timestamp: new Date().toISOString()
     };
 
@@ -276,6 +360,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
     try {
       await FirebaseService.saveLivehouseRequests(updatedRequests);
       await FirebaseService.saveCalendarEvents(updatedEvents);
+      await FirebaseService.logSystemActivity(`Admin approved livehouse reservation request ID: ${req.id} for Host: ${req.name} (Poppo ID: ${req.poppoId}) on ${req.date} at ${req.timeslot}`, 'Info');
     } catch (err) {
       console.error("Firestore sync failed on approval:", err);
     }
@@ -302,6 +387,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
 
     try {
       await FirebaseService.saveLivehouseRequests(updatedRequests);
+      await FirebaseService.logSystemActivity(`Admin denied/closed livehouse reservation request ID: ${req.id} for Host: ${req.name} (Poppo ID: ${req.poppoId}) on ${req.date} at ${req.timeslot}`, 'Info');
     } catch (err) {
       console.error("Firestore sync failed on denial:", err);
     }
@@ -338,6 +424,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
 
     try {
       await FirebaseService.saveLivehouseRequests(updatedRequests);
+      await FirebaseService.logSystemActivity(`Admin proposed alternative timeslot for request ID: ${req.id}: ${proposalTimeslot} on ${proposalDate} (Host: ${req.name}, Poppo ID: ${req.poppoId})`, 'Info');
     } catch (err) {
       console.error("Firestore sync failed on slot proposal:", err);
     }
@@ -377,6 +464,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
 
     try {
       await FirebaseService.saveLivehouseRequests(updatedRequests);
+      await FirebaseService.logSystemActivity(`Host accepted proposed alternative timeslot for request ID: ${req.id}: ${req.proposedTimeslot} on ${req.proposedDate} (Host: ${req.name}, Poppo ID: ${req.poppoId})`, 'Info');
     } catch (err) {
       console.error("Firestore sync failed on proposal acceptance:", err);
     }
@@ -403,6 +491,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
 
     try {
       await FirebaseService.saveLivehouseRequests(updatedRequests);
+      await FirebaseService.logSystemActivity(`Host denied proposed alternative timeslot for request ID: ${req.id} (Host: ${req.name}, Poppo ID: ${req.poppoId})`, 'Warning');
     } catch (err) {
       console.error("Firestore sync failed on proposal denial:", err);
     }
@@ -418,13 +507,14 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
 
   // Filter requests visible to the logged in user based on role mapping
   const visibleRequests = useMemo(() => {
-    const isDirectorOrAdmin = auth.role === 'Director' || auth.role === 'Founder' || auth.role === 'Head Admin' || auth.role === 'Admin' || auth.level >= 2;
-    const isManager = auth.role === 'Manager';
-    const isHost = auth.role === 'Talent' || auth.role === 'Host';
+    const roleLower = String(auth.role || '').toLowerCase();
+    const isDirectorOrAdmin = ['director', 'founder', 'head admin', 'head_admin', 'admin'].includes(roleLower) || auth.level >= 2;
+    const isManagerOrAgent = ['manager', 'agent'].includes(roleLower);
+    const isHost = ['talent', 'host'].includes(roleLower);
 
     if (isDirectorOrAdmin) {
       return livehouseRequests;
-    } else if (isManager) {
+    } else if (isManagerOrAgent) {
       return livehouseRequests.filter(req => req.managerId === auth.poppo_id || req.poppoId === auth.poppo_id);
     } else if (isHost) {
       return livehouseRequests.filter(req => req.poppoId === auth.poppo_id);
@@ -450,6 +540,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
       location: formData.get('location') as string || 'ONLINE',
       created_by_name: auth.name,
       created_by_role: auth.role,
+      created_by_id: auth.poppo_id || auth.userId || 'Unknown',
       visibility: formData.get('visibility') as any || 'All',
       participants: [...selectedParticipants],
       participantIds: [...selectedParticipants], // alias for Firestore array-contains queries
@@ -460,53 +551,12 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
     Storage.setEvents(updated);
     setEvents(updated);
     Storage.addLog('Calendar', `Created event: ${newEvent.title}`, auth.name);
-    FirebaseService.saveCalendarEvents(updated).catch(err => {
+    FirebaseService.saveCalendarEvents(updated).then(async () => {
+      await FirebaseService.logSystemActivity(`Created calendar event entry: "${newEvent.title}" on ${newEvent.date} at ${newEvent.time} (Type: ${newEvent.type}, Location: ${newEvent.location}, Participants: ${newEvent.participants.join(', ')})`, 'Info');
+    }).catch(err => {
       console.error("Failed to save calendar events to Firestore:", err);
     });
     setIsAdding(false);
-    setSelectedEventId(newEvent.event_id);
-    setSelectedDate(new Date(newEvent.date + 'T00:00:00'));
-  };
-
-  // Request Timeslot Form submission
-  const handleRequestTimeslot = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const formData = new FormData(e.currentTarget);
-    const isTalent = auth.role === 'Talent';
-    
-    const requestTitle = formData.get('title') as string;
-    const poppoId = isTalent ? auth.poppo_id : (formData.get('hostId') as string || 'Agency');
-    const eventHostId = formData.get('eventHostId') as string || '';
-    const livehouseType = formData.get('livehouseType') as string;
-    const dateVal = formData.get('date') as string;
-    const timeVal = formData.get('time') as string;
-    const notes = formData.get('notes') as string;
-    
-    const newEvent: CalendarEvent = {
-      event_id: crypto.randomUUID(),
-      poppo_id: poppoId,
-      event_host_id: eventHostId,
-      title: `[Request] ${requestTitle || 'Livehouse Set'}`,
-      description: `Requested timeslot for ${livehouseType}. Notes: ${notes || 'No special requests.'}`,
-      date: dateVal,
-      time: timeVal,
-      type: livehouseType,
-      location: 'VIRTUAL ROOM (TBD)',
-      created_by_name: auth.name,
-      created_by_role: auth.role,
-      visibility: 'Leadership',
-      participants: [...selectedParticipants],
-      timestamp: new Date().toISOString()
-    };
-    
-    const updated = [...events, newEvent];
-    Storage.setEvents(updated);
-    setEvents(updated);
-    Storage.addLog('Calendar', `Requested livehouse timeslot: ${newEvent.title}`, auth.name);
-    FirebaseService.saveCalendarEvents(updated).catch(err => {
-      console.error("Failed to save livehouse timeslot request to Firestore:", err);
-    });
-    setIsRequestingTimeslot(false);
     setSelectedEventId(newEvent.event_id);
     setSelectedDate(new Date(newEvent.date + 'T00:00:00'));
   };
@@ -518,7 +568,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
     <div className="space-y-6">
       {/* Top Header for Public View */}
       {isReadOnly && (
-        <div className="border-b border-t border-slate-800 py-3 flex items-center justify-between px-2">
+        <div className="border-b border-t border-[#D4AF37]/15 py-3 flex items-center justify-between px-2">
           <span className="text-xs font-black tracking-[0.25em] text-white/50">NINERS APP</span>
         </div>
       )}
@@ -527,7 +577,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
         {/* Main Calendar Section */}
         <div className="lg:col-span-3 space-y-6">
           {/* Week Selector / Navigation controls */}
-          <div className="flex items-center justify-between bg-[#0F1117] border border-slate-800 p-4 rounded-2xl">
+          <div className="flex items-center justify-between bg-[#0F1117] border border-[#D4AF37]/15 p-4 rounded-2xl">
             <button 
               onClick={goToPreviousWeek} 
               className="p-2 hover:bg-white/5 rounded-xl transition-all cursor-pointer"
@@ -554,7 +604,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
 
           {/* 7-Day Calendar Grid */}
         <div className="overflow-x-auto pb-4 -mx-4 px-4 sm:mx-0 sm:px-0 custom-scrollbar">
-          <div className="grid grid-cols-7 gap-2 md:gap-4 bg-[#0B0D12] p-4 rounded-3xl border border-white/5 shadow-xl min-w-[700px]">
+          <div className="grid grid-cols-7 gap-2 md:gap-4 bg-[#0B0D12] p-4 rounded-3xl border border-[#D4AF37]/10 shadow-xl min-w-[700px]">
             {weekDays.map((day, idx) => {
               const dayName = format(day, 'EEEE');
               const dayAbbr = format(day, 'EEE').toUpperCase();
@@ -574,7 +624,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                       "w-full py-4 rounded-2xl flex flex-col items-center justify-center gap-1.5 transition-all border cursor-pointer select-none relative",
                       isSelected 
                         ? "bg-[#181B24] border-[#D4AF37] shadow-[0_0_15px_rgba(212,175,55,0.15)] text-[#D4AF37]" 
-                        : "bg-[#0F1117] border-white/5 hover:border-white/10 hover:bg-[#13161F] text-white"
+                        : "bg-[#0F1117] border-[#D4AF37]/10 hover:border-[#D4AF37]/20 hover:bg-[#13161F] text-white"
                     )}
                     title={`Select ${dayName}`}
                     aria-label={`Select ${dayName}`}
@@ -599,7 +649,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
         </div>
 
           {/* Events Section Heading */}
-          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+          <div className="flex items-center justify-between border-b border-[#D4AF37]/15 pb-3">
             <h3 className="text-xs font-black uppercase tracking-[0.2em] text-white">
               Scheduled Events ({format(selectedDate, 'EEEE, MMMM d')})
             </h3>
@@ -615,9 +665,12 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                 const isEventSelected = selectedEventId === e.event_id;
                 
                 const colorConfig = EVENT_COLORS[e.type || ''] || {
-                  bg: 'bg-white/5 border-white/5',
+                  bg: 'bg-[#D4AF37]/5 border-[#D4AF37]/10',
                   text: 'text-white/40',
-                  gradient: 'from-slate-600 to-slate-400'
+                  gradient: 'from-slate-600 to-slate-400',
+                  cardGradient: 'bg-gradient-to-br from-[#D4AF37]/5 via-transparent to-[#0F1117]',
+                  border: 'border-[#D4AF37]/10',
+                  borderHover: 'hover:border-[#D4AF37]/20'
                 };
                 
                 return (
@@ -625,10 +678,11 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                     key={e.event_id}
                     onClick={() => setSelectedEventId(e.event_id)}
                     className={cn(
-                      "w-full text-left bg-[#0F1117]/80 p-5 rounded-2xl relative overflow-hidden transition-all flex items-stretch gap-4 border cursor-pointer group shadow-lg",
+                      "w-full text-left p-5 rounded-2xl relative overflow-hidden transition-all flex items-stretch gap-4 border cursor-pointer group shadow-lg",
+                      colorConfig.cardGradient,
                       isEventSelected 
-                        ? "border-[#D4AF37] bg-[#13161C] shadow-[0_0_15px_rgba(212,175,55,0.15)]" 
-                        : "border-white/5 hover:border-white/10 hover:bg-[#12151D]"
+                        ? "border-[#D4AF37] ring-1 ring-[#D4AF37]/30 bg-[#13161C] shadow-[0_0_15px_rgba(212,175,55,0.15)]" 
+                        : cn(colorConfig.border, colorConfig.borderHover)
                     )}
                   >
                     <div className={cn("w-1.5 rounded-full shrink-0 bg-gradient-to-b", colorConfig.gradient)} />
@@ -643,7 +697,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                           {e.type || 'Event'}
                         </span>
                         <span className="font-mono text-xs font-bold text-[#67e8f9]">
-                          {e.time || '14:00 - 16:00'}
+                          {e.time || '02:00 PM - 04:00 PM (Manila Time)'}
                         </span>
                       </div>
                       
@@ -668,7 +722,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                 );
               })
             ) : (
-              <div className="bg-[#0F1117]/30 border border-dashed border-white/5 rounded-2xl py-12 text-center">
+              <div className="bg-[#0F1117]/30 border border-dashed border-[#D4AF37]/10 rounded-2xl py-12 text-center">
                 <CalendarIcon className="mx-auto text-white/10 mb-2" size={28} />
                 <p className="text-xs text-white/20 italic">No events scheduled for this date.</p>
               </div>
@@ -676,19 +730,19 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
           </div>
 
           {/* Detailed Interactive Card */}
-          <div className="bg-[#0F1117] border border-white/5 rounded-3xl p-6 shadow-xl relative overflow-hidden bg-gradient-to-br from-[#0F1117] to-[#12141A]">
+          <div className="bg-[#0F1117] border border-[#D4AF37]/10 rounded-3xl p-6 shadow-xl relative overflow-hidden bg-gradient-to-br from-[#0F1117] to-[#12141A]">
             <div className="absolute inset-0 bg-gradient-to-tr from-indigo-500/2 via-transparent to-[#D4AF37]/2 pointer-events-none" />
             
             {selectedEvent ? (
               <div className="space-y-5 relative z-10">
-                <div className="flex items-center justify-between border-b border-white/5 pb-3">
+                <div className="flex items-center justify-between border-b border-[#D4AF37]/10 pb-3">
                   <div className="flex items-center gap-2">
                     <Info size={14} className="text-[#D4AF37]" />
                     <span className="text-[10px] font-black uppercase text-[#D4AF37] tracking-widest">
                       Complete Event Metadata
                     </span>
                   </div>
-                  <span className="text-[9px] font-mono text-white/30 uppercase tracking-widest bg-white/5 px-2 py-0.5 rounded border border-white/5">
+                  <span className="text-[9px] font-mono text-white/30 uppercase tracking-widest bg-white/5 px-2 py-0.5 rounded border border-[#D4AF37]/15">
                     ID: {selectedEvent.event_id}
                   </span>
                 </div>
@@ -701,14 +755,14 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                     </div>
                     <div>
                       <span className="block text-[9px] font-black uppercase tracking-wider text-white/30 mb-1">Description / Notes</span>
-                      <p className="font-medium text-white/60 leading-relaxed bg-[#0A0B0E]/60 border border-white/5 rounded-xl p-3.5">
+                      <p className="font-medium text-white/60 leading-relaxed bg-[#0A0B0E]/60 border border-[#D4AF37]/10 rounded-xl p-3.5">
                         {selectedEvent.description || 'No description provided.'}
                       </p>
                     </div>
                     {selectedEvent.location && (
                       <div>
                         <span className="block text-[9px] font-black uppercase tracking-wider text-white/30 mb-1">Location Details</span>
-                        <div className="flex items-center gap-1.5 font-bold text-white uppercase bg-[#0A0B0E]/30 px-3 py-2 rounded-xl border border-white/5 w-fit">
+                        <div className="flex items-center gap-1.5 font-bold text-white uppercase bg-[#0A0B0E]/30 px-3 py-2 rounded-xl border border-[#D4AF37]/10 w-fit">
                           <MapPin size={13} className="text-red-400" />
                           <span>{selectedEvent.location}</span>
                         </div>
@@ -716,22 +770,22 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                     )}
                   </div>
                   
-                  <div className="space-y-4 md:border-l md:border-white/5 md:pl-6">
+                  <div className="space-y-4 md:border-l md:border-[#D4AF37]/10 md:pl-6">
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <span className="block text-[9px] font-black uppercase tracking-wider text-white/30 mb-1">Target Date</span>
-                        <p className="font-mono font-bold text-white bg-[#0A0B0E]/40 px-2.5 py-1.5 rounded-lg border border-white/5 w-fit">{selectedEvent.date}</p>
+                        <p className="font-mono font-bold text-white bg-[#0A0B0E]/40 px-2.5 py-1.5 rounded-lg border border-[#D4AF37]/10 w-fit">{selectedEvent.date}</p>
                       </div>
                       <div>
                         <span className="block text-[9px] font-black uppercase tracking-wider text-white/30 mb-1">Scheduled Time</span>
-                        <p className="font-mono font-bold text-white bg-[#0A0B0E]/40 px-2.5 py-1.5 rounded-lg border border-white/5 w-fit">{selectedEvent.time || 'N/A'}</p>
+                        <p className="font-mono font-bold text-white bg-[#0A0B0E]/40 px-2.5 py-1.5 rounded-lg border border-[#D4AF37]/10 w-fit">{selectedEvent.time || 'N/A'}</p>
                       </div>
                     </div>
                     
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <span className="block text-[9px] font-black uppercase tracking-wider text-white/30 mb-1">Host ID</span>
-                        <span className="inline-flex px-2.5 py-1.5 bg-[#0A0B0E]/40 border border-white/5 rounded-lg font-mono font-bold text-white/80">
+                        <span className="inline-flex px-2.5 py-1.5 bg-[#0A0B0E]/40 border border-[#D4AF37]/10 rounded-lg font-mono font-bold text-white/80">
                           {selectedEvent.poppo_id}
                         </span>
                       </div>
@@ -765,7 +819,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                     {selectedEvent.event_host_id && (
                       <div>
                         <span className="block text-[9px] font-black uppercase tracking-wider text-white/30 mb-1">Event Host ID</span>
-                        <p className="font-mono font-bold text-white bg-[#0A0B0E]/40 px-2.5 py-1.5 rounded-lg border border-white/5 w-fit">
+                        <p className="font-mono font-bold text-white bg-[#0A0B0E]/40 px-2.5 py-1.5 rounded-lg border border-[#D4AF37]/10 w-fit">
                           {selectedEvent.event_host_id}
                         </p>
                       </div>
@@ -773,7 +827,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                     
                     <div>
                       <span className="block text-[9px] font-black uppercase tracking-wider text-white/30 mb-1">Created Timestamp</span>
-                      <p className="font-mono text-white/40 text-[10px] bg-[#0A0B0E]/30 px-2.5 py-1 rounded-lg border border-white/5 w-fit">
+                      <p className="font-mono text-white/40 text-[10px] bg-[#0A0B0E]/30 px-2.5 py-1 rounded-lg border border-[#D4AF37]/10 w-fit">
                         {new Date(selectedEvent.timestamp || new Date()).toLocaleString()}
                       </p>
                     </div>
@@ -781,14 +835,14 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
 
                   {/* Niners Participants display */}
                   {selectedEvent.participants && selectedEvent.participants.length > 0 && (
-                    <div className="md:col-span-2 pt-2 border-t border-white/5">
+                    <div className="md:col-span-2 pt-2 border-t border-[#D4AF37]/10">
                       <span className="block text-[9px] font-black uppercase tracking-wider text-white/30 mb-2">Niners Participants ({selectedEvent.participants.length})</span>
                       <div className="flex flex-wrap gap-2">
                         {selectedEvent.participants.map(poppoId => {
                           const pHost = (hosts || []).find(h => h.id === poppoId);
                           const dispName = pHost ? `${pHost.nickname || pHost.name} (#${poppoId})` : `#${poppoId}`;
                           return (
-                            <span key={poppoId} className="bg-slate-800/60 border border-slate-700 rounded-lg px-2.5 py-1 text-[10px] font-semibold text-white/90">
+                            <span key={poppoId} className="bg-slate-800/60 border border-[#D4AF37]/15 rounded-lg px-2.5 py-1 text-[10px] font-semibold text-white/90">
                               {dispName}
                             </span>
                           );
@@ -807,18 +861,18 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
           </div>
 
           {/* Livehouse Reservation Requests Queue Panel */}
-          {!isReadOnly && auth.level > 0 && (
-            <div className="bg-[#0F1117] border border-white/5 rounded-3xl p-6 shadow-xl bg-gradient-to-br from-[#0F1117] to-[#12141A] mt-6 relative overflow-hidden">
+          {!isReadOnly && auth.role && (
+            <div className="bg-[#0F1117] border border-[#D4AF37]/10 rounded-3xl p-6 shadow-xl bg-gradient-to-br from-[#0F1117] to-[#12141A] mt-6 relative overflow-hidden">
               <div className="absolute inset-0 bg-gradient-to-tr from-pink-500/2 via-transparent to-[#D4AF37]/2 pointer-events-none" />
               
-              <div className="flex items-center justify-between border-b border-white/5 pb-3 mb-5">
+              <div className="flex items-center justify-between border-b border-[#D4AF37]/10 pb-3 mb-5">
                 <div className="flex items-center gap-2">
                   <Clock size={16} className="text-[#ec4899]" />
                   <span className="text-[10px] font-black uppercase text-white tracking-widest">
                     Livehouse Reservation Requests Queue
                   </span>
                 </div>
-                <span className="text-[9px] font-mono text-white/30 uppercase tracking-widest bg-white/5 px-2 py-0.5 rounded border border-white/5 font-bold">
+                <span className="text-[9px] font-mono text-white/30 uppercase tracking-widest bg-white/5 px-2 py-0.5 rounded border border-[#D4AF37]/15 font-bold">
                   Requests: {visibleRequests.length}
                 </span>
               </div>
@@ -827,7 +881,9 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                 <div className="space-y-4 max-h-[450px] overflow-y-auto pr-2 custom-scrollbar">
                   {visibleRequests.map(req => {
                     const isOwnRequest = req.poppoId === auth.poppo_id;
-                    const canManage = auth.role === 'Director' || auth.role === 'Founder' || auth.role === 'Head Admin' || auth.role === 'Admin' || auth.role === 'Manager' || auth.level >= 2;
+                    const roleLower = String(auth.role || '').toLowerCase();
+                    const canManage = ['director', 'founder', 'head admin', 'head_admin', 'admin', 'manager', 'agent'].includes(roleLower) || auth.level >= 2;
+                    const canApprove = ['director', 'founder', 'head admin', 'head_admin'].includes(roleLower);
                     
                     let statusColor = 'bg-slate-500/10 border-slate-500/20 text-slate-400';
                     if (req.status === 'Approved') statusColor = 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400';
@@ -836,7 +892,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                     if (req.status === 'Closed') statusColor = 'bg-red-500/10 border-red-500/20 text-red-400';
 
                     return (
-                      <div key={req.id} className="bg-[#0A0B0E]/60 border border-white/5 rounded-2xl p-4 space-y-3 shadow-lg relative group hover:border-[#ec4899]/30 transition-all">
+                      <div key={req.id} className="bg-[#0A0B0E]/60 border border-[#D4AF37]/10 rounded-2xl p-4 space-y-3 shadow-lg relative group hover:border-[#ec4899]/30 transition-all font-sans">
                         <div className="flex items-center justify-between gap-4">
                           <div className="flex items-center gap-2">
                             <span className={cn("px-2.5 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider", statusColor)}>
@@ -896,12 +952,14 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                           {/* Manager Actions on request */}
                           {(req.status === 'Pending Approval' || req.status === 'Host Accepted Proposal') && canManage && (
                             <div className="flex flex-wrap items-center gap-2 pt-1 self-center justify-end">
-                              <button 
-                                onClick={() => handleApproveRequest(req.id)}
-                                className="bg-slate-900 border border-emerald-500/70 hover:bg-emerald-500/10 text-emerald-400 text-[9px] font-black uppercase tracking-widest px-4 py-2 rounded-lg cursor-pointer transition-all active:scale-95 shadow-lg shadow-emerald-500/5"
-                              >
-                                Approve slot
-                              </button>
+                              {canApprove && (
+                                <button 
+                                  onClick={() => handleApproveRequest(req.id)}
+                                  className="bg-slate-900 border border-emerald-500/70 hover:bg-emerald-500/10 text-emerald-400 text-[9px] font-black uppercase tracking-widest px-4 py-2 rounded-lg cursor-pointer transition-all active:scale-95 shadow-lg shadow-emerald-500/5"
+                                >
+                                  Approve slot
+                                </button>
+                              )}
                               <button 
                                 onClick={() => setProposingRequestId(req.id)}
                                 className="bg-slate-900 border border-pink-500/50 hover:bg-pink-500/10 text-pink-400 text-[9px] font-black uppercase tracking-widest px-4 py-2 rounded-lg cursor-pointer transition-all active:scale-95"
@@ -920,19 +978,18 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
 
                         {/* Propose different slot inline mini-form */}
                         {proposingRequestId === req.id && (
-                          <div className="bg-[#12141C] border border-slate-800 rounded-xl p-4 mt-3 space-y-3">
+                          <div className="bg-[#12141C] border border-[#D4AF37]/15 rounded-xl p-4 mt-3 space-y-3">
                             <h5 className="text-[10px] font-black text-white/50 uppercase tracking-widest">Propose Alternative Timeslot</h5>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                               <div className="space-y-1">
                                 <label htmlFor={`prop-date-${req.id}`} className="text-[8px] font-black text-white/40 uppercase tracking-wider block">Proposal Date</label>
-                                <input 
+                                <SingleDatePicker 
                                   id={`prop-date-${req.id}`}
-                                  type="date" 
+                                  name="proposedDate"
                                   value={proposalDate} 
-                                  onChange={(e) => setProposalDate(e.target.value)} 
+                                  onChange={(val) => setProposalDate(val)} 
                                   required 
                                   title="Proposal Date" 
-                                  className="w-full bg-[#0A0B0E] border border-slate-800 rounded-lg px-3 py-2 text-xs focus:border-[#D4AF37] outline-none text-white font-mono" 
                                 />
                               </div>
                               <div className="space-y-1">
@@ -943,7 +1000,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                                   onChange={(e) => setProposalTimeslot(e.target.value)} 
                                   required 
                                   title="Proposal Timeslot Option" 
-                                  className="w-full bg-[#0A0B0E] border border-slate-800 rounded-lg px-3 py-2 text-xs focus:border-[#D4AF37] outline-none text-white font-bold cursor-pointer"
+                                  className="w-full bg-[#0A0B0E] border border-[#D4AF37]/15 rounded-lg px-3 py-2 text-xs focus:border-[#D4AF37] outline-none text-white font-bold cursor-pointer"
                                 >
                                   <option value="">-- Choose timeslot --</option>
                                   {getTimeslotAvailability(proposalDate).map(t => (
@@ -963,7 +1020,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                               <button 
                                 type="button" 
                                 onClick={() => setProposingRequestId(null)} 
-                                className="px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-white/45 text-[9px] font-black uppercase tracking-wider hover:bg-slate-800 transition-colors"
+                                className="px-3 py-1.5 rounded-lg bg-slate-900 border border-[#D4AF37]/15 text-white/45 text-[9px] font-black uppercase tracking-wider hover:bg-slate-800 transition-colors"
                               >
                                 Cancel
                               </button>
@@ -994,7 +1051,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
         {/* Sidebar: Event Options & Create */}
         <div className="space-y-6">
           {/* Filter options */}
-          <div className="bg-[#0F1117] border border-slate-800 p-4 rounded-2xl space-y-3 shadow-lg">
+          <div className="bg-[#0F1117] border border-[#D4AF37]/15 p-4 rounded-2xl space-y-3 shadow-lg">
             <h4 className="font-black text-white/40 text-[9px] uppercase tracking-widest">Filter by Type</h4>
             <div className="flex flex-col gap-1.5">
               {Object.keys(EVENT_COLORS).map(type => {
@@ -1007,8 +1064,8 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                     className={cn(
                       "w-full text-left px-3 py-2 rounded-xl text-[10px] font-bold uppercase transition-all border border-transparent cursor-pointer",
                       isActive
-                        ? "bg-slate-800 border-slate-700 text-white"
-                        : "bg-[#0A0B0E] border-slate-900 text-slate-500 hover:text-white/60"
+                        ? "bg-slate-800 border-[#D4AF37]/20 text-white"
+                        : "bg-[#0A0B0E] border-[#D4AF37]/10 text-slate-500 hover:text-white/60"
                     )}
                   >
                     <span className="flex items-center gap-2">
@@ -1030,33 +1087,27 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
           </div>
 
           {/* Action Buttons for interactive page only */}
-          {!isReadOnly && auth.level > 0 && (
+          {!isReadOnly && (
             <div className="space-y-3">
-              {(auth.role !== 'Talent' && auth.role !== 'Host') && (
-                <>
-                  <button 
-                    onClick={() => setIsAdding(true)} 
-                    className="w-full bg-[#D4AF37] hover:bg-[#D4AF37]/80 text-black font-black uppercase tracking-wider text-xs py-3.5 rounded-xl cursor-pointer flex items-center justify-center gap-2 shadow-lg shadow-[#D4AF37]/5 transition-all transform active:scale-95"
-                  >
-                    <Plus size={16} />
-                    Add Event Entry
-                  </button>
-                  <button 
-                    onClick={() => setIsRequestingTimeslot(true)} 
-                    className="w-full border border-[#D4AF37]/50 hover:border-[#D4AF37] text-[#D4AF37] hover:bg-[#D4AF37]/5 font-black uppercase tracking-wider text-xs py-3.5 rounded-xl cursor-pointer flex items-center justify-center gap-2 transition-all transform active:scale-95"
-                  >
-                    <Clock size={16} />
-                    Request Timeslot
-                  </button>
-                </>
+              {auth.level > 0 && (
+                <button 
+                  onClick={() => setIsAdding(true)} 
+                  className="w-full bg-[#D4AF37] hover:bg-[#D4AF37]/80 text-black font-black uppercase tracking-wider text-xs py-3.5 rounded-xl cursor-pointer flex items-center justify-center gap-2 shadow-lg shadow-[#D4AF37]/5 transition-all transform active:scale-95"
+                >
+                  <Plus size={16} />
+                  Add Event Entry
+                </button>
               )}
-              <button 
-                onClick={() => setIsReservingLivehouse(true)} 
-                className="w-full bg-[#ec4899] hover:bg-[#ec4899]/80 text-white font-black uppercase tracking-wider text-xs py-3.5 rounded-xl cursor-pointer flex items-center justify-center gap-2 shadow-lg shadow-[#ec4899]/5 transition-all transform active:scale-95"
-              >
-                <Clock size={16} />
-                Reserve Livehouse Slot
-              </button>
+
+              {['talent', 'host'].includes(auth.role?.toLowerCase() || '') && (
+                <button 
+                  onClick={() => setIsReservingLivehouse(true)} 
+                  className="w-full bg-slate-900 border border-[#D4AF37] hover:bg-[#D4AF37]/5 text-[#D4AF37] hover:text-white font-black uppercase tracking-[0.2em] text-xs py-3.5 rounded-xl cursor-pointer flex items-center justify-center gap-2 shadow-xl transition-all transform active:scale-95"
+                >
+                  <Plus size={16} />
+                  SCHEDULE LIVEHOUSE
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -1067,271 +1118,18 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
         {isAdding && (
           <div className="fixed inset-0 z-[1000] flex items-center justify-center p-6">
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsAdding(false)} className="absolute inset-0 bg-[#0A0B0E]/80 backdrop-blur-sm" />
-            <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="relative bg-[#0F1117] border border-slate-800 w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl z-10 max-h-[90vh] overflow-y-auto custom-scrollbar">
-              <div className="p-6 border-b border-slate-800 font-black text-white uppercase tracking-widest text-[10px]">Create New Event Entry</div>
-              <form onSubmit={handleCreate} className="p-6 space-y-5">
-                
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <label htmlFor="event-title" className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">Event Title</label>
-                    <input id="event-title" name="title" required className="w-full bg-[#0A0B0E] border border-slate-800 rounded-xl px-4 py-3 text-sm focus:border-[#D4AF37] outline-none text-white placeholder-white/20" placeholder="e.g. PK Battle" title="Event Title" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label htmlFor="event-type" className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">Event Type</label>
-                    <select id="event-type" name="type" title="Event Type" className="w-full bg-[#0A0B0E] border border-slate-800 rounded-xl px-4 py-3 text-sm focus:border-[#D4AF37] outline-none text-white font-bold cursor-pointer">
-                      {Object.keys(EVENT_COLORS).map(type => (
-                        <option key={type} value={type} className="bg-[#0f1117] text-white">{type}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-                
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <label htmlFor="event-host-id" className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">Host ID (Poppo ID)</label>
-                    <input 
-                      id="event-host-id"
-                      name="hostId" 
-                      required={auth.role !== 'Talent'} 
-                      disabled={auth.role === 'Talent'}
-                      defaultValue={auth.role === 'Talent' ? auth.poppo_id : ''}
-                      className="w-full bg-[#0A0B0E] border border-slate-800 rounded-xl px-4 py-3 text-sm focus:border-[#D4AF37] outline-none text-white" 
-                      placeholder="e.g. 19157913" 
-                      title="Host ID"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label htmlFor="event-ev-host-id" className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">Event Host ID (Info Only)</label>
-                    <input 
-                      id="event-ev-host-id"
-                      name="eventHostId" 
-                      className="w-full bg-[#0A0B0E] border border-slate-800 rounded-xl px-4 py-3 text-sm focus:border-[#D4AF37] outline-none text-white placeholder-white/20" 
-                      placeholder="e.g. 1234567" 
-                      title="Event Host ID"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <label htmlFor="event-date" className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">Event Date</label>
-                    <input id="event-date" name="date" type="date" required className="w-full bg-[#0A0B0E] border border-slate-800 rounded-xl px-4 py-3 text-sm focus:border-[#D4AF37] outline-none text-white" title="Event Date" placeholder="Event Date" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label htmlFor="event-time" className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">Time Block</label>
-                    <input id="event-time" name="time" placeholder="14:00 - 16:00" required className="w-full bg-[#0A0B0E] border border-slate-800 rounded-xl px-4 py-3 text-sm focus:border-[#D4AF37] outline-none text-white font-bold" title="Event Time" />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <label htmlFor="event-location" className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">Location Details</label>
-                    <input id="event-location" name="location" placeholder="e.g. CHANNEL ROOM 109" required className="w-full bg-[#0A0B0E] border border-slate-800 rounded-xl px-4 py-3 text-sm focus:border-[#D4AF37] outline-none text-white font-bold" title="Location Details" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label htmlFor="event-visibility" className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">Visibility</label>
-                    <select id="event-visibility" name="visibility" title="Event visibility level" className="w-full bg-[#0A0B0E] border border-slate-800 rounded-xl px-4 py-3 text-sm focus:border-[#D4AF37] outline-none text-white font-bold cursor-pointer">
-                       <option value="All">Everyone (Public)</option>
-                       <option value="Leadership">Leadership Only</option>
-                       <option value="Director">Director Only</option>
-                     </select>
-                  </div>
-                </div>
-
-                {/* Niners Participants selector — filtered to hosts only */}
-                <div className="space-y-1.5">
-                  <label htmlFor="event-participants-add" className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">
-                    Niners Participants ({selectedParticipants.length} selected)
-                  </label>
-                  <select
-                    id="event-participants-add"
-                    value=""
-                    title="Add Niners Participants"
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      if (val && !selectedParticipants.includes(val)) {
-                        setSelectedParticipants([...selectedParticipants, val]);
-                      }
-                    }}
-                    className="w-full bg-[#0A0B0E] border border-slate-800 rounded-xl px-4 py-3 text-sm focus:border-[#D4AF37] outline-none text-white font-bold cursor-pointer"
-                  >
-                    <option value="">— Select a host to add —</option>
-                    {(hosts || [])
-                      .filter(h => h.role === 'Talent' || h.role === 'Host' || (h as any).role === 'talent' || (h as any).role === 'host')
-                      .filter(h => !selectedParticipants.includes(h.id))
-                      .sort((a, b) => (a.nickname || a.name || '').localeCompare(b.nickname || b.name || ''))
-                      .map(h => (
-                        <option key={h.id} value={h.id} className="bg-[#0f1117] text-white">
-                          {h.id} — {h.nickname || h.name}
-                        </option>
-                      ))}
-                  </select>
-                  
-                  {/* Selected participants chips */}
-                  {selectedParticipants.length > 0 && (
-                    <div className="flex flex-wrap gap-2 pt-2">
-                      {selectedParticipants.map(poppoId => {
-                        const pHost = (hosts || []).find(h => h.id === poppoId);
-                        const nick = pHost?.nickname || pHost?.name || poppoId;
-                        return (
-                          <span key={poppoId} className="bg-slate-800 border border-[#D4AF37]/20 rounded-xl px-2.5 py-1.5 text-[10px] font-black text-white flex items-center gap-2 shadow-sm">
-                            <span className="text-[#D4AF37] font-mono">{poppoId}</span>
-                            <span className="text-white/70">{nick}</span>
-                            <button
-                              type="button"
-                              onClick={() => setSelectedParticipants(selectedParticipants.filter(id => id !== poppoId))}
-                              className="text-slate-400 hover:text-red-400 font-extrabold text-[10px] transition-colors ml-1 shrink-0"
-                            >
-                              ✕
-                            </button>
-                          </span>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-
-
-                <div className="space-y-1.5">
-                  <label htmlFor="event-description" className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">Description / Notes</label>
-                  <textarea id="event-description" name="description" title="Description and notes" className="w-full bg-[#0A0B0E] border border-slate-800 rounded-xl p-4 text-sm focus:border-[#D4AF37] outline-none text-white h-24 resize-none placeholder-white/20" placeholder="Details about the event requirements..." />
-                </div>
-
-                <div className="pt-2 flex gap-4">
-                   <button type="button" onClick={() => setIsAdding(false)} className="flex-1 px-6 py-4 rounded-xl bg-slate-900 border border-slate-800 text-white/40 font-black uppercase text-[10px] tracking-widest hover:bg-slate-800 hover:text-white transition-colors cursor-pointer">Cancel</button>
-                   <button type="submit" className="flex-[2] bg-slate-900 border border-[#D4AF37] hover:bg-[#D4AF37]/5 text-[#D4AF37] hover:text-white py-4 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] shadow-xl transition-all cursor-pointer">Authorize & Create</button>
-                </div>
-              </form>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* Request Livehouse Timeslot Modal */}
-      <AnimatePresence>
-        {isRequestingTimeslot && (
-          <div className="fixed inset-0 z-[1000] flex items-center justify-center p-6">
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsRequestingTimeslot(false)} className="absolute inset-0 bg-[#0A0B0E]/80 backdrop-blur-sm" />
-            <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="relative bg-[#0F1117] border border-slate-800 w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl z-10 max-h-[90vh] overflow-y-auto custom-scrollbar">
-              <div className="p-6 border-b border-slate-800 font-black text-white uppercase tracking-widest text-[10px]">Request Livehouse Timeslot</div>
-              <form onSubmit={handleRequestTimeslot} className="p-6 space-y-5">
-                
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <label htmlFor="req-theme" className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">Performance Theme / Title</label>
-                    <input id="req-theme" name="title" required className="w-full bg-[#0A0B0E] border border-slate-800 rounded-xl px-4 py-3 text-sm focus:border-[#D4AF37] outline-none text-white placeholder-white/20" placeholder="e.g. Summer Acoustic Vibes" title="Performance Theme" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label htmlFor="req-livehouse-type" className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">Livehouse Type</label>
-                    <select id="req-livehouse-type" name="livehouseType" title="Livehouse Type" className="w-full bg-[#0A0B0E] border border-slate-800 rounded-xl px-4 py-3 text-sm focus:border-[#D4AF37] outline-none text-white font-bold cursor-pointer">
-                      <option value="Solo Livehouse" className="bg-[#0f1117] text-white">Solo Livehouse</option>
-                      <option value="Party Livehouse" className="bg-[#0f1117] text-white">Party Livehouse</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <label htmlFor="req-host-id" className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">Host ID (Poppo ID)</label>
-                    <input 
-                      id="req-host-id"
-                      name="hostId" 
-                      required={auth.role !== 'Talent'} 
-                      disabled={auth.role === 'Talent'}
-                      defaultValue={auth.role === 'Talent' ? auth.poppo_id : ''}
-                      className="w-full bg-[#0A0B0E] border border-slate-800 rounded-xl px-4 py-3 text-sm focus:border-[#D4AF37] outline-none text-white" 
-                      placeholder="Enter Poppo ID..." 
-                      title="Target Poppo ID"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label htmlFor="req-ev-host-id" className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">Event Host ID (Info Only)</label>
-                    <input 
-                      id="req-ev-host-id"
-                      name="eventHostId" 
-                      className="w-full bg-[#0A0B0E] border border-slate-800 rounded-xl px-4 py-3 text-sm focus:border-[#D4AF37] outline-none text-white placeholder-white/20" 
-                      placeholder="e.g. 1234567" 
-                      title="Event Host ID"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <label htmlFor="req-date" className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">Requested Date</label>
-                    <input id="req-date" name="date" type="date" required className="w-full bg-[#0A0B0E] border border-slate-800 rounded-xl px-4 py-3 text-sm focus:border-[#D4AF37] outline-none text-white" title="Requested Date" placeholder="Requested Date" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label htmlFor="req-time" className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">Requested Timeslot Block</label>
-                    <select id="req-time" name="time" title="Requested Timeslot Block" className="w-full bg-[#0A0B0E] border border-slate-800 rounded-xl px-4 py-3 text-sm focus:border-[#D4AF37] outline-none text-white font-bold cursor-pointer">
-                      <option value="14:00 - 16:00" className="bg-[#0f1117] text-white">14:00 - 16:00</option>
-                      <option value="16:00 - 18:00" className="bg-[#0f1117] text-white">16:00 - 18:00</option>
-                      <option value="18:00 - 20:00" className="bg-[#0f1117] text-white">18:00 - 20:00</option>
-                      <option value="20:00 - 22:00" className="bg-[#0f1117] text-white">20:00 - 22:00</option>
-                      <option value="22:00 - 00:00" className="bg-[#0f1117] text-white">22:00 - 00:00</option>
-                    </select>
-                  </div>
-                </div>
-
-                {/* Niners Participants selector */}
-                <div className="space-y-1.5">
-                  <label htmlFor="req-participants-add" className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">
-                    Niners Participants ({selectedParticipants.length} / 9)
-                  </label>
-                  <select
-                    id="req-participants-add"
-                    value=""
-                    title="Add Niners Participants"
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      if (val && selectedParticipants.length < 9 && !selectedParticipants.includes(val)) {
-                        setSelectedParticipants([...selectedParticipants, val]);
-                      }
-                    }}
-                    disabled={selectedParticipants.length >= 9}
-                    className="w-full bg-[#0A0B0E] border border-slate-800 rounded-xl px-4 py-3 text-sm focus:border-[#D4AF37] outline-none text-white font-bold cursor-pointer disabled:opacity-40"
-                  >
-                    <option value="">-- Add Participant Host --</option>
-                    {(hosts || []).map(h => (
-                      <option key={h.id} value={h.id} className="bg-[#0f1117] text-white">
-                        {h.nickname || h.name} (#{h.id})
-                      </option>
-                    ))}
-                  </select>
-                  
-                  {/* Stacking visual blocks display below */}
-                  {selectedParticipants.length > 0 && (
-                    <div className="flex flex-wrap gap-2 pt-1">
-                      {selectedParticipants.map(poppoId => {
-                        const pHost = (hosts || []).find(h => h.id === poppoId);
-                        const dispName = pHost ? `${pHost.nickname || pHost.name} (#${poppoId})` : `#${poppoId}`;
-                        return (
-                          <span key={poppoId} className="bg-slate-800 border border-slate-700 rounded-xl px-2.5 py-1 text-[10px] font-black text-white flex items-center gap-1.5 shadow-sm">
-                            <span>{dispName}</span>
-                            <button
-                              type="button"
-                              onClick={() => setSelectedParticipants(selectedParticipants.filter(id => id !== poppoId))}
-                              className="text-slate-400 hover:text-red-400 font-extrabold text-[10px] transition-colors shrink-0"
-                            >
-                              ✕
-                            </button>
-                          </span>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-
-                <div className="space-y-1.5">
-                  <label htmlFor="req-notes" className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">Special Notes / Equipment Requests</label>
-                  <textarea id="req-notes" name="notes" title="Special Notes / Equipment Requests" className="w-full bg-[#0A0B0E] border border-slate-800 rounded-xl p-4 text-sm focus:border-[#D4AF37] outline-none text-white h-24 resize-none placeholder-white/20" placeholder="e.g. Need high fidelity mic presets..." />
-                </div>
-
-                <div className="pt-2 flex gap-4">
-                   <button type="button" onClick={() => setIsRequestingTimeslot(false)} className="flex-1 px-6 py-4 rounded-xl bg-slate-900 border border-slate-800 text-white/40 font-black uppercase text-[10px] tracking-widest hover:bg-slate-800 hover:text-white transition-colors cursor-pointer">Cancel</button>
-                   <button type="submit" className="flex-[2] bg-slate-900 border border-[#D4AF37] hover:bg-[#D4AF37]/5 text-[#D4AF37] hover:text-white py-4 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] shadow-xl transition-all cursor-pointer">Submit Timeslot Request</button>
-                </div>
-              </form>
+            <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="relative bg-[#0F1117] border border-[#D4AF37]/20 w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl z-10 max-h-[90vh] overflow-y-auto custom-scrollbar">
+              <div className="p-6 border-b border-[#D4AF37]/20 font-black text-white uppercase tracking-widest text-[10px]">Schedule New Calendar Event</div>
+              <div className="p-6">
+                <AddEventForm 
+                  onSuccess={() => {
+                    setIsAdding(false);
+                    // Simple reload to refresh the calendar data visually
+                    window.location.reload();
+                  }}
+                  onCancel={() => setIsAdding(false)}
+                />
+              </div>
             </motion.div>
           </div>
         )}
@@ -1342,8 +1140,8 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
         {isReservingLivehouse && (
           <div className="fixed inset-0 z-[1000] flex items-center justify-center p-6">
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsReservingLivehouse(false)} className="absolute inset-0 bg-[#0A0B0E]/80 backdrop-blur-sm" />
-            <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="relative bg-[#0F1117] border border-slate-800 w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl z-10 max-h-[90vh] overflow-y-auto custom-scrollbar">
-              <div className="p-6 border-b border-slate-800 font-black text-white uppercase tracking-widest text-[10px]">Reserve Livehouse Timeslot</div>
+            <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="relative bg-[#0F1117] border border-[#D4AF37]/20 w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl z-10 max-h-[90vh] overflow-y-auto custom-scrollbar">
+              <div className="p-6 border-b border-[#D4AF37]/20 font-black text-white uppercase tracking-widest text-[10px]">SCHEDULE LIVEHOUSE</div>
               <form onSubmit={handleReserveLivehouse} className="p-6 space-y-5">
                 
                 <div className="grid grid-cols-2 gap-4">
@@ -1353,7 +1151,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                       id="res-poppo-id"
                       disabled 
                       value={auth.poppo_id} 
-                      className="w-full bg-[#0A0B0E] border border-slate-800 rounded-xl px-4 py-3 text-sm text-white/50 cursor-not-allowed outline-none" 
+                      className="w-full bg-[#0A0B0E] border border-[#D4AF37]/15 rounded-xl px-4 py-3 text-sm text-white/50 cursor-not-allowed outline-none" 
                     />
                   </div>
                   <div className="space-y-1.5">
@@ -1362,7 +1160,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                       id="res-host-name"
                       disabled 
                       value={auth.nickname || auth.name} 
-                      className="w-full bg-[#0A0B0E] border border-slate-800 rounded-xl px-4 py-3 text-sm text-white/50 cursor-not-allowed outline-none" 
+                      className="w-full bg-[#0A0B0E] border border-[#D4AF37]/15 rounded-xl px-4 py-3 text-sm text-white/50 cursor-not-allowed outline-none" 
                     />
                   </div>
                 </div>
@@ -1375,48 +1173,83 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                       value={selectedLivehouseType}
                       onChange={(e) => setSelectedLivehouseType(e.target.value as any)}
                       title="Livehouse Type" 
-                      className="w-full bg-[#0A0B0E] border border-slate-800 rounded-xl px-4 py-3 text-sm focus:border-[#D4AF37] outline-none text-white font-bold cursor-pointer"
+                      className="w-full bg-[#0A0B0E] border border-[#D4AF37]/15 rounded-xl px-4 py-3 text-sm focus:border-[#D4AF37] outline-none text-white font-bold cursor-pointer"
                     >
-                      <option value="Solo Livehouse" className="bg-[#0f1117]">Solo Livehouse</option>
-                      <option value="Party Livehouse" className="bg-[#0f1117]">Party Livehouse</option>
+                      <option value="SOLO LIVEHOUSE" className="bg-[#0f1117]">SOLO LIVEHOUSE</option>
+                      <option value="PARTY LIVEHOUSE" className="bg-[#0f1117]">PARTY LIVEHOUSE</option>
                     </select>
                   </div>
                   <div className="space-y-1.5">
                     <label htmlFor="reserve-date" className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">Date Selector</label>
-                    <input 
+                    <SingleDatePicker 
                       id="reserve-date" 
-                      type="date" 
+                      name="reserveDate"
                       value={reserveDate} 
-                      onChange={(e) => setReserveDate(e.target.value)} 
+                      onChange={(val) => setReserveDate(val)} 
                       required 
-                      className="w-full bg-[#0A0B0E] border border-slate-800 rounded-xl px-4 py-3 text-sm focus:border-[#D4AF37] outline-none text-white font-mono" 
-                      title="Reserve Date" 
                     />
                   </div>
                 </div>
 
-                <div className="space-y-1.5">
-                  <label htmlFor="reserve-timeslot" className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">Timeslot (Select Available)</label>
-                  <select 
-                    id="reserve-timeslot" 
-                    value={reserveTimeslot} 
-                    onChange={(e) => setReserveTimeslot(e.target.value)} 
-                    required 
-                    title="Reserve Timeslot" 
-                    className="w-full bg-[#0A0B0E] border border-slate-800 rounded-xl px-4 py-3 text-sm focus:border-[#D4AF37] outline-none text-white font-bold cursor-pointer font-mono"
-                  >
-                    <option value="" className="text-white/40 font-sans">-- Choose a timeslot --</option>
-                    {getTimeslotAvailability(reserveDate).map(t => (
-                      <option 
-                        key={t.slot} 
-                        value={t.slot} 
-                        disabled={t.isTaken} 
-                        className={cn("bg-[#0f1117]", t.isTaken ? "text-red-500/50" : "text-white")}
-                      >
-                        {t.label}
-                      </option>
-                    ))}
-                  </select>
+                <div className="space-y-3">
+                  <span className="text-[10px] font-black text-white/40 uppercase tracking-widest block">Select Timeslot</span>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[300px] overflow-y-auto pr-1 custom-scrollbar">
+                    {getTimeslotAvailability(reserveDate).map(t => {
+                      const displaySlot = t.slot.replace(' (Manila Time)', '');
+                      const isSelected = reserveTimeslot === t.slot;
+                      
+                      let statusText = '2 Available';
+                      let statusClass = 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20';
+                      if (t.isTaken) {
+                        statusText = 'Not Available';
+                        statusClass = 'text-red-400 bg-red-500/10 border-red-500/20';
+                      } else if (2 - t.count === 1) {
+                        statusText = 'Only 1 Available';
+                        statusClass = 'text-amber-400 bg-amber-500/10 border-amber-500/20';
+                      }
+
+                      return (
+                        <button
+                          key={t.slot}
+                          type="button"
+                          disabled={t.isTaken}
+                          onClick={() => setReserveTimeslot(t.slot)}
+                          className={cn(
+                            "p-3.5 rounded-xl border text-left transition-all flex flex-col justify-between gap-2.5 relative overflow-hidden",
+                            t.isTaken
+                              ? "bg-[#0A0B0E]/40 border-red-500/10 cursor-not-allowed opacity-50"
+                              : isSelected
+                                ? "bg-[#181B24] border-[#D4AF37] shadow-[0_0_12px_rgba(212,175,55,0.15)] text-white"
+                                : "bg-[#0A0B0E] border-[#D4AF37]/10 hover:border-[#D4AF37]/20 hover:bg-[#12151D] text-white/70"
+                          )}
+                        >
+                          <div className="flex justify-between items-start gap-2 w-full">
+                            <span className="font-mono text-xs font-black tracking-tight">{displaySlot}</span>
+                            <span className={cn("px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider border shrink-0", statusClass)}>
+                              {statusText}
+                            </span>
+                          </div>
+
+                          {t.pendingCount > 0 && (
+                            <div className="text-[9px] font-bold text-amber-500 bg-amber-500/5 px-2 py-1 rounded-md border border-amber-500/10 w-fit">
+                              {t.pendingCount} pending request{t.pendingCount > 1 ? 's' : ''}
+                            </div>
+                          )}
+
+                          {t.eventTitles.length > 0 && (
+                            <div className="space-y-1 mt-1 border-t border-white/5 pt-1.5 w-full">
+                              <span className="block text-[8px] font-black text-white/30 uppercase tracking-wider">Booked Events:</span>
+                              {t.eventTitles.map((title, i) => (
+                                <p key={i} className="text-[9px] font-bold text-white/60 truncate" title={title}>
+                                  • {title}
+                                </p>
+                              ))}
+                            </div>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
 
                 <div className="space-y-1.5">
@@ -1426,14 +1259,14 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                     value={reserveNotes} 
                     onChange={(e) => setReserveNotes(e.target.value)} 
                     title="Reservation Notes" 
-                    className="w-full bg-[#0A0B0E] border border-slate-800 rounded-xl p-4 text-sm focus:border-[#D4AF37] outline-none text-white h-24 resize-none placeholder-white/20" 
+                    className="w-full bg-[#0A0B0E] border border-[#D4AF37]/15 rounded-xl p-4 text-sm focus:border-[#D4AF37] outline-none text-white h-24 resize-none placeholder-white/20" 
                     placeholder="Provide details for your livehouse set..." 
                   />
                 </div>
 
                 <div className="pt-2 flex gap-4">
-                  <button type="button" onClick={() => setIsReservingLivehouse(false)} className="flex-1 px-6 py-4 rounded-xl bg-slate-900 border border-slate-800 text-white/40 font-black uppercase text-[10px] tracking-widest hover:bg-slate-800 hover:text-white transition-colors cursor-pointer">Cancel</button>
-                  <button type="submit" className="flex-[2] bg-slate-900 border border-[#ec4899] hover:bg-[#ec4899]/5 text-[#ec4899] hover:text-white py-4 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] shadow-xl transition-all cursor-pointer">Submit Reservation Request</button>
+                  <button type="button" onClick={() => setIsReservingLivehouse(false)} className="flex-1 px-6 py-4 rounded-xl bg-slate-900 border border-[#D4AF37]/15 text-white/40 font-black uppercase text-[10px] tracking-widest hover:bg-slate-800 hover:text-white transition-colors cursor-pointer">Cancel</button>
+                  <button type="submit" className="flex-[2] bg-slate-900 border border-[#D4AF37] hover:bg-[#D4AF37]/5 text-[#D4AF37] hover:text-white py-4 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] shadow-xl transition-all cursor-pointer">Submit Schedule Request</button>
                 </div>
               </form>
             </motion.div>

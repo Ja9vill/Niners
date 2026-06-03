@@ -288,6 +288,7 @@ export const AppUsersTab: React.FC<AppUsersTabProps> = ({ currentUserRole }) => 
                   <td className="px-4 py-2.5">
                     <div className="relative">
                       <select
+                        title="User Role"
                         value={user.role}
                         onChange={e => handleRoleChange(user.poppo_id, e.target.value as UserRole)}
                         className="w-full appearance-none bg-[#1A1A28] border border-[#D4AF37]/15 text-[#F0EFE8] rounded-lg pl-2.5 pr-7 py-1.5 text-xs font-bold cursor-pointer outline-none focus:ring-1 focus:ring-[#D4AF37]/40 focus:border-[#D4AF37] transition-all"
@@ -369,7 +370,7 @@ export const AppUsersTab: React.FC<AppUsersTabProps> = ({ currentUserRole }) => 
                             ? 'bg-emerald-500 border-emerald-500 focus:ring-emerald-300'
                             : 'bg-[#1A1A28] border-[#D4AF37]/15 focus:ring-[#5a5865]',
                         ].join(' ')}
-                        aria-pressed={user.isActive}
+                        {...({ 'aria-pressed': user.isActive })}
                         aria-label={`Toggle login access for ${user.poppo_id}`}
                       >
                         <span

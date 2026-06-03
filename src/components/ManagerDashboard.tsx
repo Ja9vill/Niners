@@ -1075,6 +1075,8 @@ export const ManagerDashboard: React.FC = () => {
                     <label className="block text-xs font-semibold text-slate-400 mb-1">Current Followers</label>
                     <input
                       type="number"
+                      title="Current Followers"
+                      placeholder="Current Followers"
                       value={currentFollowers}
                       onChange={(e) => setCurrentFollowers(Number(e.target.value))}
                       className="w-full px-4 py-2 bg-slate-955 border border-slate-800 rounded-lg text-white"
@@ -1084,6 +1086,8 @@ export const ManagerDashboard: React.FC = () => {
                     <label className="block text-xs font-semibold text-slate-400 mb-1">Fanclub Subscribers</label>
                     <input
                       type="number"
+                      title="Fanclub Subscribers"
+                      placeholder="Fanclub Subscribers"
                       value={fanclubSubscribers}
                       onChange={(e) => setFanclubSubscribers(Number(e.target.value))}
                       className="w-full px-4 py-2 bg-slate-955 border border-slate-800 rounded-lg text-white"
@@ -1093,6 +1097,8 @@ export const ManagerDashboard: React.FC = () => {
                     <label className="block text-xs font-semibold text-slate-400 mb-1">Fanclub GC Members</label>
                     <input
                       type="number"
+                      title="Fanclub GC Members"
+                      placeholder="Fanclub GC Members"
                       value={fanclubGcMembers}
                       onChange={(e) => setFanclubGcMembers(Number(e.target.value))}
                       className="w-full px-4 py-2 bg-slate-955 border border-slate-800 rounded-lg text-white"
@@ -1104,6 +1110,8 @@ export const ManagerDashboard: React.FC = () => {
                         <label className="block text-xs font-semibold text-slate-400 mb-1">GC Updates (Host)</label>
                         <input
                           type="number"
+                          title="GC Updates (Host)"
+                          placeholder="GC Updates (Host)"
                           value={gcUpdatesHost}
                           onChange={(e) => setGcUpdatesHost(Number(e.target.value))}
                           className="w-full px-4 py-2 bg-slate-955 border border-slate-800 rounded-lg text-white"
@@ -1113,6 +1121,8 @@ export const ManagerDashboard: React.FC = () => {
                         <label className="block text-xs font-semibold text-slate-400 mb-1">GC Updates (Fans)</label>
                         <input
                           type="number"
+                          title="GC Updates (Fans)"
+                          placeholder="GC Updates (Fans)"
                           value={gcUpdatesFans}
                           onChange={(e) => setGcUpdatesFans(Number(e.target.value))}
                           className="w-full px-4 py-2 bg-slate-955 border border-slate-800 rounded-lg text-white"
@@ -1130,6 +1140,8 @@ export const ManagerDashboard: React.FC = () => {
                     <label className="block text-xs font-semibold text-slate-400 mb-1">PK Win Percentage (%)</label>
                     <input
                       type="number"
+                      title="PK Win Percentage (%)"
+                      placeholder="PK Win Percentage (%)"
                       min="0"
                       max="100"
                       value={pkWinPercent}
@@ -1141,6 +1153,8 @@ export const ManagerDashboard: React.FC = () => {
                     <label className="block text-xs font-semibold text-slate-400 mb-1">PK Points</label>
                     <input
                       type="number"
+                      title="PK Points"
+                      placeholder="PK Points"
                       value={pkPoints}
                       onChange={(e) => setPkPoints(Number(e.target.value))}
                       className="w-full px-4 py-2 bg-slate-955 border border-slate-800 rounded-lg text-white"
@@ -1150,6 +1164,8 @@ export const ManagerDashboard: React.FC = () => {
                     <label className="block text-xs font-semibold text-slate-400 mb-1">PK Sessions</label>
                     <input
                       type="number"
+                      title="PK Sessions"
+                      placeholder="PK Sessions"
                       value={pkSessions}
                       onChange={(e) => setPkSessions(Number(e.target.value))}
                       className="w-full px-4 py-2 bg-slate-955 border border-slate-800 rounded-lg text-white"
@@ -1166,6 +1182,8 @@ export const ManagerDashboard: React.FC = () => {
                       <label className="block text-xs font-semibold text-slate-400 mb-1">Year</label>
                       <input
                         type="number"
+                        title="Year"
+                        placeholder="Year"
                         value={year}
                         onChange={(e) => setYear(Number(e.target.value))}
                         className="w-full px-4 py-2 bg-slate-955 border border-slate-800 rounded-lg text-white"
@@ -1175,6 +1193,8 @@ export const ManagerDashboard: React.FC = () => {
                       <label className="block text-xs font-semibold text-slate-400 mb-1">Month</label>
                       <input
                         type="number"
+                        title="Month"
+                        placeholder="Month"
                         min="1"
                         max="12"
                         value={month}
@@ -1186,6 +1206,8 @@ export const ManagerDashboard: React.FC = () => {
                       <label className="block text-xs font-semibold text-slate-400 mb-1">Level</label>
                       <input
                         type="number"
+                        title="Level"
+                        placeholder="Level"
                         value={level}
                         onChange={(e) => setLevel(Number(e.target.value))}
                         className="w-full px-4 py-2 bg-slate-955 border border-slate-800 rounded-lg text-white"
@@ -1194,6 +1216,7 @@ export const ManagerDashboard: React.FC = () => {
                     <div>
                       <label className="block text-xs font-semibold text-slate-400 mb-1">Period Type</label>
                       <select
+                        title="Period Type"
                         value={periodType}
                         onChange={(e) => setPeriodType(e.target.value)}
                         className="w-full px-4 py-2 bg-slate-955 border border-slate-800 rounded-lg text-white"
@@ -1209,6 +1232,8 @@ export const ManagerDashboard: React.FC = () => {
                       <label className="block text-xs font-semibold text-slate-400 mb-1">Live Duration (Minutes)</label>
                       <input
                         type="number"
+                        title="Live Duration (Minutes)"
+                        placeholder="Live Duration (Minutes)"
                         value={liveDurationMinutes}
                         onChange={(e) => setLiveDurationMinutes(Number(e.target.value))}
                         className="w-full px-4 py-2 bg-slate-955 border border-slate-800 rounded-lg text-white"
@@ -1218,6 +1243,8 @@ export const ManagerDashboard: React.FC = () => {
                       <label className="block text-xs font-semibold text-slate-400 mb-1">Party Host Duration (Minutes)</label>
                       <input
                         type="number"
+                        title="Party Host Duration (Minutes)"
+                        placeholder="Party Host Duration (Minutes)"
                         value={partyHostDurationMinutes}
                         onChange={(e) => setPartyHostDurationMinutes(Number(e.target.value))}
                         className="w-full px-4 py-2 bg-slate-955 border border-slate-800 rounded-lg text-white"
@@ -1233,6 +1260,8 @@ export const ManagerDashboard: React.FC = () => {
                         <label className="block text-xs font-semibold text-slate-400 mb-1">Total Duration</label>
                         <input
                           type="number"
+                          title="Total Duration"
+                          placeholder="Total Duration"
                           value={totalDuration}
                           onChange={(e) => setTotalDuration(Number(e.target.value))}
                           className="w-full px-4 py-2 bg-slate-955 border border-slate-800 rounded-lg text-white"
@@ -1242,6 +1271,8 @@ export const ManagerDashboard: React.FC = () => {
                         <label className="block text-xs font-semibold text-slate-400 mb-1">Average ACU</label>
                         <input
                           type="number"
+                          title="Average ACU"
+                          placeholder="Average ACU"
                           value={averageAcu}
                           onChange={(e) => setAverageAcu(Number(e.target.value))}
                           className="w-full px-4 py-2 bg-slate-955 border border-slate-800 rounded-lg text-white"
@@ -1251,6 +1282,8 @@ export const ManagerDashboard: React.FC = () => {
                         <label className="block text-xs font-semibold text-slate-400 mb-1">New Fans</label>
                         <input
                           type="number"
+                          title="New Fans"
+                          placeholder="New Fans"
                           value={newFans}
                           onChange={(e) => setNewFans(Number(e.target.value))}
                           className="w-full px-4 py-2 bg-slate-955 border border-slate-800 rounded-lg text-white"
@@ -1260,6 +1293,8 @@ export const ManagerDashboard: React.FC = () => {
                         <label className="block text-xs font-semibold text-slate-400 mb-1">New Fanclub Members</label>
                         <input
                           type="number"
+                          title="New Fanclub Members"
+                          placeholder="New Fanclub Members"
                           value={newFanClubMembers}
                           onChange={(e) => setNewFanClubMembers(Number(e.target.value))}
                           className="w-full px-4 py-2 bg-slate-955 border border-slate-800 rounded-lg text-white"
@@ -1269,6 +1304,8 @@ export const ManagerDashboard: React.FC = () => {
                         <label className="block text-xs font-semibold text-slate-400 mb-1">Gifting This Week</label>
                         <input
                           type="number"
+                          title="Gifting This Week"
+                          placeholder="Gifting This Week"
                           value={giftingThisWeek}
                           onChange={(e) => setGiftingThisWeek(Number(e.target.value))}
                           className="w-full px-4 py-2 bg-slate-955 border border-slate-800 rounded-lg text-white"
@@ -1278,6 +1315,8 @@ export const ManagerDashboard: React.FC = () => {
                         <label className="block text-xs font-semibold text-slate-400 mb-1">Unfollowers</label>
                         <input
                           type="number"
+                          title="Unfollowers"
+                          placeholder="Unfollowers"
                           value={unfollowers}
                           onChange={(e) => setUnfollowers(Number(e.target.value))}
                           className="w-full px-4 py-2 bg-slate-955 border border-slate-800 rounded-lg text-white"
@@ -1298,6 +1337,8 @@ export const ManagerDashboard: React.FC = () => {
                           <label className="block text-xs font-semibold text-slate-400 mb-1">Total Earnings points</label>
                           <input
                             type="number"
+                            title="Total Earnings points"
+                            placeholder="Total Earnings points"
                             value={totalEarningsOfPoints}
                             onChange={(e) => setTotalEarningsOfPoints(Number(e.target.value))}
                             className="w-full px-4 py-2 bg-slate-955 border border-emerald-900/30 rounded-lg text-white focus:ring-emerald-500"
@@ -1307,6 +1348,8 @@ export const ManagerDashboard: React.FC = () => {
                           <label className="block text-xs font-semibold text-slate-400 mb-1">Agent Commission</label>
                           <input
                             type="number"
+                            title="Agent Commission"
+                            placeholder="Agent Commission"
                             value={agentCommission}
                             onChange={(e) => setAgentCommission(Number(e.target.value))}
                             className="w-full px-4 py-2 bg-slate-955 border border-emerald-900/30 rounded-lg text-white focus:ring-emerald-500"
@@ -1316,6 +1359,8 @@ export const ManagerDashboard: React.FC = () => {
                           <label className="block text-xs font-semibold text-slate-400 mb-1">Live Earnings</label>
                           <input
                             type="number"
+                            title="Live Earnings"
+                            placeholder="Live Earnings"
                             value={liveEarnings}
                             onChange={(e) => setLiveEarnings(Number(e.target.value))}
                             className="w-full px-4 py-2 bg-slate-955 border border-emerald-900/30 rounded-lg text-white"
@@ -1325,6 +1370,8 @@ export const ManagerDashboard: React.FC = () => {
                           <label className="block text-xs font-semibold text-slate-400 mb-1">Party Earnings</label>
                           <input
                             type="number"
+                            title="Party Earnings"
+                            placeholder="Party Earnings"
                             value={partyEarnings}
                             onChange={(e) => setPartyEarnings(Number(e.target.value))}
                             className="w-full px-4 py-2 bg-slate-955 border border-emerald-900/30 rounded-lg text-white"
@@ -1334,6 +1381,8 @@ export const ManagerDashboard: React.FC = () => {
                           <label className="block text-xs font-semibold text-slate-400 mb-1">Private Chat Earnings</label>
                           <input
                             type="number"
+                            title="Private Chat Earnings"
+                            placeholder="Private Chat Earnings"
                             value={privateChatEarnings}
                             onChange={(e) => setPrivateChatEarnings(Number(e.target.value))}
                             className="w-full px-4 py-2 bg-slate-955 border border-emerald-900/30 rounded-lg text-white"
@@ -1343,6 +1392,8 @@ export const ManagerDashboard: React.FC = () => {
                           <label className="block text-xs font-semibold text-slate-400 mb-1">Tips</label>
                           <input
                             type="number"
+                            title="Tips"
+                            placeholder="Tips"
                             value={tips}
                             onChange={(e) => setTips(Number(e.target.value))}
                             className="w-full px-4 py-2 bg-slate-955 border border-emerald-900/30 rounded-lg text-white"
@@ -1352,6 +1403,8 @@ export const ManagerDashboard: React.FC = () => {
                           <label className="block text-xs font-semibold text-slate-400 mb-1">Platform Reward</label>
                           <input
                             type="number"
+                            title="Platform Reward"
+                            placeholder="Platform Reward"
                             value={platformReward}
                             onChange={(e) => setPlatformReward(Number(e.target.value))}
                             className="w-full px-4 py-2 bg-slate-955 border border-emerald-900/30 rounded-lg text-white"
@@ -1361,6 +1414,8 @@ export const ManagerDashboard: React.FC = () => {
                           <label className="block text-xs font-semibold text-slate-400 mb-1">Other Earnings</label>
                           <input
                             type="number"
+                            title="Other Earnings"
+                            placeholder="Other Earnings"
                             value={otherEarnings}
                             onChange={(e) => setOtherEarnings(Number(e.target.value))}
                             className="w-full px-4 py-2 bg-slate-955 border border-emerald-900/30 rounded-lg text-white"
@@ -1370,6 +1425,8 @@ export const ManagerDashboard: React.FC = () => {
                           <label className="block text-xs font-semibold text-slate-400 mb-1">Platform Hourly Salary</label>
                           <input
                             type="number"
+                            title="Platform Hourly Salary"
+                            placeholder="Platform Hourly Salary"
                             value={platformHourlySalary}
                             onChange={(e) => setPlatformHourlySalary(Number(e.target.value))}
                             className="w-full px-4 py-2 bg-slate-955 border border-emerald-900/30 rounded-lg text-white"
@@ -1379,6 +1436,8 @@ export const ManagerDashboard: React.FC = () => {
                           <label className="block text-xs font-semibold text-slate-400 mb-1">Super Salary</label>
                           <input
                             type="number"
+                            title="Super Salary"
+                            placeholder="Super Salary"
                             value={superSalary}
                             onChange={(e) => setSuperSalary(Number(e.target.value))}
                             className="w-full px-4 py-2 bg-slate-955 border border-emerald-900/30 rounded-lg text-white"
@@ -1388,6 +1447,8 @@ export const ManagerDashboard: React.FC = () => {
                           <label className="block text-xs font-semibold text-slate-400 mb-1">Super Rank</label>
                           <input
                             type="number"
+                            title="Super Rank"
+                            placeholder="Super Rank"
                             value={superRank}
                             onChange={(e) => setSuperRank(Number(e.target.value))}
                             className="w-full px-4 py-2 bg-slate-955 border border-emerald-900/30 rounded-lg text-white"
@@ -1397,6 +1458,8 @@ export const ManagerDashboard: React.FC = () => {
                           <label className="block text-xs font-semibold text-slate-400 mb-1">Total Earnings</label>
                           <input
                             type="number"
+                            title="Total Earnings"
+                            placeholder="Total Earnings"
                             value={totalEarnings}
                             onChange={(e) => setTotalEarnings(Number(e.target.value))}
                             className="w-full px-4 py-2 bg-slate-955 border border-emerald-900/30 rounded-lg text-white"
@@ -1406,6 +1469,8 @@ export const ManagerDashboard: React.FC = () => {
                           <label className="block text-xs font-semibold text-slate-400 mb-1">Earnings Past 3 Months</label>
                           <input
                             type="number"
+                            title="Earnings Past 3 Months"
+                            placeholder="Earnings Past 3 Months"
                             value={totalEarningsPast3Months}
                             onChange={(e) => setTotalEarningsPast3Months(Number(e.target.value))}
                             className="w-full px-4 py-2 bg-slate-955 border border-emerald-900/30 rounded-lg text-white"

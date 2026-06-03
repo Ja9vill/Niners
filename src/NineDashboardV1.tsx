@@ -57,7 +57,6 @@ import { TrendsTab } from './components/TrendsTab';
 import { CalendarTab } from './components/CalendarTab';
 import { DirectorTab } from './components/DirectorTab';
 import { GlossaryTab } from './components/GlossaryTab';
-import { DataReportingTab } from './components/DataReportingTab';
 import { PrivacyTab } from './components/PrivacyTab';
 import { TermsTab } from './components/TermsTab';
 import { AgencyPolicyTab } from './components/AgencyPolicyTab';
@@ -435,11 +434,6 @@ export default function App() {
             <DirectorTab />
           </AuthGate>
         );
-      case 'reporting': return wrapProtected(
-        <AuthGate onAuthChange={refreshState}>
-          <DataReportingTab />
-        </AuthGate>
-      );
       case 'glossary': return <GlossaryTab />;
       case 'privacy': return <PrivacyTab />;
       case 'terms': return <TermsTab />;
@@ -492,7 +486,6 @@ export default function App() {
   };
 
   const navItems = [  { id: 'home', label: 'Dashboard', icon: LayoutDashboard },
-  { id: 'reporting', label: 'Reporting', icon: BookOpen, protected: true },
   { id: 'calendar', label: 'Calendar', icon: Calendar },
   { id: 'events', label: 'Events', icon: Calendar, protected: true },
   { id: 'dashboard', label: 'Director Hub', icon: Lock, protected: true },

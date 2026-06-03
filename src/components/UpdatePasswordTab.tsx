@@ -136,6 +136,8 @@ export const UpdatePasswordTab: React.FC<UpdatePasswordTabProps> = ({ onMigratio
                 <label className="text-[10px] uppercase font-bold text-[#A09E9A]">Poppo ID</label>
                 <input
                   type="text"
+                  title="Poppo ID"
+                  placeholder="Poppo ID"
                   value={reAuthPoppoId}
                   disabled={true}
                   className="w-full px-3 py-2 bg-[#0D0D14] border border-[#D4AF37]/15 rounded-xl text-sm outline-none text-[#A09E9A]"
