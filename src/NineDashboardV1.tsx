@@ -493,7 +493,7 @@ export default function App() {
   { id: 'dashboard', label: 'Director Hub', icon: Lock, protected: true },
   { id: 'profiles', label: 'Management Hub', icon: Users, protected: true },
   { id: 'learning-resources', label: 'Learning Resources', icon: BookOpen, protected: true },
-  { id: 'account', label: 'Account', icon: User },
+  { id: 'account', label: 'Account', icon: User, protected: true },
   { id: 'overview', label: 'Analytics', icon: Activity, protected: true },
   { id: 'roster', label: 'Roster', icon: Users, protected: true },
   { id: 'trends', label: 'Trends', icon: TrendingUp, protected: true },

@@ -28,7 +28,7 @@ export default function App() {
 
         {/* ── Public Routes ───────────────────────────────────────── */}
         <Route path="/" element={<PublicLayout />}>
-          <Route index element={<Navigate to="/login" replace />} />
+          <Route index element={<Navigate to="/poppo-live" replace />} />
           <Route path="login" element={<Login />} />
           <Route path="roster" element={<PublicRoster />} />
           <Route path="calendar" element={<PublicCalendar />} />
