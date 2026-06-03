@@ -171,7 +171,7 @@ export const RosterTab: React.FC<RosterTabProps> = ({ isReadOnly = false }) => {
   return (
     <div className="space-y-6 relative">
       {/* FILTER MENU BLOCKS */}
-      <div className="bg-[#1A1A28]/80 backdrop-blur-md p-5 rounded-2xl border border-indigo-500/15 shadow-2xl shadow-black/40 sticky top-0 z-10 flex flex-col gap-4 relative overflow-hidden">
+      <div className="bg-[#1A1A28]/80 backdrop-blur-md p-5 rounded-2xl border border-[#D4AF37]/40 shadow-[0_0_15px_rgba(212,175,55,0.15)] sticky top-0 z-10 flex flex-col gap-4 relative overflow-hidden">
         {/* Subtle background glow for the filter section */}
         <div className="absolute -top-24 -left-24 w-48 h-48 bg-indigo-500/10 blur-3xl rounded-full pointer-events-none"></div>
         <div className="absolute -bottom-24 -right-24 w-48 h-48 bg-[#D4AF37]/5 blur-3xl rounded-full pointer-events-none"></div>
@@ -490,7 +490,14 @@ export const RosterTab: React.FC<RosterTabProps> = ({ isReadOnly = false }) => {
                               <h4 className="font-bold text-[#F0EFE8] text-sm">{(evt as any).eventTitle || (evt as any).title || 'Event'}</h4>
                               <span className="text-[10px] font-mono text-emerald-400 bg-emerald-400/10 px-2 py-0.5 rounded border border-emerald-400/20">{(evt as any).status || 'Scheduled'}</span>
                             </div>
-                            <div className="text-xs text-[#A09E9A]">{(evt as any).eventDate || (evt as any).date || (evt as any).startDate || ''} • {(evt as any).eventType || (evt as any).type || ''}</div>
+                            <div className="text-xs text-[#A09E9A]">
+                              {(evt as any).eventDate || (evt as any).date || (evt as any).startDate || ''} • {(() => {
+                                const t = (evt as any).timeslot || (evt as any).time;
+                                const tz = (evt as any).timezone || 'PHT';
+                                if (t) return `${t} ${tz}`;
+                                return 'TBA';
+                              })()}
+                            </div>
                           </div>
                         ))}
                       </div>

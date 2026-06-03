@@ -309,7 +309,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
       location: 'VIRTUAL ROOM (LIVEHOUSE)',
       created_by_name: auth.nickname || auth.name || 'Admin',
       created_by_role: auth.role || 'Admin',
-      created_by_id: auth.poppo_id || auth.userId || 'Unknown',
+      created_by_id: auth.poppo_id || auth.id || 'Unknown',
       visibility: 'All',
       participants: [req.poppoId],
       participantIds: [req.poppoId],
@@ -503,7 +503,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
       location: formData.get('location') as string || 'ONLINE',
       created_by_name: auth.name,
       created_by_role: auth.role,
-      created_by_id: auth.poppo_id || auth.userId || 'Unknown',
+      created_by_id: auth.poppo_id || auth.id || 'Unknown',
       visibility: formData.get('visibility') as any || 'All',
       participants: [...selectedParticipants],
       participantIds: [...selectedParticipants], // alias for Firestore array-contains queries
@@ -540,8 +540,8 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
         {/* Main Calendar Section */}
         <div className="space-y-6">
           {/* View Toggles & Navigation controls */}
-          <div className="flex flex-col sm:flex-row items-center justify-between bg-[#0F1117] border border-[#D4AF37]/15 p-4 rounded-2xl gap-4 shadow-xl">
-            <div className="flex items-center gap-2 bg-[#0A0B0E] p-1.5 rounded-xl border border-[#D4AF37]/10 w-full sm:w-auto">
+          <div className="flex flex-col sm:flex-row items-center justify-between bg-[#0F1117] border border-[#D4AF37]/40 p-4 rounded-2xl gap-4 shadow-[0_0_15px_rgba(212,175,55,0.15)]">
+            <div className="flex items-center gap-2 bg-[#0A0B0E] p-1.5 rounded-xl border border-[#D4AF37]/20 w-full sm:w-auto">
               <button 
                 onClick={() => setViewMode('week')}
                 className={cn(
@@ -591,7 +591,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
           {viewMode === 'week' ? (
             /* 7-Day Calendar Grid */
             <div className="overflow-x-auto pb-4 -mx-4 px-4 sm:mx-0 sm:px-0 custom-scrollbar">
-              <div className="grid grid-cols-7 gap-2 md:gap-4 bg-[#0B0D12] p-4 rounded-3xl border border-[#D4AF37]/10 shadow-xl min-w-[700px]">
+              <div className="grid grid-cols-7 gap-2 md:gap-4 bg-[#0B0D12] p-4 rounded-3xl border border-[#D4AF37]/40 shadow-[0_0_15px_rgba(212,175,55,0.15)] min-w-[700px]">
                 {weekDays.map((day, idx) => {
                   const dayName = format(day, 'EEEE');
                   const dayAbbr = format(day, 'EEE').toUpperCase();
@@ -673,10 +673,10 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
           )}
 
           {/* Scheduled Events Panel */}
-          <div className="bg-gradient-to-br from-[#0F1117] to-[#12141A] rounded-3xl border border-purple-500/20 p-5 space-y-4 shadow-[0_0_20px_rgba(168,85,247,0.1)] relative overflow-hidden">
+          <div className="bg-gradient-to-br from-[#0F1117] to-[#12141A] rounded-3xl border border-[#D4AF37]/40 p-5 space-y-4 shadow-[0_0_15px_rgba(212,175,55,0.15)] relative overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-tr from-purple-500/5 via-transparent to-indigo-500/5 pointer-events-none" />
             
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-purple-500/20 pb-4 gap-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-[#D4AF37]/20 pb-4 gap-4">
               <div className="flex items-center gap-3">
                 <div className="w-2.5 h-2.5 rounded-full bg-purple-400 shadow-[0_0_8px_rgba(168,85,247,0.8)]" />
                 <h3 className="text-xs font-black uppercase tracking-widest text-white/90">

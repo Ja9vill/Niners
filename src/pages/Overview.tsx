@@ -395,6 +395,7 @@ export const Overview = () => {
           {[
             {
               title: "Agency Revenue",
+              theme: "from-amber-500/20 to-orange-500/5 hover:border-amber-400/50",
               items: [
                 { label: 'Total Agency Points', value: formatPts(sum(getPoints)), icon: Star, color: '#D4AF37' }, // Classic Gold
                 { label: 'Agency Commission', value: formatPts(sum(getAgentComm)), icon: Award, color: '#CA8A04' } // Muted Yellow/Gold
@@ -402,6 +403,7 @@ export const Overview = () => {
             },
             {
               title: "Agency Members Incentives",
+              theme: "from-orange-500/20 to-red-500/5 hover:border-orange-400/50",
               items: [
                 { label: 'Super Salary', value: formatPts(sum(getSuperSalary)), icon: Zap, color: '#C2410C' }, // Muted Deep Orange
                 { label: 'Super Rank', value: formatPts(sum(getSuperRank)), icon: TrendingUp, color: '#B45309' } // Muted Amber
@@ -409,6 +411,7 @@ export const Overview = () => {
             },
             {
               title: "Members Activeness",
+              theme: "from-red-500/20 to-rose-500/5 hover:border-red-400/50",
               items: [
                 { label: 'Active Hosts', value: String(uniqueHosts), icon: Users, color: '#0E7490' }, // Muted Deep Cyan
                 { label: 'Total Live Hours', value: fmtH(sum(getLiveDuration)), icon: Clock, color: '#0F766E' } // Muted Deep Teal
@@ -423,12 +426,7 @@ export const Overview = () => {
                   return (
                     <div
                       key={i}
-                      className="relative overflow-hidden rounded-xl p-4 flex items-center gap-4 transition-all duration-300 group hover:-translate-y-1 cursor-default shadow-lg backdrop-blur-sm"
-                      style={{
-                        background: `linear-gradient(135deg, #1e293b 0%, #0D0D14 100%)`, // Deep slate gradient
-                        borderWidth: '0px', // Eliminate flat border
-                        boxShadow: `0 8px 16px rgba(0,0,0,0.3)`
-                      }}
+                      className={`relative overflow-hidden rounded-xl p-4 flex items-center gap-4 transition-all duration-300 group hover:-translate-y-1 cursor-default shadow-lg backdrop-blur-sm bg-gradient-to-br border border-white/5 ${row.theme}`}
                     >
                       <div 
                         className="absolute inset-0 opacity-0 group-hover:opacity-10 transition-opacity duration-500 pointer-events-none" 

@@ -217,12 +217,14 @@ export interface CalendarEvent {
   
   // Legacy alias fields mapped to frontend
   event_id?: string;
+  event_host_id?: string;
   poppo_id?: string;
   title?: string;
   date?: string;
   time?: string;
   visibility?: string;
   type?: string;
+  location?: string;
   participants?: string[];
   participantIds?: string[];
 }
