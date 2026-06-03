@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Outlet, useNavigate, useLocation, Link } from 'react-router-dom';
 import { 
-  Menu, X, LogOut, LayoutDashboard, Users, User, Shield, Calendar, DollarSign, Activity, FileText
+  Menu, X, LogOut, LayoutDashboard, Users, User, Shield, Calendar, DollarSign, Activity, FileText, BookOpen
 } from 'lucide-react';
 import { Storage } from '../lib/storage';
 import { auth } from '../lib/firebase';
@@ -26,6 +26,7 @@ export const DashboardLayout = () => {
       { path: '/app/dashboard', label: 'Overview', icon: LayoutDashboard },
       { path: '/app/roster', label: 'Roster', icon: Users },
       { path: '/app/calendar', label: 'Calendar', icon: Calendar },
+      { path: '/app/learning', label: 'Learning', icon: BookOpen },
     ];
     
     const role = (authState.role || '').toLowerCase();

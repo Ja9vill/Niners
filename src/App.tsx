@@ -18,6 +18,7 @@ import { LandingPage } from './pages/LandingPage';
 import { PublicRoster } from './pages/PublicRoster';
 import { PublicCalendar } from './pages/PublicCalendar';
 import { PoppoLivePage } from './pages/PoppoLivePage';
+import { LearningResources } from './pages/LearningResources';
 
 export default function App() {
   return (
@@ -52,6 +53,7 @@ export default function App() {
           <Route path="dashboard" element={<Overview />} />
           <Route path="roster"    element={<RosterTab />} />
           <Route path="calendar"  element={<CalendarTab />} />
+          <Route path="learning"  element={<LearningResources />} />
 
           {/* Host self-profile — Talent / Host roles */}
           <Route

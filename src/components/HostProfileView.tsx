@@ -1068,9 +1068,20 @@ PK Win Rate: ${pkData.win_percentage}% over ${pkData.sessions} sessions
 Fanbase: ${fanbaseLatest ? `${fanbaseLatest.total_followers || 0} followers, ${fanbaseLatest.fanclub_subscribers || 0} FC subs, ${fanbaseLatest.fanclub_gc_members || 0} GC members` : 'No fanbase data'}
 Monthly Performance (last 6): ${JSON.stringify(last6)}
 
-[SUMMARY] Write a 2-3 sentence performance summary of this host. Be specific and data-driven.
-[JOURNEY] Write a 2-3 sentence narrative about their streamer career journey and growth trajectory.
-[RECOMMENDATIONS] List 3-5 specific, actionable bullet points to help this host improve. Use "• " prefix for each.`;
+CRITICAL REQUIREMENT: When generating the analysis, recommendations, and tasks, you MUST reference ONLY the concepts and terminology from the Nine Pillars of Streaming Success training framework. Categorize your recommendations and tasks strictly using the following 9 Pillars:
+1. Profile Optimization (Digital Handshake - Cover photo billboard, Nametag cognitive fluency, Bio elevator pitch)
+2. Live Quality (Psychological Comfort - Audio priority, lighting, background, camera placement)
+3. Timing & Consistency (Engine of Loyalty - Habit formation, pre-stream and no-stream updates)
+4. Visibility Investment (Overcoming Obscurity - Lucky Box timing, Random PK scheduling, peak hour matching)
+5. In-Stream Interaction (Engagement Engine - Reciprocity, open-ended questions, eliminating dead air)
+6. Fanbase Development (Architecting Your Tribe - Conversion funnel, Follow/Fanclub CTAs, tribe name/symbols)
+7. Retention (Maintaining Loyalty - Emotional continuity, Group Chat check-ins, weekly rituals)
+8. Monetization (Activating Financial Support - Goal framing, gratitude loops, monetization moments)
+9. Intentional Goal Setting (Guiding Principle - Four Goal Arches: Financial, Community, Skill, Quality; Declare-Track-Review loop)
+
+[SUMMARY] Write a 2-3 sentence performance summary of this host. Be specific, data-driven, and relate findings directly to the 9 Pillars.
+[JOURNEY] Write a 2-3 sentence narrative about their streamer career journey and growth trajectory, evaluated using the 9 Pillars milestones.
+[RECOMMENDATIONS] List 3-5 specific, actionable bullet points to help this host improve. Use "• " prefix for each. Each bullet point MUST start by identifying the relevant Pillar (e.g. "[Pillar 4: Visibility Investment]") and contain a specific training task referencing the framework concepts (e.g., "Run 3 PKs back-to-back with a Lucky Box dropped 2 minutes prior").`;
 
       const res = await fetch('/api/chat', {
         method: 'POST',
