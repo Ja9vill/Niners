@@ -723,7 +723,7 @@ export const ManagerDashboard: React.FC = () => {
       manager: managerPoppoId,
       status: 'Active',
       level: 1,
-      tier: 'X',
+
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     };

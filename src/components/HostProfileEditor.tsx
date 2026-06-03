@@ -34,9 +34,9 @@ export const HostProfileEditor = () => {
           role: authState.role as any || 'Talent',
           team: 'Unassigned',
           manager: 'Nine Management',
-          base_salary_category: 'N/A',
+          tier_pay: 'N/A',
           status: 'Active',
-          tier: 'X',
+
           level: authState.level || 1,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()

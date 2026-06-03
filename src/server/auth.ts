@@ -257,9 +257,9 @@ router.post("/login", async (req, res) => {
           team: "Management",
           manager: "Self",
           anchor_type: "Nine Agency",
-          base_salary_category: "N/A",
+          tier_pay: "N/A",
           status: "Active",
-          tier: "Director",
+
           photoUrl: "",
           isActive: true,
           created_at: new Date().toISOString(),
@@ -267,8 +267,18 @@ router.post("/login", async (req, res) => {
         };
         try {
           const db = getAdminFirestore();
-          await db.collection("users").doc('19157913').set(hostData);
-          console.log("✅ Auto-created missing Director doc in Firestore users collection during login bypass.");
+          // Write auth info to users
+          await db.collection("users").doc('19157913').set({
+            poppo_id: hostData.id,
+            nickname: hostData.nickname,
+            role: hostData.role,
+            isActive: hostData.isActive,
+            updated_at: hostData.updated_at
+          }, { merge: true });
+          
+          // Write full profile to director collection
+          await db.collection("director").doc('19157913').set(hostData, { merge: true });
+          console.log("✅ Auto-created missing Director doc in Firestore during login bypass.");
         } catch (dbSaveErr) {
           console.error("Failed to auto-save Director doc in Firestore:", dbSaveErr);
         }
@@ -565,16 +575,17 @@ router.post("/google-login", async (req, res) => {
       const directorId = `director_${uid.slice(0, 8)}`;
       const newDirectorData: any = {
         id: directorId,
+        poppo_id: directorId,
         name: decoded.name || email.split("@")[0],
         nickname: decoded.name || email.split("@")[0],
         role: "director",
         team: "Management",
         manager: "N/A",
         anchor_type: "Nine Agency",
-        base_salary_category: "N/A",
+        tier_pay: "N/A",
         status: "Active",
         level: 5,
-        tier: "Director",
+
         photoUrl: decoded.picture || "",
         isActive: true,
         googleUid: uid,
@@ -582,7 +593,20 @@ router.post("/google-login", async (req, res) => {
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
-      await db.collection("users").doc(directorId).set(newDirectorData);
+      
+      // Write auth info to users
+      await db.collection("users").doc(directorId).set({
+        poppo_id: newDirectorData.id,
+        nickname: newDirectorData.nickname,
+        role: newDirectorData.role,
+        isActive: newDirectorData.isActive,
+        googleUid: newDirectorData.googleUid,
+        updated_at: newDirectorData.updated_at
+      }, { merge: true });
+      
+      // Write full profile to director collection
+      await db.collection("director").doc(directorId).set(newDirectorData, { merge: true });
+      
       console.log(`✅ Auto-provisioned Director account for authorized email: ${email}`);
       await syncCustomClaims(directorId, "director", false);
       const responsePayload = getHostPayloadAndToken(newDirectorData);
@@ -659,16 +683,17 @@ router.post("/google-register", async (req, res) => {
       // Create new host document
       hostData = {
         id: cleanPoppoId,
+        poppo_id: cleanPoppoId,
         name: decoded.name || "Google User",
         nickname: decoded.name || "Google User",
         role: "host",
         team: "Alpha",
         manager: "Unassigned",
         anchor_type: "Nine Agency",
-        base_salary_category: "N/A",
+        tier_pay: "N/A",
         status: "Active",
         level: 1,
-        tier: "C",
+
         photoUrl: decoded.picture || "",
         isActive: true,
         googleUid: uid,
@@ -676,7 +701,21 @@ router.post("/google-register", async (req, res) => {
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
-      await hostDocRef.set(hostData);
+      
+      // Write auth info to users
+      await hostDocRef.set({
+        poppo_id: hostData.id,
+        nickname: hostData.nickname,
+        role: hostData.role,
+        isActive: hostData.isActive,
+        googleUid: hostData.googleUid,
+        updated_at: hostData.updated_at
+      }, { merge: true });
+      
+      // Write full profile to host collection
+      await db.collection("host").doc(cleanPoppoId).set(hostData, { merge: true });
+      // Legacy hosts backup
+      try { await db.collection("hosts").doc(cleanPoppoId).set(hostData, { merge: true }); } catch (e) {}
       const tempRequired = hostData.is_temp_password ?? false;
       await syncCustomClaims(cleanPoppoId, hostData.role, tempRequired);
     }
@@ -994,7 +1033,7 @@ router.post(
           assignedManagerId: null,
           team: "Unassigned",
           team_anchor: "Unassigned",
-          base_salary_category: "N/A",
+          tier_pay: "N/A",
           tier_pay: "N/A"
         };
         await db.collection("host").doc(poppoId).set(hostData);
@@ -1417,9 +1456,9 @@ router.post("/login-with-poppo", loginRateLimiter, async (req: any, res: any) =>
           team: "Management",
           manager: "Self",
           anchor_type: "Nine Agency",
-          base_salary_category: "N/A",
+          tier_pay: "N/A",
           status: "Active",
-          tier: "Director",
+
           photoUrl: "",
           isActive: true,
           created_at: new Date().toISOString(),

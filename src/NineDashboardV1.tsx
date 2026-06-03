@@ -95,6 +95,7 @@ export default function App() {
   const [logs, setLogs] = useState(Storage.getLogs());
   const [notifications, setNotifications] = useState(Storage.getNotifications());
   const [showNotifications, setShowNotifications] = useState(false);
+  const [showNotificationPrompt, setShowNotificationPrompt] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [firebaseUser, setFirebaseUser] = useState(auth.currentUser);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -107,6 +108,7 @@ export default function App() {
   const [isAuthChecking, setIsAuthChecking] = useState(true);
   const [appAuthState, setAppAuthState] = useState<'LOADING' | 'AUTHENTICATED' | 'FORCE_PASSWORD_CHANGE' | 'UNAUTHENTICATED'>('LOADING');
 
+  const navigate = useNavigate();
   // Persist view mode
   useEffect(() => {
     try { localStorage.setItem('nine-view-mode', isMobileView ? 'mobile' : 'desktop'); } catch {}
@@ -460,10 +462,10 @@ export default function App() {
             team: authState.anchor_team || 'Director Only',
             manager: authState.manager_assigned || 'Self',
             anchor_type: 'Nine Agency',
-            base_salary_category: 'N/A',
+            tier_pay: 'N/A',
             status: 'Active',
             level: authState.level || 5,
-            tier: 'S',
+
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
           };
@@ -1361,7 +1363,7 @@ export const OverviewTab = ({ commissions, hosts }: { commissions: CommissionEnt
                      </div>
                      <div className="text-right">
                        <p className="text-sm font-bold text-emerald-400 font-mono">{formatNumber(host.totalPoints)} pts</p>
-                       <p className="text-[10px] font-medium text-[#A09E9A]/60 uppercase">{host.base_salary_category}</p>
+                        <p className="text-[10px] font-medium text-[#A09E9A]/60 uppercase">{host.tier_pay}</p>
                      </div>
                    </div>
                    <div className="pt-2 border-t border-white/5 flex justify-between items-center text-[10px]">

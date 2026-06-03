@@ -120,7 +120,7 @@ export const RosterTab: React.FC<RosterTabProps> = ({ isReadOnly = false }) => {
 
       // 3. Tier Pay Filter
       if (tierFilter !== 'All Tiers') {
-        const tierPay = (host.tier_pay || host.base_salary_category || host.baseSalary || '').toLowerCase();
+        const tierPay = (host.tier_pay || host.tierPay || '').toLowerCase();
         if (tierPay !== tierFilter.toLowerCase()) return false;
       }
 
@@ -216,8 +216,8 @@ export const RosterTab: React.FC<RosterTabProps> = ({ isReadOnly = false }) => {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {filteredHosts.map(host => {
-            const tier = String(host.tier_pay || host.base_salary_category || host.baseSalary || 'N/A');
-            const blockStyles = getTierBlockStyles(tier);
+            const tierPay = String(host.tier_pay || host.tierPay || 'N/A');
+            const blockStyles = getTierBlockStyles(tierPay);
             return (
               <div
                 key={host.id}
@@ -251,7 +251,7 @@ export const RosterTab: React.FC<RosterTabProps> = ({ isReadOnly = false }) => {
 
                 <div className="mt-2 flex items-center gap-3">
                   {(() => {
-                    const tier = String((host as any).tier_pay || host.base_salary_category || host.baseSalary || 'N/A');
+                    const tier = String((host as any).tier_pay || host.tierPay || 'N/A');
 
                     const getTierStyle = (t: string) => {
                       const lower = t.toLowerCase();

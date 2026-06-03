@@ -177,8 +177,8 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
         gradientBg: 'bg-gradient-to-br from-white/10 via-white/5 to-[#1A1A28]/80',
       };
     };
-    return getCategoryStyles(host.tier_pay || host.base_salary_category || '');
-  }, [host.tier_pay, host.base_salary_category]);
+    return getCategoryStyles(host.tier_pay || '');
+  }, [host.tier_pay]);
 
   // Profile Edit States
   const [editNickname, setEditNickname] = useState(host.nickname || host.name || '');
@@ -187,9 +187,9 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
   const [editRole, setEditRole] = useState<string>(host.role || 'Host');
   const [editTeam, setEditTeam] = useState<string>(host.team || 'Unassigned');
   const [editManager, setEditManager] = useState<string>(host.manager || 'Nine Management');
-  const [editTierPay, setEditTierPay] = useState<string>(host.tier_pay || host.base_salary_category || 'N/A');
+  const [editTierPay, setEditTierPay] = useState<string>(host.tier_pay || 'N/A');
   const [editStatus, setEditStatus] = useState<string>(host.status || 'Active');
-  const [editTier, setEditTier] = useState<string>(host.tier || 'X');
+
   const [editLevel, setEditLevel] = useState<number>(host.level || 1);
   const [isProcessingPhoto, setIsProcessingPhoto] = useState(false);
   const [managersList, setManagersList] = useState<{ id: string; name: string }[]>([]);
@@ -229,6 +229,15 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
     gc_activity_count_host: '',
     gc_activity_count_fans: '',
     notes: ''
+  });
+
+  // Monthly Live Data Reporting States (For non-Nine Agency)
+  const [isMonthlyDataFormOpen, setIsMonthlyDataFormOpen] = useState(false);
+  const [isSubmittingMonthlyData, setIsSubmittingMonthlyData] = useState(false);
+  const [monthlyDataForm, setMonthlyDataForm] = useState({
+    total_earnings: '',
+    total_duration: '',
+    last_3_months_total_earnings: ''
   });
 
   // Fanbase latest report (loaded from Firestore)
@@ -275,9 +284,9 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
     setEditRole(host.role || 'Host');
     setEditTeam(host.team || 'Unassigned');
     setEditManager(host.manager || 'Nine Management');
-    setEditTierPay(host.tier_pay || host.base_salary_category || 'N/A');
+    setEditTierPay(host.tier_pay || 'N/A');
     setEditStatus(host.status || 'Active');
-    setEditTier(host.tier || 'X');
+
     setEditLevel(host.level || 1);
     
     const loadProfileData = async () => {
@@ -928,7 +937,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
           assignedManagerId: assignedManagerId,
           tier_pay: editTierPay as any,
           status: editStatus as any,
-          tier: editTier as any,
+
           level: Number(editLevel) || 1,
           social_links: { ig: selfSocialIg, tiktok: selfSocialTk, fb: selfSocialFb, whatsapp: selfSocialWa },
           streaming_hours: selfStreamSlots.filter(s => s.from && s.to),
@@ -936,7 +945,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
         };
 
         await FirebaseService.updateHost(updatedHost, host.role);
-        await FirebaseService.logSystemActivity(`Admin edited profile metadata and public info for Host: ${host.nickname || host.name} (Poppo ID: ${host.id}) - New Nickname: ${editNickname.trim()}, Role: ${editRole}, Team: ${editTeam}, Manager: ${editManager}, Salary Category: ${editBaseSalaryCategory}, Status: ${editStatus}, Tier: ${editTier}, Level: ${editLevel}, Bio: "${truncatedBio}"`, 'Warning');
+        await FirebaseService.logSystemActivity(`Admin edited profile metadata and public info for Host: ${host.nickname || host.name} (Poppo ID: ${host.id}) - New Nickname: ${editNickname.trim()}, Role: ${editRole}, Team: ${editTeam}, Manager: ${editManager}, Salary Category: ${editTierPay}, Status: ${editStatus}, Level: ${editLevel}, Bio: "${truncatedBio}"`, 'Warning');
       } else {
         // Normal host self-edit
         updatedHost = {
@@ -1211,7 +1220,7 @@ Return EXACTLY three sections with these exact labels on their own lines:
 [RECOMMENDATIONS]
 
 Host: ${host.nickname || host.name} (Poppo ID: ${host.id})
-Status: ${host.status || 'Unknown'} | Tier: ${host.tier || 'X'} | Level: ${host.level || 1}
+Status: ${host.status || 'Unknown'} | Level: ${host.level || 1}
 Role: ${host.role || 'Host'} | Manager: ${host.manager || 'N/A'} | Team: ${host.team || 'N/A'}
 Total Live Earnings: ${perfTotals.liveEarnings.toLocaleString()} | Party Earnings: ${perfTotals.partyEarnings.toLocaleString()}
 Total Points Earned (all time): ${perfTotals.points.toLocaleString()}
@@ -1747,7 +1756,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
              </span>
              {/* Tier Pay glowing badge */}
              <span className={cn("text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full border backdrop-blur-md shadow-[0_0_15px_rgba(212,175,55,0.3)]", styles.badgeText, styles.borderColor, "bg-black/40")}>
-                {host.tier_pay || host.base_salary_category || 'Regular Host'}
+                {host.tier_pay || 'Regular Host'}
              </span>
           </div>
 
@@ -1799,7 +1808,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
             </div>
             <div className="flex flex-col">
               <span className="text-[9px] font-black uppercase tracking-widest mb-1 text-white/40">Tier Pay</span>
-              <span className={cn("font-black drop-shadow-sm text-sm", styles.badgeText)}>{host.tier_pay || host.base_salary_category || 'Regular Host'}</span>
+              <span className={cn("font-black drop-shadow-sm text-sm", styles.badgeText)}>{host.tier_pay || 'Regular Host'}</span>
             </div>
             <div className="flex flex-col">
               <span className="text-[9px] font-black uppercase tracking-widest mb-1 text-white/40">Assigned Manager</span>
@@ -3061,6 +3070,9 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
       {renderFanbaseModal()}
       {renderSelfEditModal()}
       {renderAddEventModal()}
+      {renderMonthlyDataModal()}
     </div>
   );
 };
+
+export default HostProfileView;

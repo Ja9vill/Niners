@@ -198,7 +198,7 @@ export const RosterManagementTab: React.FC<RosterManagementTabProps> = ({ hosts,
       const nickname = getVal('nickname') || getVal('name');
       const status = getVal('status');
       const team_anchor = getVal('team_anchor') || getVal('anchor_type');
-      const tier_pay = getVal('tier_pay') || getVal('tier') || getVal('base_salary_category');
+      const tier_pay = getVal('tier_pay') || getVal('tierPay');
       const manager = getVal('assigned_manager_poppo_id') || getVal('manager');
       const photoUrl = getVal('photoUrl');
 

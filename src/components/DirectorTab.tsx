@@ -993,8 +993,8 @@ export const DirectorTab = () => {
       // Event Participation score calculated deterministically or from calendar exposures
       const participationRate = (() => {
         // Fallback: use S/A tiers or level metrics to ensure mock data coverage
-        if (host.tier === 'S' || host.level > 10) return 92;
-        if (host.tier === 'A') return 88;
+        if (host.tier_pay === 'S idol' || host.level > 10) return 92;
+        if (host.tier_pay === 'Rocket Host') return 88;
         return 50;
       })();
 
@@ -1843,10 +1843,10 @@ export const DirectorTab = () => {
                           team: String(formData.get('team') || 'Unassigned'),
                           manager: 'Nine Management',
                           anchor_type: 'Nine Agency',
-                          base_salary_category: 'N/A',
+                          tier_pay: 'N/A',
                           status: 'Active',
                           level: 1,
-                          tier: 'X',
+
                           isActive: true,
                           created_at: new Date().toISOString(),
                           updated_at: new Date().toISOString(),
@@ -1869,10 +1869,10 @@ export const DirectorTab = () => {
                         team: String(formData.get('team') || 'Unassigned'),
                         manager: String(formData.get('manager') || 'Nine Management'),
                         anchor_type: 'Nine Agency',
-                        base_salary_category: 'N/A',
+                        tier_pay: 'N/A',
                         status: 'Active',
                         level: 1,
-                        tier: 'X',
+
                         isActive: true,
                         created_at: new Date().toISOString(),
                         updated_at: new Date().toISOString(),
@@ -1985,9 +1985,9 @@ export const DirectorTab = () => {
                               manager: manager,
                               team: team,
                               anchor_type: 'Nine Agency',
-                              base_salary_category: 'N/A',
+                              tier_pay: 'N/A',
                               level: level,
-                              tier: 'X',
+
                               isActive: true,
                               created_at: new Date().toISOString(),
                               updated_at: new Date().toISOString()
@@ -2258,11 +2258,11 @@ export const DirectorTab = () => {
                               </td>
                               <td className="px-6 py-4">
                                 <select 
-                                  value={host.base_salary_category}
+                                  value={host.tier_pay}
                                   onChange={async (e) => {
                                     const val = e.target.value as any;
                                     const original = { ...host };
-                                    const updated: Host = { ...host, base_salary_category: val };
+                                    const updated: Host = { ...host, tier_pay: val };
                                     try {
                                       await FirebaseService.updateHost(updated, host.role);
                                       await auditLogAction('UPDATE_HOST', original, updated);
@@ -2860,9 +2860,9 @@ export const DirectorTab = () => {
                   { field: 'role', label: 'Role' },
                   { field: 'team', label: 'Team Group' },
                   { field: 'manager', label: 'Assigned Manager' },
-                  { field: 'base_salary_category', label: 'Salary Class' },
+                  { field: 'tier_pay', label: 'Salary Class' },
                   { field: 'status', label: 'Roster Status' },
-                  { field: 'tier', label: 'Tier Rank' },
+
                   { field: 'level', label: 'Level Snapshot' }
                 ].map(({ field, label }) => {
                   const existVal = (existingHost as any)[field];
@@ -3641,10 +3641,10 @@ export const DirectorTab = () => {
           team: 'Unassigned',
           manager: 'Nine Management',
           anchor_type: 'Nine Agency',
-          base_salary_category: 'N/A',
+          tier_pay: 'N/A',
           status: 'Active',
           level: 1,
-          tier: 'X',
+
           isActive: true,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),

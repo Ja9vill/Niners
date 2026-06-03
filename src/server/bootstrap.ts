@@ -42,9 +42,9 @@ async function runBootstrap() {
       team: "Management",
       manager: "Self",
       anchor_type: "Nine Agency",
-      base_salary_category: "N/A",
+      tier_pay: "N/A",
       status: "Active",
-      tier: "Director",
+
       photoUrl: "",
       isActive: true,
       is_temp_password: false,
