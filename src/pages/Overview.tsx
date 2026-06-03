@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { LayoutDashboard, Loader2, TrendingUp, Users, Star, Zap, Award } from 'lucide-react';
+import { LayoutDashboard, Loader2, TrendingUp, Users, Star, Zap, Award, Clock } from 'lucide-react';
 import { FirebaseService } from '../lib/firebaseService';
 import { Host } from '../types';
 import { OverviewTab } from '../NineDashboardV1';
@@ -238,6 +238,50 @@ export const Overview = () => {
     return map;
   }, [reports]);
 
+  // Compute Base Salary Tiers dynamically from ALL roles
+  const baseSalaryTiers = useMemo(() => {
+    const counts: Record<string, number> = {};
+    hosts.forEach(h => {
+      const tierRaw = h.tier_pay || (h as any).tierPay || (h as any).tier_Pay;
+      if (!tierRaw) return;
+      
+      const tierClean = String(tierRaw).trim();
+      const tierLower = tierClean.toLowerCase();
+      
+      if (tierLower === 'regular host' || tierLower === '' || tierLower === 'none' || tierLower === 'null') return;
+      
+      const words = tierClean.split(' ');
+      const displayTier = words.map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+      
+      counts[displayTier] = (counts[displayTier] || 0) + 1;
+    });
+    
+    const defaultColors = ['#facc15', '#22d3ee', '#ec4899', '#a855f7', '#10b981', '#f97316', '#3b82f6'];
+    
+    return Object.entries(counts)
+      .sort((a, b) => b[1] - a[1]) // Sort by count descending
+      .map(([label, value], i) => {
+        const lblLow = label.toLowerCase();
+        let color = defaultColors[i % defaultColors.length];
+        let textColorGradient = undefined;
+        
+        if (lblLow.includes('rocket')) {
+          color = '#38bdf8'; // light sky blue base
+          textColorGradient = 'linear-gradient(to right, #7dd3fc, #1e3a8a)'; // lightblue to dark blue
+        } else if (lblLow.includes('idol')) {
+          color = '#f472b6'; // pink base
+          textColorGradient = 'linear-gradient(to right, #fbcfe8, #be185d)'; // light pink to dark pink
+        }
+
+        return {
+          label,
+          value,
+          color,
+          textColorGradient
+        };
+      });
+  }, [hosts]);
+
   // Keep spotlight synchronized when monthlyTrend loads/re-calculates
   useEffect(() => {
     if (monthlyTrend.length > 0) {
@@ -272,30 +316,62 @@ export const Overview = () => {
   // Aggregate all earnings breakdown fields
   const sum = (fn: (r: any) => number) => filteredReports.reduce((s, r) => s + fn(r), 0);
 
-  const kpis = [
-    { label: 'Total Agency Points', value: formatPts(sum(getPoints)), icon: Star, color: 'text-[#D4AF37]', bg: 'bg-[#D4AF37]/10' },
-    { label: 'Live Hours', value: fmtH(sum(getLiveDuration)), icon: Zap, color: 'text-cyan-400', bg: 'bg-cyan-400/10' },
-    { label: 'Agency Commission', value: formatPts(sum(getAgentComm)), icon: Award, color: 'text-emerald-400', bg: 'bg-emerald-400/10' },
-    { label: 'Active Hosts', value: String(uniqueHosts), icon: Users, color: 'text-purple-400', bg: 'bg-purple-400/10' },
-  ];
 
-  const earningsBreakdown = [
-    { label: 'LIVE\nEARNINGS',          value: sum(getLiveEarnings),   color: '#06b6d4' },
-    { label: 'PARTY\nEARNINGS',         value: sum(getPartyEarnings),  color: '#8b5cf6' },
-    { label: 'PRIVATE\nCHAT',           value: sum(getPrivateChat),    color: '#ec4899' },
-    { label: 'TIPS',                    value: sum(getTips),           color: '#f59e0b' },
-    { label: 'PLATFORM\nREWARD',        value: sum(getPlatformReward), color: '#10b981' },
-    { label: 'OTHER\nEARNINGS',         value: sum(getOtherEarnings),  color: '#a78bfa' },
-    { label: 'PLATFORM\nHOURLY SALARY', value: sum(getPlatformHourly), color: '#38bdf8' },
-    { label: 'SUPER\nSALARY',           value: sum(getSuperSalary),    color: '#D4AF37' },
-    { label: 'SUPER\nRANK',             value: sum(getSuperRank),      color: '#fb923c' },
-  ];
 
   const CHART_COLORS = ['#D4AF37','#6366f1','#ec4899','#10b981','#f59e0b','#06b6d4','#a78bfa'];
 
   return (
     <div className="flex flex-col gap-6">
-      {/* Header */}
+      {/* Base Salary Tiers Block */}
+      <div className="bg-[#1A1A28]/80 backdrop-blur-md border border-[#D4AF37]/15 shadow-2xl rounded-2xl p-5 relative overflow-hidden">
+        {/* Subtle background glow for the entire section */}
+        <div className="absolute -top-24 -left-24 w-48 h-48 bg-[#D4AF37]/5 blur-3xl rounded-full pointer-events-none"></div>
+        <div className="absolute -bottom-24 -right-24 w-48 h-48 bg-indigo-500/5 blur-3xl rounded-full pointer-events-none"></div>
+        <p className="text-[9px] font-black text-[#A09E9A] uppercase tracking-[0.2em] mb-4 relative z-10 flex items-center gap-2">
+          <span className="w-1.5 h-1.5 rounded-full bg-[#D4AF37] animate-pulse"></span>
+          Base Salary Tiers
+        </p>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 relative z-10">
+          {baseSalaryTiers.map((item, i) => (
+            <div
+              key={i}
+              className="relative overflow-hidden rounded-xl p-4 flex flex-col items-center justify-center text-center transition-all duration-300 group hover:-translate-y-1 cursor-default shadow-lg backdrop-blur-sm"
+              style={{
+                background: `linear-gradient(135deg, #1e293b 0%, #0D0D14 100%)`, // Deep slate gradient
+                borderWidth: '0px', // Eliminate flat border
+                boxShadow: `0 8px 16px rgba(0,0,0,0.3)`
+              }}
+            >
+              <div 
+                className="absolute inset-0 opacity-0 group-hover:opacity-10 transition-opacity duration-500 pointer-events-none" 
+                style={{ background: `radial-gradient(circle at center, ${item.color} 0%, transparent 70%)` }}
+              />
+              <p className="text-[10px] font-black uppercase tracking-widest leading-tight mb-2 whitespace-pre-line drop-shadow-sm text-[#9CA3AF] z-10 transition-colors group-hover:text-white">
+                {item.label}
+              </p>
+              <p 
+                className="text-3xl font-black leading-none drop-shadow-md z-10" 
+                style={{ 
+                  color: item.textColorGradient ? 'transparent' : item.color,
+                  backgroundImage: item.textColorGradient,
+                  backgroundClip: item.textColorGradient ? 'text' : undefined,
+                  WebkitBackgroundClip: item.textColorGradient ? 'text' : undefined,
+                  WebkitTextFillColor: item.textColorGradient ? 'transparent' : undefined,
+                }}
+              >
+                {item.value}
+              </p>
+              {/* Bottom accent line */}
+              <div 
+                className="absolute bottom-0 left-0 h-[3px] w-0 group-hover:w-full transition-all duration-500 ease-out"
+                style={{ backgroundColor: item.color }}
+              ></div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Header with Filters */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3">
           <LayoutDashboard className="text-[#D4AF37]" size={24} />
@@ -304,91 +380,107 @@ export const Overview = () => {
             <p className="text-xs text-[#A09E9A] font-mono">{reports.length} performance records loaded</p>
           </div>
         </div>
-        {/* Filters */}
-        <div className="flex items-center gap-2">
-          <select
-            title="Filter by Year"
-            value={selectedYear}
-            onChange={e => setSelectedYear(e.target.value)}
-            className="bg-[#1A1A28] border border-[#D4AF37]/20 rounded-lg px-3 py-1.5 text-xs font-bold text-[#F0EFE8] outline-none focus:border-[#D4AF37] cursor-pointer"
-          >
-            <option value="all">All Years</option>
-            {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
-          </select>
-          <select
-            title="Filter by Month"
-            value={selectedMonth}
-            onChange={e => setSelectedMonth(e.target.value)}
-            className="bg-[#1A1A28] border border-[#D4AF37]/20 rounded-lg px-3 py-1.5 text-xs font-bold text-[#F0EFE8] outline-none focus:border-[#D4AF37] cursor-pointer"
-          >
-            <option value="all">All Months</option>
-            {MONTH_ORDER.map(m => <option key={m} value={m}>{m}</option>)}
-          </select>
-        </div>
       </div>
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {kpis.map((kpi, i) => {
-          const Icon = kpi.icon;
-          return (
-            <div key={i} className="bg-[#1A1A28] border border-[#D4AF37]/10 rounded-2xl p-4 flex items-center gap-3 hover:border-[#D4AF37]/20 transition-all">
-              <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center shrink-0', kpi.bg)}>
-                <Icon size={18} className={kpi.color} />
-              </div>
-              <div>
-                <p className="text-[10px] font-bold text-[#A09E9A] uppercase tracking-widest">{kpi.label}</p>
-                <p className={cn('text-xl font-black', kpi.color)}>{kpi.value}</p>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Earnings Breakdown Grid */}
+      {/* Agency Performance Metrics */}
       <div className="bg-[#1A1A28]/80 backdrop-blur-md border border-[#D4AF37]/15 shadow-2xl rounded-2xl p-5 relative overflow-hidden">
         {/* Subtle background glow for the entire section */}
         <div className="absolute -top-24 -right-24 w-48 h-48 bg-[#D4AF37]/5 blur-3xl rounded-full pointer-events-none"></div>
-        <p className="text-[9px] font-black text-[#A09E9A] uppercase tracking-[0.2em] mb-4 relative z-10 flex items-center gap-2">
+        <p className="text-[9px] font-black text-[#A09E9A] uppercase tracking-[0.2em] mb-5 relative z-10 flex items-center gap-2">
           <span className="w-1.5 h-1.5 rounded-full bg-[#D4AF37] animate-pulse"></span>
-          Earnings Breakdown
+          Agency Performance Metrics
         </p>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-9 gap-3 relative z-10">
-          {earningsBreakdown.map((item, i) => (
-            <div
-              key={i}
-              className="relative overflow-hidden rounded-xl p-3.5 flex flex-col items-center text-center transition-all duration-300 group hover:-translate-y-1 cursor-default shadow-lg backdrop-blur-sm"
-              {...({ style: {
-                background: `linear-gradient(135deg, ${item.color}15 0%, #0D0D14 100%)`,
-                borderColor: `${item.color}30`,
-                borderWidth: '1px',
-                borderStyle: 'solid',
-                boxShadow: `0 4px 12px ${item.color}05`
-              } })}
-            >
-              <div 
-                className="absolute inset-0 opacity-0 group-hover:opacity-20 transition-opacity duration-500 pointer-events-none" 
-                {...({ style: { background: `radial-gradient(circle at center, ${item.color} 0%, transparent 70%)` } })}
-              />
-              <p
-                className="text-[8px] font-black uppercase tracking-widest leading-tight mb-2.5 whitespace-pre-line drop-shadow-sm transition-colors group-hover:text-white z-10"
-                {...({ style: { color: item.color + 'cc' } })}
-              >
-                {item.label}
-              </p>
-              <p
-                className="text-sm sm:text-base font-black leading-none drop-shadow-md z-10"
-                {...({ style: { color: item.color } })}
-              >
-                {item.value > 0 ? formatPts(item.value) : '—'}
-              </p>
-              {/* Bottom accent line */}
-              <div 
-                className="absolute bottom-0 left-0 h-[2px] w-0 group-hover:w-full transition-all duration-500 ease-out"
-                {...({ style: { backgroundColor: item.color } })}
-              ></div>
+        
+        <div className="flex flex-col gap-6 relative z-10">
+          {[
+            {
+              title: "Agency Revenue",
+              items: [
+                { label: 'Total Agency Points', value: formatPts(sum(getPoints)), icon: Star, color: '#D4AF37' }, // Classic Gold
+                { label: 'Agency Commission', value: formatPts(sum(getAgentComm)), icon: Award, color: '#CA8A04' } // Muted Yellow/Gold
+              ]
+            },
+            {
+              title: "Agency Members Incentives",
+              items: [
+                { label: 'Super Salary', value: formatPts(sum(getSuperSalary)), icon: Zap, color: '#C2410C' }, // Muted Deep Orange
+                { label: 'Super Rank', value: formatPts(sum(getSuperRank)), icon: TrendingUp, color: '#B45309' } // Muted Amber
+              ]
+            },
+            {
+              title: "Members Activeness",
+              items: [
+                { label: 'Active Hosts', value: String(uniqueHosts), icon: Users, color: '#0E7490' }, // Muted Deep Cyan
+                { label: 'Total Live Hours', value: fmtH(sum(getLiveDuration)), icon: Clock, color: '#0F766E' } // Muted Deep Teal
+              ]
+            }
+          ].map((row, rowIdx) => (
+            <div key={rowIdx} className="flex flex-col gap-3">
+              <h4 className="text-[10px] font-bold text-[#A09E9A] uppercase tracking-widest pl-2 border-l-2 border-[#D4AF37]/30">{row.title}</h4>
+              <div className="grid grid-cols-2 gap-4">
+                {row.items.map((item, i) => {
+                  const Icon = item.icon;
+                  return (
+                    <div
+                      key={i}
+                      className="relative overflow-hidden rounded-xl p-4 flex items-center gap-4 transition-all duration-300 group hover:-translate-y-1 cursor-default shadow-lg backdrop-blur-sm"
+                      style={{
+                        background: `linear-gradient(135deg, #1e293b 0%, #0D0D14 100%)`, // Deep slate gradient
+                        borderWidth: '0px', // Eliminate flat border
+                        boxShadow: `0 8px 16px rgba(0,0,0,0.3)`
+                      }}
+                    >
+                      <div 
+                        className="absolute inset-0 opacity-0 group-hover:opacity-10 transition-opacity duration-500 pointer-events-none" 
+                        style={{ background: `radial-gradient(circle at right, ${item.color} 0%, transparent 70%)` }}
+                      />
+                      <div className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0 border" style={{ backgroundColor: `${item.color}10`, borderColor: `${item.color}20` }}>
+                        <Icon size={20} style={{ color: item.color }} />
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-black uppercase tracking-widest leading-tight mb-1 drop-shadow-sm text-[#9CA3AF] z-10 transition-colors group-hover:text-white">
+                          {item.label}
+                        </p>
+                        <p className="text-2xl sm:text-3xl font-black leading-none drop-shadow-md z-10" style={{ color: item.color }}>
+                          {item.value}
+                        </p>
+                      </div>
+                      {/* Left accent line */}
+                      <div 
+                        className="absolute left-0 top-0 w-[3px] h-0 group-hover:h-full transition-all duration-500 ease-out"
+                        style={{ backgroundColor: item.color }}
+                      ></div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           ))}
+        </div>
+        
+        {/* Contextual Date Filters Relocated Here */}
+        <div className="mt-8 pt-4 border-t border-[#D4AF37]/10 flex items-center justify-between flex-wrap gap-4 relative z-10">
+          <p className="text-[10px] font-black text-[#A09E9A] uppercase tracking-widest">Filter Performance Data</p>
+          <div className="flex items-center gap-2">
+            <select
+              title="Filter by Year"
+              value={selectedYear}
+              onChange={e => setSelectedYear(e.target.value)}
+              className="bg-[#0D0D14] border border-[#D4AF37]/20 rounded-lg px-3 py-1.5 text-xs font-bold text-[#F0EFE8] outline-none focus:border-[#D4AF37] cursor-pointer shadow-inner"
+            >
+              <option value="all">All Years</option>
+              {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
+            </select>
+            <select
+              title="Filter by Month"
+              value={selectedMonth}
+              onChange={e => setSelectedMonth(e.target.value)}
+              className="bg-[#0D0D14] border border-[#D4AF37]/20 rounded-lg px-3 py-1.5 text-xs font-bold text-[#F0EFE8] outline-none focus:border-[#D4AF37] cursor-pointer shadow-inner"
+            >
+              <option value="all">All Months</option>
+              {MONTH_ORDER.map(m => <option key={m} value={m}>{m}</option>)}
+            </select>
+          </div>
         </div>
       </div>
 

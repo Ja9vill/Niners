@@ -110,7 +110,7 @@ export const RoleGuard: React.FC<RoleGuardProps> = ({ roles, children }) => {
     return <>{children}</>;
   }
 
-  return <Navigate to="/app/unauthorized" replace />;
+  return <Navigate to="/unauthorized" replace />;
 };
 
 /**

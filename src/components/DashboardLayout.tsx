@@ -556,39 +556,43 @@ export const DashboardLayout = () => {
     await signOut(auth);
   };
 
-  const getNavigationLinks = () => {
-    const links: any[] = [
-      { path: '/app/dashboard', label: 'Overview', icon: LayoutDashboard },
-      { path: '/app/roster', label: 'Roster', icon: Users },
-      { path: '/app/calendar', label: 'Calendar', icon: Calendar },
-      { path: '/app/my-profile', label: 'My Profile', icon: User },
-    ];
+  const getSideNavLinks = () => {
+    const links: any[] = [];
     
     const role = (authState.role || '').toLowerCase();
     
     if (role === 'director' || role === 'head admin' || role === 'head_admin') {
-      links.push({ isDivider: true, id: 'div-director' });
       links.push({ isTitle: true, label: "Director's Hub", id: 'title-director' });
       
-      links.push({ path: '/app/profiles', label: 'Roster Management', icon: Users });
-      links.push({ path: '/app/hub', label: 'Operations', icon: Activity });
+      links.push({ path: '/profiles', label: 'Roster Management', icon: Users });
+      links.push({ path: '/hub', label: 'Operations', icon: Activity });
       
       if (role === 'director') {
-        links.push({ path: '/app/provision-user', label: 'Provision User', icon: Plus });
-        links.push({ path: '/app/financial-data', label: 'Financial Data', icon: DollarSign });
+        links.push({ path: '/provision-user', label: 'Provision User', icon: Plus });
+        links.push({ path: '/financial-data', label: 'Financial Data', icon: DollarSign });
       }
       
-      links.push({ path: '/app/director', label: 'Sitewide Logs', icon: FileText });
+      links.push({ path: '/director', label: 'Sitewide Logs', icon: FileText });
     } else if (role === 'admin') {
-      links.push({ path: '/app/admin-hub', label: 'Admin Hub', icon: Shield });
+      links.push({ path: '/admin-hub', label: 'Admin Hub', icon: Shield });
     } else if (role === 'manager' || role === 'agent') {
-      links.push({ path: '/app/hub', label: 'Operations', icon: Activity });
+      links.push({ path: '/hub', label: 'Operations', icon: Activity });
     }
 
     return links;
   };
 
-  const links = getNavigationLinks();
+  const getBottomNavLinks = () => {
+    return [
+      { path: '/dashboard', label: 'Overview', icon: LayoutDashboard },
+      { path: '/roster', label: 'Roster', icon: Users },
+      { path: '/calendar', label: 'Calendar', icon: Calendar },
+      { path: '/my-profile', label: 'My Profile', icon: User },
+    ];
+  };
+
+  const sideNavLinks = getSideNavLinks();
+  const bottomNavLinks = getBottomNavLinks();
 
   return (
     <div className="flex flex-col h-[100dvh] bg-[#0A0A0F] text-[#F0EFE8] overflow-hidden selection:bg-[#D4AF37]/30 selection:text-white">
@@ -645,7 +649,7 @@ export const DashboardLayout = () => {
               <div className="text-xs text-[#A09E9A] capitalize">{authState.role}</div>
             </div>
 
-            {links.map((link) => {
+            {sideNavLinks.map((link) => {
               if (link.isDivider) {
                 return <div key={link.id} className="border-t border-white/5 my-4 mx-3" />;
               }
@@ -709,7 +713,7 @@ export const DashboardLayout = () => {
 
       {/* Mobile Bottom Nav */}
       <div className="md:hidden h-16 bg-[#11111A] border-t border-white/5 flex items-center justify-around shrink-0 px-2 pb-safe z-20">
-        {links.slice(0, 4).map(tab => {
+        {bottomNavLinks.map(tab => {
           const Icon = tab.icon;
           const isActive = location.pathname.startsWith(tab.path);
           return (

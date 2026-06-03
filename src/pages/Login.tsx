@@ -15,7 +15,7 @@ const authService = new PoppoAuthService();
 export const Login = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const from = location.state?.from?.pathname || '/app/dashboard';
+  const from = location.state?.from?.pathname || '/dashboard';
 
   // ── State ──────────────────────────────────────────────────────────────────
   const [phase, setPhase] = useState<Phase>('username');

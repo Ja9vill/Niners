@@ -79,16 +79,24 @@ export const RosterTab: React.FC<RosterTabProps> = ({ isReadOnly = false }) => {
     setIsSpotlightLoading(true);
     try {
       const [events, awards] = await Promise.all([
-        FirebaseService.getPublicCalendarEvents(),
+        FirebaseService.getCalendarEvents(),
         FirebaseService.getAwards ? FirebaseService.getAwards(host.id) : Promise.resolve([])
       ]);
 
       // Filter events where host might be involved
-      // Note: Assuming events have a 'hostIds' or similar property, otherwise just showing recent
-      const relatedEvents = events.filter(e =>
-        (e.hostId && e.hostId === host.id) ||
-        (e.title && e.title.includes(host.nickname || host.name))
-      );
+      const relatedEvents = events.filter((e: any) => {
+        const pIdStr = String(host.id);
+        const p1 = Array.isArray(e.participants) ? e.participants.map(String) : [];
+        const p2 = Array.isArray(e.participantIds) ? e.participantIds.map(String) : [];
+        const p3 = Array.isArray(e.participants_id) ? e.participants_id.map(String) : [];
+        return String(e.poppo_id) === pIdStr || 
+               String(e.event_host_id) === pIdStr || 
+               String(e.hostId) === pIdStr || 
+               p1.includes(pIdStr) || 
+               p2.includes(pIdStr) || 
+               p3.includes(pIdStr) || 
+               (e.title && e.title.includes(host.nickname || host.name));
+      });
       setHostEvents(relatedEvents);
       setHostAwards(awards || []);
     } catch (err) {
@@ -482,7 +490,7 @@ export const RosterTab: React.FC<RosterTabProps> = ({ isReadOnly = false }) => {
                               <h4 className="font-bold text-[#F0EFE8] text-sm">{(evt as any).eventTitle || (evt as any).title || 'Event'}</h4>
                               <span className="text-[10px] font-mono text-emerald-400 bg-emerald-400/10 px-2 py-0.5 rounded border border-emerald-400/20">{(evt as any).status || 'Scheduled'}</span>
                             </div>
-                            <div className="text-xs text-[#A09E9A]">{(evt as any).eventDate || (evt as any).startDate || ''} • {(evt as any).eventType || (evt as any).type || ''}</div>
+                            <div className="text-xs text-[#A09E9A]">{(evt as any).eventDate || (evt as any).date || (evt as any).startDate || ''} • {(evt as any).eventType || (evt as any).type || ''}</div>
                           </div>
                         ))}
                       </div>

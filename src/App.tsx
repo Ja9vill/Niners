@@ -40,7 +40,7 @@ export default function App() {
 
         {/* ── Protected Dashboard ──────────────────────────────────── */}
         <Route
-          path="/app"
+          path="/"
           element={
             <RequireAuth>
               <DashboardLayout />
@@ -48,7 +48,7 @@ export default function App() {
           }
         >
           {/* Default landing */}
-          <Route index element={<Navigate to="/app/dashboard" replace />} />
+          <Route index element={<Navigate to="/dashboard" replace />} />
 
           {/* Shared tabs (all authenticated roles) */}
           <Route path="dashboard" element={<Overview />} />
@@ -134,11 +134,9 @@ export default function App() {
               </div>
             }
           />
-
-          {/* Catch-all inside /app */}
-          <Route path="*" element={<Navigate to="/app/dashboard" replace />} />
         </Route>
 
+        <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
     </BrowserRouter>
   );

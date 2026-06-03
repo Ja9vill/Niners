@@ -3,6 +3,7 @@ import { Search, Filter, Loader2, Star, Users, LayoutGrid } from 'lucide-react';
 import { FirebaseService } from '../lib/firebaseService';
 import { Host } from '../types';
 import { HostProfileView } from './HostProfileView';
+import { cn } from '../lib/utils';
 
 const getTierBlockStyles = (tierInput: string) => {
   const norm = String(tierInput || '').toLowerCase();

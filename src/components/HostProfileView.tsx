@@ -385,13 +385,15 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
         }
 
         // Section 2: Query exposures from 'calendar' collection
-        const [eventsSnap1, eventsSnap2] = await Promise.all([
+        const [eventsSnap1, eventsSnap2, eventsSnap3, eventsSnap4] = await Promise.all([
           getDocs(query(collection(db, 'calendar'), where('participantIds', 'array-contains', host.id))),
-          getDocs(query(collection(db, 'calendar'), where('participants', 'array-contains', host.id)))
+          getDocs(query(collection(db, 'calendar'), where('participants', 'array-contains', host.id))),
+          getDocs(query(collection(db, 'calendar'), where('participants_id', 'array-contains', host.id))),
+          getDocs(query(collection(db, 'calendar'), where('poppo_id', '==', host.id)))
         ]);
         const seenEventIds = new Set<string>();
         const eventsList: any[] = [];
-        [...eventsSnap1.docs, ...eventsSnap2.docs].forEach(doc => {
+        [...eventsSnap1.docs, ...eventsSnap2.docs, ...eventsSnap3.docs, ...eventsSnap4.docs].forEach(doc => {
           if (!seenEventIds.has(doc.id)) {
             seenEventIds.add(doc.id);
             eventsList.push({ id: doc.id, ...doc.data() });
