@@ -1,7 +1,7 @@
 import { auth, db, storage } from './firebase';
 import { ref, uploadString, getBytes } from 'firebase/storage';
 import { Storage } from './storage';
-import { doc, setDoc, getDoc, collection, query, where, getDocs, deleteDoc, writeBatch, Timestamp, onSnapshot, updateDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc, collection, query, where, getDocs, deleteDoc, writeBatch, Timestamp, onSnapshot, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
 import { CommissionEntry, Host, PKEntry, ExposureEntry, FanbaseHealthEntry, WeeklyLiveDataEntry, MonthlyLiveDataEntry, TopNinersEarningsSummary, EventsCalendarPublic, ReportingSubmission, Task, ActivityAuditLog, CalendarEvent, LivehouseRequest } from '../types';
 
 export enum OperationType {
@@ -65,7 +65,7 @@ function handleFirestoreError(error: unknown, operationType: OperationType, path
 export const FirebaseService = {
   // Hosts management
   async saveHosts(hosts: Host[]) {
-    const path = 'hosts';
+    const path = 'host';
     try {
       const batch = writeBatch(db);
       hosts.forEach(h => {
@@ -78,30 +78,162 @@ export const FirebaseService = {
     }
   },
 
-  async updateHost(host: Host) {
-    const path = `hosts/${host.id}`;
+  async syncHostManagerRelationship(hostId: string, newManagerId: string | null): Promise<void> {
+    const hostUserRef = doc(db, 'users', hostId);
+    const hostHostsRef = doc(db, 'host', hostId);
+    
+    // 1. Fetch current host document to find old manager
+    let oldManagerId: string | null = null;
     try {
-      const docRef = doc(db, 'hosts', host.id);
-      await setDoc(docRef, { ...host, updated_at: new Date().toISOString() });
+      const hostSnap = await getDoc(hostUserRef);
+      if (hostSnap.exists()) {
+        const hostData = hostSnap.data();
+        oldManagerId = hostData?.assignedManagerId || hostData?.assigned_manager_poppo_id || null;
+      } else {
+        const hostHostsSnap = await getDoc(hostHostsRef);
+        if (hostHostsSnap.exists()) {
+          const hostData = hostHostsSnap.data();
+          oldManagerId = hostData?.assignedManagerId || hostData?.assigned_manager_poppo_id || null;
+        }
+      }
+    } catch (e) {
+      console.warn("Could not fetch current host to determine old manager:", e);
+    }
+
+    if (oldManagerId === newManagerId) {
+      return;
+    }
+
+    const batch = writeBatch(db);
+
+    // Ensure host document in both users and hosts collections has the correct assignedManagerId
+    try {
+      const snap = await getDoc(hostUserRef);
+      if (snap.exists()) {
+        batch.update(hostUserRef, { assignedManagerId: newManagerId });
+      }
+    } catch (e) {}
+    try {
+      const snap = await getDoc(hostHostsRef);
+      if (snap.exists()) {
+        batch.update(hostHostsRef, { assignedManagerId: newManagerId });
+      }
+    } catch (e) {}
+
+    // Ensure new manager document in both users and hosts collections has hostId in assignedHosts
+    if (newManagerId) {
+      const newManagerUserRef = doc(db, 'users', newManagerId);
+      const newManagerHostsRef = doc(db, 'host', newManagerId);
+      try {
+        const snap = await getDoc(newManagerUserRef);
+        if (snap.exists()) {
+          batch.update(newManagerUserRef, { assignedHosts: arrayUnion(hostId) });
+        }
+      } catch (e) {}
+      try {
+        const snap = await getDoc(newManagerHostsRef);
+        if (snap.exists()) {
+          batch.update(newManagerHostsRef, { assignedHosts: arrayUnion(hostId) });
+        }
+      } catch (e) {}
+    }
+
+    // Ensure old manager document has hostId removed from assignedHosts
+    if (oldManagerId) {
+      const oldManagerUserRef = doc(db, 'users', oldManagerId);
+      const oldManagerHostsRef = doc(db, 'host', oldManagerId);
+      try {
+        const snap = await getDoc(oldManagerUserRef);
+        if (snap.exists()) {
+          batch.update(oldManagerUserRef, { assignedHosts: arrayRemove(hostId) });
+        }
+      } catch (e) {}
+      try {
+        const snap = await getDoc(oldManagerHostsRef);
+        if (snap.exists()) {
+          batch.update(oldManagerHostsRef, { assignedHosts: arrayRemove(hostId) });
+        }
+      } catch (e) {}
+    }
+
+    await batch.commit();
+  },
+
+  async updateHost(host: Host) {
+    const path = `host/${host.id}`;
+    try {
+      const managerName = host.manager || host.assigned_manager_nickname || host.assigned_manager || '';
+      const managerId = host.assignedManagerId || host.assigned_manager_poppo_id || '';
+      const teamName = host.team || host.team_anchor || '';
+      const salaryCategory = host.base_salary_category || host.tier_pay || '';
+
+      const updateData = {
+        ...host,
+        poppo_id: host.id,
+        nickname: host.nickname || host.name,
+        manager: managerName,
+        assigned_manager: managerName,
+        assigned_manager_nickname: managerName,
+        assigned_manager_poppo_id: managerId || null,
+        assignedManagerId: managerId || null,
+        team: teamName,
+        team_anchor: teamName,
+        base_salary_category: salaryCategory,
+        tier_pay: salaryCategory,
+        updated_at: new Date().toISOString()
+      };
+      
+      const hostDocRef = doc(db, 'host', host.id);
+      await setDoc(hostDocRef, updateData, { merge: true });
+      
+      try {
+        const userDocRef = doc(db, 'users', host.id);
+        await setDoc(userDocRef, updateData, { merge: true });
+      } catch (userErr) {
+        console.warn(`[UPDATE] Could not sync user authentication document for ${host.id}:`, userErr);
+      }
+      
+      await this.syncHostManagerRelationship(host.id, host.assignedManagerId || null);
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, path);
     }
   },
 
   async deleteHost(hostId: string) {
-    const path = `hosts/${hostId}`;
+    const path = `host/${hostId}`;
     try {
-      await deleteDoc(doc(db, 'hosts', hostId));
+      await deleteDoc(doc(db, 'host', hostId));
     } catch (error) {
       handleFirestoreError(error, OperationType.DELETE, path);
     }
   },
 
   async getAllHosts(): Promise<Host[]> {
-    const path = 'hosts';
+    const path = 'host';
     try {
       const snapshot = await getDocs(collection(db, path));
-      return snapshot.docs.map(d => d.data() as Host);
+      return snapshot.docs.map(d => {
+        const data = d.data();
+        const managerName = data.manager || data.assigned_manager_nickname || data.assigned_manager || 'Nine Management';
+        const managerId = data.assignedManagerId || data.assigned_manager_poppo_id || null;
+        const teamName = data.team || data.team_anchor || 'Unassigned';
+        const salaryCategory = data.base_salary_category || data.tier_pay || 'Regular Host';
+        return {
+          ...data,
+          id: d.id,
+          poppo_id: d.id,
+          name: data.nickname || data.name || 'Unknown',
+          nickname: data.nickname || data.name || 'Unknown',
+          manager: managerName,
+          team: teamName,
+          base_salary_category: salaryCategory,
+          assignedManagerId: managerId,
+          assigned_manager_nickname: managerName,
+          assigned_manager_poppo_id: managerId,
+          team_anchor: teamName,
+          tier_pay: salaryCategory,
+        } as Host;
+      });
     } catch (error) {
       handleFirestoreError(error, OperationType.LIST, path);
       return [];
@@ -110,7 +242,7 @@ export const FirebaseService = {
   
   // *** User credentials retrieval ***
   async getUserCredentials(): Promise<{ poppo_id: string; password?: string }[]> {
-    const path = 'hosts';
+    const path = 'host';
     try {
       const snapshot = await getDocs(collection(db, path));
       return snapshot.docs.map(d => {
@@ -553,7 +685,7 @@ export const FirebaseService = {
    * Returns an unsubscribe function — call it on component unmount to stop listening.
    */
   subscribeToHosts(callback: (hosts: Host[]) => void): () => void {
-    const path = 'hosts';
+    const path = 'host';
     const unsubscribe = onSnapshot(
       collection(db, path),
       (snapshot) => {
@@ -574,9 +706,9 @@ export const FirebaseService = {
    * @param patch - Object with only the fields to update
    */
   async patchHost(poppoId: string, patch: Partial<Host>): Promise<void> {
-    const path = `hosts/${poppoId}`;
+    const path = `host/${poppoId}`;
     try {
-      const docRef = doc(db, 'hosts', poppoId);
+      const docRef = doc(db, 'host', poppoId);
       await updateDoc(docRef, { ...patch, updated_at: new Date().toISOString() });
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, path);
@@ -646,7 +778,7 @@ export interface HostRosterUser {
  * Returns an unsubscribe function — call it in useEffect cleanup.
  */
 export const subscribeToHosts = (callback: (hosts: HostRosterUser[]) => void): (() => void) => {
-  const q = query(collection(db, 'hosts'));
+  const q = query(collection(db, 'host'));
   return onSnapshot(
     q,
     (snapshot) => {
@@ -676,7 +808,7 @@ export const patchHost = async (
   poppoId: string,
   updates: Partial<Omit<HostRosterUser, 'poppo_id'>>
 ): Promise<{ success: true }> => {
-  const hostDocRef = doc(db, 'hosts', poppoId);
+  const hostDocRef = doc(db, 'host', poppoId);
   await updateDoc(hostDocRef, { ...updates, updated_at: new Date().toISOString() });
   return { success: true };
 };

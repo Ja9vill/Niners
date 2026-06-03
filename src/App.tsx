@@ -191,8 +191,17 @@ export default function App() {
     }
   }, [activeTab, migrationRequired, isAuthChecking, appAuthState, firebaseUser, authState.level]);
 
-  // Initialize data from Firebase
   useEffect(() => {
+    // Run test performance reports cleanup on startup
+    fetch('/api/auth/cleanup-test-reports', { method: 'POST' })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.deletedIds && data.deletedIds.length > 0) {
+          console.log(`[Startup Cleanup] Cleaned up test reports:`, data.deletedIds);
+        }
+      })
+      .catch(err => console.warn('[Startup Cleanup] Failed to run database test report cleanup:', err));
+
     const loadData = async () => {
       setIsLoading(true);
       try {
@@ -241,6 +250,8 @@ export default function App() {
     loadData();
   }, [authState.level]);
 
+
+
   const handleLogout = async () => {
     try {
       await signOut(auth);
@@ -262,6 +273,9 @@ export default function App() {
     } catch (wipeErr) {
       console.warn("Could not execute security wipeLocalAuthState:", wipeErr);
     }
+
+    // Redirect to homepage
+    window.location.href = '/';
   };
 
   const handleMigrationSuccess = () => {

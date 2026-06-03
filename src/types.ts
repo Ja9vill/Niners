@@ -64,6 +64,9 @@ export interface Host {
   // Google OAuth fields
   googleUid?: string;
   googleEmail?: string;
+  // Two-way relationship fields
+  assignedManagerId?: string | null;
+  assignedHosts?: string[] | null;
   // Legacy fields for compatibility during transition
   anchor?: AnchorType;
   baseSalary?: BaseSalaryTier;

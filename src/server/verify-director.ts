@@ -80,19 +80,19 @@ async function verifyDirector() {
       console.log("⚠️ User doc NOT found in 'users' collection! Bootstrapping...");
     }
 
-    const hostDoc = await db.collection("hosts").doc(poppoId).get();
+    const hostDoc = await db.collection("host").doc(poppoId).get();
     if (hostDoc.exists) {
       const hostData = hostDoc.data();
-      console.log(`✅ Host doc found in 'hosts' collection. role=${hostData?.role}, is_temp_password=${hostData?.is_temp_password}, isActive=${hostData?.isActive}`);
+      console.log(`✅ Host doc found in 'host' collection. role=${hostData?.role}, is_temp_password=${hostData?.is_temp_password}, isActive=${hostData?.isActive}`);
       if (hostData?.is_temp_password !== false || hostData?.isActive !== true) {
         console.log("🔧 Fixing 'hosts' doc settings...");
-        await db.collection("hosts").doc(poppoId).update({ 
+        await db.collection("host").doc(poppoId).update({ 
           is_temp_password: false,
           isActive: true
         });
       }
     } else {
-      console.log("⚠️ Host doc NOT found in 'hosts' collection!");
+      console.log("⚠️ Host doc NOT found in 'host' collection!");
     }
 
     console.log("🎉 Emergency verification and recovery completed successfully.");

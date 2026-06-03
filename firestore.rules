@@ -8,31 +8,34 @@ service cloud.firestore {
     }
     
     function getRole() {
-      return isSignedIn() && request.auth.token != null ? request.auth.token.role : '';
+      return isSignedIn() ? (
+        request.auth.token != null && request.auth.token.role != null ? request.auth.token.role : 
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role : '')
+      ) : '';
     }
     
     function isDirector() {
-      return getRole() == 'Director';
+      return getRole() == 'Director' || getRole() == 'director';
     }
     
     function isHeadAdmin() {
-      return getRole() == 'Head Admin';
+      return getRole() == 'Head Admin' || getRole() == 'head admin' || getRole() == 'head_admin' || getRole() == 'Head_Admin';
     }
     
     function isAdmin() {
-      return getRole() == 'Admin';
+      return getRole() == 'Admin' || getRole() == 'admin';
     }
     
     function isManager() {
-      return getRole() == 'Manager';
+      return getRole() == 'Manager' || getRole() == 'manager';
     }
     
     function isAgent() {
-      return getRole() == 'Agent';
+      return getRole() == 'Agent' || getRole() == 'agent';
     }
     
     function isHost() {
-      return getRole() == 'Host';
+      return getRole() == 'Host' || getRole() == 'host' || getRole() == 'Talent' || getRole() == 'talent';
     }
     
     function isLeadership() {
@@ -142,6 +145,28 @@ service cloud.firestore {
         (isManager() || isAgent()) && 
         resource.data.assignerId == request.auth.uid
       );
+    }
+
+    // 8. Awards & Assignments
+    match /awards/{awardId} {
+      allow read: if isSignedIn();
+      allow write: if isDirector() || isHeadAdmin() || isLeadership();
+    }
+    match /award_assignments/{assignmentId} {
+      allow read: if isSignedIn();
+      allow write: if isDirector() || isHeadAdmin() || isLeadership();
+    }
+
+    // 9. Progress Notes
+    match /notes/{noteId} {
+      allow read, write: if isDirector() || isHeadAdmin() || isLeadership() || isStaff();
+    }
+
+    // 10. Host Intake Requests
+    match /host_requests/{requestId} {
+      allow read: if isDirector() || isHeadAdmin() || isLeadership() || isStaff();
+      allow create: if isStaff() || isDirector() || isHeadAdmin() || isLeadership();
+      allow update, delete: if isDirector() || isHeadAdmin() || isLeadership();
     }
     
     // Default Deny: block all other access by default

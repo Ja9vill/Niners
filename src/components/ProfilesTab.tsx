@@ -107,6 +107,15 @@ export const ProfilesTab = () => {
   // Filters
   const [tierFilter, setTierFilter] = useState<Tier[]>([]);
   const [salaryFilter, setSalaryFilter] = useState<BaseSalaryTier[]>([]);
+
+  const managerOptions = useMemo(() => {
+    return hosts
+      .filter(h => (h.role || '').toLowerCase() === 'manager' || (h.role || '').toLowerCase() === 'agent')
+      .map(h => ({
+        id: h.id || (h as any).poppoId || (h as any).poppo_id,
+        name: h.nickname || h.name || h.id
+      }));
+  }, [hosts]);
   
   const auth = Storage.getAuthState();
 
@@ -288,6 +297,9 @@ export const ProfilesTab = () => {
     const formData = new FormData(e.currentTarget);
     
     const photoUrl = uploadedPhoto || (formData.get('photoUrl') as string);
+    const selectedManagerName = formData.get('manager') as string;
+    const selectedMgr = managerOptions.find(m => m.name === selectedManagerName);
+    const assignedManagerId = selectedMgr ? selectedMgr.id : null;
     
     const updatedHost: Host = {
       ...selectedHost,
@@ -296,7 +308,8 @@ export const ProfilesTab = () => {
       nickname: formData.get('nickname') as string || (formData.get('name') as string),
       role: formData.get('role') as Role,
       team: formData.get('team') as string,
-      manager: formData.get('manager') as string,
+      manager: selectedManagerName,
+      assignedManagerId: assignedManagerId,
       anchor_type: formData.get('anchor_type') as AnchorType,
       base_salary_category: formData.get('base_salary_category') as BaseSalaryTier,
       status: formData.get('status') as HostStatus,
@@ -958,7 +971,12 @@ export const ProfilesTab = () => {
                   <div className="space-y-1.5">
                     <label htmlFor="edit-manager" className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">{TEXT.manager}</label>
                     <select id="edit-manager" name="manager" defaultValue={selectedHost.manager} className="w-full glass-input font-bold" title="Manager">
-                      {MANAGERS.map(m => <option key={m} value={m}>{m}</option>)}
+                      {!managerOptions.some(m => m.name === selectedHost.manager) && selectedHost.manager && (
+                        <option value={selectedHost.manager}>{selectedHost.manager}</option>
+                      )}
+                      {managerOptions.map(m => (
+                        <option key={m.id} value={m.name}>{m.name}</option>
+                      ))}
                     </select>
                   </div>
                   <div className="space-y-1.5">

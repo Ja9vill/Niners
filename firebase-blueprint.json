@@ -6,9 +6,12 @@
       "type": "object",
       "properties": {
         "id": { "type": "string" },
+        "poppo_id": { "type": "string" },
+        "assigned_manager": { "type": "string" },
+        "tier_pay": { "type": "string" },
+        "team_anchor": { "type": "string" },
         "name": { "type": "string" },
         "nickname": { "type": "string" },
-        "tier": { "type": "string" },
         "role": { "type": "string" },
         "team": { "type": "string" },
         "manager": { "type": "string" },
@@ -16,10 +19,41 @@
         "base_salary_category": { "type": "string" },
         "status": { "type": "string" },
         "level": { "type": "number" },
+        "tier": { "type": "string" },
         "password": { "type": "string" },
         "is_temp_password": { "type": "boolean" },
         "photoUrl": { "type": "string" },
         "description": { "type": "string" },
+        "bio": { "type": "string" },
+        "followers_count": { "type": "number" },
+        "reset_requested": { "type": "boolean" },
+        "isActive": { "type": "boolean" },
+        "social_links": {
+          "type": "object",
+          "properties": {
+            "fb": { "type": "string" },
+            "ig": { "type": "string" },
+            "tiktok": { "type": "string" },
+            "whatsapp": { "type": "string" }
+          }
+        },
+        "streaming_hours": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "from": { "type": "string" },
+              "to": { "type": "string" }
+            }
+          }
+        },
+        "googleUid": { "type": "string" },
+        "googleEmail": { "type": "string" },
+        "assignedManagerId": { "type": ["string", "null"] },
+        "assignedHosts": {
+          "type": ["array", "null"],
+          "items": { "type": "string" }
+        },
         "created_at": { "type": "string" },
         "updated_at": { "type": "string" }
       },
@@ -246,6 +280,31 @@
       },
       "required": ["taskId", "assignedToUserId", "relatedPoppoId", "status", "title"]
     },
+    "User": {
+      "title": "User",
+      "description": "Core User Profile in Niners agency",
+      "type": "object",
+      "properties": {
+        "poppoId": { "type": "string" },
+        "nickname": { "type": "string" },
+        "role": { "type": "string" },
+        "level": { "type": "integer" },
+        "status": { "type": "string" },
+        "password_hash": { "type": "string" },
+        "is_first_login": { "type": "boolean" },
+        "is_temp_password": { "type": "boolean" },
+        "assignedManagerId": { "type": ["string", "null"] },
+        "assignedHosts": {
+          "type": ["array", "null"],
+          "items": { "type": "string" }
+        },
+        "createdAt": { "type": "string" },
+        "passwordSetAt": { "type": ["string", "null"] },
+        "lastLoginAt": { "type": ["string", "null"] },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["poppoId", "nickname", "role"]
+    },
     "ActivityAuditLog": {
       "title": "Activity Audit Log",
       "description": "System audit logs for user and profile actions",
@@ -262,7 +321,8 @@
     }
   },
   "firestore": {
-    "hosts": { "schema": "Host", "description": "Global talent roster" },
+    "users": { "schema": "User", "description": "Master user collection" },
+    "host": { "schema": "Host", "description": "Global talent roster" },
     "commissions": { "schema": "Commission", "description": "Monthly financials" },
     "pk_records": { "schema": "PKRecord", "description": "PK performance history" },
     "exposures": { "schema": "Exposure", "description": "Visibility logs" },

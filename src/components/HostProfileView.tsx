@@ -6,7 +6,7 @@ import { FirebaseService } from '../lib/firebaseService';
 import { Storage } from '../lib/storage';
 import { cn, formatNumber } from '../lib/utils';
 import { MANAGERS, BASE_SALARY_POLICIES } from '../lib/constants';
-import { collection, query, where, getDocs, Timestamp } from 'firebase/firestore';
+import { collection, query, where, getDocs, Timestamp, documentId } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 
@@ -46,6 +46,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
   const [editLevel, setEditLevel] = useState<number>(host.level || 1);
   const [isSaving, setIsSaving] = useState(false);
   const [isProcessingPhoto, setIsProcessingPhoto] = useState(false);
+  const [managersList, setManagersList] = useState<{ id: string; name: string }[]>([]);
 
   useEffect(() => {
     // Reset edit values when host changes
@@ -64,15 +65,31 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
     const loadProfileData = async () => {
       setIsLoading(true);
       try {
-        // Section 1: Query performance_reports by poppoId
+        // Section 1: Query performance_reports by document ID prefix (poppoId_month_year)
+        const cleanHostId = String(host.id).trim();
         const perfQuery = query(
           collection(db, 'performance_reports'), 
-          where('poppoId', '==', host.id)
+          where(documentId(), '>=', `${cleanHostId}_`),
+          where(documentId(), '<=', `${cleanHostId}_\uf8ff`)
         );
         const perfSnap = await getDocs(perfQuery);
         const perfList: any[] = [];
+        const MONTH_MAP: Record<string,number> = {
+          January:1,February:2,March:3,April:4,May:5,June:6,
+          July:7,August:8,September:9,October:10,November:11,December:12
+        };
         perfSnap.forEach(doc => {
-          perfList.push({ id: doc.id, ...doc.data() });
+          const data = doc.data();
+          const parts = doc.id.split('_');
+          const monthNameFromId = parts[1] || '';
+          const yearFromId = parts[2] ? parseInt(parts[2]) : 0;
+          perfList.push({
+            id: doc.id,
+            ...data,
+            monthName: data.monthName || monthNameFromId,
+            month: data.month || MONTH_MAP[monthNameFromId] || 0,
+            year: data.year || yearFromId,
+          });
         });
         perfList.sort((a, b) => {
           if (a.year !== b.year) return b.year - a.year;
@@ -109,6 +126,21 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
     };
     loadProfileData();
   }, [host.id]);
+
+  useEffect(() => {
+    const fetchManagers = async () => {
+      try {
+        const allHosts = await FirebaseService.getAllHosts();
+        const mgrs = allHosts
+          .filter(h => (h.role || '').toLowerCase() === 'manager' || (h.role || '').toLowerCase() === 'agent')
+          .map(h => ({ id: h.id || (h as any).poppoId || (h as any).poppo_id, name: h.nickname || h.name || h.id }));
+        setManagersList(mgrs);
+      } catch (err) {
+        console.error("Failed to load managers list:", err);
+      }
+    };
+    fetchManagers();
+  }, []);
 
 
 
@@ -175,6 +207,9 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
     }
     setIsSaving(true);
     try {
+      const selectedMgr = managersList.find(m => m.name === editManager);
+      const assignedManagerId = selectedMgr ? selectedMgr.id : null;
+
       const updatedHost: Host = {
         ...host,
         nickname: editNickname.trim(),
@@ -184,6 +219,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
         role: editRole as any,
         team: editTeam,
         manager: editManager,
+        assignedManagerId: assignedManagerId,
         base_salary_category: editBaseSalaryCategory as any,
         status: editStatus as any,
         tier: editTier as any,
@@ -357,8 +393,11 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
                 onChange={(e) => setEditManager(e.target.value)}
                 className="w-full bg-[#0D0D14] border border-white/10 rounded px-1.5 py-1 text-[11px] text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
               >
-                {MANAGERS.map(mgr => (
-                  <option key={mgr} value={mgr} className="bg-[#1A1A28] text-[#F0EFE8]">{mgr}</option>
+                {!managersList.some(m => m.name === editManager) && editManager && (
+                  <option value={editManager} className="bg-[#1A1A28] text-[#F0EFE8]">{editManager}</option>
+                )}
+                {managersList.map(mgr => (
+                  <option key={mgr.id} value={mgr.name} className="bg-[#1A1A28] text-[#F0EFE8]">{mgr.name}</option>
                 ))}
               </select>
             </div>
@@ -429,7 +468,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
             </div>
             <div className="flex items-center gap-1.5">
               <span className="text-[#A09E9A] font-bold uppercase tracking-wider">Team / Anchor Group:</span>
-              <span className="text-indigo-400 font-semibold">{host.team} (Tier: {host.tier}, Level: {host.level})</span>
+              <span className="text-indigo-400 font-semibold">{host.team}</span>
             </div>
             <div className="flex items-center gap-1.5">
               <span className="text-[#A09E9A] font-bold uppercase tracking-wider">Status:</span>
