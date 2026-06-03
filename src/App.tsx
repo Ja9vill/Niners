@@ -18,6 +18,8 @@ import { PublicRoster } from './pages/PublicRoster';
 import { PublicCalendar } from './pages/PublicCalendar';
 import { PoppoLivePage } from './pages/PoppoLivePage';
 import { AdminHub } from './components/AdminHub';
+import { ProvisionUser } from './pages/ProvisionUser';
+import { FinancialData } from './pages/FinancialData';
 
 export default function App() {
   return (
@@ -89,6 +91,26 @@ export default function App() {
             element={
               <RoleGuard roles={['director', 'head admin', 'head_admin']}>
                 <DirectorTab />
+              </RoleGuard>
+            }
+          />
+
+          {/* Provision User (Director Only) */}
+          <Route
+            path="provision-user"
+            element={
+              <RoleGuard roles={['director']}>
+                <ProvisionUser />
+              </RoleGuard>
+            }
+          />
+
+          {/* Financial Data (Director Only) */}
+          <Route
+            path="financial-data"
+            element={
+              <RoleGuard roles={['director']}>
+                <FinancialData />
               </RoleGuard>
             }
           />

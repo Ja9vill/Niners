@@ -48,8 +48,8 @@ export const RosterTab: React.FC<RosterTabProps> = ({ isReadOnly = false }) => {
   const [error, setError] = useState<string | null>(null);
 
   // Filters
-  const [roleFilter, setRoleFilter] = useState<'All Members' | 'Show hosts' | 'Show team leaders'>('All Members');
-  const [tierFilter, setTierFilter] = useState<string>('All Tiers');
+  const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
+  const [selectedTiers, setSelectedTiers] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
 
   // Spotlight State
@@ -105,28 +105,42 @@ export const RosterTab: React.FC<RosterTabProps> = ({ isReadOnly = false }) => {
   };
 
   const filteredHosts = useMemo(() => {
+    if (selectedRoles.length === 0 && selectedTiers.length === 0 && !searchTerm.trim()) {
+      return []; // Return empty if no filters applied
+    }
+
     return hosts.filter(host => {
       // 1. Search Filter
-      const searchStr = searchTerm.toLowerCase();
-      const hostName = (host.nickname || host.name || '').toLowerCase();
-      const hostIdStr = String(host.id || '');
-      const matchesSearch = hostName.includes(searchStr) || hostIdStr.includes(searchStr);
-      if (!matchesSearch) return false;
+      if (searchTerm.trim()) {
+        const searchStr = searchTerm.toLowerCase();
+        const hostName = (host.nickname || host.name || '').toLowerCase();
+        const hostIdStr = String(host.id || '');
+        const matchesSearch = hostName.includes(searchStr) || hostIdStr.includes(searchStr);
+        if (!matchesSearch) return false;
+      }
 
       // 2. Role Filter
-      const roleStr = (host.role || '').toLowerCase();
-      if (roleFilter === 'Show hosts' && roleStr !== 'host') return false;
-      if (roleFilter === 'Show team leaders' && roleStr === 'host') return false;
+      if (selectedRoles.length > 0) {
+        const roleStr = (host.role || '').toLowerCase();
+        const isHost = roleStr === 'host' || roleStr === 'talent';
+        
+        let matchesRole = false;
+        if (selectedRoles.includes('Host') && isHost) matchesRole = true;
+        if (selectedRoles.includes('Team Leader') && !isHost) matchesRole = true;
+        
+        if (!matchesRole) return false;
+      }
 
       // 3. Tier Pay Filter
-      if (tierFilter !== 'All Tiers') {
+      if (selectedTiers.length > 0) {
         const tierPay = (host.tier_pay || host.tierPay || '').toLowerCase();
-        if (tierPay !== tierFilter.toLowerCase()) return false;
+        const matchesTier = selectedTiers.some(t => tierPay.includes(t.toLowerCase().replace(' host', '')));
+        if (!matchesTier) return false;
       }
 
       return true;
     });
-  }, [hosts, searchTerm, roleFilter, tierFilter]);
+  }, [hosts, searchTerm, selectedRoles, selectedTiers]);
 
   if (isLoading) {
     return (
@@ -149,54 +163,77 @@ export const RosterTab: React.FC<RosterTabProps> = ({ isReadOnly = false }) => {
   return (
     <div className="space-y-6 relative">
       {/* FILTER MENU BLOCKS */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-[#1A1A28] p-4 rounded-2xl border border-white/5 sticky top-0 z-10">
+      <div className="bg-[#1A1A28]/80 backdrop-blur-md p-5 rounded-2xl border border-indigo-500/15 shadow-2xl shadow-black/40 sticky top-0 z-10 flex flex-col gap-4 relative overflow-hidden">
+        {/* Subtle background glow for the filter section */}
+        <div className="absolute -top-24 -left-24 w-48 h-48 bg-indigo-500/10 blur-3xl rounded-full pointer-events-none"></div>
+        <div className="absolute -bottom-24 -right-24 w-48 h-48 bg-[#D4AF37]/5 blur-3xl rounded-full pointer-events-none"></div>
 
         {/* Search Block */}
-        <div className="relative w-full">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[#A09E9A]/50" size={16} />
+        <div className="relative w-full z-10">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-indigo-400/50" size={16} />
           <input
             type="text"
             placeholder="Search Host ID or Nickname..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-9 pr-4 py-2 bg-black/20 border border-white/10 rounded-xl text-xs text-[#F0EFE8] focus:outline-none focus:border-indigo-500/50 w-full"
+            className="pl-9 pr-4 py-3 bg-black/30 border border-white/10 rounded-xl text-xs text-[#F0EFE8] focus:outline-none focus:border-indigo-500/50 focus:bg-black/50 transition-all w-full shadow-inner"
           />
         </div>
 
-        {/* Role Filter Block */}
-        <div className="relative w-full">
-          <Filter className="absolute left-3 top-1/2 -translate-y-1/2 text-[#A09E9A]/50" size={16} />
-          <select
-            value={roleFilter}
-            onChange={(e) => setRoleFilter(e.target.value as any)}
-            title="Filter by Role"
-            aria-label="Filter by Role"
-            className="pl-9 pr-4 py-2 bg-black/20 border border-white/10 rounded-xl text-xs text-[#F0EFE8] focus:outline-none focus:border-indigo-500/50 w-full appearance-none"
-          >
-            <option value="All Members">All Members</option>
-            <option value="Show hosts">Show hosts</option>
-            <option value="Show team leaders">Show team leaders</option>
-          </select>
-        </div>
+        <div className="flex flex-col md:flex-row gap-6">
+          {/* Role Checkboxes */}
+          <div className="flex-1">
+            <h3 className="text-[10px] font-black uppercase tracking-widest text-[#A09E9A]/50 mb-2 flex items-center gap-1.5"><Filter size={12}/> Role Filter</h3>
+            <div className="flex flex-wrap gap-4">
+              {['Host', 'Team Leader'].map(role => (
+                <label key={role} className="flex items-center gap-2 cursor-pointer group">
+                  <div className={cn(
+                    "w-4 h-4 rounded border flex items-center justify-center transition-colors",
+                    selectedRoles.includes(role) ? "bg-indigo-500 border-indigo-500" : "bg-black/20 border-white/20 group-hover:border-white/40"
+                  )}>
+                    {selectedRoles.includes(role) && <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
+                  </div>
+                  <span className={cn("text-xs font-bold transition-colors", selectedRoles.includes(role) ? "text-[#F0EFE8]" : "text-[#A09E9A] group-hover:text-[#F0EFE8]")}>{role}</span>
+                  <input
+                    type="checkbox"
+                    className="hidden"
+                    checked={selectedRoles.includes(role)}
+                    onChange={(e) => {
+                      if (e.target.checked) setSelectedRoles(prev => [...prev, role]);
+                      else setSelectedRoles(prev => prev.filter(r => r !== role));
+                    }}
+                  />
+                </label>
+              ))}
+            </div>
+          </div>
 
-        {/* Tier Pay Filter Block */}
-        <div className="relative w-full">
-          <Star className="absolute left-3 top-1/2 -translate-y-1/2 text-[#A09E9A]/50" size={16} />
-          <select
-            value={tierFilter}
-            onChange={(e) => setTierFilter(e.target.value)}
-            title="Filter by Tier"
-            aria-label="Filter by Tier"
-            className="pl-9 pr-4 py-2 bg-black/20 border border-white/10 rounded-xl text-xs text-[#F0EFE8] focus:outline-none focus:border-indigo-500/50 w-full appearance-none"
-          >
-            <option value="All Tiers">All Tiers</option>
-            <option value="Star Host">Star Host</option>
-            <option value="Rocket Host">Rocket Host</option>
-            <option value="S idol">S idol</option>
-            <option value="Esports">Esports</option>
-            <option value="Influencer">Influencer</option>
-            <option value="Regular Host">Regular Host</option>
-          </select>
+          {/* Tier Pay Blocks */}
+          <div className="flex-[2]">
+            <h3 className="text-[10px] font-black uppercase tracking-widest text-[#A09E9A]/50 mb-2 flex items-center gap-1.5"><Star size={12}/> Tier Pay Category</h3>
+            <div className="flex flex-wrap gap-2">
+              {['Star Host', 'Rocket Host', 'S idol', 'Esports', 'Influencer', 'Regular Host'].map(tier => {
+                const isSelected = selectedTiers.includes(tier);
+                return (
+                  <button
+                    key={tier}
+                    onClick={() => {
+                      if (isSelected) setSelectedTiers(prev => prev.filter(t => t !== tier));
+                      else setSelectedTiers(prev => [...prev, tier]);
+                    }}
+                    className={cn(
+                      "px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all border",
+                      isSelected 
+                        ? "bg-indigo-500/20 text-indigo-300 border-indigo-500/50 shadow-[0_0_10px_rgba(99,102,241,0.2)]" 
+                        : "bg-black/20 text-[#A09E9A] border-white/10 hover:border-white/30 hover:text-[#F0EFE8]"
+                    )}
+                  >
+                    {tier}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         </div>
       </div>
 
@@ -208,13 +245,17 @@ export const RosterTab: React.FC<RosterTabProps> = ({ isReadOnly = false }) => {
         <span className="text-[#A09E9A] text-xs font-mono">{filteredHosts.length} profiles found</span>
       </div>
 
-      {/* 2-BLOCK PER ROW GRID UNDER THE FILTERS */}
+      {/* MINIMUM 2-BLOCK PER ROW GRID UNDER THE FILTERS */}
       {filteredHosts.length === 0 ? (
-        <div className="py-20 text-center text-[#A09E9A]/40">
-          No hosts match the selected filters.
+        <div className="py-20 text-center flex flex-col items-center justify-center">
+          <div className="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center mb-4 text-[#A09E9A]/30">
+            <Filter size={32} />
+          </div>
+          <p className="text-[#A09E9A]/70 font-bold">No profiles to show.</p>
+          <p className="text-xs text-[#A09E9A]/40 mt-1">Please select at least one role, tier, or enter a search term above.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
           {filteredHosts.map(host => {
             const tierPay = String(host.tier_pay || host.tierPay || 'N/A');
             const blockStyles = getTierBlockStyles(tierPay);
@@ -223,58 +264,60 @@ export const RosterTab: React.FC<RosterTabProps> = ({ isReadOnly = false }) => {
                 key={host.id}
                 onClick={() => openSpotlight(host)}
                 className={cn(
-                  "border rounded-2xl p-4 flex items-center gap-4 cursor-pointer hover:bg-white/[0.02] transition-all hover:scale-[1.01] shadow-lg shadow-black/20",
+                  "border rounded-2xl p-4 flex flex-col items-center text-center gap-2 cursor-pointer hover:bg-white/[0.02] transition-all hover:-translate-y-1 shadow-lg shadow-black/20 relative",
                   blockStyles.border,
                   blockStyles.bg
                 )}
               >
-              <div className="relative w-16 h-16 rounded-2xl overflow-hidden bg-black/40 border border-white/10 flex-shrink-0">
-                {host.photoUrl ? (
-                  <img src={host.photoUrl} alt="" className="w-full h-full object-cover" />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-[#A09E9A]/30">
-                    <Users size={24} />
-                  </div>
-                )}
-              </div>
-
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1">
-                  <h3 className="text-[#F0EFE8] font-bold text-lg truncate">
-                    {host.nickname || host.name}
-                  </h3>
-                  <span className="px-2 py-0.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-[9px] font-black uppercase tracking-wider">
+                {/* Role badge top right absolute */}
+                <div className="absolute top-3 right-3">
+                  <span className="px-2 py-0.5 rounded-md bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-[8px] font-black uppercase tracking-wider shadow-sm">
                     {host.role || 'Host'}
                   </span>
                 </div>
-                <div className="text-[#A09E9A] text-xs font-mono">ID: {host.id}</div>
 
-                <div className="mt-2 flex items-center gap-3">
-                  {(() => {
-                    const tier = String((host as any).tier_pay || host.tierPay || 'N/A');
-
-                    const getTierStyle = (t: string) => {
-                      const lower = t.toLowerCase();
-                      if (lower.includes('star')) return 'text-yellow-400 bg-yellow-400/10 border-yellow-400/30';
-                      if (lower.includes('rocket')) return 'text-cyan-400 bg-cyan-400/10 border-cyan-400/30';
-                      if (lower.includes('s idol')) return 'text-pink-500 bg-pink-500/10 border-pink-500/30';
-                      if (lower.includes('esports')) return 'text-[#00f2fe] bg-[#00f2fe]/10 border-[#00f2fe]/30 shadow-[0_0_8px_rgba(0,242,254,0.4)]';
-                      if (lower.includes('regular')) return 'text-emerald-400 bg-emerald-400/10 border-emerald-400/30';
-                      return 'text-[#A09E9A] bg-white/5 border-white/10';
-                    };
-
-                    return (
-                      <div className={cn("flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-md border", getTierStyle(tier))}>
-                        <Star size={10} />
-                        {tier}
-                      </div>
-                    );
-                  })()}
-                  {host.status === 'Active' && (
-                    <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"></div>
+                <div className="relative w-16 h-16 rounded-2xl overflow-hidden bg-black/40 border border-white/10 flex-shrink-0 mt-2">
+                  {host.photoUrl ? (
+                    <img src={host.photoUrl} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-[#A09E9A]/30">
+                      <Users size={24} />
+                    </div>
                   )}
                 </div>
-              </div>
+
+                <div className="flex flex-col items-center w-full px-1 min-w-0 mt-1">
+                  <h3 className="text-[#F0EFE8] font-bold text-sm truncate w-full mb-0.5">
+                    {host.nickname || host.name}
+                  </h3>
+                  <div className="text-[#A09E9A] text-[10px] font-mono mb-2">ID: {host.id}</div>
+
+                  <div className="flex items-center justify-center gap-2 w-full">
+                    {(() => {
+                      const tier = String((host as any).tier_pay || host.tierPay || 'N/A');
+
+                      const getTierStyle = (t: string) => {
+                        const lower = t.toLowerCase();
+                        if (lower.includes('star')) return 'text-yellow-400 bg-yellow-400/10 border-yellow-400/30';
+                        if (lower.includes('rocket')) return 'text-cyan-400 bg-cyan-400/10 border-cyan-400/30';
+                        if (lower.includes('s idol')) return 'text-pink-500 bg-pink-500/10 border-pink-500/30';
+                        if (lower.includes('esports')) return 'text-[#00f2fe] bg-[#00f2fe]/10 border-[#00f2fe]/30 shadow-[0_0_8px_rgba(0,242,254,0.4)]';
+                        if (lower.includes('regular')) return 'text-emerald-400 bg-emerald-400/10 border-emerald-400/30';
+                        return 'text-[#A09E9A] bg-white/5 border-white/10';
+                      };
+
+                      return (
+                        <div className={cn("flex items-center gap-1 text-[9px] font-bold px-2 py-1 rounded-md border", getTierStyle(tier))}>
+                          <Star size={10} />
+                          {tier}
+                        </div>
+                      );
+                    })()}
+                    {host.status === 'Active' && (
+                      <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"></div>
+                    )}
+                  </div>
+                </div>
               </div>
             );
           })}

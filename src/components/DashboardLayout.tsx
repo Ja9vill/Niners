@@ -557,26 +557,32 @@ export const DashboardLayout = () => {
   };
 
   const getNavigationLinks = () => {
-    const links = [
+    const links: any[] = [
       { path: '/app/dashboard', label: 'Overview', icon: LayoutDashboard },
       { path: '/app/roster', label: 'Roster', icon: Users },
       { path: '/app/calendar', label: 'Calendar', icon: Calendar },
+      { path: '/app/my-profile', label: 'My Profile', icon: User },
     ];
     
     const role = (authState.role || '').toLowerCase();
     
     if (role === 'director' || role === 'head admin' || role === 'head_admin') {
-      links.push({ path: '/app/director', label: 'Hub', icon: Shield });
-      links.push({ path: '/app/profiles', label: 'Members', icon: Users });
-      links.push({ path: '/app/my-profile', label: 'My Profile', icon: User });
+      links.push({ isDivider: true, id: 'div-director' });
+      links.push({ isTitle: true, label: "Director's Hub", id: 'title-director' });
+      
+      links.push({ path: '/app/profiles', label: 'Roster Management', icon: Users });
+      links.push({ path: '/app/hub', label: 'Operations', icon: Activity });
+      
+      if (role === 'director') {
+        links.push({ path: '/app/provision-user', label: 'Provision User', icon: Plus });
+        links.push({ path: '/app/financial-data', label: 'Financial Data', icon: DollarSign });
+      }
+      
+      links.push({ path: '/app/director', label: 'Sitewide Logs', icon: FileText });
     } else if (role === 'admin') {
       links.push({ path: '/app/admin-hub', label: 'Admin Hub', icon: Shield });
-      links.push({ path: '/app/my-profile', label: 'My Profile', icon: User });
     } else if (role === 'manager' || role === 'agent') {
-      links.push({ path: '/app/hub', label: 'Hub', icon: Users });
-    } else {
-      // talent / host
-      links.push({ path: '/app/my-profile', label: 'Profile', icon: User });
+      links.push({ path: '/app/hub', label: 'Operations', icon: Activity });
     }
 
     return links;
@@ -640,6 +646,16 @@ export const DashboardLayout = () => {
             </div>
 
             {links.map((link) => {
+              if (link.isDivider) {
+                return <div key={link.id} className="border-t border-white/5 my-4 mx-3" />;
+              }
+              if (link.isTitle) {
+                return (
+                  <div key={link.id} className="text-[9px] font-black text-[#A09E9A]/40 uppercase tracking-[0.2em] px-3 mb-2 mt-2">
+                    {link.label}
+                  </div>
+                );
+              }
               const Icon = link.icon;
               const isActive = location.pathname.startsWith(link.path);
               return (

@@ -3070,7 +3070,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
       {renderFanbaseModal()}
       {renderSelfEditModal()}
       {renderAddEventModal()}
-      {renderMonthlyDataModal()}
+      {/* renderMonthlyDataModal() */}
     </div>
   );
 };

@@ -346,26 +346,47 @@ export const Overview = () => {
       </div>
 
       {/* Earnings Breakdown Grid */}
-      <div className="bg-[#1A1A28] border border-[#D4AF37]/10 rounded-2xl p-4">
-        <p className="text-[9px] font-black text-[#A09E9A]/50 uppercase tracking-[0.2em] mb-3">Earnings Breakdown</p>
-        <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-9 gap-2">
+      <div className="bg-[#1A1A28]/80 backdrop-blur-md border border-[#D4AF37]/15 shadow-2xl rounded-2xl p-5 relative overflow-hidden">
+        {/* Subtle background glow for the entire section */}
+        <div className="absolute -top-24 -right-24 w-48 h-48 bg-[#D4AF37]/5 blur-3xl rounded-full pointer-events-none"></div>
+        <p className="text-[9px] font-black text-[#A09E9A] uppercase tracking-[0.2em] mb-4 relative z-10 flex items-center gap-2">
+          <span className="w-1.5 h-1.5 rounded-full bg-[#D4AF37] animate-pulse"></span>
+          Earnings Breakdown
+        </p>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-9 gap-3 relative z-10">
           {earningsBreakdown.map((item, i) => (
             <div
               key={i}
-              className="bg-[#0D0D14] border border-[#D4AF37]/10 rounded-xl p-3 flex flex-col items-center text-center hover:border-[#D4AF37]/20 transition-all group"
+              className="relative overflow-hidden rounded-xl p-3.5 flex flex-col items-center text-center transition-all duration-300 group hover:-translate-y-1 cursor-default shadow-lg backdrop-blur-sm"
+              {...({ style: {
+                background: `linear-gradient(135deg, ${item.color}15 0%, #0D0D14 100%)`,
+                borderColor: `${item.color}30`,
+                borderWidth: '1px',
+                borderStyle: 'solid',
+                boxShadow: `0 4px 12px ${item.color}05`
+              } })}
             >
+              <div 
+                className="absolute inset-0 opacity-0 group-hover:opacity-20 transition-opacity duration-500 pointer-events-none" 
+                {...({ style: { background: `radial-gradient(circle at center, ${item.color} 0%, transparent 70%)` } })}
+              />
               <p
-                className="text-[8px] font-black uppercase tracking-wider leading-tight mb-2 whitespace-pre-line"
-                {...({ style: { color: item.color + 'aa' } })}
+                className="text-[8px] font-black uppercase tracking-widest leading-tight mb-2.5 whitespace-pre-line drop-shadow-sm transition-colors group-hover:text-white z-10"
+                {...({ style: { color: item.color + 'cc' } })}
               >
                 {item.label}
               </p>
               <p
-                className="text-sm font-black leading-none"
+                className="text-sm sm:text-base font-black leading-none drop-shadow-md z-10"
                 {...({ style: { color: item.color } })}
               >
                 {item.value > 0 ? formatPts(item.value) : '—'}
               </p>
+              {/* Bottom accent line */}
+              <div 
+                className="absolute bottom-0 left-0 h-[2px] w-0 group-hover:w-full transition-all duration-500 ease-out"
+                {...({ style: { backgroundColor: item.color } })}
+              ></div>
             </div>
           ))}
         </div>
