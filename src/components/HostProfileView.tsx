@@ -9,7 +9,7 @@ import { cn, formatNumber } from '../lib/utils';
 import { MANAGERS, BASE_SALARY_POLICIES } from '../lib/constants';
 import { collection, query, where, getDocs, Timestamp, documentId, doc, setDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, BarChart, Bar, Cell } from 'recharts';
+import { ComposedChart, Area, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, BarChart, Bar, Cell } from 'recharts';
 import { SingleDatePicker, DateRangePicker } from './InteractiveDatePicker';
 
 interface HostProfileViewProps {
@@ -74,6 +74,64 @@ const formatUpdateMetaDate = (timestampInput: any): string => {
   }
 };
 
+const formatDateYYYYMMDD = (dateInput: any): string => {
+  if (!dateInput) return '—';
+  try {
+    let date: Date;
+    if (dateInput?.seconds) {
+      date = new Date(dateInput.seconds * 1000);
+    } else if (dateInput?.toDate) {
+      date = dateInput.toDate();
+    } else {
+      date = new Date(dateInput);
+    }
+    if (isNaN(date.getTime())) return String(dateInput);
+    const yyyy = date.getFullYear();
+    const mm = String(date.getMonth() + 1).padStart(2, '0');
+    const dd = String(date.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  } catch (e) {
+    return String(dateInput);
+  }
+};
+
+const formatTimeslot = (timeStr: string) => {
+  if (!timeStr) return 'TBA Manila Time PHT';
+  const clean = timeStr.trim();
+  
+  // Extract time part and strip/ignore any existing timezone string to avoid duplicates or misformatting
+  let timePart = clean;
+  const tzMatch = clean.match(/\s*(pht|pst|gmt|utc|est|philippine|manila.*)$/i);
+  if (tzMatch) {
+    timePart = clean.substring(0, tzMatch.index).trim();
+  }
+  
+  let formattedTime = timePart;
+  const ampmMatch = timePart.match(/^(\d{1,2}):(\d{2})\s*([ap]\.?m\.?)/i);
+  if (ampmMatch) {
+    const hours = parseInt(ampmMatch[1], 10);
+    const minutes = ampmMatch[2];
+    const ampm = ampmMatch[3].toUpperCase().replace(/\./g, '');
+    const hoursStr = String(hours).padStart(2, '0');
+    formattedTime = `${hoursStr}:${minutes} ${ampm}`;
+  } else {
+    const match = timePart.match(/^(\d{1,2}):(\d{2})/);
+    if (match) {
+      let hours = parseInt(match[1], 10);
+      const minutes = match[2];
+      const ampm = hours >= 12 ? 'PM' : 'AM';
+      hours = hours % 12;
+      hours = hours ? hours : 12;
+      const hoursStr = String(hours).padStart(2, '0');
+      formattedTime = `${hoursStr}:${minutes} ${ampm}`;
+    }
+  }
+  
+  return `${formattedTime} Manila Time PHT`;
+};
+
+const MONTH_ORDER = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
 // Helper to format period uniformly (e.g. "Jan/26")
 const formatPeriodShort = (monthNameOrNum: any, year: any): string => {
   if (!monthNameOrNum) return '—';
@@ -123,106 +181,62 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
   const [isLoading, setIsLoading] = useState(true);
   const [sortAscending, setSortAscending] = useState(true);
 
-  // Dynamic styles based on tier_pay category
+  // Dynamic styles based on base_salary_category
   const styles = useMemo(() => {
     const getCategoryStyles = (category: string) => {
       const norm = String(category || '').trim().toLowerCase();
-      
-      // Star Host: Yellow to Gold
       if (norm === 'star host') {
         return {
           borderColor: 'border-[#D4AF37]/50',
-          hoverBorderColor: 'hover:border-[#D4AF37]/50',
           shadow: 'shadow-lg shadow-[#D4AF37]/15',
           badgeText: 'text-[#D4AF37]',
-          badgeBgBorder: 'bg-[#D4AF37]/10 border-[#D4AF37]/20',
           accentColor: '#D4AF37',
           topTrim: 'border-t-[#D4AF37] border-t-2',
-          gradientBg: 'bg-gradient-to-br from-[#D4AF37]/15 via-[#D4AF37]/2 to-[#0D0D14]/95',
-          iconBg: 'bg-[#D4AF37]/20 text-[#D4AF37]',
-          buttonBg: 'bg-[#D4AF37]/10 border-[#D4AF37]/30 text-[#D4AF37] hover:bg-[#D4AF37]/20',
-          textAccent: 'text-[#D4AF37]',
-          awardBorder: 'border-[#D4AF37]/15 hover:border-[#D4AF37]/40',
-          indicatorColor: 'bg-[#D4AF37]',
+          gradientBg: 'bg-gradient-to-br from-[#D4AF37]/20 via-[#D4AF37]/5 to-[#1A1A28]/80',
         };
       }
-      
-      // S Idol: Pink to Dark Pink
-      if (norm === 's idol' || norm === 's_idol') {
+      if (norm === 's idol') {
         return {
-          borderColor: 'border-[#EC4899]/50',
-          hoverBorderColor: 'hover:border-[#EC4899]/50',
-          shadow: 'shadow-lg shadow-[#EC4899]/15',
-          badgeText: 'text-[#EC4899]',
-          badgeBgBorder: 'bg-[#EC4899]/10 border-[#EC4899]/20',
-          accentColor: '#EC4899',
-          topTrim: 'border-t-[#EC4899] border-t-2',
-          gradientBg: 'bg-gradient-to-br from-[#EC4899]/15 via-[#EC4899]/2 to-[#0D0D14]/95',
-          iconBg: 'bg-[#EC4899]/20 text-[#EC4899]',
-          buttonBg: 'bg-[#EC4899]/10 border-[#EC4899]/30 text-[#EC4899] hover:bg-[#EC4899]/20',
-          textAccent: 'text-[#EC4899]',
-          awardBorder: 'border-[#EC4899]/15 hover:border-[#EC4899]/40',
-          indicatorColor: 'bg-[#EC4899]',
+          borderColor: 'border-[#ec4899]/50',
+          shadow: 'shadow-lg shadow-[#ec4899]/15',
+          badgeText: 'text-[#ec4899]',
+          accentColor: '#ec4899',
+          topTrim: 'border-t-[#ec4899] border-t-2',
+          gradientBg: 'bg-gradient-to-br from-[#ec4899]/20 via-[#ec4899]/5 to-[#1A1A28]/80',
         };
       }
-      
-      // Rocket Host: Blue to Deep Blue
       if (norm === 'rocket host') {
         return {
-          borderColor: 'border-[#3B82F6]/50',
-          hoverBorderColor: 'hover:border-[#3B82F6]/50',
-          shadow: 'shadow-lg shadow-[#3B82F6]/15',
-          badgeText: 'text-[#3B82F6]',
-          badgeBgBorder: 'bg-[#3B82F6]/10 border-[#3B82F6]/20',
-          accentColor: '#3B82F6',
-          topTrim: 'border-t-[#3B82F6] border-t-2',
-          gradientBg: 'bg-gradient-to-br from-[#3B82F6]/15 via-[#3B82F6]/2 to-[#0D0D14]/95',
-          iconBg: 'bg-[#3B82F6]/20 text-[#3B82F6]',
-          buttonBg: 'bg-[#3B82F6]/10 border-[#3B82F6]/30 text-[#3B82F6] hover:bg-[#3B82F6]/20',
-          textAccent: 'text-[#3B82F6]',
-          awardBorder: 'border-[#3B82F6]/15 hover:border-[#3B82F6]/40',
-          indicatorColor: 'bg-[#3B82F6]',
+          borderColor: 'border-[#3b82f6]/50',
+          shadow: 'shadow-lg shadow-[#3b82f6]/15',
+          badgeText: 'text-[#3b82f6]',
+          accentColor: '#3b82f6',
+          topTrim: 'border-t-[#3b82f6] border-t-2',
+          gradientBg: 'bg-gradient-to-br from-[#3b82f6]/20 via-[#3b82f6]/5 to-[#1A1A28]/80',
         };
       }
-      
-      // Esports: Purple to Violet
-      if (norm === 'esports' || norm.includes('esport')) {
+      if (norm === 'esport host' || norm.includes('esport')) {
         return {
-          borderColor: 'border-[#A855F7]/50',
-          hoverBorderColor: 'hover:border-[#A855F7]/50',
-          shadow: 'shadow-lg shadow-[#A855F7]/15',
-          badgeText: 'text-[#A855F7]',
-          badgeBgBorder: 'bg-[#A855F7]/10 border-[#A855F7]/20',
-          accentColor: '#A855F7',
-          topTrim: 'border-t-[#A855F7] border-t-2',
-          gradientBg: 'bg-gradient-to-br from-[#A855F7]/15 via-[#A855F7]/2 to-[#0D0D14]/95',
-          iconBg: 'bg-[#A855F7]/20 text-[#A855F7]',
-          buttonBg: 'bg-[#A855F7]/10 border-[#A855F7]/30 text-[#A855F7] hover:bg-[#A855F7]/20',
-          textAccent: 'text-[#A855F7]',
-          awardBorder: 'border-[#A855F7]/15 hover:border-[#A855F7]/40',
-          indicatorColor: 'bg-[#A855F7]',
+          borderColor: 'border-[#a855f7]/50',
+          shadow: 'shadow-lg shadow-[#a855f7]/15',
+          badgeText: 'text-[#a855f7]',
+          accentColor: '#a855f7',
+          topTrim: 'border-t-[#a855f7] border-t-2',
+          gradientBg: 'bg-gradient-to-br from-[#a855f7]/20 via-[#a855f7]/5 to-[#1A1A28]/80',
         };
       }
-      
-      // Regular Host: Green to Apple Green (and fallback)
+      // Regular Host
       return {
-        borderColor: 'border-[#22C55E]/50',
-        hoverBorderColor: 'hover:border-[#22C55E]/50',
-        shadow: 'shadow-lg shadow-[#22C55E]/15',
-        badgeText: 'text-[#22C55E]',
-        badgeBgBorder: 'bg-[#22C55E]/10 border-[#22C55E]/20',
-        accentColor: '#22C55E',
-        topTrim: 'border-t-[#22C55E] border-t-2',
-        gradientBg: 'bg-gradient-to-br from-[#22C55E]/15 via-[#22C55E]/2 to-[#0D0D14]/95',
-        iconBg: 'bg-[#22C55E]/20 text-[#22C55E]',
-        buttonBg: 'bg-[#22C55E]/10 border-[#22C55E]/30 text-[#22C55E] hover:bg-[#22C55E]/20',
-        textAccent: 'text-[#22C55E]',
-        awardBorder: 'border-[#22C55E]/15 hover:border-[#22C55E]/40',
-        indicatorColor: 'bg-[#22C55E]',
+        borderColor: 'border-white/5',
+        shadow: 'shadow-md',
+        badgeText: 'text-[#F0EFE8]',
+        accentColor: '#ffffff',
+        topTrim: 'border-t-white/10 border-t-2',
+        gradientBg: 'bg-gradient-to-br from-white/10 via-white/5 to-[#1A1A28]/80',
       };
     };
-    return getCategoryStyles(host.tier_pay || '');
-  }, [host.tier_pay]);
+    return getCategoryStyles(host.base_salary_category || '');
+  }, [host.base_salary_category]);
 
   // Profile Edit States
   const [editNickname, setEditNickname] = useState(host.nickname || host.name || '');
@@ -231,7 +245,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
   const [editRole, setEditRole] = useState<string>(host.role || 'Host');
   const [editTeam, setEditTeam] = useState<string>(host.team || 'Unassigned');
   const [editManager, setEditManager] = useState<string>(host.manager || 'Nine Management');
-  const [editTierPay, setEditTierPay] = useState<string>(host.tier_pay || 'N/A');
+  const [editBaseSalaryCategory, setEditBaseSalaryCategory] = useState<string>(host.base_salary_category || 'N/A');
   const [editStatus, setEditStatus] = useState<string>(host.status || 'Active');
 
   const [editLevel, setEditLevel] = useState<number>(host.level || 1);
@@ -249,6 +263,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
     host.streaming_hours?.length ? host.streaming_hours : [{ from: '', to: '' }]
   );
   const [isSavingSelf, setIsSavingSelf] = useState(false);
+  const [trendChartViewMode, setTrendChartViewMode] = useState<'area' | 'bar'>('area');
 
   // RPK Reporting States
   const [isRpkFormOpen, setIsRpkFormOpen] = useState(false);
@@ -303,7 +318,8 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
   const [weeklyLiveData, setWeeklyLiveData] = useState<any[]>([]);
 
   // New States for dropdown selections, RPK metadata, event form data, and AI reports triggers
-  const [selectedPeriod, setSelectedPeriod] = useState<string>('all');
+  const [analyticsYear, setAnalyticsYear] = useState<string>('all');
+  const [analyticsMonth, setAnalyticsMonth] = useState<string>('all');
   const [eventFormData, setEventFormData] = useState({
     eventType: 'SOLO LIVEHOUSE',
     eventDate: '',
@@ -312,6 +328,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
   });
   const [isAddEventFormOpen, setIsAddEventFormOpen] = useState(false);
   const [isSubmittingEvent, setIsSubmittingEvent] = useState(false);
+  const [eventActiveTab, setEventActiveTab] = useState<'exposure' | 'attendance'>('exposure');
   const [rpkMetadata, setRpkMetadata] = useState<{ lastUpdated: string; updatedBy: string } | null>(null);
   
   // AI report states
@@ -328,7 +345,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
     setEditRole(host.role || 'Host');
     setEditTeam(host.team || 'Unassigned');
     setEditManager(host.manager || 'Nine Management');
-    setEditTierPay(host.tier_pay || 'N/A');
+    setEditBaseSalaryCategory(host.base_salary_category || 'N/A');
     setEditStatus(host.status || 'Active');
 
     setEditLevel(host.level || 1);
@@ -365,7 +382,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
         });
         perfList.sort((a, b) => {
           if (a.year !== b.year) return b.year - a.year;
-          return b.month - a.month;
+          return a.month - b.month;
         });
         setPerformanceReports(perfList);
 
@@ -419,7 +436,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
               });
               mapped.sort((a: any, b: any) => {
                 if (a.year !== b.year) return b.year - a.year;
-                return b.month - a.month;
+                return a.month - b.month;
               });
               setPerformanceReports(mapped);
             }
@@ -981,7 +998,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
           team: editTeam,
           manager: editManager,
           assignedManagerId: assignedManagerId,
-          tier_pay: editTierPay as any,
+          base_salary_category: editBaseSalaryCategory as any,
           status: editStatus as any,
 
           level: Number(editLevel) || 1,
@@ -991,7 +1008,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
         };
 
         await FirebaseService.updateHost(updatedHost, host.role);
-        await FirebaseService.logSystemActivity(`Admin edited profile metadata and public info for Host: ${host.nickname || host.name} (Poppo ID: ${host.id}) - New Nickname: ${editNickname.trim()}, Role: ${editRole}, Team: ${editTeam}, Manager: ${editManager}, Salary Category: ${editTierPay}, Status: ${editStatus}, Level: ${editLevel}, Bio: "${truncatedBio}"`, 'Warning');
+        await FirebaseService.logSystemActivity(`Admin edited profile metadata and public info for Host: ${host.nickname || host.name} (Poppo ID: ${host.id}) - New Nickname: ${editNickname.trim()}, Role: ${editRole}, Team: ${editTeam}, Manager: ${editManager}, Base Salary Category: ${editBaseSalaryCategory}, Status: ${editStatus}, Level: ${editLevel}, Bio: "${truncatedBio}"`, 'Warning');
       } else {
         // Normal host self-edit
         updatedHost = {
@@ -1114,9 +1131,23 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
     return 0;
   };
 
-  // Aggregate totals from all performance reports
-  const perfTotals = useMemo(() => {
-    const sum = (fn: (r: any) => number) => performanceReports.reduce((s, r) => s + fn(r), 0);
+  // Available years from reports
+  const availableYears = useMemo(() => {
+    const years = Array.from(new Set(performanceReports.map(r => String(r.year)).filter(Boolean)));
+    return years.sort().reverse();
+  }, [performanceReports]);
+
+  // Filtered performance reports based on analyticsYear & analyticsMonth selectors
+  const filteredReports = useMemo(() => {
+    return performanceReports.filter(r => {
+      if (analyticsYear !== 'all' && String(r.year) !== analyticsYear) return false;
+      if (analyticsMonth !== 'all' && String(r.monthName) !== analyticsMonth) return false;
+      return true;
+    });
+  }, [performanceReports, analyticsYear, analyticsMonth]);
+
+  const selectedMetrics = useMemo(() => {
+    const sum = (fn: (r: any) => number) => filteredReports.reduce((s, r) => s + fn(r), 0);
     const liveHrs =       sum(r => getLiveHoursForReport(r));
     const partyHrs =      sum(r => pf(r, 'partyHostDurationMinutes','party_host_duration_minutes','partyHostDuration','partyDuration') / 60);
     const points =        sum(r => pf(r, 'totalEarningsOfPoints','total_earnings_of_points','totalPoints','total_points','points'));
@@ -1148,48 +1179,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
       superRank,
       totalEarnings,
     };
-  }, [performanceReports]);
-
-  const activeReport = useMemo(() => {
-    if (selectedPeriod === 'all') return null;
-    return performanceReports.find(r => r.id === selectedPeriod) || null;
-  }, [selectedPeriod, performanceReports]);
-
-  const selectedMetrics = useMemo(() => {
-    if (!activeReport) {
-      return perfTotals;
-    }
-    const liveHrs =       getLiveHoursForReport(activeReport);
-    const partyHrs =      pf(activeReport, 'partyHostDurationMinutes','party_host_duration_minutes','partyHostDuration','partyDuration') / 60;
-    const points =        pf(activeReport, 'totalEarningsOfPoints','total_earnings_of_points','totalPoints','total_points','points');
-    const liveEarnings =  pf(activeReport, 'liveEarnings','live_earnings');
-    const partyEarnings = pf(activeReport, 'partyEarnings','party_earnings');
-    const privateChat =   pf(activeReport, 'privateChatEarnings','private_chat_earnings','privateChat');
-    const tips =          pf(activeReport, 'tips');
-    const platformReward =pf(activeReport, 'platformReward','platform_reward');
-    const otherEarnings = pf(activeReport, 'otherEarnings','other_earnings');
-    const platformHourly =pf(activeReport, 'platformHourlySalary','platform_hourly_salary');
-    const superSalary =   pf(activeReport, 'superSalary','super_salary');
-    const superRank =     pf(activeReport, 'superRank','super_rank');
-    
-    const totalEarnings = liveEarnings + partyEarnings + platformReward + tips + otherEarnings + superSalary + superRank;
-    
-    return {
-      liveHrs,
-      partyHrs,
-      points,
-      liveEarnings,
-      partyEarnings,
-      privateChat,
-      tips,
-      platformReward,
-      otherEarnings,
-      platformHourly,
-      superSalary,
-      superRank,
-      totalEarnings,
-    };
-  }, [activeReport, perfTotals]);
+  }, [filteredReports]);
 
   // Sort performance reports chronologically
   const sortedReportsForRender = useMemo(() => {
@@ -1351,7 +1341,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
   };
 
   // Monthly bar chart data - chronologically ascending (earliest to newest)
-  const monthlyChartData = useMemo(() => {
+  const trendChartData = useMemo(() => {
     const MONTH_ORDER = ['January','February','March','April','May','June','July','August','September','October','November','December'];
     return [...performanceReports]
       .sort((a, b) => {
@@ -1373,6 +1363,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
         return {
           label: formatPeriodShort(r.monthName || r.month, r.year),
           points: pf(r, 'totalEarningsOfPoints','total_earnings_of_points','totalPoints','total_points','points'),
+          live_duration: getLiveHoursForReport(r)
         };
       });
   }, [performanceReports]);
@@ -1414,67 +1405,164 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
 
   // Earnings breakdown tiles definition
   const earningTiles = [
-    { label: 'TOTAL LIVE\nDURATION', value: selectedMetrics.liveHrs + selectedMetrics.partyHrs, color: '#06b6d4', fmt: (v: number) => v ? `${v.toFixed(1)}h` : '—' },
-    { label: 'Live\nEarnings',      value: selectedMetrics.liveEarnings,   color: '#3b82f6',  fmt: (v: number) => v ? v.toLocaleString() : '—' },
-    { label: 'Total\nEarnings',     value: selectedMetrics.totalEarnings,  color: '#22d3ee',  fmt: (v: number) => v ? v.toLocaleString() : '—' },
-    { label: 'Total\nPoints',       value: selectedMetrics.points,         color: '#D4AF37',  fmt: (v: number) => v ? v.toLocaleString() : '—' },
-    { label: 'Party\nEarnings',     value: selectedMetrics.partyEarnings,  color: '#8b5cf6',  fmt: (v: number) => v ? v.toLocaleString() : '—' },
-    { label: 'Platform\nReward',    value: selectedMetrics.platformReward, color: '#10b981',  fmt: (v: number) => v ? v.toLocaleString() : '—' },
-    { label: 'Tips',                value: selectedMetrics.tips,           color: '#f59e0b',  fmt: (v: number) => v ? v.toLocaleString() : '—' },
-    { label: 'Other\nEarnings',     value: selectedMetrics.otherEarnings,  color: '#a78bfa',  fmt: (v: number) => v ? v.toLocaleString() : '—' },
-    { label: 'Super\nRank',         value: selectedMetrics.superRank,      color: '#fb923c',  fmt: (v: number) => v ? v.toLocaleString() : '—' },
-    { label: 'Super\nSalary',       value: selectedMetrics.superSalary,    color: '#fbbf24',  fmt: (v: number) => v ? v.toLocaleString() : '—' },
-    { label: 'Party\nHours',        value: selectedMetrics.partyHrs,       color: '#c084fc',  fmt: (v: number) => v ? `${v.toFixed(1)}h` : '—' },
-    { label: 'SOLO LIVE\nHOURS',    value: selectedMetrics.liveHrs,        color: '#22d3ee',  fmt: (v: number) => v ? `${v.toFixed(1)}h` : '—' },
+    // Row 1
+    { 
+      label: 'TOTAL EARNINGS', 
+      value: selectedMetrics.totalEarnings, 
+      bgGradient: 'linear-gradient(to bottom right, #3A2A18, #221A15)', 
+      accentColor: '#FFB800', 
+      hoverBorder: 'hover:border-[#FFB800]/50',
+      fmt: (v: number) => v ? v.toLocaleString() : '0'
+    },
+    { 
+      label: 'TOTAL POINTS', 
+      value: selectedMetrics.points, 
+      bgGradient: 'linear-gradient(to bottom right, #3D221C, #221515)', 
+      accentColor: '#FF7B00', 
+      hoverBorder: 'hover:border-[#FF7B00]/50',
+      fmt: (v: number) => v ? v.toLocaleString() : '0'
+    },
+    { 
+      label: 'TOTAL INCENTIVES', 
+      value: selectedMetrics.superRank + selectedMetrics.superSalary, 
+      bgGradient: 'linear-gradient(to bottom right, #3A1C28, #20131A)', 
+      accentColor: '#FF3B5C', 
+      hoverBorder: 'hover:border-[#FF3B5C]/50',
+      fmt: (v: number) => v ? v.toLocaleString() : '0'
+    },
+    // Row 2
+    { 
+      label: 'SOLO LIVE POINTS', 
+      value: selectedMetrics.liveEarnings, 
+      bgGradient: 'linear-gradient(to bottom right, #3A2A18, #221A15)', 
+      accentColor: '#FFB800', 
+      hoverBorder: 'hover:border-[#FFB800]/50',
+      fmt: (v: number) => v ? v.toLocaleString() : '0'
+    },
+    { 
+      label: 'PARTY LIVE POINTS', 
+      value: selectedMetrics.partyEarnings, 
+      bgGradient: 'linear-gradient(to bottom right, #3D221C, #221515)', 
+      accentColor: '#FF7B00', 
+      hoverBorder: 'hover:border-[#FF7B00]/50',
+      fmt: (v: number) => v ? v.toLocaleString() : '0'
+    },
+    { 
+      label: 'TIPS', 
+      value: selectedMetrics.tips, 
+      bgGradient: 'linear-gradient(to bottom right, #3A1C28, #20131A)', 
+      accentColor: '#FF3B5C', 
+      hoverBorder: 'hover:border-[#FF3B5C]/50',
+      fmt: (v: number) => v ? v.toLocaleString() : '0'
+    },
+    // Row 3
+    { 
+      label: 'SUPER RANK', 
+      value: selectedMetrics.superRank, 
+      bgGradient: 'linear-gradient(to bottom right, #3A2A18, #221A15)', 
+      accentColor: '#FFB800', 
+      hoverBorder: 'hover:border-[#FFB800]/50',
+      fmt: (v: number) => v ? v.toLocaleString() : '0'
+    },
+    { 
+      label: 'SUPER SALARY', 
+      value: selectedMetrics.superSalary, 
+      bgGradient: 'linear-gradient(to bottom right, #3D221C, #221515)', 
+      accentColor: '#FF7B00', 
+      hoverBorder: 'hover:border-[#FF7B00]/50',
+      fmt: (v: number) => v ? v.toLocaleString() : '0'
+    },
+    { 
+      label: 'OTHER EARNINGS', 
+      value: selectedMetrics.otherEarnings, 
+      bgGradient: 'linear-gradient(to bottom right, #3A1C28, #20131A)', 
+      accentColor: '#FF3B5C', 
+      hoverBorder: 'hover:border-[#FF3B5C]/50',
+      fmt: (v: number) => v ? v.toLocaleString() : '0'
+    },
+    // Row 4
+    { 
+      label: 'TOTAL HOURS', 
+      value: selectedMetrics.liveHrs + selectedMetrics.partyHrs, 
+      bgGradient: 'linear-gradient(to bottom right, #3A2A18, #221A15)', 
+      accentColor: '#FFB800', 
+      hoverBorder: 'hover:border-[#FFB800]/50',
+      fmt: (v: number) => v ? `${v.toFixed(1)}h` : '0.0h'
+    },
+    { 
+      label: 'SOLO LIVE HOURS', 
+      value: selectedMetrics.liveHrs, 
+      bgGradient: 'linear-gradient(to bottom right, #3D221C, #221515)', 
+      accentColor: '#FF7B00', 
+      hoverBorder: 'hover:border-[#FF7B00]/50',
+      fmt: (v: number) => v ? `${v.toFixed(1)}h` : '0.0h'
+    },
+    { 
+      label: 'PARTY LIVE HOURS', 
+      value: selectedMetrics.partyHrs, 
+      bgGradient: 'linear-gradient(to bottom right, #3A1C28, #20131A)', 
+      accentColor: '#FF3B5C', 
+      hoverBorder: 'hover:border-[#FF3B5C]/50',
+      fmt: (v: number) => v ? `${v.toFixed(1)}h` : '0.0h'
+    },
   ];
 
   const renderEarningsBreakdown = () => {
     if (performanceReports.length === 0) return null;
     return (
-      <div className={cn("space-y-4 bg-white/5 backdrop-blur-xl border border-white/10 p-5 rounded-3xl transition-all duration-300 hover:border-[#D4AF37]/30 group", styles.shadow)}>
-        <div className="flex items-center justify-between mb-2">
+      <div className={cn("space-y-4 bg-white/5 backdrop-blur-xl border border-white/10 p-5 rounded-3xl transition-all duration-300 hover:border-amber-500/30 group", styles.shadow)}>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-2">
           <div className="flex items-center gap-2">
-             <div className="w-8 h-8 rounded-full bg-[#D4AF37]/20 flex items-center justify-center text-[#D4AF37] text-sm shadow-inner">📈</div>
-             <h4 className="text-xs font-black uppercase tracking-widest text-[#F0EFE8]">
-               {activeReport ? `Analytics: ${formatPeriodShort(activeReport.monthName || activeReport.month, activeReport.year)}` : 'Analytics: All Time'}
-             </h4>
+             <div className="w-8 h-8 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-400 text-sm shadow-inner">📈</div>
+             <h4 className="text-xs font-black uppercase tracking-widest text-[#F0EFE8]">PERFORMANCE ANALYTICS</h4>
           </div>
-          <select
-            title="Select Period"
-            value={selectedPeriod}
-            onChange={e => setSelectedPeriod(e.target.value)}
-            className="bg-[#0D0D14] border border-white/10 rounded-xl px-2 py-0.5 text-[8px] font-black text-[#D4AF37] outline-none focus:border-[#D4AF37]/50 cursor-pointer transition-all uppercase tracking-wider"
-          >
-            <option value="all">All Time</option>
-            {performanceReports.map(r => (
-              <option key={r.id} value={r.id}>
-                {formatPeriodShort(r.monthName || r.month, r.year)}
-              </option>
-            ))}
-          </select>
+          <div className="flex items-center gap-2 relative z-10">
+            <select
+              title="Filter by Year"
+              value={analyticsYear}
+              onChange={e => setAnalyticsYear(e.target.value)}
+              className="bg-[#0D0D14] border border-[#D4AF37]/20 rounded-lg px-3 py-1.5 text-xs font-bold text-[#F0EFE8] outline-none focus:border-[#D4AF37] cursor-pointer shadow-inner"
+            >
+              <option value="all">All Years</option>
+              {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
+            </select>
+            <select
+              title="Filter by Month"
+              value={analyticsMonth}
+              onChange={e => setAnalyticsMonth(e.target.value)}
+              className="bg-[#0D0D14] border border-[#D4AF37]/20 rounded-lg px-3 py-1.5 text-xs font-bold text-[#F0EFE8] outline-none focus:border-[#D4AF37] cursor-pointer shadow-inner"
+            >
+              <option value="all">All Months</option>
+              {MONTH_ORDER.map(m => <option key={m} value={m}>{m}</option>)}
+            </select>
+          </div>
         </div>
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-3 gap-3 pt-1">
           {earningTiles.map((tile, i) => {
             const valStr = tile.fmt(tile.value);
-            const textClass = valStr.length > 7 
-              ? "text-[9px]" 
-              : valStr.length > 5 
-                ? "text-[11px]" 
-                : "text-xs md:text-sm";
+            const textClass = valStr.length > 10
+              ? "text-xs sm:text-sm md:text-base"
+              : valStr.length > 7
+                ? "text-sm sm:text-base md:text-lg"
+                : "text-base sm:text-lg md:text-xl";
             return (
-              <div key={i} className="bg-[#09090e] border border-white/10 rounded-xl p-2.5 flex flex-col items-center text-center hover:border-white/20 transition-all">
-                <p 
-                  className="text-[7px] font-black uppercase tracking-wider leading-tight mb-1.5 whitespace-pre-line"
-                  {...({ style: { color: tile.color + 'aa' } })}
-                >
+              <div 
+                key={i} 
+                style={{ background: tile.bgGradient }}
+                className={cn(
+                  "border border-white/5 p-3 sm:p-4.5 rounded-2xl flex flex-col items-center justify-center text-center min-h-[90px] transition-all duration-300 transform group-hover:translate-y-[-2px] shadow-lg gap-1.5",
+                  tile.hoverBorder
+                )}
+              >
+                <span className="text-[8px] sm:text-[9px] md:text-[10px] font-black text-white/50 uppercase tracking-widest leading-tight">
                   {tile.label}
-                </p>
-                <p 
-                  className={cn("font-black leading-none truncate max-w-full", textClass)}
-                  {...({ style: { color: tile.color } })}
+                </span>
+                <span 
+                  style={{ color: tile.accentColor }}
+                  className={cn("font-black tracking-tight drop-shadow-md", textClass)}
                 >
                   {valStr}
-                </p>
+                </span>
               </div>
             );
           })}
@@ -1483,45 +1571,171 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
     );
   };
 
-  const renderMonthlyPointsTrend = () => {
-    if (monthlyChartData.length === 0) return null;
-    const COLORS = ['#D4AF37','#6366f1','#ec4899','#10b981','#f59e0b','#06b6d4','#a78bfa','#fb923c','#38bdf8','#34d399','#f472b6','#818cf8'];
+  const renderMonthlyTrend = () => {
+    if (trendChartData.length === 0) return null;
+
     return (
       <div className={cn("space-y-4 bg-white/5 backdrop-blur-xl border border-white/10 p-5 rounded-3xl transition-all duration-300 hover:border-indigo-500/30 group", styles.shadow)}>
-        <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
              <div className="w-8 h-8 rounded-full bg-indigo-500/20 flex items-center justify-center text-indigo-400 text-sm shadow-inner">📊</div>
-             <h4 className="text-xs font-black uppercase tracking-widest text-[#F0EFE8]">Monthly Points Trend</h4>
+             <h4 className="text-xs font-black uppercase tracking-widest text-[#F0EFE8]">Points & Duration Trend</h4>
           </div>
-          <span className="px-3 py-1 text-[9px] font-black text-indigo-400 border border-indigo-500/30 bg-indigo-500/10 rounded-full uppercase tracking-widest shadow-[0_0_10px_rgba(99,102,241,0.2)]">
-            {monthlyChartData.length} months
-          </span>
         </div>
-        <div className="h-44">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={monthlyChartData} margin={{ top: 5, right: 5, left: -25, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#ffffff08" vertical={false} />
-              <XAxis dataKey="label" tick={{ fontSize: 8, fill: '#A09E9A', fontWeight: 'bold' }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fontSize: 8, fill: '#A09E9A' }} axisLine={false} tickLine={false}
-                tickFormatter={v => v >= 1000 ? `${(v/1000).toFixed(0)}K` : String(v)} />
-              <Tooltip
-                contentStyle={{ backgroundColor: '#13131E', borderColor: '#ffffff20', borderRadius: '12px', fontSize: '10px' }}
-                formatter={(v: number) => [v.toLocaleString() + ' pts', 'Points']}
-                labelStyle={{ color: '#D4AF37', fontWeight: 'bold', marginBottom: '4px' }}
-              />
-              <Bar dataKey="points" radius={[4, 4, 0, 0]}>
-                {monthlyChartData.map((_, idx) => (
-                  <Cell key={idx} fill={COLORS[idx % COLORS.length]} fillOpacity={0.85} />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
+        
+        <div className="flex items-center justify-between mt-2 pt-2 border-t border-white/5">
+          {/* Legend */}
+          <div className="flex gap-3 text-[9px] font-black uppercase tracking-widest">
+            <span className="text-[#D4AF37] drop-shadow-sm">● Points</span>
+            <span className="text-[#06b6d4] drop-shadow-sm">● Live Hours</span>
+          </div>
+
+          {/* View Toggle */}
+          <div className="flex items-center gap-1 bg-black/40 p-1 rounded-xl border border-white/5">
+            <button
+              type="button"
+              onClick={() => setTrendChartViewMode('area')}
+              className={cn(
+                "px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer",
+                trendChartViewMode === 'area'
+                  ? "bg-indigo-500/20 text-indigo-400 border border-indigo-500/30"
+                  : "text-white/40 hover:text-white/70 border border-transparent"
+              )}
+            >
+              Area
+            </button>
+            <button
+              type="button"
+              onClick={() => setTrendChartViewMode('bar')}
+              className={cn(
+                "px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer",
+                trendChartViewMode === 'bar'
+                  ? "bg-indigo-500/20 text-indigo-400 border border-indigo-500/30"
+                  : "text-white/40 hover:text-white/70 border border-transparent"
+              )}
+            >
+              Bar
+            </button>
+          </div>
+        </div>
+
+        <div className="h-48 w-full mt-4">
+          {trendChartViewMode === 'area' ? (
+            <ResponsiveContainer width="100%" height="100%">
+              <ComposedChart data={trendChartData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="colorPoints" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#D4AF37" stopOpacity={0.4}/>
+                    <stop offset="95%" stopColor="#D4AF37" stopOpacity={0.01}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" vertical={false} />
+                <XAxis 
+                  dataKey="label" 
+                  tick={{ fontSize: 9, fill: '#A09E9A', fontWeight: 'bold' }}
+                  axisLine={{ stroke: '#ffffff20' }}
+                  tickLine={false}
+                />
+                <YAxis 
+                  yAxisId="left"
+                  tick={{ fontSize: 9, fill: '#A09E9A', fontWeight: 'bold' }}
+                  axisLine={false}
+                  tickLine={false}
+                  tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`}
+                />
+                <YAxis 
+                  yAxisId="right"
+                  orientation="right"
+                  tick={{ fontSize: 9, fill: '#A09E9A', fontWeight: 'bold' }}
+                  axisLine={false}
+                  tickLine={false}
+                  tickFormatter={(value) => `${value.toFixed(0)}h`}
+                />
+                <Tooltip 
+                  contentStyle={{ backgroundColor: '#13131E', borderColor: '#ffffff20', borderRadius: '12px', fontSize: '10px', fontWeight: 'bold' }}
+                  itemStyle={{ color: '#F0EFE8' }}
+                  labelStyle={{ color: '#D4AF37', marginBottom: '4px' }}
+                />
+                <Area 
+                  yAxisId="left"
+                  type="monotone" 
+                  dataKey="points" 
+                  name="Points"
+                  stroke="#D4AF37" 
+                  strokeWidth={2}
+                  fill="url(#colorPoints)"
+                  activeDot={{ r: 6, fill: '#D4AF37', stroke: '#F0EFE8', strokeWidth: 2 }}
+                  animationDuration={1000}
+                />
+                <Line 
+                  yAxisId="right"
+                  type="monotone" 
+                  dataKey="live_duration" 
+                  name="Live Duration"
+                  stroke="#06b6d4" 
+                  strokeWidth={3}
+                  dot={{ r: 4, fill: '#13131E', stroke: '#06b6d4', strokeWidth: 2 }}
+                  activeDot={{ r: 6, fill: '#06b6d4', stroke: '#F0EFE8', strokeWidth: 2 }}
+                  animationDuration={1000}
+                />
+              </ComposedChart>
+            </ResponsiveContainer>
+          ) : (
+            <ResponsiveContainer width="100%" height="100%">
+              <ComposedChart data={trendChartData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" vertical={false} />
+                <XAxis 
+                  dataKey="label" 
+                  tick={{ fontSize: 9, fill: '#A09E9A', fontWeight: 'bold' }}
+                  axisLine={{ stroke: '#ffffff20' }}
+                  tickLine={false}
+                />
+                <YAxis 
+                  yAxisId="left"
+                  tick={{ fontSize: 9, fill: '#A09E9A', fontWeight: 'bold' }}
+                  axisLine={false}
+                  tickLine={false}
+                  tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`}
+                />
+                <YAxis 
+                  yAxisId="right"
+                  orientation="right"
+                  tick={{ fontSize: 9, fill: '#A09E9A', fontWeight: 'bold' }}
+                  axisLine={false}
+                  tickLine={false}
+                  tickFormatter={(value) => `${value.toFixed(0)}h`}
+                />
+                <Tooltip 
+                  contentStyle={{ backgroundColor: '#13131E', borderColor: '#ffffff20', borderRadius: '12px', fontSize: '10px', fontStyle: 'normal', fontWeight: 'bold' }}
+                  itemStyle={{ color: '#F0EFE8' }}
+                  labelStyle={{ color: '#D4AF37', marginBottom: '4px' }}
+                />
+                <Bar 
+                  yAxisId="left"
+                  dataKey="points" 
+                  name="Points"
+                  fill="#D4AF37" 
+                  radius={[4, 4, 0, 0]}
+                  maxBarSize={40}
+                  animationDuration={1000}
+                />
+                <Bar 
+                  yAxisId="right"
+                  dataKey="live_duration" 
+                  name="Live Duration"
+                  fill="#06b6d4" 
+                  radius={[4, 4, 0, 0]}
+                  maxBarSize={40}
+                  animationDuration={1000}
+                />
+              </ComposedChart>
+            </ResponsiveContainer>
+          )}
         </div>
       </div>
     );
   };
 
-  // Self-edit modal: bio, social links, streaming hours only
   const renderSelfEditModal = () => {
     if (!isSelfEditing) return null;
     const currentAuth = Storage.getAuthState();
@@ -1605,11 +1819,11 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
 
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
-                    <label className="text-[8px] font-black text-[#A09E9A] uppercase tracking-widest block">Tier Pay</label>
+                    <label className="text-[8px] font-black text-[#A09E9A] uppercase tracking-widest block">Base Salary Category</label>
                     <select
-                      title="Tier Pay"
-                      value={editTierPay}
-                      onChange={(e) => setEditTierPay(e.target.value)}
+                      title="Base Salary Category"
+                      value={editBaseSalaryCategory}
+                      onChange={(e) => setEditBaseSalaryCategory(e.target.value)}
                       className="w-full bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-1.5 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37] font-bold"
                     >
                       {BASE_SALARY_POLICIES.map(policy => (
@@ -1828,172 +2042,117 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
     return (
       <div className={cn("backdrop-blur-xl border-2 rounded-3xl overflow-hidden flex flex-col relative group/card transition-all duration-300", styles.gradientBg, styles.borderColor, styles.shadow, styles.topTrim)}>
         
-        {/* Header split layout (2-Column Split) */}
-        <div className="flex flex-col sm:flex-row gap-5 p-5 items-start">
+        {/* Full-width square profile photo acting as a header banner */}
+        <div className="w-full aspect-square relative bg-[#0D0D14]">
+          {isProcessingPhoto && (
+            <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-20">
+              <Loader2 size={24} className="animate-spin text-[#D4AF37]" />
+            </div>
+          )}
+          {editPhotoUrl ? (
+            <img src={editPhotoUrl} alt={host.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center text-7xl text-[#A09E9A] font-black bg-gradient-to-br from-[#1A1A28] to-[#0D0D14]">
+              {editNickname?.[0]?.toUpperCase() || host.name?.[0] || 'JD'}
+            </div>
+          )}
           
-          {/* Left Column: Profile Photo */}
-          <div className="w-24 h-24 sm:w-28 sm:h-28 shrink-0 relative rounded-2xl overflow-hidden border border-white/10 bg-[#0D0D14]">
-            {isProcessingPhoto && (
-              <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-20">
-                <Loader2 size={20} className="animate-spin text-[#D4AF37]" />
-              </div>
-            )}
-            {editPhotoUrl ? (
-              <img src={editPhotoUrl} alt={host.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center text-5xl text-[#A09E9A] font-black bg-gradient-to-br from-[#1A1A28] to-[#0D0D14]">
-                {editNickname?.[0]?.toUpperCase() || host.name?.[0] || 'JD'}
-              </div>
-            )}
-            
-            {/* Status overlay badge */}
-            <div className="absolute top-1 left-1 z-10">
-              <span className={cn("text-[7px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-full border backdrop-blur-md shadow-lg", 
+          {/* Faded gradient overlay at the bottom 25% to merge with profile block */}
+          <div className="absolute bottom-0 inset-x-0 h-1/3 bg-gradient-to-t from-[#1A1A28] via-[#1A1A28]/60 to-transparent z-10" />
+          
+          {/* Absolute positioned badges overlaying the image */}
+          <div className="absolute top-4 right-4 z-20 flex flex-col items-end gap-2">
+             <span className={cn("text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full border backdrop-blur-md shadow-lg", 
                 host.status === 'Active' ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30" : "bg-amber-500/20 text-amber-400 border-amber-500/30")}>
                 {host.status || 'Active'}
-              </span>
-            </div>
-
-            {/* Edit Profile overlay button */}
-            {((!isReadOnly && isDirectorOrHeadAdmin) || (isOwnProfile && !isSpotlight)) && (
-              <div className="absolute bottom-1 right-1 z-10">
-                <button
-                  onClick={() => setIsSelfEditing(true)}
-                  className="w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-md border border-white/20 flex items-center justify-center text-white transition-all shadow-xl cursor-pointer"
-                  title="Edit Profile"
-                >
-                  <Edit2 size={10} />
-                </button>
-              </div>
-            )}
+             </span>
+             {/* Base Salary Category glowing badge */}
+             <span className={cn("text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full border backdrop-blur-md shadow-[0_0_15px_rgba(212,175,55,0.3)]", styles.badgeText, styles.borderColor, "bg-black/40")}>
+                {host.base_salary_category || 'Regular Host'}
+             </span>
           </div>
 
-          {/* Right Column next to the photo */}
-          <div className="flex-1 min-w-0 flex flex-col justify-between self-stretch space-y-2">
-            <div>
-              <h2 className="text-xl md:text-2xl font-black text-[#F0EFE8] tracking-tight truncate drop-shadow-md">
-                {host.nickname || host.name}
-              </h2>
-              <div className="flex items-center flex-wrap gap-1.5 mt-1">
-                <span className="text-[9px] font-mono font-bold text-[#A09E9A]">ID: {host.id}</span>
-                {activeAwards.map(a => {
-                  let badgeStyle = 'bg-amber-500/10 text-amber-400 border-amber-500/20';
-                  if (a.awardColor === 'Purple') badgeStyle = 'bg-purple-500/10 text-purple-400 border-purple-500/20';
-                  else if (a.awardColor === 'Emerald') badgeStyle = 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
-                  else if (a.awardColor === 'Blue') badgeStyle = 'bg-blue-500/10 text-blue-400 border-blue-500/20';
-                  else if (a.awardColor === 'Red') badgeStyle = 'bg-red-500/10 text-red-400 border-red-500/20';
-                  else if (a.awardColor === 'Orange') badgeStyle = 'bg-orange-500/10 text-orange-400 border-orange-500/20';
-
-                  return (
-                    <span 
-                      key={a.id} 
-                      className={cn("text-[7px] font-black uppercase px-1.5 py-0.5 rounded-full border shrink-0 backdrop-blur-sm", badgeStyle)}
-                      title={`Active Award: ${a.awardName} (${a.startDate} to ${a.endDate})`}
-                    >
-                      {a.awardName}
-                    </span>
-                  );
-                })}
-              </div>
+          {/* Edit / Save Options overlaying the image bottom right */}
+          {((!isReadOnly && isDirectorOrHeadAdmin) || (isOwnProfile && !isSpotlight)) && (
+            <div className="absolute bottom-4 right-4 z-20 flex gap-2">
+              <button
+                onClick={() => setIsSelfEditing(true)}
+                className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-md border border-white/20 flex items-center justify-center text-white transition-all shadow-xl cursor-pointer"
+                title="Edit Profile"
+              >
+                <Edit2 size={16} />
+              </button>
             </div>
-
-            <div className="grid grid-cols-2 gap-x-3 gap-y-2 pt-2 border-t border-white/5 text-[10px] text-[#A09E9A]">
-              {/* Conditional Logic: Hide role field if Host or Talent */}
-              {!(String(host.role).toLowerCase() === 'host' || String(host.role).toLowerCase() === 'talent') && (
-                <div className="flex flex-col">
-                  <span className="text-[8px] font-black uppercase tracking-widest text-white/40">Role</span>
-                  <span className="text-[#D4AF37] font-bold truncate">{host.role}</span>
-                </div>
-              )}
-              <div className="flex flex-col">
-                <span className="text-[8px] font-black uppercase tracking-widest text-white/40">Tier Pay</span>
-                <span className={cn("font-black drop-shadow-sm truncate", styles.badgeText)}>{host.tier_pay || 'Regular Host'}</span>
-              </div>
-              <div className="flex flex-col">
-                <span className="text-[8px] font-black uppercase tracking-widest text-white/40">Team Anchor</span>
-                <span className="text-indigo-400 font-bold truncate">{host.team || 'Unassigned'}</span>
-              </div>
-              <div className="flex flex-col">
-                <span className="text-[8px] font-black uppercase tracking-widest text-white/40">Assigned Manager</span>
-                <span className="text-[#F0EFE8] font-bold truncate">{host.manager || 'Nine Management'}</span>
-              </div>
-            </div>
-          </div>
+          )}
         </div>
 
-        {/* Basic Info Section (directly below the header split) */}
-        <div className="p-5 pt-3 border-t border-white/5 flex flex-col space-y-4">
-          {/* Top Row: Split into 2 columns */}
-          <div className="grid grid-cols-2 gap-4 items-start">
-            {/* Left Column: Social Media clickable icons */}
-            <div className="space-y-1.5">
-              <span className="text-[8px] font-black text-white/40 uppercase tracking-widest block">Social Media</span>
-              <div className="flex items-center gap-2 flex-wrap">
-                {renderSocialIcon({
-                  type: 'instagram',
-                  url: host.social_links?.ig,
-                  icon: <Instagram size={16} />,
-                  label: 'Instagram',
-                  colorClass: 'text-pink-500 hover:bg-pink-500/10 hover:border-pink-500/30'
-                })}
-                {renderSocialIcon({
-                  type: 'tiktok',
-                  url: host.social_links?.tiktok,
-                  icon: (
-                    <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
-                      <path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.17-2.86-.74-3.95-1.72-.1.08-.21.17-.31.25-.02 3.78-.01 7.56-.02 11.34-.1 2.39-1.39 4.71-3.64 5.63-2.18.97-4.88.75-6.85-.56-2.03-1.32-3.08-3.83-2.67-6.21.36-2.28 2.14-4.22 4.41-4.72.16-.03.32-.06.49-.09V12.3c-.15.02-.29.04-.44.07-3.23.51-5.74 3.49-5.69 6.78.07 3.32 2.7 6.18 6.01 6.3 3.25.17 6.18-2.19 6.57-5.41.09-.76.08-1.53.08-2.3V5.19c-.87.59-1.89.97-2.95 1.07-1.12.11-2.27-.1-3.27-.63-.97-.53-1.73-1.39-2.13-2.42C12.98 2.2 12.87 1.09 12.525.02z" />
-                    </svg>
-                  ),
-                  label: 'TikTok',
-                  colorClass: 'text-cyan-400 hover:bg-cyan-500/10 hover:border-cyan-500/30'
-                })}
-                {renderSocialIcon({
-                  type: 'facebook',
-                  url: host.social_links?.fb,
-                  icon: <Facebook size={16} />,
-                  label: 'Facebook',
-                  colorClass: 'text-blue-500 hover:bg-blue-500/10 hover:border-blue-500/30'
-                })}
-                {renderSocialIcon({
-                  type: 'whatsapp',
-                  url: host.social_links?.whatsapp,
-                  icon: (
-                    <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
-                      <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.514 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.73-1.45L0 24zm6.59-4.846c1.6.95 3.188 1.449 4.825 1.451 5.436 0 9.86-4.42 9.864-9.864.002-2.637-1.019-5.117-2.875-6.973-1.857-1.857-4.339-2.875-6.98-2.875-5.437 0-9.86 4.42-9.863 9.865-.001 1.716.463 3.39 1.342 4.877l-.994 3.634 3.716-.975zm12.167-7.79c-.273-.137-1.62-.8-1.871-.892-.253-.09-.437-.137-.621.137-.184.272-.713.89-.873 1.073-.16.184-.321.206-.594.07-1.12-.56-1.92-.937-2.678-2.23-.2-.345.2-.32.57-.962.082-.136.04-.256-.02-.393-.06-.137-.506-1.22-.693-1.67-.182-.44-.367-.38-.506-.388-.13-.004-.28-.006-.43-.006-.15 0-.395.056-.6.28-.206.223-.787.77-.787 1.877 0 1.107.805 2.176.918 2.33.113.15 1.583 2.417 3.834 3.388.536.23 1.012.38 1.357.49.538.172 1.028.148 1.416.09.431-.064 1.332-.546 1.518-1.072.186-.527.186-.978.13-1.07-.056-.09-.206-.137-.478-.273z" />
-                    </svg>
-                  ),
-                  label: 'WhatsApp',
-                  colorClass: 'text-emerald-500 hover:bg-emerald-500/10 hover:border-emerald-500/30'
-                })}
+        {/* Identity Details Block (merged below the photo) */}
+        <div className="px-6 pb-6 -mt-8 relative z-20 flex-1 flex flex-col space-y-5">
+          <div>
+            <h2 className="text-3xl md:text-4xl font-black text-[#F0EFE8] tracking-tight drop-shadow-md">{host.nickname || host.name}</h2>
+            <div className="flex items-center flex-wrap gap-2 mt-1.5">
+              <span className="text-xs font-mono font-bold text-[#A09E9A]">ID: {host.id}</span>
+              {activeAwards.map(a => {
+                let badgeStyle = 'bg-amber-500/10 text-amber-400 border-amber-500/20';
+                if (a.awardColor === 'Purple') badgeStyle = 'bg-purple-500/10 text-purple-400 border-purple-500/20';
+                else if (a.awardColor === 'Emerald') badgeStyle = 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
+                else if (a.awardColor === 'Blue') badgeStyle = 'bg-blue-500/10 text-blue-400 border-blue-500/20';
+                else if (a.awardColor === 'Red') badgeStyle = 'bg-red-500/10 text-red-400 border-red-500/20';
+                else if (a.awardColor === 'Orange') badgeStyle = 'bg-orange-500/10 text-orange-400 border-orange-500/20';
+
+                return (
+                  <span 
+                    key={a.id} 
+                    className={cn("text-[8px] font-black uppercase px-2 py-0.5 rounded-full border shrink-0 backdrop-blur-sm", badgeStyle)}
+                    title={`Active Award: ${a.awardName} (${a.startDate} to ${a.endDate})`}
+                  >
+                    {a.awardName}
+                  </span>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-y-4 gap-x-4 pt-4 border-t border-white/5 text-xs text-[#A09E9A]">
+            <div className="flex flex-col">
+              <span className="text-[9px] font-black uppercase tracking-widest mb-1 text-white/40">Role</span>
+              <span className="text-[#D4AF37] font-black">{host.role === 'Host' || host.role === 'Talent' ? 'Star Host' : host.role}</span>
+            </div>
+            <div className="flex flex-col">
+              <span className="text-[9px] font-black uppercase tracking-widest mb-1 text-white/40">Base Salary Category</span>
+              <span className={cn("font-black drop-shadow-sm text-sm", styles.badgeText)}>{host.base_salary_category || 'Regular Host'}</span>
+            </div>
+            <div className="flex flex-col">
+              <span className="text-[9px] font-black uppercase tracking-widest mb-1 text-white/40">Assigned Manager</span>
+              <span className="text-[#F0EFE8] font-bold">{host.manager}</span>
+            </div>
+            <div className="flex flex-col">
+              <span className="text-[9px] font-black uppercase tracking-widest mb-1 text-white/40">Team Group</span>
+              <span className="text-indigo-400 font-bold">{host.team}</span>
+            </div>
+          </div>
+
+          {host.streaming_hours && host.streaming_hours.length > 0 && (
+            <div className="pt-2 border-t border-white/5 space-y-2">
+              <span className="text-[9px] font-black text-white/40 uppercase tracking-widest block">Streaming Schedule</span>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {host.streaming_hours.slice(0, 2).map((slot, idx) => (
+                  <div key={idx} className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl px-3 py-2 text-center shadow-inner">
+                    <span className="text-[10px] font-bold text-white/90">{slot.from} - {slot.to}</span>
+                  </div>
+                ))}
               </div>
             </div>
+          )}
 
-            {/* Right Column: Streaming Hours */}
-            <div className="space-y-1.5">
-              <span className="text-[8px] font-black text-white/40 uppercase tracking-widest block">Streaming Hours</span>
-              {host.streaming_hours && host.streaming_hours.length > 0 ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-                  {host.streaming_hours.slice(0, 2).map((slot, idx) => (
-                    <div key={idx} className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-lg py-1 text-center shadow-inner">
-                      <span className="text-[9px] font-bold text-white/90">{slot.from} - {slot.to}</span>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <span className="text-[9px] text-[#A09E9A]/40 italic block py-1">No schedule set.</span>
-              )}
-            </div>
+          {/* Host Public Message */}
+          <div className="pt-2 border-t border-white/5 space-y-1.5">
+            <span className="text-[9px] font-black text-white/40 uppercase tracking-widest block">Host Public Message</span>
+            <p className="text-xs text-[#A09E9A] leading-relaxed italic whitespace-pre-wrap bg-black/20 p-3 rounded-xl border border-white/5">
+              "{String(host.bio || host.description || 'No public message set.').slice(0, 100)}"
+            </p>
           </div>
 
-          {/* Bottom Row: Public Message / Bio section */}
-          <div className="pt-3 border-t border-white/5 space-y-1">
-            <span className="text-[8px] font-black text-white/40 uppercase tracking-widest block">Public Message / Bio</span>
-            <blockquote className={cn("text-xs text-[#A09E9A] leading-relaxed italic whitespace-pre-wrap bg-black/20 p-3 rounded-xl border border-white/5 relative pl-7 pr-4 shadow-inner border-l-4", styles.borderColor)}>
-              <span className={cn("absolute left-2.5 top-2 text-xl font-serif leading-none", styles.badgeText)}>&ldquo;</span>
-              {host.bio || host.description || 'No public message set.'}
-              <span className={cn("absolute right-2.5 bottom-0 text-xl font-serif leading-none select-none", styles.badgeText)}>&rdquo;</span>
-            </blockquote>
-          </div>
         </div>
       </div>
     );
@@ -2058,110 +2217,6 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
     );
   };
 
-  const renderEarningsTrend = () => {
-    if (!performanceReports || performanceReports.length === 0) return null;
-
-    // Sort based on toggle state for the line chart
-    const MONTH_ORDER = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-    const chartData = [...performanceReports]
-      .sort((a, b) => {
-        const yearA = Number(a.year) || 0;
-        const yearB = Number(b.year) || 0;
-        let monthA = Number(a.month) || 0;
-        if (!monthA && a.monthName) {
-          monthA = MONTH_ORDER.findIndex(m => m.toLowerCase() === String(a.monthName).toLowerCase()) + 1;
-        }
-        let monthB = Number(b.month) || 0;
-        if (!monthB && b.monthName) {
-          monthB = MONTH_ORDER.findIndex(m => m.toLowerCase() === String(b.monthName).toLowerCase()) + 1;
-        }
-        if (yearA !== yearB) {
-          return sortAscending ? yearA - yearB : yearB - yearA;
-        }
-        return sortAscending ? monthA - monthB : monthB - monthA;
-      })
-      .map(report => {
-        return {
-          month: formatPeriodShort(report.monthName || report.month, report.year),
-          points: pf(report, 'totalEarningsOfPoints','total_earnings_of_points','totalPoints','total_points','points'),
-          live_duration: getLiveHoursForReport(report)
-        };
-      });
-
-    if (chartData.length === 0) return null;
-
-    return (
-      <div className={cn("space-y-4 bg-white/5 backdrop-blur-xl border border-white/10 p-5 rounded-3xl transition-all duration-300 hover:border-cyan-500/30 group", styles.shadow)}>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-             <div className="w-8 h-8 rounded-full bg-cyan-500/20 flex items-center justify-center text-cyan-400 text-sm shadow-inner">📉</div>
-             <h4 className="text-xs font-black uppercase tracking-widest text-[#F0EFE8]">Earnings & Duration Trend</h4>
-          </div>
-          <div className="flex gap-3 text-[9px] font-black uppercase tracking-widest">
-            <span className="text-[#D4AF37] drop-shadow-sm">● Points</span>
-            <span className="text-[#06b6d4] drop-shadow-sm">● Live Hours</span>
-          </div>
-        </div>
-        
-        <div className="h-48 w-full mt-4">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={chartData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" vertical={false} />
-              <XAxis 
-                dataKey="month" 
-                tick={{ fontSize: 9, fill: '#A09E9A', fontWeight: 'bold' }}
-                axisLine={{ stroke: '#ffffff20' }}
-                tickLine={false}
-              />
-              <YAxis 
-                yAxisId="left"
-                tick={{ fontSize: 9, fill: '#A09E9A', fontWeight: 'bold' }}
-                axisLine={false}
-                tickLine={false}
-                tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`}
-              />
-              <YAxis 
-                yAxisId="right"
-                orientation="right"
-                tick={{ fontSize: 9, fill: '#A09E9A', fontWeight: 'bold' }}
-                axisLine={false}
-                tickLine={false}
-                tickFormatter={(value) => `${value.toFixed(0)}h`}
-              />
-              <Tooltip 
-                contentStyle={{ backgroundColor: '#13131E', borderColor: '#ffffff20', borderRadius: '12px', fontSize: '10px', fontWeight: 'bold' }}
-                itemStyle={{ color: '#F0EFE8' }}
-                labelStyle={{ color: '#D4AF37', marginBottom: '4px' }}
-              />
-              <Line 
-                yAxisId="left"
-                type="monotone" 
-                dataKey="points" 
-                name="Points"
-                stroke="#D4AF37" 
-                strokeWidth={3}
-                dot={{ r: 4, fill: '#13131E', stroke: '#D4AF37', strokeWidth: 2 }}
-                activeDot={{ r: 6, fill: '#D4AF37', stroke: '#F0EFE8', strokeWidth: 2 }}
-                animationDuration={1500}
-              />
-              <Line 
-                yAxisId="right"
-                type="monotone" 
-                dataKey="live_duration" 
-                name="Live Duration"
-                stroke="#06b6d4" 
-                strokeWidth={3}
-                dot={{ r: 4, fill: '#13131E', stroke: '#06b6d4', strokeWidth: 2 }}
-                activeDot={{ r: 6, fill: '#06b6d4', stroke: '#F0EFE8', strokeWidth: 2 }}
-                animationDuration={1500}
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-    );
-  };
-
   const renderRandomPK = () => {
     const currentAuth = Storage.getAuthState();
     const isOwnProfile = currentAuth.poppo_id === host.id;
@@ -2175,95 +2230,253 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
              <div className="w-8 h-8 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-400 text-sm shadow-inner">⚔️</div>
              <h4 className="text-xs font-black uppercase tracking-widest text-[#F0EFE8]">PK Performance</h4>
           </div>
-          <div className="px-3 py-1 text-[9px] font-black text-amber-400 border border-amber-500/30 bg-amber-500/10 rounded-full uppercase tracking-widest shadow-[0_0_10px_rgba(251,191,36,0.2)]">
-            Summary
-          </div>
-        </div>
-        
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
-          {[
-            { label: 'WIN %', value: `${pkData.win_percentage}%`, subLabel: 'Monthly', gradient: 'from-amber-500/20 to-orange-500/5', border: 'hover:border-amber-400/50', text: 'text-amber-400' },
-            { label: 'SCORE', value: formatNumber(pkData.pk_score), subLabel: 'Monthly', gradient: 'from-orange-500/20 to-red-500/5', border: 'hover:border-orange-400/50', text: 'text-orange-400' },
-            { label: 'SESSIONS', value: String(pkData.sessions), subLabel: 'Weekly', gradient: 'from-red-500/20 to-rose-500/5', border: 'hover:border-red-400/50', text: 'text-red-400' },
-          ].map((cell, idx) => (
-            <div key={idx} className={`bg-gradient-to-br ${cell.gradient} border border-white/5 p-4 rounded-2xl flex flex-col justify-between min-h-[90px] transition-all duration-300 transform group-hover:translate-y-[-2px] shadow-lg ${cell.border}`}>
-              <span className="text-[9px] font-black text-white/50 uppercase tracking-widest leading-none">{cell.label}</span>
-              <span className={`text-xl md:text-2xl font-black tracking-tight mt-2 block drop-shadow-md ${cell.text}`}>
-                {cell.value}
-              </span>
-              <span className="text-[8px] font-bold text-white/30 uppercase tracking-wider mt-1">{cell.subLabel}</span>
-            </div>
-          ))}
-        </div>
-
-        <div className="flex items-center justify-between mt-4 pt-4 border-t border-white/5">
-          {rpkMetadata ? (
-            <p className="text-[9px] text-[#A09E9A]/60 italic font-medium">
-              Updated: {formatUpdateMetaDate(rpkMetadata.lastUpdated)}
-            </p>
-          ) : <div />}
-          
           {(isOwnProfile || isStaffUser) && (
             <button 
               onClick={() => setIsRpkFormOpen(true)}
-              className="px-4 py-2 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-400 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all cursor-pointer shadow-md hover:shadow-amber-500/20"
+              className="px-3 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-400 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all cursor-pointer shadow-md hover:shadow-amber-500/20"
             >
               Submit Report
             </button>
           )}
         </div>
+        
+        <div className="grid gap-[12px] pt-2" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+          {[
+            { 
+              label: 'WIN %', 
+              value: `${pkData.win_percentage}%`, 
+              subLabel: 'Monthly', 
+              bgGradient: 'linear-gradient(to bottom right, #3A2A18, #221A15)', 
+              accentColor: '#FFB800', 
+              hoverBorder: 'hover:border-[#FFB800]/50' 
+            },
+            { 
+              label: 'SCORE', 
+              value: formatNumber(pkData.pk_score), 
+              subLabel: 'Monthly', 
+              bgGradient: 'linear-gradient(to bottom right, #3D221C, #221515)', 
+              accentColor: '#FF7B00', 
+              hoverBorder: 'hover:border-[#FF7B00]/50' 
+            },
+            { 
+              label: 'SESSIONS', 
+              value: String(pkData.sessions), 
+              subLabel: 'Weekly', 
+              bgGradient: 'linear-gradient(to bottom right, #3A1C28, #20131A)', 
+              accentColor: '#FF3B5C', 
+              hoverBorder: 'hover:border-[#FF3B5C]/50' 
+            },
+          ].map((cell, idx) => (
+            <div 
+              key={idx} 
+              style={{ background: cell.bgGradient }}
+              className={cn(
+                "border border-white/5 p-2.5 sm:p-4 rounded-2xl flex flex-col justify-between min-h-[85px] sm:min-h-[90px] transition-all duration-300 transform group-hover:translate-y-[-2px] shadow-lg", 
+                cell.hoverBorder
+              )}
+            >
+              <span className="text-[8px] sm:text-[9px] font-black text-[#A09E9A] uppercase tracking-widest leading-none">
+                {cell.label}
+              </span>
+              <span 
+                style={{ color: cell.accentColor }}
+                className="text-sm sm:text-lg md:text-xl font-black tracking-tight mt-2 block drop-shadow-md font-mono"
+              >
+                {cell.value}
+              </span>
+              <span className="text-[7px] sm:text-[8px] font-bold text-white/30 uppercase tracking-wider mt-1">
+                {cell.subLabel}
+              </span>
+            </div>
+          ))}
+        </div>
+
+        {rpkMetadata && (
+          <div className="flex items-center justify-between mt-4 pt-4 border-t border-white/5">
+            <p className="text-[9px] text-[#A09E9A]/60 italic font-medium">
+              Updated: {formatUpdateMetaDate(rpkMetadata.lastUpdated)}
+            </p>
+          </div>
+        )}
       </div>
     );
   };
 
-  const renderEventExposure = () => {
+  const renderExposuresAndAttendance = () => {
     const currentAuth = Storage.getAuthState();
     const isOwnProfile = currentAuth.poppo_id === host.id;
+    
+    const attendedCount = attendedEvents.length;
+    const totalCount = totalAgencyEventsCount || 0;
+    const presenceRatio = totalCount > 0 ? (attendedCount / totalCount) : 0;
+    const presencePercentage = Math.round(presenceRatio * 100);
+
     return (
-      <div className={cn("space-y-4 flex-1 bg-white/5 backdrop-blur-xl border border-white/10 p-5 rounded-3xl transition-all duration-300 hover:border-indigo-500/30 group", styles.shadow)}>
-        <div className="flex items-center justify-between">
+      <div className={cn("space-y-4 flex-1 bg-white/5 backdrop-blur-xl border border-white/10 p-5 rounded-3xl transition-all duration-300 hover:border-amber-500/30 group", styles.shadow)}>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-             <div className="w-8 h-8 rounded-full bg-indigo-500/20 flex items-center justify-center text-indigo-400 text-sm shadow-inner">📅</div>
-             <h4 className="text-xs font-black uppercase tracking-widest text-[#F0EFE8]">Event Exposure</h4>
+             <div className="w-8 h-8 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-400 text-sm shadow-inner">📅</div>
+             <h4 className="text-xs font-black uppercase tracking-widest text-[#F0EFE8]">EVENTS</h4>
           </div>
           <div className="flex items-center gap-2">
-            {isOwnProfile && (
+            {isOwnProfile && eventActiveTab === 'exposure' && (
               <button
                 onClick={() => setIsAddEventFormOpen(true)}
-                className="px-3 py-1.5 bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 text-indigo-400 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all cursor-pointer shadow-md"
+                className="px-3 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-400 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all cursor-pointer shadow-md"
               >
                 + Add Event
               </button>
             )}
-            <span className="px-3 py-1 text-[9px] font-black text-indigo-400 border border-indigo-500/30 bg-indigo-500/10 rounded-full uppercase tracking-widest shadow-[0_0_10px_rgba(99,102,241,0.2)]">
-              Total: {participatedEvents.length}
-            </span>
+            <div className="flex items-center gap-1 bg-black/40 p-1 rounded-xl border border-white/5">
+              <button
+                type="button"
+                onClick={() => setEventActiveTab('exposure')}
+                className={cn(
+                  "px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer",
+                  eventActiveTab === 'exposure'
+                    ? "bg-amber-500/20 text-amber-400 border border-amber-500/30"
+                    : "text-white/40 hover:text-white/70 border border-transparent"
+                )}
+              >
+                Exposures
+              </button>
+              <button
+                type="button"
+                onClick={() => setEventActiveTab('attendance')}
+                className={cn(
+                  "px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer",
+                  eventActiveTab === 'attendance'
+                    ? "bg-amber-500/20 text-amber-400 border border-amber-500/30"
+                    : "text-white/40 hover:text-white/70 border border-transparent"
+                )}
+              >
+                Attendance
+              </button>
+            </div>
           </div>
         </div>
-        <div className="space-y-3 mt-4 max-h-48 overflow-y-auto custom-scrollbar pr-1">
-          {participatedEvents.length > 0 ? (
-            participatedEvents.map((e, idx) => {
-              const eventDate = formatDateStandard(e.eventDate || e.date);
-              return (
-                <div key={idx} className="bg-gradient-to-r from-white/5 to-white/[0.02] border border-white/10 p-4 rounded-2xl flex items-center justify-between hover:border-indigo-500/30 transition-all duration-300 shadow-sm group/item">
-                  <div className="min-w-0 pr-4">
-                    <p className="text-sm font-black text-[#F0EFE8] leading-tight truncate group-hover/item:text-indigo-300 transition-colors">{e.description || e.eventType}</p>
-                    <p className="text-[10px] text-white/50 font-bold mt-1.5 truncate tracking-wide">{eventDate} • {e.timeslot}</p>
-                  </div>
-                  <span className="text-[9px] font-black uppercase tracking-widest bg-black/40 border border-white/10 px-3 py-1 rounded-full text-indigo-400 shrink-0 shadow-inner">
-                    {e.status}
+
+        {eventActiveTab === 'exposure' ? (
+          <>
+            <div className="space-y-3 mt-4 max-h-48 overflow-y-auto custom-scrollbar pr-1">
+              {participatedEvents.length > 0 ? (
+                participatedEvents.map((e, idx) => {
+                  const eventDate = formatDateYYYYMMDD(e.eventDate || e.date);
+                  const eventTitle = e.eventType || e.description || e.eventTitle || e.title || 'Event';
+                  const hostName = host.nickname || host.name;
+                  const displayTitle = `${hostName} - ${eventTitle}`;
+
+                  return (
+                    <div key={idx} className="bg-white/5 border border-white/10 p-3 rounded-xl hover:border-amber-500/30 transition-all duration-300 shadow-sm flex flex-col gap-1.5 group/item">
+                      <h4 className="font-bold text-[#F0EFE8] text-sm group-hover/item:text-amber-400 transition-colors truncate">
+                        {displayTitle}
+                      </h4>
+                      <div className="text-xs text-[#A09E9A]">
+                        {eventDate} . {formatTimeslot(e.timeslot)}
+                      </div>
+                      <div className="pt-0.5">
+                        <span className="text-[10px] font-mono text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded border border-amber-400/20 inline-block uppercase tracking-wider">
+                          {e.status || 'Scheduled'}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })
+              ) : (
+                <p className="text-xs text-white/30 italic text-center py-6 font-medium">No historical event participations found.</p>
+              )}
+            </div>
+            {participatedEvents.length > 0 && (
+              <p className="text-[9px] text-[#A09E9A]/60 italic font-medium mt-4 pt-4 border-t border-white/5">
+                Updated by: {participatedEvents[0].created_by_name || 'Unknown'}
+              </p>
+            )}
+          </>
+        ) : (
+          <>
+            <div className="grid grid-cols-2 gap-2.5 pt-2">
+              {[
+                { 
+                  label: 'Events Attended', 
+                  value: `${attendedCount} / ${totalCount}`, 
+                  subLabel: 'Total Agency',
+                  bgGradient: 'linear-gradient(to bottom right, #3A2A18, #221A15)', 
+                  accentColor: '#FFB800', 
+                  hoverBorder: 'hover:border-[#FFB800]/50'
+                },
+                { 
+                  label: 'Presence Score', 
+                  value: `${presencePercentage}%`, 
+                  subLabel: 'Consistency',
+                  bgGradient: 'linear-gradient(to bottom right, #3D221C, #221515)', 
+                  accentColor: '#FF7B00', 
+                  hoverBorder: 'hover:border-[#FF7B00]/50'
+                },
+              ].map((cell, idx) => (
+                <div 
+                  key={idx} 
+                  style={{ background: cell.bgGradient }}
+                  className={cn(
+                    "border border-white/5 p-2.5 sm:p-4 rounded-2xl flex flex-col justify-between min-h-[85px] transition-all duration-300 transform group-hover:translate-y-[-2px] shadow-lg",
+                    cell.hoverBorder
+                  )}
+                >
+                  <span className="text-[8px] sm:text-[9px] font-black text-[#A09E9A] uppercase tracking-widest leading-none">
+                    {cell.label}
+                  </span>
+                  <span 
+                    style={{ color: cell.accentColor }}
+                    className="text-sm sm:text-lg font-black tracking-tight mt-2 block drop-shadow-md font-mono"
+                  >
+                    {cell.value}
+                  </span>
+                  <span className="text-[7px] sm:text-[8px] font-bold text-white/30 uppercase tracking-wider mt-1">
+                    {cell.subLabel}
                   </span>
                 </div>
-              );
-            })
-          ) : (
-            <p className="text-xs text-white/30 italic text-center py-6 font-medium">No historical event participations found.</p>
-          )}
-        </div>
-        {participatedEvents.length > 0 && (
-          <p className="text-[9px] text-[#A09E9A]/60 italic font-medium mt-4 pt-4 border-t border-white/5">
-            Updated by: {participatedEvents[0].created_by_name || 'Unknown'}
-          </p>
+              ))}
+            </div>
+
+            {/* Progress Bar */}
+            <div className="px-1 py-1">
+              <div className="w-full bg-black/40 rounded-full h-1.5 border border-white/5 overflow-hidden">
+                <div 
+                  className="bg-gradient-to-r from-amber-600 via-orange-500 to-yellow-400 h-1.5 rounded-full transition-all duration-500" 
+                  style={{ width: `${Math.min(100, Math.max(0, presencePercentage))}%` }}
+                />
+              </div>
+            </div>
+
+            {/* Scrollable list of attended events */}
+            <div className="space-y-3 mt-4 max-h-48 overflow-y-auto custom-scrollbar pr-1">
+              {attendedEvents.length > 0 ? (
+                attendedEvents.map((e, idx) => {
+                  const eventDate = formatDateStandard(e.eventDate || e.date);
+                  return (
+                    <div key={idx} className="bg-gradient-to-r from-white/5 to-white/[0.02] border border-white/10 p-4 rounded-2xl hover:border-amber-500/30 transition-all duration-300 shadow-sm space-y-2 group/item">
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm font-black text-[#F0EFE8] leading-tight truncate group-hover/item:text-amber-400 transition-colors">{e.eventTitle || e.eventType || 'Unnamed Event'}</p>
+                        <span className="text-[9px] font-black uppercase tracking-widest bg-black/40 border border-white/10 px-3 py-1 rounded-full text-amber-400 shrink-0 shadow-inner">
+                          Attended
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-white/50 font-bold tracking-wide">{eventDate} • {e.timeslot || 'N/A'}</p>
+                      {e.eventFeedback && (
+                        <div className="bg-black/20 border border-white/5 p-3 rounded-xl mt-1.5">
+                          <p className="text-xs text-[#A09E9A] leading-relaxed font-medium">
+                            <span className="font-bold text-[#F0EFE8]/70">Feedback: </span>
+                            {e.eventFeedback}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              ) : (
+                <p className="text-xs text-[#A09E9A]/40 italic text-center py-6 font-medium">No attended agency events found for this host.</p>
+              )}
+            </div>
+          </>
         )}
       </div>
     );
@@ -2285,49 +2498,84 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
              <div className="w-8 h-8 rounded-full bg-pink-500/20 flex items-center justify-center text-pink-400 text-sm shadow-inner">💖</div>
              <h4 className="text-xs font-black uppercase tracking-widest text-[#F0EFE8]">Fanbase Health</h4>
           </div>
-          {fanbaseLatest?.timestamp && (
-            <span className="text-[9px] font-bold text-pink-400 border border-pink-500/20 bg-pink-500/10 px-3 py-1 rounded-full uppercase tracking-widest shadow-[0_0_10px_rgba(244,114,182,0.2)]">
-              {formatDateStandard(fanbaseLatest.timestamp)}
-            </span>
-          )}
+          <div className="flex items-center gap-2">
+            {fanbaseLatest?.timestamp && (
+              <span className="text-[9px] font-bold text-pink-400 border border-pink-500/20 bg-pink-500/10 px-3 py-1 rounded-full uppercase tracking-widest shadow-[0_0_10px_rgba(244,114,182,0.2)]">
+                {formatDateStandard(fanbaseLatest.timestamp)}
+              </span>
+            )}
+            {canSubmitFanbase && (
+              <button 
+                onClick={() => setIsFanbaseFormOpen(true)}
+                className="px-3 py-1.5 bg-pink-500/10 hover:bg-pink-500/20 border border-pink-500/30 text-pink-400 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all cursor-pointer shadow-md hover:shadow-pink-500/20"
+              >
+                Submit Report
+              </button>
+            )}
+          </div>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
+        <div className="grid grid-cols-4 gap-3 pt-2 w-full">
           {[
-            { label: 'Followers', value: fanbaseLatest?.total_followers != null ? formatNumber(fanbaseLatest.total_followers) : '—', text: 'text-fuchsia-400', gradient: 'from-fuchsia-500/20 to-purple-500/5', border: 'hover:border-fuchsia-400/50' },
-            { label: 'FC Subs', value: fanbaseLatest?.fanclub_subscribers != null ? formatNumber(fanbaseLatest.fanclub_subscribers) : '—', text: 'text-purple-400', gradient: 'from-purple-500/20 to-indigo-500/5', border: 'hover:border-purple-400/50' },
-            { label: 'GC Members', value: fanbaseLatest?.fanclub_gc_members != null ? formatNumber(fanbaseLatest.fanclub_gc_members) : '—', text: 'text-indigo-400', gradient: 'from-indigo-500/20 to-blue-500/5', border: 'hover:border-indigo-400/50' },
+            { 
+              label: 'Followers', 
+              value: fanbaseLatest?.total_followers != null ? formatNumber(fanbaseLatest.total_followers) : '—', 
+              bgGradient: 'linear-gradient(to bottom right, #3A2A18, #221A15)', 
+              accentColor: '#FFB800', 
+              hoverBorder: 'hover:border-[#FFB800]/50' 
+            },
+            { 
+              label: 'FC Subs', 
+              value: fanbaseLatest?.fanclub_subscribers != null ? formatNumber(fanbaseLatest.fanclub_subscribers) : '—', 
+              bgGradient: 'linear-gradient(to bottom right, #3D221C, #221515)', 
+              accentColor: '#FF7B00', 
+              hoverBorder: 'hover:border-[#FF7B00]/50' 
+            },
+            { 
+              label: 'GC Members', 
+              value: fanbaseLatest?.fanclub_gc_members != null ? formatNumber(fanbaseLatest.fanclub_gc_members) : '—', 
+              bgGradient: 'linear-gradient(to bottom right, #3A1C28, #20131A)', 
+              accentColor: '#FF3B5C', 
+              hoverBorder: 'hover:border-[#FF3B5C]/50' 
+            },
             { 
               label: 'GC Activity', 
               value: fanbaseLatest && (fanbaseLatest.gc_activity_count_host != null || fanbaseLatest.gc_activity_count_fans != null)
                 ? formatNumber(Number(fanbaseLatest.gc_activity_count_host || 0) + Number(fanbaseLatest.gc_activity_count_fans || 0)) 
                 : '—', 
-              text: 'text-blue-400', gradient: 'from-blue-500/20 to-cyan-500/5', border: 'hover:border-blue-400/50' 
+              bgGradient: 'linear-gradient(to bottom right, #2A1C3A, #161220)', 
+              accentColor: '#B388FF', 
+              hoverBorder: 'hover:border-[#B388FF]/50' 
             },
           ].map((cell, idx) => (
-            <div key={idx} className={`bg-gradient-to-br ${cell.gradient} border border-white/5 p-4 rounded-2xl flex flex-col justify-between min-h-[90px] transition-all duration-300 transform group-hover:translate-y-[-2px] shadow-lg ${cell.border}`}>
-              <span className="text-[9px] font-black text-white/50 uppercase tracking-widest leading-none">{cell.label}</span>
-              <span className={`text-lg sm:text-xl font-black tracking-tight mt-2 block drop-shadow-md ${cell.text}`}>{cell.value}</span>
+            <div 
+              key={idx} 
+              style={{ background: cell.bgGradient }}
+              className={cn(
+                "border border-white/5 p-2.5 sm:p-4 rounded-2xl flex flex-col justify-between min-h-[85px] sm:min-h-[90px] transition-all duration-300 transform group-hover:translate-y-[-2px] shadow-lg w-full min-w-0", 
+                cell.hoverBorder
+              )}
+            >
+              <span className="text-[8px] sm:text-[9px] font-black text-[#A09E9A] uppercase tracking-widest leading-none">
+                {cell.label}
+              </span>
+              <span 
+                style={{ color: cell.accentColor }}
+                className="text-sm sm:text-lg md:text-xl font-black tracking-tight mt-2 block drop-shadow-md font-mono"
+              >
+                {cell.value}
+              </span>
             </div>
           ))}
         </div>
 
-        <div className="flex items-center justify-between mt-4 pt-4 border-t border-white/5">
-          {fanbaseLatest?.timestamp ? (
+        {fanbaseLatest?.timestamp && (
+          <div className="flex items-center justify-between mt-4 pt-4 border-t border-white/5">
             <p className="text-[9px] text-[#A09E9A]/60 italic font-medium">
               Updated by: {fanbaseLatest.reporter_name || 'Unknown'}
             </p>
-          ) : <div />}
-          
-          {canSubmitFanbase && (
-            <button 
-              onClick={() => setIsFanbaseFormOpen(true)}
-              className="px-4 py-2 bg-pink-500/10 hover:bg-pink-500/20 border border-pink-500/30 text-pink-400 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all cursor-pointer shadow-md hover:shadow-pink-500/20"
-            >
-              Submit Report
-            </button>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     );
   };
@@ -2924,106 +3172,42 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
     );
   };
 
-  const renderPresenceRating = () => {
-    const attendedCount = attendedEvents.length;
-    const totalCount = totalAgencyEventsCount || 0;
-    const presenceRatio = totalCount > 0 ? (attendedCount / totalCount) : 0;
-    const presencePercentage = Math.round(presenceRatio * 100);
 
-    return (
-      <div className={cn("space-y-4 flex-1 bg-white/5 backdrop-blur-xl border border-white/10 p-5 rounded-3xl transition-all duration-300 hover:border-indigo-500/30 group", styles.shadow)}>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-             <div className="w-8 h-8 rounded-full bg-indigo-500/20 flex items-center justify-center text-indigo-400 text-sm shadow-inner">🎯</div>
-             <h4 className="text-xs font-black uppercase tracking-widest text-[#F0EFE8]">Agency Presence</h4>
-          </div>
-          <span className="px-3 py-1 text-[9px] font-black text-indigo-400 border border-indigo-500/30 bg-indigo-500/10 rounded-full uppercase tracking-widest shadow-[0_0_10px_rgba(99,102,241,0.2)]">
-            Score: {presencePercentage}%
-          </span>
-        </div>
-
-        <div className="grid grid-cols-2 gap-2.5 bg-[#0D0D14]/40 border border-white/5 p-3 rounded-2xl">
-          {[
-            { label: 'Events Attended', value: `${attendedCount} / ${totalCount}`, subLabel: 'Total Agency' },
-            { label: 'Presence Score', value: `${presencePercentage}%`, subLabel: 'Consistency' },
-          ].map((cell, idx) => (
-            <div key={idx} className="bg-[#222235]/40 border border-white/5 p-3 rounded-xl flex flex-col justify-between min-h-[78px] hover:border-[#D4AF37]/20 transition-colors shadow-sm">
-              <span className="text-[8px] font-black text-[#A09E9A] uppercase tracking-widest leading-none">{cell.label}</span>
-              <span className="text-xs md:text-sm font-black text-[#F0EFE8] tracking-tight mt-2.5 block">
-                {cell.value}
-              </span>
-              <span className="text-[7px] font-bold text-[#A09E9A]/60 uppercase tracking-wider mt-1">{cell.subLabel}</span>
-            </div>
-          ))}
-        </div>
-
-        {/* Progress Bar */}
-        <div className="px-1 space-y-1">
-          <div className="w-full bg-[#0D0D14]/60 rounded-full h-1.5 border border-white/5 overflow-hidden">
-            <div 
-              className="bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 h-1.5 rounded-full transition-all duration-500" 
-              {...({ style: { width: `${Math.min(100, Math.max(0, presencePercentage))}%` } })}
-            />
-          </div>
-        </div>
-
-        {/* Scrollable list of attended events */}
-        <div className="space-y-2 mt-2 max-h-48 overflow-y-auto custom-scrollbar">
-          {attendedEvents.length > 0 ? (
-            attendedEvents.map((e, idx) => {
-              const eventDate = formatDateStandard(e.eventDate || e.date);
-              return (
-                <div key={idx} className="bg-[#222235]/40 border border-white/5 p-3 rounded-xl hover:border-[#D4AF37]/20 transition-colors shadow-sm space-y-1">
-                  <div className="flex items-center justify-between">
-                    <p className="text-xs font-bold text-[#F0EFE8] leading-tight truncate">{e.eventTitle || e.eventType || 'Unnamed Event'}</p>
-                    <span className="text-[7px] font-black uppercase tracking-wider bg-[#1A1A28] border border-white/5 px-2 py-0.5 rounded text-indigo-400 shrink-0">
-                      Attended
-                    </span>
-                  </div>
-                  <p className="text-[8px] text-[#A09E9A] font-medium">{eventDate} • {e.timeslot || 'N/A'}</p>
-                  {e.eventFeedback && (
-                    <div className="bg-[#1A1A28]/80 border border-white/5 p-2 rounded-lg mt-1">
-                      <p className="text-[8px] text-[#A09E9A] leading-relaxed">
-                        <span className="font-bold text-[#F0EFE8]/70">Feedback: </span>
-                        {e.eventFeedback}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              );
-            })
-          ) : (
-            <p className="text-xs text-[#A09E9A]/40 italic text-center py-6">No attended agency events found for this host.</p>
-          )}
-        </div>
-      </div>
-    );
-  };
 
   const renderAwardsBlock = () => {
-    if (awards.length === 0) return null;
-    const ICON_MAP: Record<string, string> = { trophy: '🏆', star: '⭐', medal: '🥇', crown: '👑', badge: '🎖️' };
+    if (activeAwards.length === 0) return null;
     return (
-      <div className={cn("space-y-4 bg-white/5 backdrop-blur-xl border border-white/10 p-5 rounded-3xl transition-all duration-300 group", styles.hoverBorderColor, styles.shadow)}>
+      <div className={cn("space-y-4 bg-white/5 backdrop-blur-xl border border-white/10 p-5 rounded-3xl transition-all duration-300 hover:border-[#D4AF37]/30 group", styles.shadow)}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-             <div className={cn("w-8 h-8 rounded-full flex items-center justify-center text-sm shadow-inner", styles.iconBg)}>🏆</div>
-             <h4 className="text-xs font-black uppercase tracking-widest text-[#F0EFE8]">AGENCY BADGES & AWARDS</h4>
+             <div className="w-8 h-8 rounded-full bg-[#D4AF37]/20 flex items-center justify-center text-[#D4AF37] text-sm shadow-inner">🏆</div>
+             <h4 className="text-xs font-black uppercase tracking-widest text-[#F0EFE8]">Agency Awards</h4>
           </div>
-          <span className={cn("px-3 py-1 text-[9px] font-black rounded-full uppercase tracking-widest border", styles.badgeText, styles.badgeBgBorder)} style={{ boxShadow: `0 0 10px ${styles.accentColor}20` }}>
-            {awards.length} earned
+          <span className="px-3 py-1 text-[9px] font-black text-[#D4AF37] border border-[#D4AF37]/30 bg-[#D4AF37]/10 rounded-full uppercase tracking-widest shadow-[0_0_10px_rgba(212,175,55,0.2)]">
+            {activeAwards.length} active
           </span>
         </div>
         <div className="flex flex-wrap gap-2.5">
-          {awards.map((award: any, i: number) => (
-            <div key={i} className={cn("flex flex-col items-center gap-1.5 bg-[#0D0D14] rounded-xl p-3 w-[88px] text-center transition-all border group/award", styles.awardBorder)}>
-              <span className="text-2xl group-hover/award:scale-110 transition-transform inline-block">{ICON_MAP[award.iconType] || '🎖️'}</span>
-              <p className="text-[8px] font-black text-[#F0EFE8] leading-tight">{award.title}</p>
-              {(award.dateAwarded || award.awardedAt) && (
-                <p className="text-[7px] text-[#A09E9A]/40 font-mono">{new Date(award.dateAwarded || award.awardedAt).getFullYear()}</p>
-              )}
-            </div>
-          ))}
+          {activeAwards.map((a: any) => {
+            let badgeColorStyle = 'bg-amber-500/10 text-amber-400 border-amber-500/20 hover:border-amber-500/40';
+            if (a.awardColor === 'Purple') badgeColorStyle = 'bg-purple-500/10 text-purple-400 border-purple-500/20 hover:border-purple-500/40';
+            else if (a.awardColor === 'Emerald') badgeColorStyle = 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 hover:border-emerald-500/40';
+            else if (a.awardColor === 'Blue') badgeColorStyle = 'bg-blue-500/10 text-blue-400 border-blue-500/20 hover:border-blue-500/40';
+            else if (a.awardColor === 'Red') badgeColorStyle = 'bg-red-500/10 text-red-400 border-red-500/20 hover:border-red-500/40';
+            else if (a.awardColor === 'Orange') badgeColorStyle = 'bg-orange-500/10 text-orange-400 border-orange-500/20 hover:border-orange-500/40';
+
+            return (
+              <div 
+                key={a.id} 
+                className={cn("flex flex-col items-center justify-center gap-1.5 bg-[#0D0D14] border rounded-xl p-3 w-[100px] text-center transition-all duration-300 hover:scale-105 shadow-md", badgeColorStyle)}
+                title={`Active Period: ${a.startDate} to ${a.endDate}`}
+              >
+                <span className="text-xl">🏆</span>
+                <p className="text-[10px] font-black uppercase tracking-wider leading-tight text-[#F0EFE8] mt-1">{a.awardName}</p>
+                <p className="text-[8px] opacity-40 font-mono mt-0.5">{a.startDate} to {a.endDate}</p>
+              </div>
+            );
+          })}
         </div>
       </div>
     );
@@ -3166,13 +3350,11 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
             <>
               {renderIdentityCard()}
               {renderEarningsBreakdown()}
-              {renderMonthlyPointsTrend()}
+              {renderMonthlyTrend()}
               {renderPerformanceHistory()}
-              {renderEarningsTrend()}
-              <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
                 {renderRandomPK()}
-                {renderEventExposure()}
-                {renderPresenceRating()}
+                {renderExposuresAndAttendance()}
               </div>
               {renderFanbaseBlock()}
               {renderAwardsBlock()}
@@ -3199,13 +3381,11 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
               {/* Right Column (Performance Stats) */}
               <div className="space-y-6 lg:col-span-2">
                 {renderEarningsBreakdown()}
-                {renderMonthlyPointsTrend()}
-                {renderEarningsTrend()}
+                {renderMonthlyTrend()}
                 {renderPerformanceHistory()}
-                <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
                   {renderRandomPK()}
-                  {renderEventExposure()}
-                  {renderPresenceRating()}
+                  {renderExposuresAndAttendance()}
                 </div>
                 {renderFanbaseBlock()}
                 {renderAwardsBlock()}

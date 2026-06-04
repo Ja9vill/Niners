@@ -2254,7 +2254,7 @@ export const DirectorTab = () => {
                             <th className="px-4 py-4">Role</th>
 
                             <th className="px-6 py-4">Status</th>
-                            <th className="px-6 py-4">Tier Pay</th>
+                            <th className="px-6 py-4">Salary Class</th>
                             <th className="px-6 py-4 text-right">Actions</th>
                           </tr>
                         </thead>
@@ -2943,7 +2943,7 @@ export const DirectorTab = () => {
                   { field: 'role', label: 'Role' },
                   { field: 'team', label: 'Team Group' },
                   { field: 'manager', label: 'Assigned Manager' },
-                  { field: 'tier_pay', label: 'Tier Pay' },
+                  { field: 'tier_pay', label: 'Salary Class' },
                   { field: 'status', label: 'Roster Status' },
 
                   { field: 'level', label: 'Level Snapshot' }

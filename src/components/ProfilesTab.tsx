@@ -178,11 +178,11 @@ export const ProfilesTab: React.FC<ProfilesTabProps> = ({ isReadOnly = false }) 
           <select
             value={tierFilter}
             onChange={(e) => setTierFilter(e.target.value)}
-            title="Filter by Tier Pay"
-            aria-label="Filter by Tier Pay"
+            title="Filter by Tier"
+            aria-label="Filter by Tier"
             className="pl-9 pr-4 py-2 bg-black/20 border border-white/10 rounded-xl text-xs text-[#F0EFE8] focus:outline-none focus:border-indigo-500/50 w-full appearance-none"
           >
-            <option value="All Tiers">All Tier Pay</option>
+            <option value="All Tiers">All Tiers</option>
             <option value="Star Host">Star Host</option>
             <option value="Rocket Host">Rocket Host</option>
             <option value="S idol">S idol</option>
@@ -221,9 +221,9 @@ export const ProfilesTab: React.FC<ProfilesTabProps> = ({ isReadOnly = false }) 
                   blockStyles.bg
                 )}
               >
-              <div className="relative w-16 h-16 rounded-2xl overflow-hidden bg-black/40 border border-white/10 flex-shrink-0" style={{ aspectRatio: '1 / 1' }}>
+              <div className="relative w-16 h-16 rounded-2xl overflow-hidden bg-black/40 border border-white/10 flex-shrink-0">
                 {host.photoUrl ? (
-                  <img src={host.photoUrl} alt="" className="w-full h-full object-cover" style={{ aspectRatio: '1 / 1', objectFit: 'cover' }} />
+                  <img src={host.photoUrl} alt="" className="w-full h-full object-cover" />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center text-[#A09E9A]/30">
                     <Users size={24} />

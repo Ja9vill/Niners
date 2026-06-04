@@ -87,6 +87,62 @@ const formatBadgeTitle = (title: string) => {
     .replace(/\bDecember\b/i, 'Dec');
 };
 
+const formatDateYYYYMMDD = (dateInput: any) => {
+  if (!dateInput) return '';
+  try {
+    let date: Date;
+    if (dateInput?.seconds) {
+      date = new Date(dateInput.seconds * 1000);
+    } else if (dateInput?.toDate) {
+      date = dateInput.toDate();
+    } else {
+      date = new Date(dateInput);
+    }
+    if (isNaN(date.getTime())) return String(dateInput);
+    const yyyy = date.getFullYear();
+    const mm = String(date.getMonth() + 1).padStart(2, '0');
+    const dd = String(date.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  } catch (e) {
+    return String(dateInput);
+  }
+};
+
+const formatTimeslot = (timeStr: string) => {
+  if (!timeStr) return 'TBA Manila Time PHT';
+  const clean = timeStr.trim();
+  
+  // Extract time part and strip/ignore any existing timezone string to avoid duplicates or misformatting
+  let timePart = clean;
+  const tzMatch = clean.match(/\s*(pht|pst|gmt|utc|est|philippine|manila.*)$/i);
+  if (tzMatch) {
+    timePart = clean.substring(0, tzMatch.index).trim();
+  }
+  
+  let formattedTime = timePart;
+  const ampmMatch = timePart.match(/^(\d{1,2}):(\d{2})\s*([ap]\.?m\.?)/i);
+  if (ampmMatch) {
+    const hours = parseInt(ampmMatch[1], 10);
+    const minutes = ampmMatch[2];
+    const ampm = ampmMatch[3].toUpperCase().replace(/\./g, '');
+    const hoursStr = String(hours).padStart(2, '0');
+    formattedTime = `${hoursStr}:${minutes} ${ampm}`;
+  } else {
+    const match = timePart.match(/^(\d{1,2}):(\d{2})/);
+    if (match) {
+      let hours = parseInt(match[1], 10);
+      const minutes = match[2];
+      const ampm = hours >= 12 ? 'PM' : 'AM';
+      hours = hours % 12;
+      hours = hours ? hours : 12;
+      const hoursStr = String(hours).padStart(2, '0');
+      formattedTime = `${hoursStr}:${minutes} ${ampm}`;
+    }
+  }
+  
+  return `${formattedTime} Manila Time PHT`;
+};
+
 export const RosterTab: React.FC<RosterTabProps> = ({ isReadOnly = false }) => {
   const [hosts, setHosts] = useState<Host[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -265,7 +321,7 @@ export const RosterTab: React.FC<RosterTabProps> = ({ isReadOnly = false }) => {
 
           {/* Tier Pay Blocks */}
           <div className="flex-[2]">
-            <h3 className="text-[10px] font-black uppercase tracking-widest text-[#A09E9A]/50 mb-2 flex items-center gap-1.5"><Star size={12}/> Tier Pay</h3>
+            <h3 className="text-[10px] font-black uppercase tracking-widest text-[#A09E9A]/50 mb-2 flex items-center gap-1.5"><Star size={12}/> Tier Pay Category</h3>
             <div className="flex flex-wrap gap-2">
               {['Star Host', 'Rocket Host', 'S idol', 'Esports', 'Influencer', 'Regular Host'].map(tier => {
                 const isSelected = selectedTiers.includes(tier);
@@ -531,17 +587,16 @@ export const RosterTab: React.FC<RosterTabProps> = ({ isReadOnly = false }) => {
                       <div className="space-y-3">
                         {hostEvents.map((evt, i) => (
                           <div key={i} className="bg-white/5 border border-white/10 p-3 rounded-xl">
-                            <div className="flex justify-between items-start mb-1">
-                              <h4 className="font-bold text-[#F0EFE8] text-sm">{(evt as any).eventTitle || (evt as any).title || 'Event'}</h4>
-                              <span className="text-[10px] font-mono text-emerald-400 bg-emerald-400/10 px-2 py-0.5 rounded border border-emerald-400/20">{(evt as any).status || 'Scheduled'}</span>
+                            <div className="flex justify-between items-start mb-1 gap-3">
+                              <h4 className="font-bold text-[#F0EFE8] text-sm truncate">
+                                {selectedHost.nickname || selectedHost.name} - {evt.eventTitle || evt.title || evt.eventType || evt.description || 'Event'}
+                              </h4>
+                              <span className="text-[10px] font-mono text-emerald-400 bg-emerald-400/10 px-2 py-0.5 rounded border border-emerald-400/20 shrink-0">
+                                {evt.status || 'Scheduled'}
+                              </span>
                             </div>
-                            <div className="text-xs text-[#A09E9A]">
-                              {(evt as any).eventDate || (evt as any).date || (evt as any).startDate || ''} • {(() => {
-                                const t = (evt as any).timeslot || (evt as any).time;
-                                const tz = (evt as any).timezone || 'PHT';
-                                if (t) return `${t} ${tz}`;
-                                return 'TBA';
-                              })()}
+                             <div className="text-xs text-[#A09E9A]">
+                              {formatDateYYYYMMDD(evt.eventDate || evt.date || evt.startDate)} . {formatTimeslot(evt.timeslot || evt.time)}
                             </div>
                           </div>
                         ))}
