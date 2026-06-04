@@ -42,14 +42,61 @@ const getTierBlockStyles = (tierInput: string) => {
   };
 };
 
+const getTierFilterStyle = (tierInput: string, isSelected: boolean) => {
+  if (!isSelected) {
+    return "bg-black/20 text-[#A09E9A] border-white/10 hover:border-white/30 hover:text-[#F0EFE8]";
+  }
+  
+  const lower = String(tierInput || '').toLowerCase();
+  
+  // star host - gold to yellow gold
+  if (lower.includes('star')) return "bg-yellow-500/20 text-yellow-300 border-yellow-500/50 shadow-[0_0_10px_rgba(234,179,8,0.2)]";
+  
+  // rocket host- blue to dark blue
+  if (lower.includes('rocket')) return "bg-blue-600/20 text-blue-300 border-blue-600/50 shadow-[0_0_10px_rgba(37,99,235,0.2)]";
+  
+  // s idol- pink to dark pink
+  if (lower.includes('idol')) return "bg-pink-600/20 text-pink-300 border-pink-600/50 shadow-[0_0_10px_rgba(219,39,119,0.2)]";
+  
+  // esports- purple to violet
+  if (lower.includes('esport')) return "bg-purple-600/20 text-purple-300 border-purple-600/50 shadow-[0_0_10px_rgba(147,51,234,0.2)]";
+  
+  // regular host - green
+  if (lower.includes('regular')) return "bg-green-600/20 text-green-300 border-green-600/50 shadow-[0_0_10px_rgba(22,163,74,0.2)]";
+  
+  // influencer is light yellow and white
+  if (lower.includes('influencer')) return "bg-yellow-100/20 text-yellow-100 border-yellow-100/50 shadow-[0_0_10px_rgba(254,240,138,0.2)]";
+
+  // Default fallback
+  return "bg-indigo-500/20 text-indigo-300 border-indigo-500/50 shadow-[0_0_10px_rgba(99,102,241,0.2)]";
+};
+
+const formatBadgeTitle = (title: string) => {
+  if (!title) return '';
+  return title
+    .replace(/\bJanuary\b/i, 'Jan')
+    .replace(/\bFebruary\b/i, 'Feb')
+    .replace(/\bMarch\b/i, 'Mar')
+    .replace(/\bApril\b/i, 'Apr')
+    .replace(/\bJune\b/i, 'Jun')
+    .replace(/\bJuly\b/i, 'Jul')
+    .replace(/\bAugust\b/i, 'Aug')
+    .replace(/\bSeptember\b/i, 'Sep')
+    .replace(/\bOctober\b/i, 'Oct')
+    .replace(/\bNovember\b/i, 'Nov')
+    .replace(/\bDecember\b/i, 'Dec');
+};
+
 export const RosterTab: React.FC<RosterTabProps> = ({ isReadOnly = false }) => {
   const [hosts, setHosts] = useState<Host[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   // Filters
-  const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
-  const [selectedTiers, setSelectedTiers] = useState<string[]>([]);
+  const [selectedRoles, setSelectedRoles] = useState<string[]>(['Host', 'Team Leader']);
+  const [selectedTiers, setSelectedTiers] = useState<string[]>([
+    'Star Host', 'Rocket Host', 'S idol', 'Esports', 'Influencer', 'Regular Host'
+  ]);
   const [searchTerm, setSearchTerm] = useState('');
 
   // Spotlight State
@@ -80,7 +127,7 @@ export const RosterTab: React.FC<RosterTabProps> = ({ isReadOnly = false }) => {
     try {
       const [events, awards] = await Promise.all([
         FirebaseService.getCalendarEvents(),
-        FirebaseService.getAwards ? FirebaseService.getAwards(host.id) : Promise.resolve([])
+        FirebaseService.getHostAwards ? FirebaseService.getHostAwards(host.id) : Promise.resolve([])
       ]);
 
       // Filter events where host might be involved
@@ -218,7 +265,7 @@ export const RosterTab: React.FC<RosterTabProps> = ({ isReadOnly = false }) => {
 
           {/* Tier Pay Blocks */}
           <div className="flex-[2]">
-            <h3 className="text-[10px] font-black uppercase tracking-widest text-[#A09E9A]/50 mb-2 flex items-center gap-1.5"><Star size={12}/> Tier Pay Category</h3>
+            <h3 className="text-[10px] font-black uppercase tracking-widest text-[#A09E9A]/50 mb-2 flex items-center gap-1.5"><Star size={12}/> Tier Pay</h3>
             <div className="flex flex-wrap gap-2">
               {['Star Host', 'Rocket Host', 'S idol', 'Esports', 'Influencer', 'Regular Host'].map(tier => {
                 const isSelected = selectedTiers.includes(tier);
@@ -231,9 +278,7 @@ export const RosterTab: React.FC<RosterTabProps> = ({ isReadOnly = false }) => {
                     }}
                     className={cn(
                       "px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all border",
-                      isSelected 
-                        ? "bg-indigo-500/20 text-indigo-300 border-indigo-500/50 shadow-[0_0_10px_rgba(99,102,241,0.2)]" 
-                        : "bg-black/20 text-[#A09E9A] border-white/10 hover:border-white/30 hover:text-[#F0EFE8]"
+                      getTierFilterStyle(tier, isSelected)
                     )}
                   >
                     {tier}
@@ -284,9 +329,9 @@ export const RosterTab: React.FC<RosterTabProps> = ({ isReadOnly = false }) => {
                   </span>
                 </div>
 
-                <div className="relative w-16 h-16 rounded-2xl overflow-hidden bg-black/40 border border-white/10 flex-shrink-0 mt-2">
+                <div className="relative w-16 h-16 rounded-2xl overflow-hidden bg-black/40 border border-white/10 flex-shrink-0 mt-2" style={{ aspectRatio: '1 / 1' }}>
                   {host.photoUrl ? (
-                    <img src={host.photoUrl} alt="" className="w-full h-full object-cover" />
+                    <img src={host.photoUrl} alt="" className="w-full h-full object-cover" style={{ aspectRatio: '1 / 1', objectFit: 'cover' }} />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-[#A09E9A]/30">
                       <Users size={24} />
@@ -350,9 +395,9 @@ export const RosterTab: React.FC<RosterTabProps> = ({ isReadOnly = false }) => {
               </button>
 
               <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 sm:gap-6 w-full pt-6 sm:pt-0">
-                <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl bg-black/40 border border-white/10 overflow-hidden shadow-xl shrink-0">
+                <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl bg-black/40 border border-white/10 overflow-hidden shadow-xl shrink-0" style={{ aspectRatio: '1 / 1' }}>
                   {selectedHost.photoUrl ? (
-                    <img src={selectedHost.photoUrl} alt="" className="w-full h-full object-cover" />
+                    <img src={selectedHost.photoUrl} alt="" className="w-full h-full object-cover" style={{ aspectRatio: '1 / 1', objectFit: 'cover' }} />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-[#A09E9A]/30">
                       <Users size={32} />
@@ -518,20 +563,66 @@ export const RosterTab: React.FC<RosterTabProps> = ({ isReadOnly = false }) => {
                     {isSpotlightLoading ? (
                       <div className="flex justify-center py-8"><Loader2 size={24} className="animate-spin text-amber-500/50" /></div>
                     ) : hostAwards.length > 0 ? (
-                      <div className="flex flex-wrap gap-3">
-                        {hostAwards.map((award, i) => (
-                          <div key={i} className="flex flex-col items-center gap-2 bg-gradient-to-b from-amber-500/10 to-transparent border border-amber-500/20 p-3 rounded-xl w-[100px] text-center">
-                            <div className="w-12 h-12 rounded-full bg-amber-500/20 flex items-center justify-center border border-amber-500/40">
-                              <Trophy size={20} className="text-amber-400" />
+                      <div className="flex flex-wrap gap-2.5">
+                        {hostAwards.map((award: any, i: number) => {
+                          const ICON_MAP: Record<string, string> = { trophy: '🏆', star: '⭐', medal: '🥇', crown: '👑', badge: '🎖️' };
+                          const topNinerMatch = award.title?.match(/top\s*(\d+)\s*niner[s]?\s*(?:[-–|:]\s*)?(.+)?/i);
+
+                          if (topNinerMatch) {
+                            const rank = parseInt(topNinerMatch[1], 10);
+                            if (rank <= 9) {
+                              const dateStr = topNinerMatch[2] || (award.dateAwarded ? new Date(award.dateAwarded).getFullYear().toString() : 'Unknown Date');
+                              
+                              // Top 9 Niner Badge (Pure CSS matching leaderboard)
+                              let bgStyle = '';
+                              if (rank === 1) {
+                                bgStyle = 'bg-gradient-to-r from-[#FFD700] via-[#F97316] to-[#EF4444] text-white border-transparent shadow-[0_0_12px_rgba(249,115,22,0.45)] drop-shadow-[0_1.5px_1.5px_rgba(0,0,0,0.8)]';
+                              } else if (rank === 2) {
+                                bgStyle = 'bg-gradient-to-r from-[#facc15]/15 via-[#facc15]/4 to-[#1A1A28]/40 border-[#facc15]/35 text-[#facc15] shadow-md shadow-[#facc15]/5';
+                              } else if (rank === 3) {
+                                bgStyle = 'bg-gradient-to-r from-[#D4AF37]/15 via-[#D4AF37]/4 to-[#1A1A28]/40 border-[#D4AF37]/35 text-[#D4AF37] shadow-md shadow-[#D4AF37]/5';
+                              } else if (rank === 4) {
+                                bgStyle = 'bg-gradient-to-r from-[#fb923c]/15 via-[#fb923c]/4 to-[#1A1A28]/40 border-[#fb923c]/30 text-[#fb923c]';
+                              } else if (rank === 5) {
+                                bgStyle = 'bg-gradient-to-r from-[#f97316]/15 via-[#f97316]/4 to-[#1A1A28]/40 border-[#f97316]/30 text-[#f97316]';
+                              } else if (rank === 6) {
+                                bgStyle = 'bg-gradient-to-r from-[#ea580c]/15 via-[#ea580c]/4 to-[#1A1A28]/40 border-[#ea580c]/30 text-[#ea580c]';
+                              } else if (rank === 7) {
+                                bgStyle = 'bg-gradient-to-r from-[#f87171]/15 via-[#f87171]/4 to-[#1A1A28]/40 border-[#f87171]/30 text-[#f87171]';
+                              } else if (rank === 8) {
+                                bgStyle = 'bg-gradient-to-r from-[#ef4444]/15 via-[#ef4444]/4 to-[#1A1A28]/40 border-[#ef4444]/30 text-[#ef4444]';
+                              } else if (rank === 9) {
+                                bgStyle = 'bg-gradient-to-r from-[#dc2626]/15 via-[#dc2626]/4 to-[#1A1A28]/40 border-[#dc2626]/30 text-[#dc2626]';
+                              }
+
+                              return (
+                                <div key={i} className={cn("relative group flex items-center justify-center rounded-xl px-4 py-0.5 h-[28px] cursor-pointer transition-transform hover:scale-105 border min-w-[110px]", bgStyle)}>
+                                  <span className="font-black uppercase tracking-widest text-[10px] text-center px-1">
+                                    {formatBadgeTitle(award.title || award.name || award.awardName || `Top ${rank} Niner`)}
+                                  </span>
+                                  {/* CSS Tooltip */}
+                                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 group-hover:opacity-100 transition-all duration-200 transform translate-y-1 group-hover:translate-y-0 bg-[#0F0F1A] border border-white/10 text-[#F0EFE8] text-[10px] font-bold px-2.5 py-1.5 rounded-lg shadow-xl whitespace-nowrap pointer-events-none z-[100] flex flex-col items-center gap-0.5">
+                                    <span className="font-black text-[#D4AF37] uppercase tracking-widest text-[8px]">Monthly Honors</span>
+                                    <span className="font-mono text-[#A09E9A]">{dateStr}</span>
+                                    {award.description && <span className="text-[9px] font-normal text-white/60">{award.description}</span>}
+                                  </div>
+                                </div>
+                              );
+                            }
+                          }
+
+                          // Legacy Award Badge
+                          return (
+                            <div key={i} className="flex flex-col items-center gap-1.5 bg-[#0D0D14] border border-[#D4AF37]/15 rounded-xl p-3 w-[88px] text-center hover:border-[#D4AF37]/40 transition-all group relative overflow-hidden">
+                              <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-[#D4AF37]/50 to-transparent" />
+                              <span className="text-2xl group-hover:scale-110 transition-transform inline-block mt-1">{ICON_MAP[award.iconType] || '🎖️'}</span>
+                              <p className="text-[8px] font-black text-[#F0EFE8] leading-tight mt-1">{formatBadgeTitle(award.title || award.name || award.awardName)}</p>
+                              {(award.dateAwarded || award.awardedAt) && (
+                                <p className="text-[7px] text-[#A09E9A]/40 font-mono">{new Date(award.dateAwarded || award.awardedAt).getFullYear()}</p>
+                              )}
                             </div>
-                            <div className="text-[10px] font-bold text-amber-100 leading-tight">
-                              {award.title}
-                            </div>
-                            <div className="text-[9px] font-mono text-amber-500/50">
-                              {award.dateAwarded || (award as any).awardedAt ? new Date((award.dateAwarded || (award as any).awardedAt)).getFullYear() : '—'}
-                            </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     ) : (
                       <div className="text-center py-12 text-[#A09E9A]/40 text-xs italic">

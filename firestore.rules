@@ -64,6 +64,11 @@ service cloud.firestore {
       allow read: if true;
       allow create, delete: if isLeadership();
       allow update: if isLeadership() || (isSignedIn() && request.auth.uid == userId);
+
+      match /host_awards/{awardId} {
+        allow read: if isSignedIn();
+        allow write: if isDirector() || isHeadAdmin() || isLeadership();
+      }
     }
     match /manager/{userId} {
       allow read: if true;
@@ -194,6 +199,10 @@ service cloud.firestore {
 
     // 8. Awards & Assignments
     match /awards/{awardId} {
+      allow read: if isSignedIn();
+      allow write: if isDirector() || isHeadAdmin() || isLeadership();
+    }
+    match /host_awards/{awardId} {
       allow read: if isSignedIn();
       allow write: if isDirector() || isHeadAdmin() || isLeadership();
     }

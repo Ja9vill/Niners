@@ -3,6 +3,7 @@ import { LayoutDashboard, Loader2, TrendingUp, Users, Star, Zap, Award, Clock } 
 import { FirebaseService } from '../lib/firebaseService';
 import { Host } from '../types';
 import { OverviewTab } from '../NineDashboardV1';
+import { HostProfileView } from '../components/HostProfileView';
 import { cn } from '../lib/utils';
 import { Storage } from '../lib/storage';
 import { BarChart, Bar, AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, LineChart, Line, CartesianGrid } from 'recharts';
@@ -65,6 +66,17 @@ export const Overview = () => {
   const [selectedMonth, setSelectedMonth] = useState<string>('all');
   const [chartType, setChartType] = useState<'area' | 'bar'>('area');
   const [selectedMonthData, setSelectedMonthData] = useState<any | null>(null);
+  const [lbYear, setLbYear] = useState<string>('all');
+  const [lbMonth, setLbMonth] = useState<string>('all');
+  const [spotlightHost, setSpotlightHost] = useState<Host | null>(null);
+  const [showRecords, setShowRecords] = useState<boolean>(false);
+  const [recordsSortOption, setRecordsSortOption] = useState<'default' | 'name' | 'share'>('default');
+  const [selectedTierForList, setSelectedTierForList] = useState<string | null>(null);
+
+  const handleSpotlightClick = (poppoId: string) => {
+    const host = hosts.find(h => String(h.poppo_id || h.id || h.poppoId) === String(poppoId));
+    if (host) setSpotlightHost(host);
+  };
 
   useEffect(() => {
     const fetchData = async () => {
@@ -167,6 +179,15 @@ export const Overview = () => {
     });
   }, [reports, selectedYear, selectedMonth]);
 
+  // Leaderboard specific filtered reports
+  const lbReports = useMemo(() => {
+    return reports.filter(r => {
+      if (lbYear !== 'all' && String(r.year) !== lbYear) return false;
+      if (lbMonth !== 'all' && r.monthName !== lbMonth) return false;
+      return true;
+    });
+  }, [reports, lbYear, lbMonth]);
+
   // Agency-wide KPIs
   const totalPoints = useMemo(() =>
     filteredReports.reduce((sum, r) => sum + getPoints(r), 0)
@@ -197,17 +218,22 @@ export const Overview = () => {
 
   // Top performers — resolve nickname from hostLookup first
   const topPerformers = useMemo(() => {
-    const byHost: Record<string, { poppoId: string; name: string; points: number; liveHrs: number; months: number }> = {};
-    filteredReports.forEach(r => {
+    const byHost: Record<string, { poppoId: string; name: string; points: number; liveHrs: number; months: number; commission: number }> = {};
+    lbReports.forEach(r => {
       const id = r.poppoId;
       const name = hostLookup.get(String(id)) || r.hostName || id;
-      if (!byHost[id]) byHost[id] = { poppoId: id, name, points: 0, liveHrs: 0, months: 0 };
+      if (!byHost[id]) byHost[id] = { poppoId: id, name, points: 0, liveHrs: 0, months: 0, commission: 0 };
       byHost[id].points += getPoints(r);
       byHost[id].liveHrs += getLiveDuration(r);
       byHost[id].months += 1;
+      byHost[id].commission += getAgentComm(r);
     });
     return Object.values(byHost).sort((a, b) => b.points - a.points);
-  }, [filteredReports, hostLookup]);
+  }, [lbReports, hostLookup]);
+
+  const lbTotalPeriodCommission = useMemo(() => {
+    return lbReports.reduce((sum, r) => sum + getAgentComm(r), 0);
+  }, [lbReports]);
 
   // Monthly trend data
   const monthlyTrend = useMemo(() => {
@@ -238,48 +264,72 @@ export const Overview = () => {
     return map;
   }, [reports]);
 
-  // Compute Base Salary Tiers dynamically from ALL roles
-  const baseSalaryTiers = useMemo(() => {
-    const counts: Record<string, number> = {};
+  const sortedReports = useMemo(() => {
+    const data = [...reports];
+    if (recordsSortOption === 'name') {
+      data.sort((a, b) => {
+        const nameA = (hostLookup.get(String(a.poppoId)) || a.hostName || a.poppoId || '').toLowerCase();
+        const nameB = (hostLookup.get(String(b.poppoId)) || b.hostName || b.poppoId || '').toLowerCase();
+        return nameA.localeCompare(nameB);
+      });
+    } else if (recordsSortOption === 'share') {
+      data.sort((a, b) => {
+        const keyA = `${a.monthName} ${a.year}`;
+        const totalA = monthlyTotalCommission.get(keyA) || 0;
+        const hostCommA = getAgentComm(a);
+        const pctA = totalA > 0 ? (hostCommA / totalA) : 0;
+
+        const keyB = `${b.monthName} ${b.year}`;
+        const totalB = monthlyTotalCommission.get(keyB) || 0;
+        const hostCommB = getAgentComm(b);
+        const pctB = totalB > 0 ? (hostCommB / totalB) : 0;
+
+        if (pctB !== pctA) {
+          return pctB - pctA;
+        }
+        const nameA = (hostLookup.get(String(a.poppoId)) || a.hostName || a.poppoId || '').toLowerCase();
+        const nameB = (hostLookup.get(String(b.poppoId)) || b.hostName || b.poppoId || '').toLowerCase();
+        return nameA.localeCompare(nameB);
+      });
+    } else {
+      data.sort((a, b) => {
+        if (a.year !== b.year) return Number(b.year) - Number(a.year);
+        return MONTH_ORDER.indexOf(b.monthName) - MONTH_ORDER.indexOf(a.monthName);
+      });
+    }
+    return data;
+  }, [reports, recordsSortOption, hostLookup, monthlyTotalCommission]);
+
+  // Compute Base Salary Tiers strictly for S idol, Esports, Star Host, Rocket Host
+  const baseSalaryTiersData = useMemo(() => {
+    const data: Record<string, { count: number; hosts: Host[] }> = {
+      'S idol': { count: 0, hosts: [] },
+      'Esports': { count: 0, hosts: [] },
+      'Star Host': { count: 0, hosts: [] },
+      'Rocket Host': { count: 0, hosts: [] }
+    };
+    
     hosts.forEach(h => {
       const tierRaw = h.tier_pay || (h as any).tierPay || (h as any).tier_Pay;
       if (!tierRaw) return;
+      const tierLower = String(tierRaw).trim().toLowerCase();
       
-      const tierClean = String(tierRaw).trim();
-      const tierLower = tierClean.toLowerCase();
-      
-      if (tierLower === 'regular host' || tierLower === '' || tierLower === 'none' || tierLower === 'null') return;
-      
-      const words = tierClean.split(' ');
-      const displayTier = words.map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
-      
-      counts[displayTier] = (counts[displayTier] || 0) + 1;
+      if (tierLower.includes('s idol') || tierLower.includes('sidol')) {
+        data['S idol'].count++;
+        data['S idol'].hosts.push(h);
+      } else if (tierLower.includes('esports')) {
+        data['Esports'].count++;
+        data['Esports'].hosts.push(h);
+      } else if (tierLower.includes('star')) {
+        data['Star Host'].count++;
+        data['Star Host'].hosts.push(h);
+      } else if (tierLower.includes('rocket')) {
+        data['Rocket Host'].count++;
+        data['Rocket Host'].hosts.push(h);
+      }
     });
     
-    const defaultColors = ['#facc15', '#22d3ee', '#ec4899', '#a855f7', '#10b981', '#f97316', '#3b82f6'];
-    
-    return Object.entries(counts)
-      .sort((a, b) => b[1] - a[1]) // Sort by count descending
-      .map(([label, value], i) => {
-        const lblLow = label.toLowerCase();
-        let color = defaultColors[i % defaultColors.length];
-        let textColorGradient = undefined;
-        
-        if (lblLow.includes('rocket')) {
-          color = '#38bdf8'; // light sky blue base
-          textColorGradient = 'linear-gradient(to right, #7dd3fc, #1e3a8a)'; // lightblue to dark blue
-        } else if (lblLow.includes('idol')) {
-          color = '#f472b6'; // pink base
-          textColorGradient = 'linear-gradient(to right, #fbcfe8, #be185d)'; // light pink to dark pink
-        }
-
-        return {
-          label,
-          value,
-          color,
-          textColorGradient
-        };
-      });
+    return data;
   }, [hosts]);
 
   // Keep spotlight synchronized when monthlyTrend loads/re-calculates
@@ -320,56 +370,64 @@ export const Overview = () => {
 
   const CHART_COLORS = ['#D4AF37','#6366f1','#ec4899','#10b981','#f59e0b','#06b6d4','#a78bfa'];
 
-  const agencyMetrics = [
-    {
-      title: "Agency Revenue",
-      theme: "from-amber-500/20 to-orange-500/5 hover:border-amber-400/50",
-      items: [
-        { label: 'Total Agency Points', value: formatPts(sum(getPoints)), icon: Star, color: '#D4AF37' },
-        { label: 'Agency Commission', value: formatPts(sum(getAgentComm)), icon: Award, color: '#CA8A04' }
-      ]
-    },
-    {
-      title: "Agency Members Incentives",
-      theme: "from-orange-500/20 to-red-500/5 hover:border-orange-400/50",
-      items: [
-        { label: 'Super Salary', value: formatPts(sum(getSuperSalary)), icon: Zap, color: '#C2410C' },
-        { label: 'Super Rank', value: formatPts(sum(getSuperRank)), icon: TrendingUp, color: '#B45309' }
-      ]
-    },
-    {
-      title: "Members Activeness",
-      theme: "from-red-500/20 to-rose-500/5 hover:border-red-400/50",
-      items: [
-        { label: 'Active Hosts', value: String(uniqueHosts), icon: Users, color: '#0E7490' },
-        { label: 'Total Live Hours', value: fmtH(sum(getLiveDuration)), icon: Clock, color: '#0F766E' }
-      ]
-    }
-  ];
-
   return (
     <div className="flex flex-col gap-6">
       {/* INJECTED DYNAMIC CSS TO BYPASS INLINE STYLES LINTER */}
       <style>{`
-        ${baseSalaryTiers.map((item, i) => `
-          .bg-radial-base-${i} { background: radial-gradient(circle at center, ${item.color} 0%, transparent 70%); }
-          .text-base-${i} { color: ${item.color}; }
-          .text-grad-base-${i} { 
-            background-image: ${item.textColorGradient};
-            background-clip: text;
-            -webkit-background-clip: text;
-            color: transparent;
-            -webkit-text-fill-color: transparent;
-          }
-          .line-base-${i} { background-color: ${item.color}; }
-        `).join('\n')}
-        
-        ${agencyMetrics.map((row, rIdx) => row.items.map((item, iIdx) => `
-          .bg-radial-metric-${rIdx}-${iIdx} { background: radial-gradient(circle at right, ${item.color} 0%, transparent 70%); }
-          .bg-icon-metric-${rIdx}-${iIdx} { background-color: ${item.color}1A; border-color: ${item.color}33; }
-          .text-metric-${rIdx}-${iIdx} { color: ${item.color}; }
-          .line-metric-${rIdx}-${iIdx} { background-color: ${item.color}; }
-        `).join('\n')).join('\n')}
+        .global-block-1 {
+          background: linear-gradient(to bottom right, #3A2A18, #221A15);
+          border: 1px solid rgba(255, 184, 0, 0.12);
+        }
+        .global-block-1:hover {
+          border-color: rgba(255, 184, 0, 0.35);
+        }
+        .global-block-2 {
+          background: linear-gradient(to bottom right, #3D221C, #221515);
+          border: 1px solid rgba(255, 123, 0, 0.12);
+        }
+        .global-block-2:hover {
+          border-color: rgba(255, 123, 0, 0.35);
+        }
+        .global-block-3 {
+          background: linear-gradient(to bottom right, #3A1C28, #20131A);
+          border: 1px solid rgba(255, 59, 92, 0.12);
+        }
+        .global-block-3:hover {
+          border-color: rgba(255, 59, 92, 0.35);
+        }
+
+        .global-tier-1 {
+          background: linear-gradient(to bottom right, #3B1B3A, #1A101C);
+          border: 1px solid rgba(245, 0, 87, 0.15);
+        }
+        .global-tier-1:hover, .global-tier-1.active-tier {
+          border-color: rgba(245, 0, 87, 0.45);
+          box-shadow: 0 0 10px rgba(245, 0, 87, 0.1);
+        }
+        .global-tier-2 {
+          background: linear-gradient(to bottom right, #2E203B, #17111E);
+          border: 1px solid rgba(213, 0, 249, 0.15);
+        }
+        .global-tier-2:hover, .global-tier-2.active-tier {
+          border-color: rgba(213, 0, 249, 0.45);
+          box-shadow: 0 0 10px rgba(213, 0, 249, 0.1);
+        }
+        .global-tier-3 {
+          background: linear-gradient(to bottom right, #373322, #1B1A12);
+          border: 1px solid rgba(255, 234, 0, 0.15);
+        }
+        .global-tier-3:hover, .global-tier-3.active-tier {
+          border-color: rgba(255, 234, 0, 0.45);
+          box-shadow: 0 0 10px rgba(255, 234, 0, 0.1);
+        }
+        .global-tier-4 {
+          background: linear-gradient(to bottom right, #1E2838, #0E131C);
+          border: 1px solid rgba(0, 229, 255, 0.15);
+        }
+        .global-tier-4:hover, .global-tier-4.active-tier {
+          border-color: rgba(0, 229, 255, 0.45);
+          box-shadow: 0 0 10px rgba(0, 229, 255, 0.1);
+        }
       `}</style>
 
       {/* Base Salary Tiers Block */}
@@ -377,34 +435,82 @@ export const Overview = () => {
         {/* Subtle background glow for the entire section */}
         <div className="absolute -top-24 -left-24 w-48 h-48 bg-[#D4AF37]/5 blur-3xl rounded-full pointer-events-none"></div>
         <div className="absolute -bottom-24 -right-24 w-48 h-48 bg-indigo-500/5 blur-3xl rounded-full pointer-events-none"></div>
+        
         <p className="text-[9px] font-black text-[#A09E9A] uppercase tracking-[0.2em] mb-4 relative z-10 flex items-center gap-2">
           <span className="w-1.5 h-1.5 rounded-full bg-[#D4AF37] animate-pulse"></span>
-          Base Salary Tiers
+          BASE SALARY TIERS
         </p>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 relative z-10">
-          {baseSalaryTiers.map((item, i) => (
-            <div
-              key={i}
-              className="relative overflow-hidden rounded-xl p-4 flex flex-col items-center justify-center text-center transition-all duration-300 group hover:-translate-y-1 cursor-default shadow-[0_8px_16px_rgba(0,0,0,0.3)] backdrop-blur-sm bg-gradient-to-br from-slate-800 to-[#0D0D14] border-0"
-            >
+
+        <div className="grid grid-cols-4 gap-3 relative z-10">
+          {[
+            { label: 'S idol', key: 'S idol', class: 'global-tier-1', color: '#F50057' },
+            { label: 'Esports', key: 'Esports', class: 'global-tier-2', color: '#D500F9' },
+            { label: 'Star Host', key: 'Star Host', class: 'global-tier-3', color: '#FFEA00' },
+            { label: 'Rocket Host', key: 'Rocket Host', class: 'global-tier-4', color: '#00E5FF' }
+          ].map((item, idx) => {
+            const dataVal = baseSalaryTiersData[item.key];
+            const isActive = selectedTierForList === item.key;
+            return (
               <div
-                className={`absolute inset-0 opacity-0 group-hover:opacity-10 transition-opacity duration-500 pointer-events-none bg-radial-base-${i}`} 
-              />
-              <p className="text-[10px] font-black uppercase tracking-widest leading-tight mb-2 whitespace-pre-line drop-shadow-sm text-[#9CA3AF] z-10 transition-colors group-hover:text-white">
-                {item.label}
-              </p>
-              <p
-                className={`text-3xl font-black leading-none drop-shadow-md z-10 ${item.textColorGradient ? 'text-grad-base-' + i : 'text-base-' + i}`} 
+                key={idx}
+                onClick={() => setSelectedTierForList(isActive ? null : item.key)}
+                className={cn(
+                  "relative overflow-hidden flex flex-col items-center justify-center text-center rounded-xl px-2 py-3 transition-all duration-300 group cursor-pointer border select-none hover:-translate-y-0.5",
+                  item.class,
+                  isActive && "active-tier"
+                )}
               >
-                {item.value}
-              </p>
-              {/* Bottom accent line */}
-              <div
-                className={`absolute bottom-0 left-0 h-[3px] w-0 group-hover:w-full transition-all duration-500 ease-out line-base-${i}`}
-              ></div>
-            </div>
-          ))}
+                <p className="text-[8px] sm:text-[10px] font-black uppercase tracking-widest leading-tight mb-2 text-[#A09E9A] drop-shadow-md z-10 transition-colors group-hover:text-white">
+                  {item.label}
+                </p>
+                <p
+                  className="text-sm sm:text-2xl md:text-3xl font-black leading-none drop-shadow-md z-10"
+                  style={{ color: item.color }}
+                >
+                  {dataVal?.count || 0}
+                </p>
+              </div>
+            );
+          })}
         </div>
+
+        {/* Expanded Tier Members List */}
+        {selectedTierForList && (
+          <div className="bg-[#0D0D14]/95 border border-[#D4AF37]/15 rounded-xl p-4 mt-3 transition-all duration-300 relative z-10">
+            <div className="flex items-center justify-between mb-3 border-b border-white/5 pb-2">
+              <p className="text-[10px] font-black text-[#A09E9A] uppercase tracking-wider">
+                {selectedTierForList} Tier Members ({baseSalaryTiersData[selectedTierForList]?.hosts.length || 0})
+              </p>
+              <button
+                onClick={() => setSelectedTierForList(null)}
+                className="text-[#A09E9A] hover:text-white text-[10px] uppercase font-bold cursor-pointer"
+              >
+                ✕ Close
+              </button>
+            </div>
+            {baseSalaryTiersData[selectedTierForList]?.hosts.length === 0 ? (
+              <p className="text-xs text-[#A09E9A]/50 italic py-2">No members in this tier category.</p>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 max-h-48 overflow-y-auto pr-1">
+                {baseSalaryTiersData[selectedTierForList]?.hosts.map((h, idx) => {
+                  const nickname = h.nickname || h.name || 'Unnamed';
+                  return (
+                    <div
+                      key={h.id || idx}
+                      onClick={() => handleSpotlightClick((h as any).poppo_id || h.id || '')}
+                      className="bg-white/[0.02] hover:bg-white/[0.06] border border-white/5 hover:border-[#D4AF37]/20 rounded-lg px-3 py-2 cursor-pointer transition-all duration-200 flex items-center gap-2 group/member"
+                    >
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 opacity-65 group-hover/member:scale-125 transition-transform"></span>
+                      <span className="text-xs font-black text-[#F0EFE8] truncate group-hover/member:text-[#D4AF37]">
+                        {nickname}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Header with Filters */}
@@ -416,77 +522,124 @@ export const Overview = () => {
             <p className="text-xs text-[#A09E9A] font-mono">{reports.length} performance records loaded</p>
           </div>
         </div>
+        
+        <div className="flex items-center gap-2">
+          <select
+            title="Filter by Year"
+            value={selectedYear}
+            onChange={e => setSelectedYear(e.target.value)}
+            className="bg-[#0D0D14] border border-[#D4AF37]/20 rounded-lg px-3 py-1.5 text-xs font-bold text-[#F0EFE8] outline-none focus:border-[#D4AF37] cursor-pointer shadow-inner"
+          >
+            <option value="all">All Years</option>
+            {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
+          </select>
+          <select
+            title="Filter by Month"
+            value={selectedMonth}
+            onChange={e => setSelectedMonth(e.target.value)}
+            className="bg-[#0D0D14] border border-[#D4AF37]/20 rounded-lg px-3 py-1.5 text-xs font-bold text-[#F0EFE8] outline-none focus:border-[#D4AF37] cursor-pointer shadow-inner"
+          >
+            <option value="all">All Months</option>
+            {MONTH_ORDER.map(m => <option key={m} value={m}>{m}</option>)}
+          </select>
+        </div>
       </div>
 
       {/* Agency Performance Metrics */}
-      <div className="bg-[#1A1A28]/80 backdrop-blur-md border border-[#D4AF37]/15 shadow-2xl rounded-2xl p-5 relative overflow-hidden">
+      <div className="bg-[#1A1A28]/80 backdrop-blur-md border border-[#D4AF37]/15 shadow-2xl rounded-2xl p-4 sm:p-5 relative overflow-hidden">
         {/* Subtle background glow for the entire section */}
         <div className="absolute -top-24 -right-24 w-48 h-48 bg-[#D4AF37]/5 blur-3xl rounded-full pointer-events-none"></div>
-        <p className="text-[9px] font-black text-[#A09E9A] uppercase tracking-[0.2em] mb-5 relative z-10 flex items-center gap-2">
+        <p className="text-[9px] font-black text-[#A09E9A] uppercase tracking-[0.2em] mb-4 sm:mb-5 relative z-10 flex items-center gap-2">
           <span className="w-1.5 h-1.5 rounded-full bg-[#D4AF37] animate-pulse"></span>
-          Agency Performance Metrics
+          AGENCY PERFORMANCE METRICS
         </p>
-        
-        <div className="flex flex-col gap-6 relative z-10">
-          {agencyMetrics.map((row, rowIdx) => (
-            <div key={rowIdx} className="flex flex-col gap-3">
-              <h4 className="text-[10px] font-bold text-[#A09E9A] uppercase tracking-widest pl-2 border-l-2 border-[#D4AF37]/30">{row.title}</h4>
-              <div className="grid grid-cols-2 gap-4">
-                {row.items.map((item, i) => {
-                  const Icon = item.icon;
-                  return (
-                    <div
-                      key={i}
-                      className={`relative overflow-hidden rounded-xl p-4 flex items-center gap-4 transition-all duration-300 group hover:-translate-y-1 cursor-default shadow-lg backdrop-blur-sm bg-gradient-to-br border border-white/5 ${row.theme}`}
-                    >
-                      <div
-                        className={`absolute inset-0 opacity-0 group-hover:opacity-10 transition-opacity duration-500 pointer-events-none bg-radial-metric-${rowIdx}-${i}`} 
-                      />
-                      <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 border bg-icon-metric-${rowIdx}-${i}`}>
-                        <Icon size={20} className={`text-metric-${rowIdx}-${i}`} />
-                      </div>
-                      <div>
-                        <p className="text-[10px] font-black uppercase tracking-widest leading-tight mb-1 drop-shadow-sm text-[#9CA3AF] z-10 transition-colors group-hover:text-white">
-                          {item.label}
-                        </p>
-                        <p className={`text-2xl sm:text-3xl font-black leading-none drop-shadow-md z-10 text-metric-${rowIdx}-${i}`}>
-                          {item.value}
-                        </p>
-                      </div>
-                      {/* Left accent line */}
-                      <div
-                        className={`absolute left-0 top-0 w-[3px] h-0 group-hover:h-full transition-all duration-500 ease-out line-metric-${rowIdx}-${i}`}
-                      ></div>
-                    </div>
-                  );
-                })}
-              </div>
+
+        <div className="grid grid-cols-3 gap-3 relative z-10">
+          {/* COLUMN 1: REVENUE */}
+          <div className="flex flex-col gap-2.5 min-w-0">
+            <h4 className="text-[9px] sm:text-[10px] font-bold text-[#A09E9A] uppercase tracking-widest pl-2 border-l-2 border-[#FFB800]/40 mb-1">
+              REVENUE
+            </h4>
+            
+            {/* Row 1 Block 1: Total Agency Pts. */}
+            <div className="global-block-1 relative overflow-hidden rounded-xl p-2.5 sm:p-4 flex flex-col justify-between min-h-[84px] sm:min-h-[104px] transition-all duration-300 group hover:-translate-y-0.5 shadow-lg border">
+              <Star className="absolute top-2 right-2 w-4 h-4 opacity-[0.07] pointer-events-none" style={{ color: '#FFB800' }} />
+              <p className="text-[8px] sm:text-[10px] font-black uppercase tracking-wider text-[#A09E9A] leading-tight pr-4">
+                Total Agency Pts.
+              </p>
+              <p className="text-sm sm:text-2xl md:text-3xl font-black leading-none mt-2 truncate" style={{ color: '#FFB800' }}>
+                {formatPts(sum(getPoints))}
+              </p>
             </div>
-          ))}
-        </div>
-        
-        {/* Contextual Date Filters Relocated Here */}
-        <div className="mt-8 pt-4 border-t border-[#D4AF37]/10 flex items-center justify-between flex-wrap gap-4 relative z-10">
-          <p className="text-[10px] font-black text-[#A09E9A] uppercase tracking-widest">Filter Performance Data</p>
-          <div className="flex items-center gap-2">
-            <select
-              title="Filter by Year"
-              value={selectedYear}
-              onChange={e => setSelectedYear(e.target.value)}
-              className="bg-[#0D0D14] border border-[#D4AF37]/20 rounded-lg px-3 py-1.5 text-xs font-bold text-[#F0EFE8] outline-none focus:border-[#D4AF37] cursor-pointer shadow-inner"
-            >
-              <option value="all">All Years</option>
-              {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
-            </select>
-            <select
-              title="Filter by Month"
-              value={selectedMonth}
-              onChange={e => setSelectedMonth(e.target.value)}
-              className="bg-[#0D0D14] border border-[#D4AF37]/20 rounded-lg px-3 py-1.5 text-xs font-bold text-[#F0EFE8] outline-none focus:border-[#D4AF37] cursor-pointer shadow-inner"
-            >
-              <option value="all">All Months</option>
-              {MONTH_ORDER.map(m => <option key={m} value={m}>{m}</option>)}
-            </select>
+
+            {/* Row 2 Block 1: Agency Commission */}
+            <div className="global-block-1 relative overflow-hidden rounded-xl p-2.5 sm:p-4 flex flex-col justify-between min-h-[84px] sm:min-h-[104px] transition-all duration-300 group hover:-translate-y-0.5 shadow-lg border">
+              <Award className="absolute top-2 right-2 w-4 h-4 opacity-[0.07] pointer-events-none" style={{ color: '#FFB800' }} />
+              <p className="text-[8px] sm:text-[10px] font-black uppercase tracking-wider text-[#A09E9A] leading-tight pr-4">
+                Agency Commission
+              </p>
+              <p className="text-sm sm:text-2xl md:text-3xl font-black leading-none mt-2 truncate" style={{ color: '#FFB800' }}>
+                {formatPts(sum(getAgentComm))}
+              </p>
+            </div>
+          </div>
+
+          {/* COLUMN 2: INCENTIVES */}
+          <div className="flex flex-col gap-2.5 min-w-0">
+            <h4 className="text-[9px] sm:text-[10px] font-bold text-[#A09E9A] uppercase tracking-widest pl-2 border-l-2 border-[#FF7B00]/40 mb-1">
+              INCENTIVES
+            </h4>
+
+            {/* Row 1 Block 2: Super Salary */}
+            <div className="global-block-2 relative overflow-hidden rounded-xl p-2.5 sm:p-4 flex flex-col justify-between min-h-[84px] sm:min-h-[104px] transition-all duration-300 group hover:-translate-y-0.5 shadow-lg border">
+              <Zap className="absolute top-2 right-2 w-4 h-4 opacity-[0.07] pointer-events-none" style={{ color: '#FF7B00' }} />
+              <p className="text-[8px] sm:text-[10px] font-black uppercase tracking-wider text-[#A09E9A] leading-tight pr-4">
+                Super Salary
+              </p>
+              <p className="text-sm sm:text-2xl md:text-3xl font-black leading-none mt-2 truncate" style={{ color: '#FF7B00' }}>
+                {formatPts(sum(getSuperSalary))}
+              </p>
+            </div>
+
+            {/* Row 2 Block 2: Super Rank */}
+            <div className="global-block-2 relative overflow-hidden rounded-xl p-2.5 sm:p-4 flex flex-col justify-between min-h-[84px] sm:min-h-[104px] transition-all duration-300 group hover:-translate-y-0.5 shadow-lg border">
+              <TrendingUp className="absolute top-2 right-2 w-4 h-4 opacity-[0.07] pointer-events-none" style={{ color: '#FF7B00' }} />
+              <p className="text-[8px] sm:text-[10px] font-black uppercase tracking-wider text-[#A09E9A] leading-tight pr-4">
+                Super Rank
+              </p>
+              <p className="text-sm sm:text-2xl md:text-3xl font-black leading-none mt-2 truncate" style={{ color: '#FF7B00' }}>
+                {formatPts(sum(getSuperRank))}
+              </p>
+            </div>
+          </div>
+
+          {/* COLUMN 3: ACTIVE MEMBERS */}
+          <div className="flex flex-col gap-2.5 min-w-0">
+            <h4 className="text-[9px] sm:text-[10px] font-bold text-[#A09E9A] uppercase tracking-widest pl-2 border-l-2 border-[#FF3B5C]/40 mb-1">
+              ACTIVE MEMBERS
+            </h4>
+
+            {/* Row 1 Block 3: Active Host */}
+            <div className="global-block-3 relative overflow-hidden rounded-xl p-2.5 sm:p-4 flex flex-col justify-between min-h-[84px] sm:min-h-[104px] transition-all duration-300 group hover:-translate-y-0.5 shadow-lg border">
+              <Users className="absolute top-2 right-2 w-4 h-4 opacity-[0.07] pointer-events-none" style={{ color: '#FF3B5C' }} />
+              <p className="text-[8px] sm:text-[10px] font-black uppercase tracking-wider text-[#A09E9A] leading-tight pr-4">
+                Active Host
+              </p>
+              <p className="text-sm sm:text-2xl md:text-3xl font-black leading-none mt-2 truncate" style={{ color: '#FF3B5C' }}>
+                {String(uniqueHosts)}
+              </p>
+            </div>
+
+            {/* Row 2 Block 3: Total Live Hours */}
+            <div className="global-block-3 relative overflow-hidden rounded-xl p-2.5 sm:p-4 flex flex-col justify-between min-h-[84px] sm:min-h-[104px] transition-all duration-300 group hover:-translate-y-0.5 shadow-lg border">
+              <Clock className="absolute top-2 right-2 w-4 h-4 opacity-[0.07] pointer-events-none" style={{ color: '#FF3B5C' }} />
+              <p className="text-[8px] sm:text-[10px] font-black uppercase tracking-wider text-[#A09E9A] leading-tight pr-4">
+                Total Live Hours
+              </p>
+              <p className="text-sm sm:text-2xl md:text-3xl font-black leading-none mt-2 truncate" style={{ color: '#FF3B5C' }}>
+                {fmtH(sum(getLiveDuration))}
+              </p>
+            </div>
           </div>
         </div>
       </div>
@@ -593,192 +746,272 @@ export const Overview = () => {
             )}
           </div>
 
-          {selectedMonthData && (() => {
-            const currentAuth = Storage.getAuthState();
-            const [mName, yStr] = selectedMonthData.label.split(' ');
-            const userMonthReports = reports.filter(r => 
-              String(r.poppoId) === String(currentAuth?.poppo_id) &&
-              r.monthName === mName &&
-              String(r.year) === yStr
-            );
-            const userComm = userMonthReports.reduce((sum, r) => sum + getAgentComm(r), 0);
-            const totalMonthComm = monthlyTotalCommission.get(selectedMonthData.label) || 0;
-            const sharePct = totalMonthComm > 0 ? (userComm / totalMonthComm) * 100 : 0;
-            const hasContribution = userComm > 0;
-
-            return (
-              <div className="mt-4 p-4 bg-[#0D0D14] border border-[#D4AF37]/15 rounded-xl flex flex-col gap-2.5 transition-all animate-fade-in">
-                <div className="flex items-center justify-between flex-wrap gap-3">
-                  <div>
-                    <p className="text-[10px] font-black text-[#A09E9A] uppercase tracking-wider">Spotlight: {selectedMonthData.label}</p>
-                    <p className="text-base font-black text-[#D4AF37] mt-0.5">{Number(selectedMonthData.points).toLocaleString()} Points</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-[10px] font-bold text-[#A09E9A]/60 uppercase tracking-widest">YOUR SHARE CONTRIBUTION OF SELECTED PERIOD</p>
-                    {hasContribution ? (
-                      <p className="text-base font-black text-white mt-0.5">
-                        {sharePct.toFixed(2)}% <span className="text-xs text-[#A09E9A]/50 font-normal">({userComm.toLocaleString()} commission)</span>
-                      </p>
-                    ) : (
-                      <p className="text-xs font-bold text-[#A09E9A]/40 mt-0.5 uppercase">No Data Available</p>
-                    )}
-                  </div>
-                </div>
-                {!hasContribution && (
-                  <div className="pt-2 border-t border-[#D4AF37]/10 mt-1">
-                    <p className="text-[10px] text-[#A09E9A]/70 leading-relaxed italic">
-                      If you have not contributed to this period, for sure you have contributed with your hard work and dedication to representing the management with high standards.
-                    </p>
-                  </div>
-                )}
-              </div>
-            );
-          })()}
         </div>
       )}
 
-      {/* Top Performers Ranking */}
-      <div className="bg-[#1A1A28] border border-[#D4AF37]/10 rounded-2xl p-5">
-        <div className="flex items-center gap-2 mb-5">
-          <Award size={16} className="text-[#D4AF37]" />
-          <h3 className="font-bold text-[#F0EFE8] text-sm uppercase tracking-widest">Agency Leaderboard</h3>
-          <span className="text-[10px] text-[#A09E9A] ml-auto">{topPerformers.length} hosts</span>
+      {/* Merged Agency Leaderboard & Spotlight Block */}
+      <div className="bg-[#1A1A28]/80 backdrop-blur-md border border-[#D4AF37]/15 rounded-2xl p-5 relative overflow-hidden flex flex-col gap-4">
+        <div className="absolute -top-10 -right-10 w-32 h-32 bg-indigo-500/10 blur-3xl rounded-full pointer-events-none"></div>
+        
+        {/* Combined Header */}
+        <div className="flex items-center justify-between flex-wrap gap-4 border-b border-[#D4AF37]/10 pb-4">
+          <div className="flex items-center gap-2">
+            <Award size={16} className="text-[#D4AF37]" />
+            <h3 className="font-bold text-[#F0EFE8] text-sm uppercase tracking-widest">Host Leaderboard & Contribution</h3>
+            <span className="text-[10px] text-[#A09E9A] font-mono">({topPerformers.length} hosts)</span>
+          </div>
+          <div className="flex items-center gap-2 relative z-10">
+            <select
+              value={lbYear}
+              onChange={e => setLbYear(e.target.value)}
+              className="bg-[#0D0D14] border border-[#D4AF37]/20 rounded-lg px-3 py-1.5 text-xs font-bold text-[#F0EFE8] outline-none focus:border-[#D4AF37] cursor-pointer shadow-inner"
+            >
+              <option value="all">All Years</option>
+              {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
+            </select>
+            <select
+              value={lbMonth}
+              onChange={e => setLbMonth(e.target.value)}
+              className="bg-[#0D0D14] border border-[#D4AF37]/20 rounded-lg px-3 py-1.5 text-xs font-bold text-[#F0EFE8] outline-none focus:border-[#D4AF37] cursor-pointer shadow-inner"
+            >
+              <option value="all">All Months</option>
+              {MONTH_ORDER.map(m => <option key={m} value={m}>{m}</option>)}
+            </select>
+          </div>
         </div>
 
-        {/* Column Headers */}
-        <div className="grid grid-cols-[auto_1fr_auto_auto] gap-x-4 items-center px-3 mb-2 text-[9px] font-black uppercase tracking-widest text-[#A09E9A]/50">
-          <span className="w-6 text-center">#</span>
-          <span>Nickname</span>
-          <span className="text-right w-24">Live Duration</span>
-          <span className="text-right w-24">Total Points</span>
-        </div>
+        {/* Spotlight Logic */}
+        {(() => {
+          const currentAuth = Storage.getAuthState();
+          
+          // User's commission for the selected period
+          const userPeriodReports = lbReports.filter(r => String(r.poppoId) === String(currentAuth?.poppo_id));
+          const userComm = userPeriodReports.reduce((sum, r) => sum + getAgentComm(r), 0);
+          
+          const sharePct = lbTotalPeriodCommission > 0 ? (userComm / lbTotalPeriodCommission) * 100 : 0;
+          const hasContribution = userComm > 0;
+          const label = (lbYear === 'all' && lbMonth === 'all') ? 'All-Time' : `${lbMonth !== 'all' ? lbMonth : ''} ${lbYear !== 'all' ? lbYear : ''}`.trim();
 
-        <div className="space-y-1.5">
-          {topPerformers.slice(0, 15).map((h, idx) => {
-            const maxPts = topPerformers[0]?.points || 1;
-            const pct = (h.points / maxPts) * 100;
-            const medals = ['🥇', '🥈', '🥉'];
-            
-            // Highlight top 9 in gradient border & background; ranks 10 to 15 have no highlight
-            const rowStyle = idx < 9
-              ? idx === 0
-                ? "bg-gradient-to-r from-[#D4AF37]/15 via-[#D4AF37]/4 to-[#1A1A28]/40 border-[#D4AF37]/35 shadow-md shadow-[#D4AF37]/5"
-                : idx < 3
-                  ? "bg-gradient-to-r from-purple-500/10 via-purple-500/2 to-[#1A1A28]/20 border-purple-500/25"
-                  : "bg-gradient-to-r from-[#D4AF37]/8 via-transparent to-transparent border-[#D4AF37]/15"
-              : "bg-transparent border-[#D4AF37]/5 hover:bg-white/[0.02]";
-
-            return (
-              <div
-                key={h.poppoId}
-                className={cn(
-                  "grid grid-cols-[auto_1fr_auto_auto] gap-x-4 items-center rounded-xl p-3 transition-all border",
-                  rowStyle
-                )}
-              >
-                {/* Rank */}
-                <span className="text-sm font-black text-[#A09E9A]/50 w-6 text-center shrink-0">
-                  {medals[idx] || `#${idx + 1}`}
-                </span>
-
-                {/* Nickname + ID + Progress */}
-                <div className="min-w-0">
-                  <div className="flex flex-col mb-1">
-                    <span className="text-sm font-black text-[#F0EFE8] truncate">{h.name}</span>
-                    <span className="text-[9px] text-[#A09E9A]/40 font-mono mt-0.5">ID: {h.poppoId}</span>
-                  </div>
-                  <div className="h-1 bg-white/5 rounded-full overflow-hidden">
-                    <div
-                      className="h-full rounded-full"
-                      {...({ style: {
-                        width: `${pct}%`,
-                        background: idx === 0 ? '#D4AF37' : idx === 1 ? '#8b5cf6' : idx === 2 ? '#ec4899' : '#374151'
-                      } })}
-                    />
-                  </div>
+          return (
+            <div className="bg-[#0D0D14] border border-[#D4AF37]/15 rounded-xl p-4 flex flex-col gap-2.5 transition-all">
+              <div className="flex items-center justify-between flex-wrap gap-3">
+                <div>
+                  <p className="text-[10px] font-black text-[#A09E9A] uppercase tracking-wider">Spotlight: {label}</p>
+                  <p className="text-base font-black text-[#D4AF37] mt-0.5">{lbTotalPeriodCommission.toLocaleString()} Pts <span className="text-[10px] text-[#A09E9A] font-normal uppercase tracking-widest">(Agency Comm)</span></p>
                 </div>
-
-                {/* Live Duration */}
-                <div className="text-right w-24 shrink-0">
-                  <p className="text-xs font-black text-cyan-400">{fmtH(h.liveHrs)}</p>
-                  <p className="text-[9px] text-[#A09E9A]/40 uppercase tracking-wider">Live</p>
-                </div>
-
-                {/* Total Points */}
-                <div className="text-right w-24 shrink-0">
-                  <p className="text-sm font-black text-[#D4AF37]">{formatPts(h.points)}</p>
-                  <p className="text-[9px] text-[#A09E9A]/40 uppercase tracking-wider">{h.months} mo</p>
+                <div className="text-right">
+                  <p className="text-[10px] font-bold text-[#A09E9A]/60 uppercase tracking-widest">YOUR SHARE CONTRIBUTION</p>
+                  <p className="text-base font-black text-white mt-0.5">
+                    {hasContribution ? sharePct.toFixed(2) : "0.00"}% <span className="text-xs text-[#A09E9A]/50 font-normal">({hasContribution ? userComm.toLocaleString() : "0"} comm)</span>
+                  </p>
                 </div>
               </div>
-            );
-          })}
+              {!hasContribution && (
+                <div className="pt-2 border-t border-[#D4AF37]/10 mt-1">
+                  <p className="text-[10px] text-[#A09E9A]/70 leading-relaxed italic">
+                    If you have not contributed to this period, for sure you have contributed with your hard work and dedication to representing the management with high standards.
+                  </p>
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
+        {/* Leaderboard Section */}
+        <div className="mt-2">
+          {/* Column Headers */}
+          <div className="grid grid-cols-[auto_1fr_auto_auto_auto] gap-x-1.5 sm:gap-x-4 items-center px-3 mb-2 text-[9px] font-black uppercase tracking-widest text-[#A09E9A]/50">
+            <span className="w-5 sm:w-6 text-center">#</span>
+            <span>Nickname</span>
+            <span className="text-right w-12 sm:w-20">Live Hrs</span>
+            <span className="text-right w-16 sm:w-24">Points</span>
+            <span className="text-right w-14 sm:w-20">Share %</span>
+          </div>
+
+          <div className="space-y-1.5">
+            {topPerformers.slice(0, 15).map((h, idx) => {
+              const maxPts = topPerformers[0]?.points || 1;
+              const pct = (h.points / maxPts) * 100;
+              const medals = ['🥇', '🥈', '🥉'];
+              
+              // Define fading colors for Top 9: Light Yellow -> Gold -> Orange -> Red
+              const top9Styles = [
+                "bg-gradient-to-r from-[#fef08a]/15 via-[#fef08a]/4 to-[#1A1A28]/40 border-[#fef08a]/35 shadow-md shadow-[#fef08a]/5",
+                "bg-gradient-to-r from-[#facc15]/15 via-[#facc15]/4 to-[#1A1A28]/40 border-[#facc15]/35 shadow-md shadow-[#facc15]/5",
+                "bg-gradient-to-r from-[#D4AF37]/15 via-[#D4AF37]/4 to-[#1A1A28]/40 border-[#D4AF37]/35 shadow-md shadow-[#D4AF37]/5",
+                "bg-gradient-to-r from-[#fb923c]/15 via-[#fb923c]/4 to-[#1A1A28]/40 border-[#fb923c]/30",
+                "bg-gradient-to-r from-[#f97316]/15 via-[#f97316]/4 to-[#1A1A28]/40 border-[#f97316]/30",
+                "bg-gradient-to-r from-[#ea580c]/15 via-[#ea580c]/4 to-[#1A1A28]/40 border-[#ea580c]/30",
+                "bg-gradient-to-r from-[#f87171]/15 via-[#f87171]/4 to-[#1A1A28]/40 border-[#f87171]/30",
+                "bg-gradient-to-r from-[#ef4444]/15 via-[#ef4444]/4 to-[#1A1A28]/40 border-[#ef4444]/30",
+                "bg-gradient-to-r from-[#dc2626]/15 via-[#dc2626]/4 to-[#1A1A28]/40 border-[#dc2626]/30"
+              ];
+              
+              const top9Colors = [
+                '#fef08a', '#facc15', '#D4AF37', '#fb923c', '#f97316', '#ea580c', '#f87171', '#ef4444', '#dc2626'
+              ];
+
+              const rowStyle = idx < 9
+                ? top9Styles[idx]
+                : idx < 15
+                  ? "bg-gradient-to-r from-[#D4AF37]/8 via-transparent to-transparent border-[#D4AF37]/15"
+                  : "bg-transparent border-[#D4AF37]/5 hover:bg-white/[0.02]";
+
+              return (
+                <div
+                  key={h.poppoId}
+                  onClick={() => { if(idx < 9) handleSpotlightClick(h.poppoId); }}
+                  className={cn(
+                    "grid grid-cols-[auto_1fr_auto_auto_auto] gap-x-1.5 sm:gap-x-4 items-center rounded-xl p-2 sm:p-3 transition-all border",
+                    rowStyle,
+                    idx < 9 && "cursor-pointer hover:scale-[1.01] hover:brightness-110"
+                  )}
+                >
+                  <span className="text-sm font-black text-[#A09E9A]/50 w-5 sm:w-6 text-center shrink-0">
+                    {medals[idx] || `#${idx + 1}`}
+                  </span>
+
+                  <div className="min-w-0">
+                    <div className="flex flex-col mb-1">
+                      <span className="text-sm font-black text-[#F0EFE8] truncate">{h.name}</span>
+                      <span className="text-[9px] text-[#A09E9A]/40 font-mono mt-0.5">ID: {h.poppoId}</span>
+                    </div>
+                    <div className="h-1 bg-white/5 rounded-full overflow-hidden">
+                      <div
+                        className="h-full rounded-full"
+                        {...({ style: {
+                          width: `${pct}%`,
+                          background: idx < 9 ? top9Colors[idx] : '#374151'
+                        } })}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="text-right w-12 sm:w-20 shrink-0">
+                    <p className="text-xs font-black text-cyan-400">{fmtH(h.liveHrs)}</p>
+                    <p className="text-[9px] text-[#A09E9A]/40 uppercase tracking-wider hidden sm:block">Live</p>
+                  </div>
+
+                  <div className="text-right w-16 sm:w-24 shrink-0">
+                    <p className="text-sm font-black text-[#D4AF37]">{formatPts(h.points)}</p>
+                    <p className="text-[9px] text-[#A09E9A]/40 uppercase tracking-wider hidden sm:block">{h.months} mo</p>
+                  </div>
+
+                  <div className="text-right w-14 sm:w-20 shrink-0">
+                    <p className="text-xs font-black text-purple-400">
+                      {(() => {
+                        const sharePct = lbTotalPeriodCommission > 0 ? (h.commission / lbTotalPeriodCommission) * 100 : 0;
+                        return `${sharePct.toFixed(2)}%`;
+                      })()}
+                    </p>
+                    <p className="text-[9px] text-[#A09E9A]/40 uppercase tracking-wider hidden sm:block">Share</p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
 
 
 
       {/* Breakdown Table */}
-      {filteredReports.length > 0 && (
-        <div className="bg-[#1A1A28] border border-[#D4AF37]/10 rounded-2xl p-5">
-          <div className="flex items-center gap-2 mb-4">
-            <LayoutDashboard size={16} className="text-emerald-400" />
-            <h3 className="font-bold text-[#F0EFE8] text-sm uppercase tracking-widest">All Records</h3>
-            <span className="text-[10px] text-[#A09E9A] ml-auto">{filteredReports.length} entries</span>
+      {reports.length > 0 && (
+        <div className="border border-[#D4AF37]/15 rounded-2xl p-5 relative overflow-hidden backdrop-blur-md shadow-2xl" style={{ background: 'linear-gradient(to bottom right, #1E1C24, #121017)' }}>
+          <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+            <div className="flex items-center gap-2">
+              <LayoutDashboard size={16} className="text-emerald-400" />
+              <h3 className="font-bold text-[#F0EFE8] text-sm uppercase tracking-widest">All Records</h3>
+              <span className="text-[10px] text-[#A09E9A] font-mono">({reports.length} entries)</span>
+            </div>
+            
+            <div className="flex items-center gap-3">
+              {showRecords && (
+                <select
+                  title="Sort Records"
+                  value={recordsSortOption}
+                  onChange={e => setRecordsSortOption(e.target.value as any)}
+                  className="bg-[#0D0D14] border border-[#D4AF37]/20 rounded-lg px-3 py-1.5 text-xs font-bold text-[#F0EFE8] outline-none focus:border-[#D4AF37] cursor-pointer shadow-inner"
+                >
+                  <option value="default">Default Sort</option>
+                  <option value="name">Name A-Z</option>
+                  <option value="share">Share % (High to Low)</option>
+                </select>
+              )}
+              <button
+                onClick={() => setShowRecords(!showRecords)}
+                className="bg-[#0D0D14] border border-[#D4AF37]/20 hover:border-[#D4AF37] px-4 py-1.5 rounded-lg text-xs font-bold text-[#F0EFE8] transition-all cursor-pointer hover:bg-white/[0.02] shadow-sm select-none"
+              >
+                {showRecords ? 'Hide Records' : 'Show Records'}
+              </button>
+            </div>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs text-left border-collapse">
-              <thead>
-                <tr className="border-b border-[#D4AF37]/10 text-[#A09E9A] uppercase tracking-wider text-[10px] font-bold">
-                  <th className="py-2 px-2">Host</th>
-                  <th className="py-2 px-2">Period</th>
-                  <th className="py-2 px-2">Level</th>
-                  <th className="py-2 px-2">Live Hrs</th>
-                  <th className="py-2 px-2">Share %</th>
-                  <th className="py-2 px-2 text-right">Points</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#D4AF37]/10">
-                {[...filteredReports]
-                  .sort((a, b) => {
-                    if (a.year !== b.year) return b.year - a.year;
-                    return MONTH_ORDER.indexOf(b.monthName) - MONTH_ORDER.indexOf(a.monthName);
-                  })
-                  .slice(0, 50)
-                  .map((r, i) => (
-                    <tr key={i} className="hover:bg-white/[0.02] transition-colors">
-                      <td className="py-2 px-2">
-                        <div>
-                          <p className="font-bold text-[#F0EFE8] truncate max-w-[120px]">
-                            {hostLookup.get(String(r.poppoId)) || r.hostName || r.poppoId}
-                          </p>
-                          <p className="text-[9px] text-[#A09E9A]/50 font-mono">{r.poppoId}</p>
-                        </div>
-                      </td>
-                      <td className="py-2 px-2 text-[#A09E9A]">{r.monthName} {r.year}</td>
-                      <td className="py-2 px-2 text-[#A09E9A]">Lvl {r.level || '-'}</td>
-                      <td className="py-2 px-2 text-cyan-400 font-mono">{fmtH(getLiveDuration(r))}</td>
-                      <td className="py-2 px-2 text-purple-400 font-mono">
-                        {(() => {
-                          const key = `${r.monthName} ${r.year}`;
-                          const total = monthlyTotalCommission.get(key) || 0;
-                          const hostComm = getAgentComm(r);
-                          const pct = total > 0 ? (hostComm / total) * 100 : 0;
-                          return `${pct.toFixed(2)}%`;
-                        })()}
-                      </td>
-                      <td className="py-2 px-2 text-right font-black text-[#D4AF37] font-mono">
-                        {getPoints(r).toLocaleString()}
-                      </td>
-                    </tr>
-                  ))}
-              </tbody>
-            </table>
-            {filteredReports.length > 50 && (
-              <p className="text-center text-[10px] text-[#A09E9A]/40 mt-3 italic">Showing top 50 of {filteredReports.length} records</p>
-            )}
-          </div>
+
+          {showRecords && (
+            <div className="overflow-x-auto transition-all duration-300">
+              <table className="w-full text-xs text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-[#D4AF37]/10 text-[#A09E9A] uppercase tracking-wider text-[10px] font-bold" style={{ background: 'linear-gradient(to right, rgba(212, 175, 55, 0.08), transparent)' }}>
+                    <th className="py-2 px-2">Host</th>
+                    <th className="py-2 px-2">Period</th>
+                    <th className="py-2 px-2">Live Hrs</th>
+                    <th className="py-2 px-2">Share %</th>
+                    <th className="py-2 px-2 text-right">Points</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#D4AF37]/10">
+                  {sortedReports
+                    .slice(0, 50)
+                    .map((r, i) => (
+                      <tr key={i} className="hover:bg-gradient-to-r hover:from-white/[0.02] hover:to-transparent transition-colors">
+                        <td className="py-2 px-2">
+                          <div>
+                            <p className="font-bold text-[#F0EFE8] truncate max-w-[120px]">
+                              {hostLookup.get(String(r.poppoId)) || r.hostName || r.poppoId}
+                            </p>
+                            <p className="text-[9px] text-[#A09E9A]/50 font-mono">{r.poppoId}</p>
+                          </div>
+                        </td>
+                        <td className="py-2 px-2 text-[#A09E9A]">{r.monthName} {r.year}</td>
+                        <td className="py-2 px-2 text-cyan-400 font-mono">{fmtH(getLiveDuration(r))}</td>
+                        <td className="py-2 px-2 text-purple-400 font-mono">
+                          {(() => {
+                            const key = `${r.monthName} ${r.year}`;
+                            const total = monthlyTotalCommission.get(key) || 0;
+                            const hostComm = getAgentComm(r);
+                            const pct = total > 0 ? (hostComm / total) * 100 : 0;
+                            return `${pct.toFixed(2)}%`;
+                          })()}
+                        </td>
+                        <td className="py-2 px-2 text-right font-black text-[#D4AF37] font-mono">
+                          {getPoints(r).toLocaleString()}
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+              {reports.length > 50 && (
+                <p className="text-center text-[10px] text-[#A09E9A]/40 mt-3 italic">Showing top 50 of {reports.length} records</p>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* SPOTLIGHT MODAL */}
+      {spotlightHost && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm overflow-y-auto">
+          <HostProfileView 
+            host={spotlightHost} 
+            isReadOnly={false} 
+            onClose={() => setSpotlightHost(null)} 
+            onProfileUpdated={() => {}}
+            isSpotlight={true}
+          />
         </div>
       )}
     </div>
   );
 };
+
+export default Overview;

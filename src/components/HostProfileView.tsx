@@ -127,54 +127,98 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
   const styles = useMemo(() => {
     const getCategoryStyles = (category: string) => {
       const norm = String(category || '').trim().toLowerCase();
+      
+      // Star Host: Yellow to Gold
       if (norm === 'star host') {
         return {
           borderColor: 'border-[#D4AF37]/50',
+          hoverBorderColor: 'hover:border-[#D4AF37]/50',
           shadow: 'shadow-lg shadow-[#D4AF37]/15',
           badgeText: 'text-[#D4AF37]',
+          badgeBgBorder: 'bg-[#D4AF37]/10 border-[#D4AF37]/20',
           accentColor: '#D4AF37',
           topTrim: 'border-t-[#D4AF37] border-t-2',
-          gradientBg: 'bg-gradient-to-br from-[#D4AF37]/20 via-[#D4AF37]/5 to-[#1A1A28]/80',
+          gradientBg: 'bg-gradient-to-br from-[#D4AF37]/15 via-[#D4AF37]/2 to-[#0D0D14]/95',
+          iconBg: 'bg-[#D4AF37]/20 text-[#D4AF37]',
+          buttonBg: 'bg-[#D4AF37]/10 border-[#D4AF37]/30 text-[#D4AF37] hover:bg-[#D4AF37]/20',
+          textAccent: 'text-[#D4AF37]',
+          awardBorder: 'border-[#D4AF37]/15 hover:border-[#D4AF37]/40',
+          indicatorColor: 'bg-[#D4AF37]',
         };
       }
-      if (norm === 's idol') {
+      
+      // S Idol: Pink to Dark Pink
+      if (norm === 's idol' || norm === 's_idol') {
         return {
-          borderColor: 'border-[#ec4899]/50',
-          shadow: 'shadow-lg shadow-[#ec4899]/15',
-          badgeText: 'text-[#ec4899]',
-          accentColor: '#ec4899',
-          topTrim: 'border-t-[#ec4899] border-t-2',
-          gradientBg: 'bg-gradient-to-br from-[#ec4899]/20 via-[#ec4899]/5 to-[#1A1A28]/80',
+          borderColor: 'border-[#EC4899]/50',
+          hoverBorderColor: 'hover:border-[#EC4899]/50',
+          shadow: 'shadow-lg shadow-[#EC4899]/15',
+          badgeText: 'text-[#EC4899]',
+          badgeBgBorder: 'bg-[#EC4899]/10 border-[#EC4899]/20',
+          accentColor: '#EC4899',
+          topTrim: 'border-t-[#EC4899] border-t-2',
+          gradientBg: 'bg-gradient-to-br from-[#EC4899]/15 via-[#EC4899]/2 to-[#0D0D14]/95',
+          iconBg: 'bg-[#EC4899]/20 text-[#EC4899]',
+          buttonBg: 'bg-[#EC4899]/10 border-[#EC4899]/30 text-[#EC4899] hover:bg-[#EC4899]/20',
+          textAccent: 'text-[#EC4899]',
+          awardBorder: 'border-[#EC4899]/15 hover:border-[#EC4899]/40',
+          indicatorColor: 'bg-[#EC4899]',
         };
       }
+      
+      // Rocket Host: Blue to Deep Blue
       if (norm === 'rocket host') {
         return {
-          borderColor: 'border-[#3b82f6]/50',
-          shadow: 'shadow-lg shadow-[#3b82f6]/15',
-          badgeText: 'text-[#3b82f6]',
-          accentColor: '#3b82f6',
-          topTrim: 'border-t-[#3b82f6] border-t-2',
-          gradientBg: 'bg-gradient-to-br from-[#3b82f6]/20 via-[#3b82f6]/5 to-[#1A1A28]/80',
+          borderColor: 'border-[#3B82F6]/50',
+          hoverBorderColor: 'hover:border-[#3B82F6]/50',
+          shadow: 'shadow-lg shadow-[#3B82F6]/15',
+          badgeText: 'text-[#3B82F6]',
+          badgeBgBorder: 'bg-[#3B82F6]/10 border-[#3B82F6]/20',
+          accentColor: '#3B82F6',
+          topTrim: 'border-t-[#3B82F6] border-t-2',
+          gradientBg: 'bg-gradient-to-br from-[#3B82F6]/15 via-[#3B82F6]/2 to-[#0D0D14]/95',
+          iconBg: 'bg-[#3B82F6]/20 text-[#3B82F6]',
+          buttonBg: 'bg-[#3B82F6]/10 border-[#3B82F6]/30 text-[#3B82F6] hover:bg-[#3B82F6]/20',
+          textAccent: 'text-[#3B82F6]',
+          awardBorder: 'border-[#3B82F6]/15 hover:border-[#3B82F6]/40',
+          indicatorColor: 'bg-[#3B82F6]',
         };
       }
-      if (norm === 'esport host' || norm.includes('esport')) {
+      
+      // Esports: Purple to Violet
+      if (norm === 'esports' || norm.includes('esport')) {
         return {
-          borderColor: 'border-[#a855f7]/50',
-          shadow: 'shadow-lg shadow-[#a855f7]/15',
-          badgeText: 'text-[#a855f7]',
-          accentColor: '#a855f7',
-          topTrim: 'border-t-[#a855f7] border-t-2',
-          gradientBg: 'bg-gradient-to-br from-[#a855f7]/20 via-[#a855f7]/5 to-[#1A1A28]/80',
+          borderColor: 'border-[#A855F7]/50',
+          hoverBorderColor: 'hover:border-[#A855F7]/50',
+          shadow: 'shadow-lg shadow-[#A855F7]/15',
+          badgeText: 'text-[#A855F7]',
+          badgeBgBorder: 'bg-[#A855F7]/10 border-[#A855F7]/20',
+          accentColor: '#A855F7',
+          topTrim: 'border-t-[#A855F7] border-t-2',
+          gradientBg: 'bg-gradient-to-br from-[#A855F7]/15 via-[#A855F7]/2 to-[#0D0D14]/95',
+          iconBg: 'bg-[#A855F7]/20 text-[#A855F7]',
+          buttonBg: 'bg-[#A855F7]/10 border-[#A855F7]/30 text-[#A855F7] hover:bg-[#A855F7]/20',
+          textAccent: 'text-[#A855F7]',
+          awardBorder: 'border-[#A855F7]/15 hover:border-[#A855F7]/40',
+          indicatorColor: 'bg-[#A855F7]',
         };
       }
-      // Regular Host
+      
+      // Regular Host: Green to Apple Green (and fallback)
       return {
-        borderColor: 'border-white/5',
-        shadow: 'shadow-md',
-        badgeText: 'text-[#F0EFE8]',
-        accentColor: '#ffffff',
-        topTrim: 'border-t-white/10 border-t-2',
-        gradientBg: 'bg-gradient-to-br from-white/10 via-white/5 to-[#1A1A28]/80',
+        borderColor: 'border-[#22C55E]/50',
+        hoverBorderColor: 'hover:border-[#22C55E]/50',
+        shadow: 'shadow-lg shadow-[#22C55E]/15',
+        badgeText: 'text-[#22C55E]',
+        badgeBgBorder: 'bg-[#22C55E]/10 border-[#22C55E]/20',
+        accentColor: '#22C55E',
+        topTrim: 'border-t-[#22C55E] border-t-2',
+        gradientBg: 'bg-gradient-to-br from-[#22C55E]/15 via-[#22C55E]/2 to-[#0D0D14]/95',
+        iconBg: 'bg-[#22C55E]/20 text-[#22C55E]',
+        buttonBg: 'bg-[#22C55E]/10 border-[#22C55E]/30 text-[#22C55E] hover:bg-[#22C55E]/20',
+        textAccent: 'text-[#22C55E]',
+        awardBorder: 'border-[#22C55E]/15 hover:border-[#22C55E]/40',
+        indicatorColor: 'bg-[#22C55E]',
       };
     };
     return getCategoryStyles(host.tier_pay || '');
@@ -1561,11 +1605,11 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
 
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
-                    <label className="text-[8px] font-black text-[#A09E9A] uppercase tracking-widest block">Base Salary Category</label>
+                    <label className="text-[8px] font-black text-[#A09E9A] uppercase tracking-widest block">Tier Pay</label>
                     <select
-                      title="Base Salary Category"
-                      value={editBaseSalaryCategory}
-                      onChange={(e) => setEditBaseSalaryCategory(e.target.value)}
+                      title="Tier Pay"
+                      value={editTierPay}
+                      onChange={(e) => setEditTierPay(e.target.value)}
                       className="w-full bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-1.5 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37] font-bold"
                     >
                       {BASE_SALARY_POLICIES.map(policy => (
@@ -1723,6 +1767,58 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
 
 
 
+  // Helper to render social icons with hover state transitions and muted/grayed-out state if empty
+  const renderSocialIcon = ({ type, url, icon, label, colorClass }: {
+    type: string;
+    url?: string;
+    icon: React.ReactNode;
+    label: string;
+    colorClass: string;
+  }) => {
+    const hasLink = !!url && String(url).trim() !== '';
+    let linkUrl = '';
+    
+    if (hasLink) {
+      const trimmed = String(url).trim();
+      if (type === 'instagram') {
+        linkUrl = trimmed.startsWith('http') ? trimmed : `https://instagram.com/${trimmed.replace('@', '')}`;
+      } else if (type === 'tiktok') {
+        linkUrl = trimmed.startsWith('http') ? trimmed : `https://tiktok.com/@${trimmed.replace('@', '')}`;
+      } else if (type === 'facebook') {
+        linkUrl = trimmed.startsWith('http') ? trimmed : `https://facebook.com/${trimmed}`;
+      } else if (type === 'whatsapp') {
+        const phone = trimmed.replace(/[^0-9+]/g, '');
+        linkUrl = phone.startsWith('+') ? `https://wa.me/${phone.replace('+', '')}` : `https://wa.me/${phone}`;
+      }
+    }
+
+    if (!hasLink) {
+      return (
+        <div 
+          className="w-9 h-9 rounded-xl bg-white/[0.02] border border-white/5 flex items-center justify-center text-[#A09E9A]/20 cursor-not-allowed transition-all duration-300"
+          title={`${label} (Not linked)`}
+        >
+          {icon}
+        </div>
+      );
+    }
+
+    return (
+      <a 
+        href={linkUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className={cn(
+          "w-9 h-9 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center transition-all duration-300 shadow-md cursor-pointer",
+          colorClass
+        )}
+        title={`Visit ${label}: ${url}`}
+      >
+        {icon}
+      </a>
+    );
+  };
+
   const renderIdentityCard = () => {
     const currentAuth = Storage.getAuthState();
     const isOwnProfile = currentAuth.poppo_id === host.id;
@@ -1732,117 +1828,172 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
     return (
       <div className={cn("backdrop-blur-xl border-2 rounded-3xl overflow-hidden flex flex-col relative group/card transition-all duration-300", styles.gradientBg, styles.borderColor, styles.shadow, styles.topTrim)}>
         
-        {/* Full-width square profile photo acting as a header banner */}
-        <div className="w-full aspect-square relative bg-[#0D0D14]">
-          {isProcessingPhoto && (
-            <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-20">
-              <Loader2 size={24} className="animate-spin text-[#D4AF37]" />
-            </div>
-          )}
-          {editPhotoUrl ? (
-            <img src={editPhotoUrl} alt={host.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center text-7xl text-[#A09E9A] font-black bg-gradient-to-br from-[#1A1A28] to-[#0D0D14]">
-              {editNickname?.[0]?.toUpperCase() || host.name?.[0] || 'JD'}
-            </div>
-          )}
+        {/* Header split layout (2-Column Split) */}
+        <div className="flex flex-col sm:flex-row gap-5 p-5 items-start">
           
-          {/* Faded gradient overlay at the bottom 25% to merge with profile block */}
-          <div className="absolute bottom-0 inset-x-0 h-1/3 bg-gradient-to-t from-[#1A1A28] via-[#1A1A28]/60 to-transparent z-10" />
-          
-          {/* Absolute positioned badges overlaying the image */}
-          <div className="absolute top-4 right-4 z-20 flex flex-col items-end gap-2">
-             <span className={cn("text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full border backdrop-blur-md shadow-lg", 
+          {/* Left Column: Profile Photo */}
+          <div className="w-24 h-24 sm:w-28 sm:h-28 shrink-0 relative rounded-2xl overflow-hidden border border-white/10 bg-[#0D0D14]">
+            {isProcessingPhoto && (
+              <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-20">
+                <Loader2 size={20} className="animate-spin text-[#D4AF37]" />
+              </div>
+            )}
+            {editPhotoUrl ? (
+              <img src={editPhotoUrl} alt={host.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-5xl text-[#A09E9A] font-black bg-gradient-to-br from-[#1A1A28] to-[#0D0D14]">
+                {editNickname?.[0]?.toUpperCase() || host.name?.[0] || 'JD'}
+              </div>
+            )}
+            
+            {/* Status overlay badge */}
+            <div className="absolute top-1 left-1 z-10">
+              <span className={cn("text-[7px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-full border backdrop-blur-md shadow-lg", 
                 host.status === 'Active' ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30" : "bg-amber-500/20 text-amber-400 border-amber-500/30")}>
                 {host.status || 'Active'}
-             </span>
-             {/* Tier Pay glowing badge */}
-             <span className={cn("text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full border backdrop-blur-md shadow-[0_0_15px_rgba(212,175,55,0.3)]", styles.badgeText, styles.borderColor, "bg-black/40")}>
-                {host.tier_pay || 'Regular Host'}
-             </span>
+              </span>
+            </div>
+
+            {/* Edit Profile overlay button */}
+            {((!isReadOnly && isDirectorOrHeadAdmin) || (isOwnProfile && !isSpotlight)) && (
+              <div className="absolute bottom-1 right-1 z-10">
+                <button
+                  onClick={() => setIsSelfEditing(true)}
+                  className="w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-md border border-white/20 flex items-center justify-center text-white transition-all shadow-xl cursor-pointer"
+                  title="Edit Profile"
+                >
+                  <Edit2 size={10} />
+                </button>
+              </div>
+            )}
           </div>
 
-          {/* Edit / Save Options overlaying the image bottom right */}
-          {((!isReadOnly && isDirectorOrHeadAdmin) || (isOwnProfile && !isSpotlight)) && (
-            <div className="absolute bottom-4 right-4 z-20 flex gap-2">
-              <button
-                onClick={() => setIsSelfEditing(true)}
-                className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-md border border-white/20 flex items-center justify-center text-white transition-all shadow-xl cursor-pointer"
-                title="Edit Profile"
-              >
-                <Edit2 size={16} />
-              </button>
-            </div>
-          )}
-        </div>
+          {/* Right Column next to the photo */}
+          <div className="flex-1 min-w-0 flex flex-col justify-between self-stretch space-y-2">
+            <div>
+              <h2 className="text-xl md:text-2xl font-black text-[#F0EFE8] tracking-tight truncate drop-shadow-md">
+                {host.nickname || host.name}
+              </h2>
+              <div className="flex items-center flex-wrap gap-1.5 mt-1">
+                <span className="text-[9px] font-mono font-bold text-[#A09E9A]">ID: {host.id}</span>
+                {activeAwards.map(a => {
+                  let badgeStyle = 'bg-amber-500/10 text-amber-400 border-amber-500/20';
+                  if (a.awardColor === 'Purple') badgeStyle = 'bg-purple-500/10 text-purple-400 border-purple-500/20';
+                  else if (a.awardColor === 'Emerald') badgeStyle = 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
+                  else if (a.awardColor === 'Blue') badgeStyle = 'bg-blue-500/10 text-blue-400 border-blue-500/20';
+                  else if (a.awardColor === 'Red') badgeStyle = 'bg-red-500/10 text-red-400 border-red-500/20';
+                  else if (a.awardColor === 'Orange') badgeStyle = 'bg-orange-500/10 text-orange-400 border-orange-500/20';
 
-        {/* Identity Details Block (merged below the photo) */}
-        <div className="px-6 pb-6 -mt-8 relative z-20 flex-1 flex flex-col space-y-5">
-          <div>
-            <h2 className="text-3xl md:text-4xl font-black text-[#F0EFE8] tracking-tight drop-shadow-md">{host.nickname || host.name}</h2>
-            <div className="flex items-center flex-wrap gap-2 mt-1.5">
-              <span className="text-xs font-mono font-bold text-[#A09E9A]">ID: {host.id}</span>
-              {activeAwards.map(a => {
-                let badgeStyle = 'bg-amber-500/10 text-amber-400 border-amber-500/20';
-                if (a.awardColor === 'Purple') badgeStyle = 'bg-purple-500/10 text-purple-400 border-purple-500/20';
-                else if (a.awardColor === 'Emerald') badgeStyle = 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
-                else if (a.awardColor === 'Blue') badgeStyle = 'bg-blue-500/10 text-blue-400 border-blue-500/20';
-                else if (a.awardColor === 'Red') badgeStyle = 'bg-red-500/10 text-red-400 border-red-500/20';
-                else if (a.awardColor === 'Orange') badgeStyle = 'bg-orange-500/10 text-orange-400 border-orange-500/20';
-
-                return (
-                  <span 
-                    key={a.id} 
-                    className={cn("text-[8px] font-black uppercase px-2 py-0.5 rounded-full border shrink-0 backdrop-blur-sm", badgeStyle)}
-                    title={`Active Award: ${a.awardName} (${a.startDate} to ${a.endDate})`}
-                  >
-                    {a.awardName}
-                  </span>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-y-4 gap-x-4 pt-4 border-t border-white/5 text-xs text-[#A09E9A]">
-            <div className="flex flex-col">
-              <span className="text-[9px] font-black uppercase tracking-widest mb-1 text-white/40">Role</span>
-              <span className="text-[#D4AF37] font-black">{host.role === 'Host' || host.role === 'Talent' ? 'Star Host' : host.role}</span>
-            </div>
-            <div className="flex flex-col">
-              <span className="text-[9px] font-black uppercase tracking-widest mb-1 text-white/40">Tier Pay</span>
-              <span className={cn("font-black drop-shadow-sm text-sm", styles.badgeText)}>{host.tier_pay || 'Regular Host'}</span>
-            </div>
-            <div className="flex flex-col">
-              <span className="text-[9px] font-black uppercase tracking-widest mb-1 text-white/40">Assigned Manager</span>
-              <span className="text-[#F0EFE8] font-bold">{host.manager}</span>
-            </div>
-            <div className="flex flex-col">
-              <span className="text-[9px] font-black uppercase tracking-widest mb-1 text-white/40">Team Group</span>
-              <span className="text-indigo-400 font-bold">{host.team}</span>
-            </div>
-          </div>
-
-          {host.streaming_hours && host.streaming_hours.length > 0 && (
-            <div className="pt-2 border-t border-white/5 space-y-2">
-              <span className="text-[9px] font-black text-white/40 uppercase tracking-widest block">Streaming Schedule</span>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {host.streaming_hours.slice(0, 2).map((slot, idx) => (
-                  <div key={idx} className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl px-3 py-2 text-center shadow-inner">
-                    <span className="text-[10px] font-bold text-white/90">{slot.from} - {slot.to}</span>
-                  </div>
-                ))}
+                  return (
+                    <span 
+                      key={a.id} 
+                      className={cn("text-[7px] font-black uppercase px-1.5 py-0.5 rounded-full border shrink-0 backdrop-blur-sm", badgeStyle)}
+                      title={`Active Award: ${a.awardName} (${a.startDate} to ${a.endDate})`}
+                    >
+                      {a.awardName}
+                    </span>
+                  );
+                })}
               </div>
             </div>
-          )}
 
-          {/* Host Public Message */}
-          <div className="pt-2 border-t border-white/5 space-y-1.5">
-            <span className="text-[9px] font-black text-white/40 uppercase tracking-widest block">Host Public Message</span>
-            <p className="text-xs text-[#A09E9A] leading-relaxed italic whitespace-pre-wrap bg-black/20 p-3 rounded-xl border border-white/5">
-              "{String(host.bio || host.description || 'No public message set.').slice(0, 100)}"
-            </p>
+            <div className="grid grid-cols-2 gap-x-3 gap-y-2 pt-2 border-t border-white/5 text-[10px] text-[#A09E9A]">
+              {/* Conditional Logic: Hide role field if Host or Talent */}
+              {!(String(host.role).toLowerCase() === 'host' || String(host.role).toLowerCase() === 'talent') && (
+                <div className="flex flex-col">
+                  <span className="text-[8px] font-black uppercase tracking-widest text-white/40">Role</span>
+                  <span className="text-[#D4AF37] font-bold truncate">{host.role}</span>
+                </div>
+              )}
+              <div className="flex flex-col">
+                <span className="text-[8px] font-black uppercase tracking-widest text-white/40">Tier Pay</span>
+                <span className={cn("font-black drop-shadow-sm truncate", styles.badgeText)}>{host.tier_pay || 'Regular Host'}</span>
+              </div>
+              <div className="flex flex-col">
+                <span className="text-[8px] font-black uppercase tracking-widest text-white/40">Team Anchor</span>
+                <span className="text-indigo-400 font-bold truncate">{host.team || 'Unassigned'}</span>
+              </div>
+              <div className="flex flex-col">
+                <span className="text-[8px] font-black uppercase tracking-widest text-white/40">Assigned Manager</span>
+                <span className="text-[#F0EFE8] font-bold truncate">{host.manager || 'Nine Management'}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Basic Info Section (directly below the header split) */}
+        <div className="p-5 pt-3 border-t border-white/5 flex flex-col space-y-4">
+          {/* Top Row: Split into 2 columns */}
+          <div className="grid grid-cols-2 gap-4 items-start">
+            {/* Left Column: Social Media clickable icons */}
+            <div className="space-y-1.5">
+              <span className="text-[8px] font-black text-white/40 uppercase tracking-widest block">Social Media</span>
+              <div className="flex items-center gap-2 flex-wrap">
+                {renderSocialIcon({
+                  type: 'instagram',
+                  url: host.social_links?.ig,
+                  icon: <Instagram size={16} />,
+                  label: 'Instagram',
+                  colorClass: 'text-pink-500 hover:bg-pink-500/10 hover:border-pink-500/30'
+                })}
+                {renderSocialIcon({
+                  type: 'tiktok',
+                  url: host.social_links?.tiktok,
+                  icon: (
+                    <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
+                      <path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.17-2.86-.74-3.95-1.72-.1.08-.21.17-.31.25-.02 3.78-.01 7.56-.02 11.34-.1 2.39-1.39 4.71-3.64 5.63-2.18.97-4.88.75-6.85-.56-2.03-1.32-3.08-3.83-2.67-6.21.36-2.28 2.14-4.22 4.41-4.72.16-.03.32-.06.49-.09V12.3c-.15.02-.29.04-.44.07-3.23.51-5.74 3.49-5.69 6.78.07 3.32 2.7 6.18 6.01 6.3 3.25.17 6.18-2.19 6.57-5.41.09-.76.08-1.53.08-2.3V5.19c-.87.59-1.89.97-2.95 1.07-1.12.11-2.27-.1-3.27-.63-.97-.53-1.73-1.39-2.13-2.42C12.98 2.2 12.87 1.09 12.525.02z" />
+                    </svg>
+                  ),
+                  label: 'TikTok',
+                  colorClass: 'text-cyan-400 hover:bg-cyan-500/10 hover:border-cyan-500/30'
+                })}
+                {renderSocialIcon({
+                  type: 'facebook',
+                  url: host.social_links?.fb,
+                  icon: <Facebook size={16} />,
+                  label: 'Facebook',
+                  colorClass: 'text-blue-500 hover:bg-blue-500/10 hover:border-blue-500/30'
+                })}
+                {renderSocialIcon({
+                  type: 'whatsapp',
+                  url: host.social_links?.whatsapp,
+                  icon: (
+                    <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
+                      <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.514 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.73-1.45L0 24zm6.59-4.846c1.6.95 3.188 1.449 4.825 1.451 5.436 0 9.86-4.42 9.864-9.864.002-2.637-1.019-5.117-2.875-6.973-1.857-1.857-4.339-2.875-6.98-2.875-5.437 0-9.86 4.42-9.863 9.865-.001 1.716.463 3.39 1.342 4.877l-.994 3.634 3.716-.975zm12.167-7.79c-.273-.137-1.62-.8-1.871-.892-.253-.09-.437-.137-.621.137-.184.272-.713.89-.873 1.073-.16.184-.321.206-.594.07-1.12-.56-1.92-.937-2.678-2.23-.2-.345.2-.32.57-.962.082-.136.04-.256-.02-.393-.06-.137-.506-1.22-.693-1.67-.182-.44-.367-.38-.506-.388-.13-.004-.28-.006-.43-.006-.15 0-.395.056-.6.28-.206.223-.787.77-.787 1.877 0 1.107.805 2.176.918 2.33.113.15 1.583 2.417 3.834 3.388.536.23 1.012.38 1.357.49.538.172 1.028.148 1.416.09.431-.064 1.332-.546 1.518-1.072.186-.527.186-.978.13-1.07-.056-.09-.206-.137-.478-.273z" />
+                    </svg>
+                  ),
+                  label: 'WhatsApp',
+                  colorClass: 'text-emerald-500 hover:bg-emerald-500/10 hover:border-emerald-500/30'
+                })}
+              </div>
+            </div>
+
+            {/* Right Column: Streaming Hours */}
+            <div className="space-y-1.5">
+              <span className="text-[8px] font-black text-white/40 uppercase tracking-widest block">Streaming Hours</span>
+              {host.streaming_hours && host.streaming_hours.length > 0 ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                  {host.streaming_hours.slice(0, 2).map((slot, idx) => (
+                    <div key={idx} className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-lg py-1 text-center shadow-inner">
+                      <span className="text-[9px] font-bold text-white/90">{slot.from} - {slot.to}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <span className="text-[9px] text-[#A09E9A]/40 italic block py-1">No schedule set.</span>
+              )}
+            </div>
           </div>
 
+          {/* Bottom Row: Public Message / Bio section */}
+          <div className="pt-3 border-t border-white/5 space-y-1">
+            <span className="text-[8px] font-black text-white/40 uppercase tracking-widest block">Public Message / Bio</span>
+            <blockquote className={cn("text-xs text-[#A09E9A] leading-relaxed italic whitespace-pre-wrap bg-black/20 p-3 rounded-xl border border-white/5 relative pl-7 pr-4 shadow-inner border-l-4", styles.borderColor)}>
+              <span className={cn("absolute left-2.5 top-2 text-xl font-serif leading-none", styles.badgeText)}>&ldquo;</span>
+              {host.bio || host.description || 'No public message set.'}
+              <span className={cn("absolute right-2.5 bottom-0 text-xl font-serif leading-none select-none", styles.badgeText)}>&rdquo;</span>
+            </blockquote>
+          </div>
         </div>
       </div>
     );
@@ -2853,20 +3004,20 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
     if (awards.length === 0) return null;
     const ICON_MAP: Record<string, string> = { trophy: '🏆', star: '⭐', medal: '🥇', crown: '👑', badge: '🎖️' };
     return (
-      <div className={cn("space-y-4 bg-white/5 backdrop-blur-xl border border-white/10 p-5 rounded-3xl transition-all duration-300 hover:border-[#D4AF37]/30 group", styles.shadow)}>
+      <div className={cn("space-y-4 bg-white/5 backdrop-blur-xl border border-white/10 p-5 rounded-3xl transition-all duration-300 group", styles.hoverBorderColor, styles.shadow)}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-             <div className="w-8 h-8 rounded-full bg-[#D4AF37]/20 flex items-center justify-center text-[#D4AF37] text-sm shadow-inner">🏆</div>
-             <h4 className="text-xs font-black uppercase tracking-widest text-[#F0EFE8]">Agency Awards</h4>
+             <div className={cn("w-8 h-8 rounded-full flex items-center justify-center text-sm shadow-inner", styles.iconBg)}>🏆</div>
+             <h4 className="text-xs font-black uppercase tracking-widest text-[#F0EFE8]">AGENCY BADGES & AWARDS</h4>
           </div>
-          <span className="px-3 py-1 text-[9px] font-black text-[#D4AF37] border border-[#D4AF37]/30 bg-[#D4AF37]/10 rounded-full uppercase tracking-widest shadow-[0_0_10px_rgba(212,175,55,0.2)]">
+          <span className={cn("px-3 py-1 text-[9px] font-black rounded-full uppercase tracking-widest border", styles.badgeText, styles.badgeBgBorder)} style={{ boxShadow: `0 0 10px ${styles.accentColor}20` }}>
             {awards.length} earned
           </span>
         </div>
         <div className="flex flex-wrap gap-2.5">
           {awards.map((award: any, i: number) => (
-            <div key={i} className="flex flex-col items-center gap-1.5 bg-[#0D0D14] border border-[#D4AF37]/15 rounded-xl p-3 w-[88px] text-center hover:border-[#D4AF37]/40 transition-all group">
-              <span className="text-2xl group-hover:scale-110 transition-transform inline-block">{ICON_MAP[award.iconType] || '🎖️'}</span>
+            <div key={i} className={cn("flex flex-col items-center gap-1.5 bg-[#0D0D14] rounded-xl p-3 w-[88px] text-center transition-all border group/award", styles.awardBorder)}>
+              <span className="text-2xl group-hover/award:scale-110 transition-transform inline-block">{ICON_MAP[award.iconType] || '🎖️'}</span>
               <p className="text-[8px] font-black text-[#F0EFE8] leading-tight">{award.title}</p>
               {(award.dateAwarded || award.awardedAt) && (
                 <p className="text-[7px] text-[#A09E9A]/40 font-mono">{new Date(award.dateAwarded || award.awardedAt).getFullYear()}</p>

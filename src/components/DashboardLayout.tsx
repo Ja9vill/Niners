@@ -2,8 +2,9 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Outlet, useNavigate, useLocation, Link } from 'react-router-dom';
 import { 
   Menu, X, LogOut, LayoutDashboard, Users, User, Shield, Calendar, DollarSign, Activity, FileText,
-  Bell, Trash2, Plus, Clock
+  Bell, Trash2, Plus, Clock, ChevronDown, Monitor, Smartphone
 } from 'lucide-react';
+import { useViewMode } from '../hooks/useViewMode';
 import { Storage } from '../lib/storage';
 import { auth, db } from '../lib/firebase';
 import { signOut } from 'firebase/auth';
@@ -12,11 +13,17 @@ import { collection, query, onSnapshot, setDoc, doc, deleteDoc, where } from 'fi
 import appLogo from '../logo.jpg';
 import { FirebaseService } from '../lib/firebaseService';
 
-export const DashboardLayout = () => {
+export const DashboardLayout = ({ children }: { children?: React.ReactNode }) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [openDropdowns, setOpenDropdowns] = useState<Record<string, boolean>>({});
   const navigate = useNavigate();
   const location = useLocation();
   const authState = Storage.getAuthState();
+  const { currentViewMode, setViewMode } = useViewMode();
+
+  const toggleDropdown = (id: string) => {
+    setOpenDropdowns(prev => ({ ...prev, [id]: !prev[id] }));
+  };
 
   // Notification center states
   const [announcements, setAnnouncements] = useState<any[]>([]);
@@ -559,23 +566,42 @@ export const DashboardLayout = () => {
   const getSideNavLinks = () => {
     const links: any[] = [];
     
+    // Base Menu for all logged-in users
+    links.push({ path: '/dashboard', label: 'Overview', icon: LayoutDashboard });
+    links.push({ path: '/roster', label: 'Roster', icon: Users });
+    links.push({ path: '/calendar', label: 'Calendar', icon: Calendar });
+    links.push({ path: '/my-profile', label: 'My Profile', icon: User });
+
     const role = (authState.role || '').toLowerCase();
     
     if (role === 'director' || role === 'head admin' || role === 'head_admin') {
+      links.push({ isDivider: true, id: 'div-1' });
       links.push({ isTitle: true, label: "Director's Hub", id: 'title-director' });
       
       links.push({ path: '/profiles', label: 'Roster Management', icon: Users });
-      links.push({ path: '/hub', label: 'Operations', icon: Activity });
+      
+      links.push({ 
+        id: 'dropdown-dashboard',
+        isDropdown: true,
+        label: 'Dashboard',
+        icon: LayoutDashboard,
+        subLinks: [
+          { path: '/director-operations', label: 'Operations', icon: Activity },
+          { path: '/financial-data', label: 'Reporting', icon: DollarSign },
+          { path: '/system-logs', label: 'System Logs', icon: FileText }
+        ]
+      });
       
       if (role === 'director') {
+        links.push({ isDivider: true, id: 'div-2' });
+        links.push({ isTitle: true, label: "Directors Access", id: 'title-access' });
         links.push({ path: '/provision-user', label: 'Provision User', icon: Plus });
-        links.push({ path: '/financial-data', label: 'Financial Data', icon: DollarSign });
       }
-      
-      links.push({ path: '/director', label: 'Sitewide Logs', icon: FileText });
     } else if (role === 'admin') {
+      links.push({ isDivider: true, id: 'div-admin' });
       links.push({ path: '/admin-hub', label: 'Admin Hub', icon: Shield });
     } else if (role === 'manager' || role === 'agent') {
+      links.push({ isDivider: true, id: 'div-manager' });
       links.push({ path: '/hub', label: 'Operations', icon: Activity });
     }
 
@@ -613,13 +639,14 @@ export const DashboardLayout = () => {
           </button>
         </div>
       )}
-      {/* Mobile Header */}
       <header className="md:hidden flex items-center justify-between p-4 bg-[#11111A] border-b border-white/5 shrink-0 z-20">
         <div className="flex items-center gap-3">
           <img src={appLogo} alt="Nine Dashboard" className="w-8 h-8 rounded-full border border-white/10 shrink-0" />
           <div className="flex flex-col">
             <h1 className="text-[11px] font-black uppercase tracking-widest text-[#F0EFE8] leading-tight">NINE TALENT MANAGEMENT</h1>
-            <div className="text-[10px] text-[#A09E9A] capitalize">{authState.role || 'Guest'}</div>
+            <div className="text-[10px] text-[#A09E9A] flex items-center gap-2">
+              <span className="capitalize">{authState.name} ({authState.role || 'Guest'})</span>
+            </div>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -644,9 +671,37 @@ export const DashboardLayout = () => {
           </div>
 
           <div className="p-4 flex-1 overflow-y-auto space-y-2">
-            <div className="mb-6 px-2">
-              <div className="text-sm font-bold truncate">{authState.name}</div>
-              <div className="text-xs text-[#A09E9A] capitalize">{authState.role}</div>
+            <div className="mb-6 px-2 flex items-center justify-between">
+              <div className="flex-1 overflow-hidden">
+                <div className="text-sm font-bold truncate pr-2">{authState.name}</div>
+                <div className="text-xs text-[#A09E9A] capitalize">{authState.role}</div>
+              </div>
+              <div className="flex items-center bg-black/20 rounded-full p-1 border border-white/5 shadow-inner shrink-0">
+                <button
+                  onClick={() => setViewMode('desktop')}
+                  className={cn(
+                    "p-1.5 rounded-full transition-all duration-300",
+                    currentViewMode === 'desktop' 
+                      ? "bg-[#D4AF37] text-black shadow-[0_0_10px_rgba(212,175,55,0.4)]" 
+                      : "text-[#A09E9A] hover:text-white"
+                  )}
+                  title="Desktop View"
+                >
+                  <Monitor size={14} />
+                </button>
+                <button
+                  onClick={() => setViewMode('mobile')}
+                  className={cn(
+                    "p-1.5 rounded-full transition-all duration-300",
+                    currentViewMode === 'mobile' 
+                      ? "bg-[#D4AF37] text-black shadow-[0_0_10px_rgba(212,175,55,0.4)]" 
+                      : "text-[#A09E9A] hover:text-white"
+                  )}
+                  title="Mobile View"
+                >
+                  <Smartphone size={14} />
+                </button>
+              </div>
             </div>
 
             {sideNavLinks.map((link) => {
@@ -660,7 +715,57 @@ export const DashboardLayout = () => {
                   </div>
                 );
               }
+
               const Icon = link.icon;
+
+              if (link.isDropdown) {
+                const isAnyChildActive = link.subLinks.some((sl: any) => location.pathname.startsWith(sl.path));
+                const isOpen = openDropdowns[link.id];
+                return (
+                  <div key={link.id} className="space-y-1">
+                    <button
+                      onClick={() => toggleDropdown(link.id)}
+                      className={cn(
+                        "w-full flex items-center justify-between px-3 py-3 rounded-xl transition-all font-bold text-sm",
+                        isAnyChildActive || isOpen
+                          ? "bg-[#D4AF37]/10 text-[#D4AF37] shadow-[inset_0_0_12px_rgba(212,175,55,0.05)]" 
+                          : "text-[#A09E9A] hover:bg-white/[0.02] hover:text-[#F0EFE8]"
+                      )}
+                    >
+                      <div className="flex items-center gap-3">
+                        <Icon size={18} />
+                        <span>{link.label}</span>
+                      </div>
+                      <ChevronDown size={14} className={cn("transition-transform duration-200", isOpen ? "rotate-180" : "")} />
+                    </button>
+                    {isOpen && (
+                      <div className="pl-11 pr-2 py-1 flex flex-col gap-1">
+                        {link.subLinks.map((subLink: any) => {
+                          const isSubActive = location.pathname.startsWith(subLink.path);
+                          const SubIcon = subLink.icon;
+                          return (
+                            <Link
+                              key={subLink.path}
+                              to={subLink.path}
+                              onClick={() => setIsSidebarOpen(false)}
+                              className={cn(
+                                "flex items-center gap-3 px-3 py-2 rounded-lg transition-all font-bold text-xs",
+                                isSubActive
+                                  ? "bg-[#D4AF37]/10 text-[#D4AF37]"
+                                  : "text-[#A09E9A] hover:text-[#F0EFE8] hover:bg-white/5"
+                              )}
+                            >
+                              {SubIcon && <SubIcon size={14} />}
+                              <span>{subLink.label}</span>
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+
               const isActive = location.pathname.startsWith(link.path);
               return (
                 <Link
@@ -706,7 +811,7 @@ export const DashboardLayout = () => {
           </header>
 
           <div className="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar">
-            <Outlet />
+            {children || <Outlet />}
           </div>
         </main>
       </div>

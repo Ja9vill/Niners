@@ -529,12 +529,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
 
   return (
     <div className="space-y-6">
-      {/* Top Header for Public View */}
-      {isReadOnly && (
-        <div className="border-b border-t border-[#D4AF37]/15 py-3 flex items-center justify-between px-2">
-          <span className="text-xs font-black tracking-[0.25em] text-white/50">NINERS APP</span>
-        </div>
-      )}
+
 
       <div className="space-y-6">
         {/* Main Calendar Section */}

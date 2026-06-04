@@ -426,7 +426,7 @@ export const RosterManagementTab: React.FC<RosterManagementTabProps> = ({ hosts,
                 <th className="px-6 py-4">Role</th>
                 <th className="px-6 py-4">Status</th>
                 <th className="px-6 py-4">Team Anchor</th>
-                <th className="px-6 py-4">Tier / Pay</th>
+                <th className="px-6 py-4">Tier Pay</th>
                 <th className="px-6 py-4">Assigned Manager (Name)</th>
                 <th className="px-6 py-4">Manager Poppo ID</th>
                 {onResetAccountAccess && <th className="px-6 py-4">Account Access</th>}
@@ -472,9 +472,10 @@ export const RosterManagementTab: React.FC<RosterManagementTabProps> = ({ hosts,
                             onClick={() => handlePhotoClick(host)}
                             className="relative group w-8 h-8 rounded-lg border border-white/10 flex-shrink-0 overflow-hidden cursor-pointer bg-white/5 hover:border-indigo-400 transition-colors"
                             title="Update Profile Photo"
+                            style={{ aspectRatio: '1 / 1' }}
                           >
                             {host.photoUrl ? (
-                              <img src={host.photoUrl} alt="" className="w-full h-full object-cover" />
+                              <img src={host.photoUrl} alt="" className="w-full h-full object-cover" style={{ aspectRatio: '1 / 1', objectFit: 'cover' }} />
                             ) : (
                               <div className="w-full h-full flex items-center justify-center">
                                 <UserCircle size={16} className="text-[#A09E9A]/50 group-hover:text-indigo-400" />
@@ -628,9 +629,9 @@ export const RosterManagementTab: React.FC<RosterManagementTabProps> = ({ hosts,
             </div>
             
             <div className="p-8 flex flex-col items-center">
-              <div className="w-32 h-32 rounded-2xl overflow-hidden border-4 border-indigo-500/30 mb-6 bg-black/50 relative group">
+              <div className="w-32 h-32 rounded-2xl overflow-hidden border-4 border-indigo-500/30 mb-6 bg-black/50 relative group" style={{ aspectRatio: '1 / 1' }}>
                 {selectedHostForUpload.photoUrl ? (
-                  <img src={selectedHostForUpload.photoUrl} alt="" className={cn("w-full h-full object-cover transition-opacity", isUploading && "opacity-50")} />
+                  <img src={selectedHostForUpload.photoUrl} alt="" className={cn("w-full h-full object-cover transition-opacity", isUploading && "opacity-50")} style={{ aspectRatio: '1 / 1', objectFit: 'cover' }} />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center">
                     <UserCircle size={64} className="text-[#A09E9A]/30" />

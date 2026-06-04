@@ -3,10 +3,12 @@ import { Outlet, Link, useLocation } from 'react-router-dom';
 import { Home, Trophy, Calendar, PlayCircle } from 'lucide-react';
 import { cn } from '../lib/utils';
 import appLogo from '../logo.jpg';
+import { Storage } from '../lib/storage';
 
-
-export const PublicLayout = () => {
+export const PublicLayout = ({ children }: { children?: React.ReactNode }) => {
   const location = useLocation();
+  const authState = Storage.getAuthState();
+  const isLoggedIn = authState && authState.level > 0;
 
   return (
     <div className="fixed inset-0 w-full h-[100dvh] flex flex-col overflow-hidden bg-[#0A0A0F] text-[#F0EFE8] font-sans selection:bg-[#D4AF37]/30 selection:text-white">
@@ -23,12 +25,14 @@ export const PublicLayout = () => {
               NINE TALENT MANAGEMENT
             </span>
           </Link>
-          <Link 
-            to="/login"
-            className="px-4 py-1.5 rounded-full bg-[#D4AF37]/10 text-[#D4AF37] border border-[#D4AF37]/20 text-[10px] font-bold uppercase tracking-widest"
-          >
-            Login
-          </Link>
+          {!isLoggedIn && (
+            <Link 
+              to="/login"
+              className="px-4 py-1.5 rounded-full bg-[#D4AF37]/10 text-[#D4AF37] border border-[#D4AF37]/20 text-[10px] font-bold uppercase tracking-widest"
+            >
+              Login
+            </Link>
+          )}
         </div>
       </header>
 
@@ -37,7 +41,7 @@ export const PublicLayout = () => {
         className="flex-1 w-full overflow-y-auto custom-scrollbar" 
         style={{ WebkitOverflowScrolling: 'touch' }}
       >
-        <Outlet />
+        {children || <Outlet />}
       </main>
 
       {/* Native Bottom Tab Bar */}

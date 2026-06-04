@@ -123,7 +123,12 @@ export const DirectorTab = () => {
   const [isLoadingAwards, setIsLoadingAwards] = useState(false);
   const [newAwardName, setNewAwardName] = useState('');
   const [newAwardColor, setNewAwardColor] = useState('Gold');
+  const [newAwardStartDate, setNewAwardStartDate] = useState('');
+  const [newAwardEndDate, setNewAwardEndDate] = useState('');
   const [isCreatingAward, setIsCreatingAward] = useState(false);
+  const [awardCreateMode, setAwardCreateMode] = useState<'single' | 'bulk'>('single');
+  const [bulkMonth, setBulkMonth] = useState('06');
+  const [bulkYear, setBulkYear] = useState('2026');
 
   // Award Assignment states
   const [assignAwardId, setAssignAwardId] = useState('');
@@ -133,11 +138,26 @@ export const DirectorTab = () => {
   const [awardEndDate, setAwardEndDate] = useState('');
   const [isAssigningAward, setIsAssigningAward] = useState(false);
 
+  useEffect(() => {
+    if (assignAwardId) {
+      const match = awards.find(a => a.id === assignAwardId);
+      if (match) {
+        setAwardStartDate(match.startDate || '');
+        setAwardEndDate(match.endDate || '');
+      }
+    } else {
+      setAwardStartDate('');
+      setAwardEndDate('');
+    }
+  }, [assignAwardId, awards]);
+
   // Filtered hosts for award assignment dropdown
   const filteredAssignHosts = useMemo(() => {
     return hosts.filter(h => {
-      if (assignRoleFilter === 'All') return true;
       const hRole = (h.role || 'host').toLowerCase().replace('_', ' ');
+      if (hRole === 'director') return false;
+
+      if (assignRoleFilter === 'All') return true;
       const filterRole = assignRoleFilter.toLowerCase().replace('_', ' ');
       return hRole === filterRole;
     });
@@ -626,7 +646,7 @@ export const DirectorTab = () => {
 
   const handleCreateAward = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newAwardName.trim()) return;
+    if (!newAwardName.trim() || !newAwardStartDate || !newAwardEndDate) return;
     setIsCreatingAward(true);
     setErrorMessage(null);
     setSuccessMessage('');
@@ -637,16 +657,79 @@ export const DirectorTab = () => {
         id: awardId,
         name: newAwardName.trim(),
         color: newAwardColor,
+        startDate: newAwardStartDate,
+        endDate: newAwardEndDate,
         createdAt: new Date().toISOString()
       };
       await setDoc(doc(db, 'awards', awardId), newAward);
       await FirebaseService.logSystemActivity(`Director/Admin created new award badge "${newAward.name}" with color "${newAward.color}"`, 'Info');
       setAwards(prev => [...prev, newAward]);
       setNewAwardName('');
+      setNewAwardStartDate('');
+      setNewAwardEndDate('');
       setSuccessMessage(`Award "${newAward.name}" created successfully!`);
     } catch (err: any) {
       console.error('Create award error:', err);
       setErrorMessage(err.message || 'Failed to create award.');
+    } finally {
+      setIsCreatingAward(false);
+    }
+  };
+
+  const handleBulkGenerateAwards = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!bulkMonth || !bulkYear) return;
+    setIsCreatingAward(true);
+    setErrorMessage(null);
+    setSuccessMessage('');
+
+    try {
+      const months = [
+        "January", "February", "March", "April", "May", "June",
+        "July", "August", "September", "October", "November", "December"
+      ];
+      const monthIndex = parseInt(bulkMonth, 10) - 1;
+      const monthName = months[monthIndex];
+      const yearNum = parseInt(bulkYear, 10);
+
+      // Compute start and end dates
+      const pad = (n: number) => String(n).padStart(2, '0');
+      const startDateStr = `${yearNum}-${pad(bulkMonth)}-01`;
+      
+      const lastDay = new Date(yearNum, monthIndex + 1, 0).getDate();
+      const endDateStr = `${yearNum}-${pad(bulkMonth)}-${pad(lastDay)}`;
+
+      const newAwardsList: any[] = [];
+      const batch = writeBatch(db);
+
+      for (let rank = 1; rank <= 9; rank++) {
+        const awardId = getUUID();
+        
+        let color = 'Gold';
+        if (rank >= 4 && rank <= 6) color = 'Orange';
+        else if (rank >= 7) color = 'Red';
+
+        const newAward = {
+          id: awardId,
+          name: `Top ${rank} Niner - ${monthName} ${bulkYear}`,
+          color,
+          startDate: startDateStr,
+          endDate: endDateStr,
+          createdAt: new Date().toISOString()
+        };
+
+        batch.set(doc(db, 'awards', awardId), newAward);
+        newAwardsList.push(newAward);
+      }
+
+      await batch.commit();
+      await FirebaseService.logSystemActivity(`Director/Admin bulk generated Monthly Top Niners awards templates for ${monthName} ${bulkYear}`, 'Info');
+      
+      setAwards(prev => [...prev, ...newAwardsList]);
+      setSuccessMessage(`Successfully generated 9 Monthly Top Niner awards for ${monthName} ${bulkYear}!`);
+    } catch (err: any) {
+      console.error('Bulk generate awards error:', err);
+      setErrorMessage(err.message || 'Failed to bulk generate awards.');
     } finally {
       setIsCreatingAward(false);
     }
@@ -2171,7 +2254,7 @@ export const DirectorTab = () => {
                             <th className="px-4 py-4">Role</th>
 
                             <th className="px-6 py-4">Status</th>
-                            <th className="px-6 py-4">Salary Class</th>
+                            <th className="px-6 py-4">Tier Pay</th>
                             <th className="px-6 py-4 text-right">Actions</th>
                           </tr>
                         </thead>
@@ -2860,7 +2943,7 @@ export const DirectorTab = () => {
                   { field: 'role', label: 'Role' },
                   { field: 'team', label: 'Team Group' },
                   { field: 'manager', label: 'Assigned Manager' },
-                  { field: 'tier_pay', label: 'Salary Class' },
+                  { field: 'tier_pay', label: 'Tier Pay' },
                   { field: 'status', label: 'Roster Status' },
 
                   { field: 'level', label: 'Level Snapshot' }
@@ -3349,58 +3432,145 @@ export const DirectorTab = () => {
 
             {/* 4. Awards Desk */}
             {operationsSubTab === 'awards' && (
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                {/* Left Panel: Create Award Form */}
-                <div className="lg:col-span-1 space-y-6">
-                  {/* Create Award Form */}
+              <div className="space-y-8 w-full">
+                {/* Row 1: Forms Grid */}
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+                  {/* Block 1: Create Award Form */}
                   <div className="bg-[#1A1A28]/40 border border-white/5 p-6 rounded-3xl space-y-4">
-                    <h4 className="text-xs font-black uppercase tracking-widest text-[#F0EFE8] pb-2 border-b border-white/5">Create Award Badge</h4>
-                    
-                    <form onSubmit={handleCreateAward} className="space-y-4">
-                      <div className="space-y-1.5">
-                        <label className="text-[9px] font-black uppercase text-[#A09E9A] tracking-wider">Award Title</label>
-                        <input
-                          type="text"
-                          value={newAwardName}
-                          onChange={(e) => setNewAwardName(e.target.value)}
-                          placeholder="e.g. Star Host"
-                          className="w-full bg-[#0D0D14] border border-white/10 rounded-xl px-3 py-2 text-xs text-[#F0EFE8] focus:outline-none focus:border-indigo-500"
-                          required
-                          title="Award Title"
-                        />
-                      </div>
-
-                      <div className="space-y-1.5">
-                        <label className="text-[9px] font-black uppercase text-[#A09E9A] tracking-wider">Tag Style Color</label>
-                        <select
-                          value={newAwardColor}
-                          onChange={(e) => setNewAwardColor(e.target.value)}
-                          className="w-full bg-[#0D0D14] border border-white/10 rounded-xl px-3 py-2 text-xs text-[#F0EFE8] focus:outline-none focus:border-indigo-500 cursor-pointer"
-                          title="Style color"
+                    <div className="flex items-center justify-between pb-2 border-b border-white/5">
+                      <h4 className="text-xs font-black uppercase tracking-widest text-[#F0EFE8]">Create Award Badge</h4>
+                      <div className="flex gap-1 bg-[#0D0D14] p-1 rounded-lg border border-white/5">
+                        <button
+                          type="button"
+                          onClick={() => setAwardCreateMode('single')}
+                          className={cn("px-2.5 py-1 rounded text-[8px] font-black uppercase tracking-wider transition-all cursor-pointer",
+                            awardCreateMode === 'single' ? "bg-indigo-600 text-white shadow-sm font-extrabold" : "text-[#A09E9A] hover:text-[#F0EFE8]")}
                         >
-                          <option value="Gold">🏆 Gold</option>
-                          <option value="Purple">⭐ Purple</option>
-                          <option value="Emerald">💚 Emerald</option>
-                          <option value="Blue">💙 Blue</option>
-                          <option value="Red">❤️ Red</option>
-                          <option value="Orange">🧡 Orange</option>
-                        </select>
+                          Single
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setAwardCreateMode('bulk')}
+                          className={cn("px-2.5 py-1 rounded text-[8px] font-black uppercase tracking-wider transition-all cursor-pointer",
+                            awardCreateMode === 'bulk' ? "bg-indigo-600 text-white shadow-sm font-extrabold" : "text-[#A09E9A] hover:text-[#F0EFE8]")}
+                        >
+                          Bulk Top 9
+                        </button>
                       </div>
+                    </div>
 
-                      <button
-                        type="submit"
-                        disabled={isCreatingAward}
-                        className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer shadow-md"
-                      >
-                        {isCreatingAward ? 'Creating...' : 'Create Award'}
-                      </button>
-                    </form>
+                    {awardCreateMode === 'single' ? (
+                      <form onSubmit={handleCreateAward} className="space-y-4">
+                        <div className="space-y-1.5">
+                          <label className="text-[9px] font-black uppercase text-[#A09E9A] tracking-wider">Award Title</label>
+                          <input
+                            type="text"
+                            value={newAwardName}
+                            onChange={(e) => setNewAwardName(e.target.value)}
+                            placeholder="e.g. Star Host"
+                            className="w-full bg-[#0D0D14] border border-white/10 rounded-xl px-3 py-2 text-xs text-[#F0EFE8] focus:outline-none focus:border-indigo-500"
+                            required
+                            title="Award Title"
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-[9px] font-black uppercase text-[#A09E9A] tracking-wider">Tag Style Color</label>
+                          <select
+                            value={newAwardColor}
+                            onChange={(e) => setNewAwardColor(e.target.value)}
+                            className="w-full bg-[#0D0D14] border border-white/10 rounded-xl px-3 py-2 text-xs text-[#F0EFE8] focus:outline-none focus:border-indigo-500 cursor-pointer"
+                            title="Style color"
+                          >
+                            <option value="Gold">🏆 Gold</option>
+                            <option value="Purple">⭐ Purple</option>
+                            <option value="Emerald">💚 Emerald</option>
+                            <option value="Blue">💙 Blue</option>
+                            <option value="Red">❤️ Red</option>
+                            <option value="Orange">🧡 Orange</option>
+                          </select>
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-[9px] font-black uppercase text-[#A09E9A] tracking-wider">Effectivity Period</label>
+                          <div className="grid grid-cols-2 gap-3">
+                            <SingleDatePicker
+                              id="new-award-start-date"
+                              name="newAwardStartDate"
+                              value={newAwardStartDate}
+                              onChange={(val) => setNewAwardStartDate(val)}
+                              required
+                            />
+                            <SingleDatePicker
+                              id="new-award-end-date"
+                              name="newAwardEndDate"
+                              value={newAwardEndDate}
+                              onChange={(val) => setNewAwardEndDate(val)}
+                              required
+                            />
+                          </div>
+                        </div>
+                        <button
+                          type="submit"
+                          disabled={isCreatingAward}
+                          className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer shadow-md"
+                        >
+                          {isCreatingAward ? 'Creating...' : 'Create Award'}
+                        </button>
+                      </form>
+                    ) : (
+                      <form onSubmit={handleBulkGenerateAwards} className="space-y-4 animate-in fade-in duration-200">
+                        <div className="space-y-1.5">
+                          <label className="text-[9px] font-black uppercase text-[#A09E9A] tracking-wider">Select Month</label>
+                          <select
+                            value={bulkMonth}
+                            onChange={(e) => setBulkMonth(e.target.value)}
+                            className="w-full bg-[#0D0D14] border border-white/10 rounded-xl px-3 py-2 text-xs text-[#F0EFE8] focus:outline-none focus:border-indigo-500 cursor-pointer"
+                            title="Select Month"
+                          >
+                            <option value="01">January</option>
+                            <option value="02">February</option>
+                            <option value="03">March</option>
+                            <option value="04">April</option>
+                            <option value="05">May</option>
+                            <option value="06">June</option>
+                            <option value="07">July</option>
+                            <option value="08">August</option>
+                            <option value="09">September</option>
+                            <option value="10">October</option>
+                            <option value="11">November</option>
+                            <option value="12">December</option>
+                          </select>
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-[9px] font-black uppercase text-[#A09E9A] tracking-wider">Select Year</label>
+                          <select
+                            value={bulkYear}
+                            onChange={(e) => setBulkYear(e.target.value)}
+                            className="w-full bg-[#0D0D14] border border-white/10 rounded-xl px-3 py-2 text-xs text-[#F0EFE8] focus:outline-none focus:border-indigo-500 cursor-pointer"
+                            title="Select Year"
+                          >
+                            <option value="2024">2024</option>
+                            <option value="2025">2025</option>
+                            <option value="2026">2026</option>
+                            <option value="2027">2027</option>
+                            <option value="2028">2028</option>
+                            <option value="2029">2029</option>
+                            <option value="2030">2030</option>
+                          </select>
+                        </div>
+                        <button
+                          type="submit"
+                          disabled={isCreatingAward}
+                          className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer shadow-md"
+                        >
+                          {isCreatingAward ? 'Generating...' : 'Bulk Generate Top 9 Badges'}
+                        </button>
+                      </form>
+                    )}
                   </div>
 
-                  {/* Assign Award Form */}
+                  {/* Block 2: Assign Custom Award Form */}
                   <div className="bg-[#1A1A28]/40 border border-white/5 p-6 rounded-3xl space-y-4">
                     <h4 className="text-xs font-black uppercase tracking-widest text-[#F0EFE8] pb-2 border-b border-white/5">Assign Custom Award</h4>
-                    
                     <form onSubmit={handleAssignAward} className="space-y-4">
                       <div className="space-y-1.5">
                         <label className="text-[9px] font-black uppercase text-[#A09E9A] tracking-wider">Select Created Award</label>
@@ -3409,6 +3579,7 @@ export const DirectorTab = () => {
                           onChange={(e) => setAssignAwardId(e.target.value)}
                           className="w-full bg-[#0D0D14] border border-white/10 rounded-xl px-3 py-2 text-xs text-[#F0EFE8] focus:outline-none focus:border-indigo-500 cursor-pointer"
                           title="Select created award"
+                          required
                         >
                           <option value="">-- Select Award --</option>
                           {awards.map(a => (
@@ -3416,7 +3587,6 @@ export const DirectorTab = () => {
                           ))}
                         </select>
                       </div>
-
                       <div className="space-y-1.5">
                         <label className="text-[9px] font-black uppercase text-[#A09E9A] tracking-wider">Filter by Role</label>
                         <select
@@ -3425,16 +3595,14 @@ export const DirectorTab = () => {
                           className="w-full bg-[#0D0D14] border border-white/10 rounded-xl px-3 py-2 text-xs text-[#F0EFE8] focus:outline-none focus:border-indigo-500 cursor-pointer"
                           title="Filter users by role"
                         >
-                          <option value="All">All Roles</option>
+                          <option value="All">All Roles (Excl. Director)</option>
                           <option value="Host">Host / Talent</option>
                           <option value="Manager">Manager</option>
                           <option value="Agent">Agent</option>
                           <option value="Admin">Admin</option>
                           <option value="Head Admin">Head Admin</option>
-                          <option value="Director">Director</option>
                         </select>
                       </div>
-
                       <div className="space-y-1.5">
                         <label className="text-[9px] font-black uppercase text-[#A09E9A] tracking-wider">Select Member</label>
                         <select
@@ -3442,6 +3610,7 @@ export const DirectorTab = () => {
                           onChange={(e) => setAssignHostId(e.target.value)}
                           className="w-full bg-[#0D0D14] border border-white/10 rounded-xl px-3 py-2 text-xs text-[#F0EFE8] focus:outline-none focus:border-[#D4AF37] cursor-pointer"
                           title="Select Member"
+                          required
                         >
                           <option value="">-- Choose Member --</option>
                           {filteredAssignHosts.map(h => (
@@ -3449,107 +3618,125 @@ export const DirectorTab = () => {
                           ))}
                         </select>
                       </div>
-
-                      <div className="grid grid-cols-2 gap-3">
+                      {assignAwardId && (
                         <div className="space-y-1.5">
-                          <label className="text-[9px] font-black uppercase text-[#A09E9A] tracking-wider">Start Date</label>
-                          <SingleDatePicker
-                            id="award-start-date"
-                            name="awardStartDate"
-                            value={awardStartDate}
-                            onChange={(val) => setAwardStartDate(val)}
-                            required
-                          />
+                          <label className="text-[9px] font-black uppercase text-[#A09E9A] tracking-wider">Effectivity Period (Inherited from template)</label>
+                          <div className="grid grid-cols-2 gap-3 bg-black/20 p-3 rounded-lg border border-white/5 text-xs text-[#F0EFE8] font-mono">
+                            <div>
+                              <span className="text-[8px] text-[#A09E9A] block uppercase mb-0.5">Start Date</span>
+                              {awardStartDate || 'N/A'}
+                            </div>
+                            <div>
+                              <span className="text-[8px] text-[#A09E9A] block uppercase mb-0.5">End Date</span>
+                              {awardEndDate || 'N/A'}
+                            </div>
+                          </div>
                         </div>
-                        <div className="space-y-1.5">
-                          <label className="text-[9px] font-black uppercase text-[#A09E9A] tracking-wider">End Date</label>
-                          <SingleDatePicker
-                            id="award-end-date"
-                            name="awardEndDate"
-                            value={awardEndDate}
-                            onChange={(val) => setAwardEndDate(val)}
-                            required
-                          />
-                        </div>
-                      </div>
-
+                      )}
                       <button
                         type="submit"
                         disabled={isAssigningAward}
                         className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer shadow-md"
                       >
-                        {isAssigningAward ? 'Assigning...' : 'Assign Award Tag'}
+                        {isAssigningAward ? 'Assigning...' : 'Assign Award Badge'}
                       </button>
                     </form>
                   </div>
                 </div>
 
-                {/* Right Panel: Assigned Awards History Table */}
-                <div className="lg:col-span-2 bg-[#1A1A28]/40 border border-white/5 p-6 rounded-3xl flex flex-col gap-4">
-                  <h4 className="text-xs font-black uppercase tracking-widest text-[#F0EFE8] pb-2 border-b border-white/5">Active Award Assignments</h4>
-                  
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left text-xs">
-                      <thead>
-                        <tr className="border-b border-white/5 text-[9px] font-black text-[#A09E9A]/40 uppercase tracking-widest bg-white/[0.02]">
-                          <th className="px-4 py-3">Host Details</th>
-                          <th className="px-4 py-3">Award Name</th>
-                          <th className="px-4 py-3">Active Period</th>
-                          <th className="px-4 py-3 text-right">Action</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-white/5">
-                        {isLoadingAwards ? (
-                          <tr>
-                            <td colSpan={4} className="py-8 text-center text-[#A09E9A]/20 italic">
-                              <Loader2 className="animate-spin text-indigo-400 mx-auto" size={16} />
-                            </td>
-                          </tr>
-                        ) : awardAssignments.length === 0 ? (
-                          <tr>
-                            <td colSpan={4} className="py-8 text-center text-[#A09E9A]/20 italic">No awards currently assigned.</td>
-                          </tr>
-                        ) : (
-                          awardAssignments.map(a => {
-                            let badgeStyle = 'bg-amber-500/10 text-amber-400 border-amber-500/20'; // Gold default
-                            if (a.awardColor === 'Purple') badgeStyle = 'bg-purple-500/10 text-purple-400 border-purple-500/20';
-                            else if (a.awardColor === 'Emerald') badgeStyle = 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
-                            else if (a.awardColor === 'Blue') badgeStyle = 'bg-blue-500/10 text-blue-400 border-blue-500/20';
-                            else if (a.awardColor === 'Red') badgeStyle = 'bg-red-500/10 text-red-400 border-red-500/20';
-                            else if (a.awardColor === 'Orange') badgeStyle = 'bg-orange-500/10 text-orange-400 border-orange-500/20';
+                {/* Block 3: Split View List of Awards */}
+                <div className="bg-[#1A1A28]/40 border border-white/5 p-6 rounded-3xl grid grid-cols-1 lg:grid-cols-2 gap-8">
+                  {/* Pane 1: Created Awards (Available for Assignment) */}
+                  <div className="space-y-4">
+                    <h4 className="text-xs font-black uppercase tracking-widest text-[#F0EFE8] pb-2 border-b border-[#D4AF37]/20 flex items-center justify-between">
+                      <span>Available Awards (Templates)</span>
+                      <span className="text-[10px] text-[#A09E9A]/60 font-mono">{awards.length} created</span>
+                    </h4>
+                    <div className="overflow-y-auto max-h-[400px] custom-scrollbar space-y-3 pr-2">
+                      {isLoadingAwards ? (
+                        <div className="py-8 text-center text-[#A09E9A]/20 italic"><Loader2 className="animate-spin text-indigo-400 mx-auto" size={16} /></div>
+                      ) : awards.length === 0 ? (
+                        <p className="text-xs text-[#A09E9A]/30 italic py-6 text-center">No awards badges created yet.</p>
+                      ) : (
+                        awards.map(a => {
+                          let labelStyle = 'bg-amber-500/10 text-amber-400 border-amber-500/20';
+                          if (a.color === 'Purple') labelStyle = 'bg-purple-500/10 text-purple-400 border-purple-500/20';
+                          else if (a.color === 'Emerald') labelStyle = 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
+                          else if (a.color === 'Blue') labelStyle = 'bg-blue-500/10 text-blue-400 border-blue-500/20';
+                          else if (a.color === 'Red') labelStyle = 'bg-red-500/10 text-red-400 border-red-500/20';
+                          else if (a.color === 'Orange') labelStyle = 'bg-orange-500/10 text-orange-400 border-orange-500/20';
 
-                            return (
-                              <tr key={a.id} className="hover:bg-white/[0.01] transition-colors">
-                                <td className="px-4 py-3 font-bold text-[#F0EFE8]">
-                                  {a.hostNickname}
-                                  <div className="text-[10px] text-[#A09E9A]/50 font-mono">ID: {a.hostId}</div>
-                                </td>
-                                <td className="px-4 py-3">
-                                  <span className={cn(
-                                    "text-[9px] font-black uppercase px-2 py-0.5 rounded-full border",
-                                    badgeStyle
-                                  )}>
+                          return (
+                            <div key={a.id} className="bg-[#13131E] border border-white/5 rounded-2xl p-4 flex items-center justify-between transition-all hover:bg-white/[0.04]">
+                              <div className="space-y-1 min-w-0">
+                                <span className={cn("text-[9px] font-black uppercase px-2 py-0.5 rounded-full border tracking-widest", labelStyle)}>
+                                  {a.name}
+                                </span>
+                                <div className="text-[10px] text-[#A09E9A] font-mono mt-1">
+                                  Period: {a.startDate || 'N/A'} to {a.endDate || 'N/A'}
+                                </div>
+                              </div>
+                              <button
+                                onClick={() => {
+                                  setAssignAwardId(a.id);
+                                  document.getElementById('assign-host-id')?.focus();
+                                }}
+                                className="text-[9px] font-black uppercase text-[#D4AF37] hover:bg-[#D4AF37]/10 px-3 py-1.5 border border-[#D4AF37]/35 rounded-xl transition-all whitespace-nowrap"
+                              >
+                                Assign Award
+                              </button>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Pane 2: Active Award Assignments */}
+                  <div className="space-y-4">
+                    <h4 className="text-xs font-black uppercase tracking-widest text-[#F0EFE8] pb-2 border-b border-[#D4AF37]/20 flex items-center justify-between">
+                      <span>Active Award Assignments</span>
+                      <span className="text-[10px] text-[#A09E9A]/60 font-mono">{awardAssignments.length} assigned</span>
+                    </h4>
+                    <div className="overflow-y-auto max-h-[400px] custom-scrollbar space-y-3 pr-2">
+                      {isLoadingAwards ? (
+                        <div className="py-8 text-center text-[#A09E9A]/20 italic"><Loader2 className="animate-spin text-indigo-400 mx-auto" size={16} /></div>
+                      ) : awardAssignments.length === 0 ? (
+                        <p className="text-xs text-[#A09E9A]/30 italic py-6 text-center">No awards currently assigned.</p>
+                      ) : (
+                        awardAssignments.map(a => {
+                          let labelStyle = 'bg-amber-500/10 text-amber-400 border-amber-500/20';
+                          if (a.awardColor === 'Purple') labelStyle = 'bg-purple-500/10 text-purple-400 border-purple-500/20';
+                          else if (a.awardColor === 'Emerald') labelStyle = 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
+                          else if (a.awardColor === 'Blue') labelStyle = 'bg-blue-500/10 text-blue-400 border-blue-500/20';
+                          else if (a.awardColor === 'Red') labelStyle = 'bg-red-500/10 text-red-400 border-red-500/20';
+                          else if (a.awardColor === 'Orange') labelStyle = 'bg-orange-500/10 text-orange-400 border-orange-500/20';
+
+                          return (
+                            <div key={a.id} className="bg-[#13131E] border border-white/5 rounded-2xl p-4 flex items-center justify-between transition-all hover:bg-white/[0.04]">
+                              <div className="space-y-1 min-w-0">
+                                <p className="text-sm font-bold text-[#F0EFE8] truncate">{a.hostNickname}</p>
+                                <p className="text-[9px] text-[#A09E9A]/60 font-mono">ID: {a.hostId}</p>
+                                <div className="flex flex-wrap items-center gap-2 mt-1">
+                                  <span className={cn("text-[8px] font-black uppercase px-2 py-0.5 rounded border tracking-wider", labelStyle)}>
                                     {a.awardName}
                                   </span>
-                                </td>
-                                <td className="px-4 py-3 text-slate-300 font-mono text-[10px]">
-                                  {a.startDate} to {a.endDate}
-                                </td>
-                                <td className="px-4 py-3 text-right">
-                                  <button
-                                    onClick={() => handleRevokeAssignment(a.id)}
-                                    className="text-red-400 hover:text-red-300 p-1 cursor-pointer shadow-sm"
-                                    title="Revoke award"
-                                  >
-                                    <Trash2 size={14} />
-                                  </button>
-                                </td>
-                              </tr>
-                            );
-                          })
-                        )}
-                      </tbody>
-                    </table>
+                                  <span className="text-[10px] text-white/40 font-mono">
+                                    {a.startDate} to {a.endDate}
+                                  </span>
+                                </div>
+                              </div>
+                              <button
+                                onClick={() => handleRevokeAssignment(a.id)}
+                                className="text-[9px] font-black uppercase text-red-400 hover:bg-red-500/10 px-3 py-1.5 border border-red-500/35 rounded-xl transition-all whitespace-nowrap"
+                              >
+                                Revoke
+                              </button>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>

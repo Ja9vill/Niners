@@ -1033,7 +1033,6 @@ router.post(
           assignedManagerId: null,
           team: "Unassigned",
           team_anchor: "Unassigned",
-          tier_pay: "N/A",
           tier_pay: "N/A"
         };
         await db.collection("host").doc(poppoId).set(hostData);

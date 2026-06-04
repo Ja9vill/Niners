@@ -2,7 +2,7 @@ import { auth, db, storage } from './firebase';
 import { ref, uploadString, getBytes, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { Storage } from './storage';
 import { doc, setDoc, getDoc, collection, query, where, getDocs, deleteDoc, writeBatch, Timestamp, onSnapshot, updateDoc, arrayUnion, arrayRemove, deleteField } from 'firebase/firestore';
-import { CommissionEntry, Host, PKEntry, ExposureEntry, FanbaseHealthEntry, WeeklyLiveDataEntry, MonthlyLiveDataEntry, TopNinersEarningsSummary, EventsCalendarPublic, Task, ActivityAuditLog, CalendarEvent, LivehouseRequest } from '../types';
+import { CommissionEntry, Host, PKEntry, ExposureEntry, FanbaseHealthEntry, WeeklyLiveDataEntry, MonthlyLiveDataEntry, TopNinersEarningsSummary, EventsCalendarPublic, Task, ActivityAuditLog, CalendarEvent, LivehouseRequest, AwardBadge, AwardAssignment, ManagerNote } from '../types';
 
 export enum OperationType {
   CREATE = 'create',
@@ -161,6 +161,86 @@ export const FirebaseService = {
     } catch (error: any) {
       console.error(`[UPDATE] Role metadata error for ID: ${id}`, error);
       handleFirestoreError(error, OperationType.UPDATE, `role_metadata/${id}`);
+    }
+  },
+
+
+  async getAwards(): Promise<AwardBadge[]> {
+    try {
+      const snap = await getDocs(collection(db, 'awards'));
+      return snap.docs.map(d => ({ id: d.id, ...d.data() } as AwardBadge));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.LIST, 'awards');
+      return [];
+    }
+  },
+  async saveAwards(awards: AwardBadge[]) {
+    try {
+      const batch = writeBatch(db);
+      awards.forEach(a => batch.set(doc(db, 'awards', a.id), a, { merge: true }));
+      await batch.commit();
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, 'awards');
+      throw error;
+    }
+  },
+  async getAwardAssignments(): Promise<AwardAssignment[]> {
+    try {
+      const snap = await getDocs(collection(db, 'award_assignments'));
+      return snap.docs.map(d => ({ id: d.id, ...d.data() } as AwardAssignment));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.LIST, 'award_assignments');
+      return [];
+    }
+  },
+  async saveAwardAssignments(assignments: AwardAssignment[]) {
+    try {
+      const batch = writeBatch(db);
+      assignments.forEach(a => batch.set(doc(db, 'award_assignments', a.id), a, { merge: true }));
+      await batch.commit();
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, 'award_assignments');
+    }
+  },
+  async deleteAwardAssignment(id: string) {
+    try {
+      await deleteDoc(doc(db, 'award_assignments', id));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, `award_assignments/${id}`);
+    }
+  },
+  async getLivehouses(): Promise<LivehouseRequest[]> {
+    try {
+      const snap = await getDocs(collection(db, 'livehouse_requests'));
+      return snap.docs.map(d => d.data() as LivehouseRequest);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.LIST, 'livehouse_requests');
+      return [];
+    }
+  },
+  async saveLivehouses(requests: LivehouseRequest[]) {
+    try {
+      const batch = writeBatch(db);
+      requests.forEach(r => batch.set(doc(db, 'livehouse_requests', r.id), r, { merge: true }));
+      await batch.commit();
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, 'livehouse_requests');
+    }
+  },
+  async updateLivehouseStatus(id: string, status: string) {
+    try {
+      await updateDoc(doc(db, 'livehouse_requests', id), { status });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `livehouse_requests/${id}`);
+    }
+  },
+  async getManagerNotes(): Promise<ManagerNote[]> {
+    try {
+      const snap = await getDocs(collection(db, 'manager_notes'));
+      return snap.docs.map(d => d.data() as ManagerNote);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.LIST, 'manager_notes');
+      return [];
     }
   },
 
@@ -610,6 +690,9 @@ export const FirebaseService = {
     }
     return allHosts;
   },
+  async getHosts(): Promise<Host[]> {
+    return this.getAllHosts();
+  },
   
   // *** User credentials retrieval ***
   async getUserCredentials(): Promise<{ poppo_id: string; password?: string }[]> {
@@ -829,21 +912,85 @@ export const FirebaseService = {
     }
   },
 
-  async getAwards(hostId: string): Promise<any[]> {
+  async getHostAwards(hostId: string): Promise<any[]> {
+    if (!hostId) return [];
     try {
-      // Try host/{id}/agency_awards subcollection first
-      const subSnap = await getDocs(collection(db, 'host', hostId, 'agency_awards'));
-      if (!subSnap.empty) {
-        return subSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+      let legacyAwards: any[] = [];
+      try {
+        // Try host/{id}/host_awards subcollection first
+        const subSnap = await getDocs(collection(db, 'host', hostId, 'host_awards'));
+        if (!subSnap.empty) {
+          legacyAwards = subSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+        } else {
+          // Fallback: top-level host_awards where poppoId == hostId
+          const topSnap = await getDocs(
+            query(collection(db, 'host_awards'), where('poppoId', '==', hostId))
+          );
+          legacyAwards = topSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+        }
+      } catch (err) {
+        console.warn('[FirebaseService] Failed to load legacy awards from subcollection/fallback for', hostId, err);
+        // Fallback to top-level host_awards just in case the subcollection query failed due to permission or other errors
+        try {
+          const topSnap = await getDocs(
+            query(collection(db, 'host_awards'), where('poppoId', '==', hostId))
+          );
+          legacyAwards = topSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+        } catch (err2) {
+          console.warn('[FirebaseService] Fallback top-level host_awards load failed for', hostId, err2);
+        }
       }
-      // Fallback: top-level agency_awards where poppoId == hostId
-      const topSnap = await getDocs(
-        query(collection(db, 'agency_awards'), where('poppoId', '==', hostId))
-      );
-      return topSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+      let assignedAwards: any[] = [];
+      try {
+        // Also get from award_assignments where hostId == hostId
+        const assignSnap = await getDocs(
+          query(collection(db, 'award_assignments'), where('hostId', '==', hostId))
+        );
+        assignedAwards = assignSnap.docs.map(d => {
+          const data = d.data();
+          return {
+            id: d.id,
+            title: data.awardName,
+            description: `Effectivity Period: ${data.startDate} to ${data.endDate}`,
+            dateAwarded: data.startDate || data.assignedAt,
+            awardedAt: data.assignedAt,
+            color: data.awardColor,
+            ...data
+          };
+        });
+      } catch (err) {
+        console.warn('[FirebaseService] Failed to load award_assignments for', hostId, err);
+      }
+
+      // Combine and deduplicate by ID
+      const allAwards = [...legacyAwards, ...assignedAwards];
+      const seen = new Set<string>();
+      return allAwards.filter(a => {
+        if (seen.has(a.id)) return false;
+        seen.add(a.id);
+        return true;
+      });
     } catch (error) {
-      console.warn('[FirebaseService] getAwards failed for', hostId, error);
+      console.warn('[FirebaseService] getHostAwards failed for', hostId, error);
       return [];
+    }
+  },
+
+  async assignAward(hostId: string, awardData: any): Promise<void> {
+    try {
+      // We will write to the top-level host_awards collection
+      const awardId = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 15);
+      const awardRef = doc(db, 'host_awards', awardId);
+      await setDoc(awardRef, {
+        ...awardData,
+        poppoId: hostId,
+        hostId: hostId,
+        awardedAt: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error('[FirebaseService] assignAward failed', error);
+      throw error;
     }
   },
 

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { db } from '../lib/firebase';
 import { collection, query, orderBy, getDocs, limit } from 'firebase/firestore';
 import { Search, Filter, AlertTriangle, Info, XCircle } from 'lucide-react';
-import { LogSeverity, SystemLog } from '../server/Logger';
+import type { LogSeverity, SystemLog } from '../server/Logger';
 import { format } from 'date-fns';
 
 export const SystemLogsViewer: React.FC = () => {

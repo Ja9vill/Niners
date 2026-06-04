@@ -346,3 +346,32 @@ export interface ActivityAuditLog {
   beforeValue: string; // String/JSON
   afterValue: string; // String/JSON
 }
+
+export interface AwardBadge {
+  id: string;
+  name: string;
+  color: string;
+  createdAt: string;
+  startDate?: string;
+  endDate?: string;
+}
+
+export interface AwardAssignment {
+  id: string;
+  awardId: string;
+  awardName: string;
+  awardColor: string;
+  hostId: string;
+  hostNickname: string;
+  startDate: string;
+  endDate: string;
+  assignedAt: string;
+}
+
+export interface ManagerNote {
+  id: string;
+  managerName: string;
+  hostNickname: string;
+  content: string;
+  timestamp: string;
+}
