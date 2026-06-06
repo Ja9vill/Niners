@@ -5,7 +5,7 @@ import { cn, formatDate } from '../lib/utils';
 import { FirebaseService } from '../lib/firebaseService';
 import { Storage } from '../lib/storage';
 import { db } from '../lib/firebase';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc, getDocs, collection } from 'firebase/firestore';
 import { Host } from '../types';
 
 const HOSTS_DATA = [
@@ -78,6 +78,57 @@ export const RosterManagementTab: React.FC<RosterManagementTabProps> = ({ hosts,
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
+  const [isBackfilling, setIsBackfilling] = useState(false);
+
+  const handleRunBackfill = async () => {
+    if (!window.confirm("Are you sure you want to run a database-wide sync to backfill all 'Assigned Host' fields for managers and agents? This will read all current hosts and rebuild manager mappings.")) {
+      return;
+    }
+    setIsBackfilling(true);
+    try {
+      const hostsSnapshot = await getDocs(collection(db, 'host'));
+      const hostsList = hostsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+      const managerHostsMap: Record<string, string[]> = {};
+      
+      hostsList.forEach((h: any) => {
+        const mgrId = h.assignedManagerId || h.assigned_manager_poppo_id || null;
+        const hostId = h.id || h.poppo_id || h.poppoId;
+        if (mgrId && hostId) {
+          if (!managerHostsMap[mgrId]) {
+            managerHostsMap[mgrId] = [];
+          }
+          if (!managerHostsMap[mgrId].includes(hostId)) {
+            managerHostsMap[mgrId].push(hostId);
+          }
+        }
+      });
+
+      const managersList = users.filter(h => {
+        const rLower = (h.role || '').toLowerCase();
+        return rLower === 'manager' || rLower === 'agent';
+      });
+
+      let updatedCount = 0;
+      for (const mgr of managersList) {
+        const mgrId = mgr.poppo_id || mgr.poppoId || mgr.id;
+        if (mgrId) {
+          const assignedHostsList = managerHostsMap[mgrId] || [];
+          await FirebaseService.updateManagerHostFields(mgrId, null, null, assignedHostsList);
+          updatedCount++;
+        }
+      }
+
+      alert(`Successfully synchronized ${updatedCount} manager/agent relationships and backfilled all Assigned Host fields.`);
+      onUpdate();
+    } catch (error: any) {
+      console.error("Backfill failed:", error);
+      alert("Failed to backfill data: " + (error.message || String(error)));
+    } finally {
+      setIsBackfilling(false);
+    }
+  };
+
   useEffect(() => {
     if (hosts && hosts.length > 0) {
       const mappedUsers = hosts.map(u => ({ ...u, id: u.id || (u as any).poppo_id || (u as any).poppoId }));
@@ -147,7 +198,7 @@ export const RosterManagementTab: React.FC<RosterManagementTabProps> = ({ hosts,
       const nickname = getVal('nickname') || getVal('name');
       const status = getVal('status');
       const team_anchor = getVal('team_anchor') || getVal('anchor_type');
-      const tier_pay = getVal('tier_pay') || getVal('tier') || getVal('base_salary_category');
+      const tier_pay = getVal('tier_pay') || getVal('tierPay');
       const manager = getVal('assigned_manager_poppo_id') || getVal('manager');
       const photoUrl = getVal('photoUrl');
 
@@ -334,6 +385,16 @@ export const RosterManagementTab: React.FC<RosterManagementTabProps> = ({ hosts,
         </div>
 
         <div className="flex items-center gap-3 justify-end min-h-[36px]">
+          <button
+            onClick={handleRunBackfill}
+            disabled={isBackfilling}
+            className="px-3 py-2 bg-amber-600/20 hover:bg-amber-600/30 border border-amber-600/40 hover:border-amber-600/60 text-amber-300 rounded-xl text-xs font-black uppercase tracking-wider transition-all disabled:opacity-50 flex items-center gap-2 cursor-pointer"
+            title="Update Assigned Host fields for all managers and agents"
+          >
+            {isBackfilling ? <Loader2 size={14} className="animate-spin" /> : <Database size={14} />}
+            {isBackfilling ? "Syncing..." : "Sync & Backfill DB"}
+          </button>
+
           {saveSuccess && (
             <span className="text-emerald-400 text-xs font-bold flex items-center gap-1 animate-pulse">
               <CheckCircle2 size={14} /> Saved!
@@ -409,7 +470,7 @@ export const RosterManagementTab: React.FC<RosterManagementTabProps> = ({ hosts,
                         <div className="flex items-center gap-3">
                           <button 
                             onClick={() => handlePhotoClick(host)}
-                            className="relative group w-8 h-8 rounded-full border border-white/10 flex-shrink-0 overflow-hidden cursor-pointer bg-white/5 hover:border-indigo-400 transition-colors"
+                            className="relative group w-8 h-8 rounded-lg border border-white/10 flex-shrink-0 overflow-hidden cursor-pointer bg-white/5 hover:border-indigo-400 transition-colors"
                             title="Update Profile Photo"
                           >
                             {host.photoUrl ? (
@@ -567,7 +628,7 @@ export const RosterManagementTab: React.FC<RosterManagementTabProps> = ({ hosts,
             </div>
             
             <div className="p-8 flex flex-col items-center">
-              <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-indigo-500/30 mb-6 bg-black/50 relative group">
+              <div className="w-32 h-32 rounded-2xl overflow-hidden border-4 border-indigo-500/30 mb-6 bg-black/50 relative group">
                 {selectedHostForUpload.photoUrl ? (
                   <img src={selectedHostForUpload.photoUrl} alt="" className={cn("w-full h-full object-cover transition-opacity", isUploading && "opacity-50")} />
                 ) : (

@@ -4,21 +4,22 @@ import { Calendar } from 'lucide-react';
 
 export const PublicCalendar = () => {
   return (
-    <div className="w-full flex flex-col items-center min-h-[80dvh] pt-24 pb-16 px-4 relative overflow-hidden bg-[#0A0A0F]">
+    <div className="w-full flex flex-col items-center min-h-[80dvh] pt-6 md:pt-10 pb-16 px-4 relative overflow-hidden bg-[#0A0A0F]">
       {/* Background ambient effects */}
       <div className="absolute top-1/4 left-0 w-[400px] h-[400px] bg-[#D4AF37]/5 rounded-full blur-[120px] pointer-events-none" />
 
       <div className="max-w-screen-xl w-full mx-auto relative z-10 flex flex-col">
         {/* Header */}
-        <div className="text-center mb-12 space-y-4">
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#D4AF37]/10 border border-[#D4AF37]/20 text-[#D4AF37] text-xs font-bold uppercase tracking-widest mx-auto">
-            <Calendar size={14} className="text-[#D4AF37]" />
-            <span>Upcoming Events</span>
-          </div>
-          <h1 className="text-4xl md:text-6xl font-black text-transparent bg-clip-text bg-gradient-to-br from-[#F0EFE8] to-[#A09E9A] tracking-tighter">
-            Agency Calendar
+        <div className="text-center mb-4 md:mb-6 flex flex-col items-center">
+          <h1 className="relative overflow-hidden rounded-xl p-3 sm:p-4 flex items-center gap-3 shadow-lg backdrop-blur-sm bg-gradient-to-br border border-white/5 from-amber-500/20 to-orange-500/5 mx-auto">
+            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl flex items-center justify-center shrink-0 border bg-[#D4AF37]/10 border-[#D4AF37]/20">
+              <Calendar size={20} className="text-[#D4AF37]" />
+            </div>
+            <span className="text-lg md:text-xl font-black uppercase tracking-widest text-[#D4AF37] drop-shadow-md z-10 pr-2">
+              Agency Calendar
+            </span>
           </h1>
-          <p className="text-[#A09E9A] max-w-xl mx-auto text-lg leading-relaxed">
+          <p className="text-[#A09E9A] max-w-xl mx-auto text-sm md:text-base leading-relaxed hidden sm:block mt-3">
             Stay updated with our latest PK battles, exclusive training sessions, and official agency events.
           </p>
         </div>

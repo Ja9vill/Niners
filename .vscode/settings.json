@@ -10,7 +10,21 @@
     "**/build": true
   },
   "eslint.workingDirectories": [
-    { "mode": "auto" }
+    {
+      "mode": "auto"
+    }
   ],
-  "eslint.ignorePath": ".eslintignore"
+  "eslint.ignorePath": ".eslintignore",
+  "editor.renderRichScreenReaderContent": true,
+  "editor.renderLineHighlightOnlyWhenFocus": true,
+  "editor.scrollbar.scrollByPage": true,
+  "editor.scrollOnMiddleClick": true,
+  "editor.autoIndentOnPaste": true,
+  "editor.codeActions.triggerOnFocusChange": true,
+  "editor.columnSelection": true,
+  "editor.experimental.asyncTokenizationLogging": true,
+  "editor.experimental.preferTreeSitter.typescript": true,
+  "editor.gotoLocation.alternativeReferenceCommand": "editor.action.goToReferences",
+  "editor.selectionHighlightMultiline": true,
+  "editor.smoothScrolling": true
 }

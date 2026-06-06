@@ -7,6 +7,7 @@ import { HostProfileView } from './HostProfileView';
 import { useRoleGuard, useUserRole } from './RoleGuard';
 import { TeamLeaderboard } from './TeamLeaderboard';
 import { useAnalytics } from '../hooks/useAnalytics';
+import { FirebaseService } from '../lib/firebaseService';
 import { 
   LayoutDashboard, 
   FileText, 
@@ -20,8 +21,10 @@ import {
   AlertTriangle,
   Zap,
   ListTodo,
-  X
+  X,
+  Clipboard
 } from 'lucide-react';
+import { SingleDatePicker, DateRangePicker } from './InteractiveDatePicker';
 
 interface HostUser {
   poppoId: string;
@@ -31,20 +34,41 @@ interface HostUser {
 }
 
 export const ManagerDashboard: React.FC = () => {
-  const [subTab, setSubTab] = useState<'dashboard' | 'reporting' | 'users'>('dashboard');
+  const [subTab, setSubTab] = useState<'dashboard' | 'reporting' | 'users' | 'notes'>('dashboard');
+  const [analyticsTab, setAnalyticsTab] = useState<'insights' | 'radar'>('insights');
   const [managedHosts, setManagedHosts] = useState<HostUser[]>([]);
   const [performanceReports, setPerformanceReports] = useState<any[]>([]);
   const [fanbaseReports, setFanbaseReports] = useState<any[]>([]);
   const [pkReports, setPkReports] = useState<any[]>([]);
   const [events, setEvents] = useState<any[]>([]);
+  const [calendarEvents, setCalendarEvents] = useState<any[]>([]);
   const [tasks, setTasks] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   
   // Selected host for profile view spotlight
   const [selectedProfileHost, setSelectedProfileHost] = useState<any | null>(null);
 
+  // Notes state
+  const [noteHostId, setNoteHostId] = useState('');
+  const [noteContent, setNoteContent] = useState('');
+  const [notesHistory, setNotesHistory] = useState<any[]>([]);
+  const [isLoadingNotes, setIsLoadingNotes] = useState(false);
+  const [noteSuccess, setNoteSuccess] = useState('');
+  const [noteError, setNoteError] = useState('');
+
+  // Intake requests state
+  const [intakePoppoId, setIntakePoppoId] = useState('');
+  const [intakeNickname, setIntakeNickname] = useState('');
+  const [intakeRequests, setIntakeRequests] = useState<any[]>([]);
+  const [isLoadingIntakes, setIsLoadingIntakes] = useState(false);
+  const [intakeSuccess, setIntakeSuccess] = useState('');
+  const [intakeError, setIntakeError] = useState('');
+  const [isSubmittingIntake, setIsSubmittingIntake] = useState(false);
+
   // Role validation for Host Isolation
   const { role, isSuperAdmin } = useUserRole();
+  const roleLower = String(role || '').toLowerCase();
+  const isElevatedStaff = ['admin', 'head admin', 'head_admin', 'director'].includes(roleLower);
 
   // Compute team insights
   const { insightsList, radarList } = useAnalytics(managedHosts, pkReports, events, performanceReports, fanbaseReports, tasks);
@@ -106,6 +130,9 @@ export const ManagerDashboard: React.FC = () => {
       // Direct write to /tasks/{taskId}
       await setDoc(doc(db, 'tasks', taskId), newTask);
       
+      const managerName = authState.nickname || authState.name || 'Manager';
+      await FirebaseService.logSystemActivity(`Manager ${managerName} assigned task "${taskTitle}" to host ${taskAssigneeId}`, 'Info');
+      
       setTaskSuccess(`Successfully assigned task "${taskTitle}" to host ${taskAssigneeId}!`);
       setTimeout(() => {
         setIsTaskModalOpen(false);
@@ -161,22 +188,36 @@ export const ManagerDashboard: React.FC = () => {
       if (!managerPoppoId) return;
       setIsLoading(true);
       try {
-        // 1. Fetch managed hosts
-        const hostsQuery = query(
-          collection(db, 'users'), 
-          where('assignedManagerId', '==', managerPoppoId)
-        );
-        const hostsSnap = await getDocs(hostsQuery);
+        // 1. Fetch managed hosts from both 'users' and 'host' collections covering both ID field variants
+        const [usersSnap1, usersSnap2, hostsSnap1, hostsSnap2] = await Promise.all([
+          getDocs(query(collection(db, 'users'), where('assignedManagerId', '==', managerPoppoId))),
+          getDocs(query(collection(db, 'users'), where('assigned_manager_poppo_id', '==', managerPoppoId))),
+          getDocs(query(collection(db, 'host'), where('assignedManagerId', '==', managerPoppoId))),
+          getDocs(query(collection(db, 'host'), where('assigned_manager_poppo_id', '==', managerPoppoId)))
+        ]);
+
         const hostsList: HostUser[] = [];
-        hostsSnap.forEach(doc => {
+        const seenHostIds = new Set<string>();
+
+        const processDoc = (doc: any) => {
           const data = doc.data();
-          hostsList.push({
-            poppoId: String(data.poppoId),
-            nickname: String(data.nickname || ''),
-            role: String(data.role || ''),
-            assignedManagerId: String(data.assignedManagerId || '')
-          });
-        });
+          const pId = String(data.poppo_id || data.poppoId || data.id || doc.id);
+          if (pId && pId !== 'undefined' && !seenHostIds.has(pId)) {
+            seenHostIds.add(pId);
+            hostsList.push({
+              poppoId: pId,
+              nickname: String(data.nickname || data.name || ''),
+              role: String(data.role || 'host'),
+              assignedManagerId: String(data.assignedManagerId || data.assigned_manager_poppo_id || '')
+            });
+          }
+        };
+
+        usersSnap1.forEach(processDoc);
+        usersSnap2.forEach(processDoc);
+        hostsSnap1.forEach(processDoc);
+        hostsSnap2.forEach(processDoc);
+
         setManagedHosts(hostsList);
 
         if (hostsList.length === 0) {
@@ -220,7 +261,7 @@ export const ManagerDashboard: React.FC = () => {
         setPkReports(pkList);
 
         // 5. Fetch Events
-        const eventsSnap = await getDocs(collection(db, 'events'));
+        const eventsSnap = await getDocs(collection(db, 'attendance'));
         const eventsList: any[] = [];
         eventsSnap.forEach(doc => {
           const data = doc.data();
@@ -232,6 +273,22 @@ export const ManagerDashboard: React.FC = () => {
           }
         });
         setEvents(eventsList);
+
+        // 5.b Fetch Calendar Events (Scheduled Exposures)
+        const calendarSnap = await getDocs(collection(db, 'calendar'));
+        const calendarList: any[] = [];
+        calendarSnap.forEach(doc => {
+          const data = doc.data();
+          const participantIds = data.participantIds || [];
+          const participants = data.participants || [];
+          const hasManagedHost = 
+            (Array.isArray(participantIds) && participantIds.some((id: any) => hostIds.includes(String(id)))) ||
+            (Array.isArray(participants) && participants.some((id: any) => hostIds.includes(String(id))));
+          if (hasManagedHost) {
+            calendarList.push({ id: doc.id, ...data });
+          }
+        });
+        setCalendarEvents(calendarList);
 
         // 6. Fetch Tasks assigned by this manager
         const tasksQuery = query(
@@ -255,6 +312,163 @@ export const ManagerDashboard: React.FC = () => {
     loadTeamData();
   }, [managerPoppoId]);
 
+  // Fetch progress notes when selected host or manager changes
+  useEffect(() => {
+    const fetchNotesHistory = async () => {
+      if (!noteHostId || !managerPoppoId) {
+        setNotesHistory([]);
+        return;
+      }
+      setIsLoadingNotes(true);
+      try {
+        const q = query(
+          collection(db, 'notes'),
+          where('hostId', '==', noteHostId)
+        );
+        const snap = await getDocs(q);
+        const list: any[] = [];
+        snap.forEach((doc) => {
+          const data = doc.data();
+          if (data.managerId === managerPoppoId) {
+            list.push({ id: doc.id, ...data });
+          }
+        });
+        list.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+        setNotesHistory(list);
+      } catch (err) {
+        console.error('Error fetching notes history:', err);
+      } finally {
+        setIsLoadingNotes(false);
+      }
+    };
+
+    fetchNotesHistory();
+  }, [noteHostId, managerPoppoId]);
+
+  const handleNoteSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!noteHostId || !noteContent.trim()) {
+      setNoteError('Please select a host and enter note content.');
+      return;
+    }
+    setNoteError('');
+    setNoteSuccess('');
+    
+    const selectedHost = managedHosts.find(h => h.poppoId === noteHostId);
+    const hostNickname = selectedHost ? selectedHost.nickname : '';
+    
+    try {
+      const managerName = authState.nickname || authState.name || 'Manager';
+      const newNote = {
+        hostId: noteHostId,
+        hostNickname,
+        managerId: managerPoppoId,
+        managerName,
+        content: noteContent,
+        timestamp: new Date().toISOString()
+      };
+      
+      const docRef = await addDoc(collection(db, 'notes'), newNote);
+      await FirebaseService.logSystemActivity(`Manager ${managerName} added coaching feedback note for host "${hostNickname}" (Poppo ID: ${noteHostId})`, 'Info');
+      setNoteSuccess('Note successfully saved!');
+      setNoteContent('');
+      setNotesHistory(prev => [{ id: docRef.id, ...newNote }, ...prev]);
+    } catch (err: any) {
+      console.error('Error adding note:', err);
+      setNoteError(err.message || 'Failed to save note.');
+    }
+  };
+
+  // Fetch intake requests when manager changes
+  useEffect(() => {
+    const fetchIntakeRequests = async () => {
+      if (!managerPoppoId) return;
+      setIsLoadingIntakes(true);
+      try {
+        const q = query(
+          collection(db, 'host_requests'),
+          where('managerId', '==', managerPoppoId)
+        );
+        const snap = await getDocs(q);
+        const list: any[] = [];
+        snap.forEach(d => {
+          list.push({ id: d.id, ...d.data() });
+        });
+        list.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+        setIntakeRequests(list);
+      } catch (err) {
+        console.error('Error fetching intake requests:', err);
+      } finally {
+        setIsLoadingIntakes(false);
+      }
+    };
+    fetchIntakeRequests();
+  }, [managerPoppoId]);
+
+  const handleIntakeSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!intakePoppoId.trim() || !intakeNickname.trim()) {
+      setIntakeError('Please enter both Poppo ID and Nickname.');
+      return;
+    }
+    setIsSubmittingIntake(true);
+    setIntakeError('');
+    setIntakeSuccess('');
+
+    try {
+      const managerName = authState.nickname || authState.name || 'Manager';
+      const requestId = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 15);
+      const newRequest = {
+        poppoId: intakePoppoId.trim(),
+        nickname: intakeNickname.trim(),
+        managerId: managerPoppoId,
+        managerName,
+        status: 'Pending',
+        timestamp: new Date().toISOString()
+      };
+
+      await setDoc(doc(db, 'host_requests', requestId), newRequest);
+      await FirebaseService.logSystemActivity(`Manager ${managerName} requested intake for host "${intakeNickname}" (Poppo ID: ${intakePoppoId.trim()})`, 'Info');
+      
+      setIntakeSuccess(`Intake request for "${intakeNickname}" submitted!`);
+      setIntakePoppoId('');
+      setIntakeNickname('');
+      setIntakeRequests(prev => [{ id: requestId, ...newRequest }, ...prev]);
+    } catch (err: any) {
+      console.error('Error submitting intake request:', err);
+      setIntakeError(err.message || 'Failed to submit intake request.');
+    } finally {
+      setIsSubmittingIntake(false);
+    }
+  };
+
+  // Helper to read field variants with fallback conversion for small hours values
+  const getLiveDurationMins = (r: any): number => {
+    const m = r?.liveDurationMinutes ?? r?.live_duration_minutes ?? r?.earningsBreakdown?.liveDurationMinutes ?? r?.earningsBreakdown?.live_duration_minutes;
+    if (m !== undefined && m !== null && m !== '') {
+      return Number(m);
+    }
+    const h = r?.liveDuration ?? r?.live_duration ?? r?.liveHours ?? r?.live_hours ?? r?.earningsBreakdown?.liveDuration ?? r?.earningsBreakdown?.live_duration;
+    if (h !== undefined && h !== null && h !== '') {
+      const val = Number(h);
+      return val <= 100 ? val * 60 : val;
+    }
+    return 0;
+  };
+
+  const getPartyDurationMins = (r: any): number => {
+    const m = r?.partyHostDurationMinutes ?? r?.party_host_duration_minutes ?? r?.earningsBreakdown?.partyHostDurationMinutes ?? r?.earningsBreakdown?.party_host_duration_minutes;
+    if (m !== undefined && m !== null && m !== '') {
+      return Number(m);
+    }
+    const h = r?.partyHostDuration ?? r?.partyDuration ?? r?.party_duration ?? r?.party_host_duration ?? r?.earningsBreakdown?.partyHostDuration ?? r?.earningsBreakdown?.partyDuration ?? r?.earningsBreakdown?.party_duration;
+    if (h !== undefined && h !== null && h !== '') {
+      const val = Number(h);
+      return val <= 100 ? val * 60 : val;
+    }
+    return 0;
+  };
+
   // Aggregate statistics for Dashboard View
   const stats = useMemo(() => {
     let totalLiveMinutes = 0;
@@ -262,8 +476,8 @@ export const ManagerDashboard: React.FC = () => {
     let totalPoints = 0;
 
     performanceReports.forEach(r => {
-      totalLiveMinutes += Number(r.liveDurationMinutes || 0);
-      totalPartyMinutes += Number(r.partyHostDurationMinutes || 0);
+      totalLiveMinutes += getLiveDurationMins(r);
+      totalPartyMinutes += getPartyDurationMins(r);
       totalPoints += Number(r.earningsBreakdown?.totalEarningsOfPoints || 0);
     });
 
@@ -272,9 +486,9 @@ export const ManagerDashboard: React.FC = () => {
       liveHrs: (totalLiveMinutes / 60).toFixed(1),
       partyHrs: (totalPartyMinutes / 60).toFixed(1),
       points: totalPoints.toLocaleString(),
-      eventsCount: events.length
+      eventsCount: calendarEvents.length
     };
-  }, [managedHosts, performanceReports, events]);
+  }, [managedHosts, performanceReports, calendarEvents]);
 
   // Form State for submits
   const [reportType, setReportType] = useState<'fanbase' | 'pk' | 'performance'>('fanbase');
@@ -379,19 +593,31 @@ export const ManagerDashboard: React.FC = () => {
       const idToken = await auth.currentUser?.getIdToken();
       let endpoint = '';
       let body: any = {};
+      const roleLower = String(role || '').toLowerCase();
+      const isElevatedStaff = ['admin', 'head admin', 'head_admin', 'director'].includes(roleLower);
 
       if (reportType === 'fanbase') {
+        // Verify manager is assigned to host if not elevated staff
+        if (!isElevatedStaff) {
+          const isAssigned = managedHosts.some(h => String(h.poppoId) === String(formPoppoId));
+          if (!isAssigned) {
+            setSubmitError('You can only submit fanbase reports for hosts assigned to you.');
+            setIsSubmitting(false);
+            return;
+          }
+        }
+
         endpoint = '/api/reports/fanbase';
         body = {
-          fromDate: fromDate ? new Date(fromDate).toISOString() : new Date().toISOString(),
-          toDate: toDate ? new Date(toDate).toISOString() : new Date().toISOString(),
+          fromDate: isElevatedStaff ? (fromDate ? new Date(fromDate).toISOString() : new Date().toISOString()) : new Date().toISOString(),
+          toDate: isElevatedStaff ? (toDate ? new Date(toDate).toISOString() : new Date().toISOString()) : new Date().toISOString(),
           poppoId: formPoppoId,
           nickname: formNickname,
           currentFollowers: Number(currentFollowers),
           fanclubSubscribers: Number(fanclubSubscribers),
           fanclubGcMembers: Number(fanclubGcMembers),
-          gcUpdatesHost: Number(gcUpdatesHost),
-          gcUpdatesFans: Number(gcUpdatesFans)
+          gcUpdatesHost: isElevatedStaff ? Number(gcUpdatesHost) : 0,
+          gcUpdatesFans: isElevatedStaff ? Number(gcUpdatesFans) : 0
         };
       } else if (reportType === 'pk') {
         endpoint = '/api/reports/pk';
@@ -497,7 +723,7 @@ export const ManagerDashboard: React.FC = () => {
       manager: managerPoppoId,
       status: 'Active',
       level: 1,
-      tier: 'X',
+
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     };
@@ -513,7 +739,7 @@ export const ManagerDashboard: React.FC = () => {
   return (
     <div className="flex flex-col md:flex-row gap-6 min-h-[60vh] max-w-6xl mx-auto">
       {/* Sidebar navigation */}
-      <aside className="w-full md:w-56 shrink-0 bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-col gap-1.5 shadow-md">
+      <aside className="w-full md:w-56 shrink-0 bg-slate-900 border border-[#D4AF37]/10 rounded-2xl p-4 flex flex-col gap-1.5 shadow-md">
         <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-3 mb-2">Team Hub</h3>
         
         <button
@@ -551,10 +777,22 @@ export const ManagerDashboard: React.FC = () => {
           <Users size={16} />
           <span>User Management</span>
         </button>
+
+        <button
+          onClick={() => setSubTab('notes')}
+          className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-bold transition-all ${
+            subTab === 'notes'
+              ? 'bg-indigo-500/10 border border-indigo-500/20 text-indigo-400'
+              : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+          }`}
+        >
+          <Clipboard size={16} />
+          <span>Progress Notes</span>
+        </button>
       </aside>
 
       {/* Main Panel Content */}
-      <main className="flex-1 min-w-0 bg-slate-950 border border-slate-800 rounded-3xl p-6 shadow-md">
+      <main className="flex-1 min-w-0 bg-slate-955 border border-[#D4AF37]/10 rounded-3xl p-6 shadow-md">
         
         {/* Tab 1: Dashboard */}
         {subTab === 'dashboard' && (
@@ -566,19 +804,19 @@ export const ManagerDashboard: React.FC = () => {
 
             {/* KPI Cards Grid */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="bg-slate-900 border border-slate-800/60 p-4 rounded-2xl flex flex-col justify-between shadow-sm">
+              <div className="bg-slate-900 border border-[#D4AF37]/10 p-4 rounded-2xl flex flex-col justify-between shadow-sm">
                 <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Managed Hosts</span>
                 <span className="text-2xl font-black text-white mt-2">{stats.hostCount}</span>
               </div>
-              <div className="bg-slate-900 border border-slate-800/60 p-4 rounded-2xl flex flex-col justify-between shadow-sm">
+              <div className="bg-slate-900 border border-[#D4AF37]/10 p-4 rounded-2xl flex flex-col justify-between shadow-sm">
                 <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Total Live Duration</span>
                 <span className="text-2xl font-black text-white mt-2">{stats.liveHrs} Hrs</span>
               </div>
-              <div className="bg-slate-900 border border-slate-800/60 p-4 rounded-2xl flex flex-col justify-between shadow-sm">
+              <div className="bg-slate-900 border border-[#D4AF37]/10 p-4 rounded-2xl flex flex-col justify-between shadow-sm">
                 <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Total Party Duration</span>
                 <span className="text-2xl font-black text-white mt-2">{stats.partyHrs} Hrs</span>
               </div>
-              <div className="bg-slate-900 border border-slate-800/60 p-4 rounded-2xl flex flex-col justify-between shadow-sm">
+              <div className="bg-slate-900 border border-[#D4AF37]/10 p-4 rounded-2xl flex flex-col justify-between shadow-sm">
                 <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Event Exposure</span>
                 <span className="text-2xl font-black text-white mt-2">{stats.eventsCount} Events</span>
               </div>
@@ -588,137 +826,154 @@ export const ManagerDashboard: React.FC = () => {
               <TeamLeaderboard managedHosts={managedHosts} performanceReports={performanceReports} />
             </div>
 
-            {/* Insights Panel */}
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-black text-white uppercase tracking-wider flex items-center gap-2">
-                  <Zap className="h-4 w-4 text-indigo-400 animate-pulse" />
-                  <span>Team Performance & Exposure Insights</span>
-                </h3>
+            {/* Tabbed switcher for Insights & Radar */}
+            <div className="bg-slate-900 border border-[#D4AF37]/10 p-5 rounded-2xl space-y-5">
+              <div className="flex items-center justify-between border-b border-[#D4AF37]/10 pb-3 flex-wrap gap-3">
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setAnalyticsTab('insights')}
+                    className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center gap-1.5 border cursor-pointer ${
+                      analyticsTab === 'insights'
+                        ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/30'
+                        : 'text-slate-400 border-transparent hover:text-white'
+                    }`}
+                  >
+                    <Zap size={12} className={analyticsTab === 'insights' ? 'animate-pulse' : ''} />
+                    <span>Critical Alerts ({insightsList.length})</span>
+                  </button>
+                  <button
+                    onClick={() => setAnalyticsTab('radar')}
+                    className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center gap-1.5 border cursor-pointer ${
+                      analyticsTab === 'radar'
+                        ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/30'
+                        : 'text-slate-400 border-transparent hover:text-white'
+                    }`}
+                  >
+                    <TrendingUp size={12} />
+                    <span>Growth Radar ({radarList.length})</span>
+                  </button>
+                </div>
+                <span className="text-[10px] text-slate-500 font-mono">Team Analytics Hub</span>
               </div>
 
-              {insightsList.length === 0 ? (
-                <div className="bg-slate-900 border border-slate-800/60 p-6 rounded-2xl text-center text-slate-500 text-xs italic">
-                  No critical exposure alerts or coaching requirements detected for your team hosts. All metrics are on track!
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {insightsList.map((insight, index) => {
-                    const isLowExposure = insight.type === 'LOW_EXPOSURE';
-                    const isVolumeDeficit = insight.type === 'VOLUME_DEFICIT';
-                    return (
-                      <div
-                        key={index}
-                        className={`p-5 rounded-2xl border flex flex-col justify-between h-48 transition-all hover:scale-[1.01] duration-300 ${
-                          isLowExposure || isVolumeDeficit
-                            ? 'border-indigo-500/20 bg-indigo-950/10 hover:border-indigo-500/35'
-                            : 'border-rose-500/20 bg-rose-950/10 hover:border-rose-500/35'
-                        }`}
-                      >
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <span
-                              className={`text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full border ${
+              {analyticsTab === 'insights' ? (
+                <div className="space-y-4">
+                  {insightsList.length === 0 ? (
+                    <div className="p-6 text-center text-slate-500 text-xs italic">
+                      No critical exposure alerts or coaching requirements detected for your team hosts. All metrics are on track!
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {insightsList.map((insight, index) => {
+                        const isLowExposure = insight.type === 'LOW_EXPOSURE';
+                        const isVolumeDeficit = insight.type === 'VOLUME_DEFICIT';
+                        return (
+                          <div
+                            key={index}
+                            className={`p-4 rounded-xl border flex flex-col justify-between min-h-[140px] transition-all hover:scale-[1.01] duration-300 ${
+                              isLowExposure || isVolumeDeficit
+                                ? 'border-indigo-500/20 bg-indigo-950/10 hover:border-indigo-500/35'
+                                : 'border-rose-500/20 bg-rose-950/10 hover:border-rose-500/35'
+                            }`}
+                          >
+                            <div className="space-y-2">
+                              <div className="flex items-center justify-between">
+                                <span
+                                  className={`text-[8px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full border ${
+                                    isLowExposure || isVolumeDeficit
+                                      ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20'
+                                      : 'bg-rose-500/10 text-rose-400 border-rose-500/20'
+                                  }`}
+                                >
+                                  {isLowExposure ? 'Low Exposure' : isVolumeDeficit ? 'Volume Deficit' : 'Coaching Required'}
+                                </span>
+                                <span className="text-[9px] font-mono text-slate-500">ID: {insight.poppoId}</span>
+                              </div>
+                              <h4 className="text-white text-xs font-extrabold line-clamp-1">{insight.title}</h4>
+                              <p className="text-slate-400 text-[11px] leading-relaxed line-clamp-2 font-medium">{insight.description}</p>
+                            </div>
+
+                            <button
+                              onClick={() => openTaskModalForInsight(insight)}
+                              className={`w-full mt-2.5 py-1.5 px-3 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all duration-250 cursor-pointer flex items-center justify-center gap-1.5 shadow-md active:scale-95 ${
                                 isLowExposure || isVolumeDeficit
-                                  ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20'
-                                  : 'bg-rose-500/10 text-rose-400 border-rose-500/20'
+                                  ? 'bg-indigo-600 hover:bg-indigo-500 text-white'
+                                  : 'bg-rose-600 hover:bg-rose-500 text-white'
                               }`}
                             >
-                              {isLowExposure ? 'Low Exposure' : isVolumeDeficit ? 'Volume Deficit' : 'Coaching Required'}
-                            </span>
-                            <span className="text-[10px] font-mono text-slate-500">ID: {insight.poppoId}</span>
+                              <ListTodo size={10} />
+                              <span>{isLowExposure ? 'Assign Visibility Task' : isVolumeDeficit ? 'Assign Engagement Task' : 'Assign Practice Task'}</span>
+                            </button>
                           </div>
-                          <h4 className="text-white text-sm font-extrabold line-clamp-1">{insight.title}</h4>
-                          <p className="text-slate-400 text-xs leading-relaxed line-clamp-3 font-medium">{insight.description}</p>
-                        </div>
-
-                        <button
-                          onClick={() => openTaskModalForInsight(insight)}
-                          className={`w-full mt-3 py-2 px-4 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-250 cursor-pointer flex items-center justify-center gap-1.5 shadow-md active:scale-95 ${
-                            isLowExposure || isVolumeDeficit
-                              ? 'bg-indigo-600 hover:bg-indigo-500 text-white'
-                              : 'bg-rose-600 hover:bg-rose-500 text-white'
-                          }`}
-                        >
-                          <ListTodo size={12} />
-                          <span>{isLowExposure ? 'Assign Visibility Task' : isVolumeDeficit ? 'Assign Engagement Task' : 'Assign Practice Task'}</span>
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-
-            {/* Growth Radar Panel */}
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-black text-white uppercase tracking-wider flex items-center gap-2">
-                  <TrendingUp className="h-4 w-4 text-emerald-400" />
-                  <span>Holistic Growth Radar</span>
-                </h3>
-              </div>
-              
-              {radarList.length === 0 ? (
-                <div className="bg-slate-900 border border-slate-800/60 p-6 rounded-2xl text-center text-slate-500 text-xs italic">
-                  No hosts available for growth assessment.
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               ) : (
-                <div className="grid grid-cols-1 gap-4">
-                  {radarList.map((radar, index) => (
-                    <div key={index} className="bg-slate-900 border border-slate-800 p-5 rounded-2xl flex flex-col gap-4">
-                      <div className="flex items-center justify-between border-b border-slate-800/60 pb-3">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center font-black text-white">
-                            {radar.healthScore}
-                          </div>
-                          <div>
-                            <h4 className="text-white text-sm font-black truncate max-w-[150px] sm:max-w-[200px]">{radar.nickname}</h4>
-                            <p className="text-[10px] text-slate-500 font-mono">ID: {radar.poppoId}</p>
-                          </div>
-                        </div>
-                        <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full border bg-emerald-500/10 text-emerald-400 border-emerald-500/20">
-                          Health Score
-                        </span>
-                      </div>
-                      
-                      {radar.recommendations.length > 0 ? (
-                        <div className="space-y-3">
-                          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Progressive Targets</p>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            {radar.recommendations.map((rec, rIdx) => (
-                              <div key={rIdx} className="bg-slate-950 border border-slate-800 p-4 rounded-xl flex flex-col justify-between">
-                                <div>
-                                  <h5 className="text-white text-xs font-bold mb-1">{rec.title}</h5>
-                                  <p className="text-slate-400 text-[10px] leading-relaxed mb-3">{rec.description}</p>
-                                </div>
-                                <button
-                                  onClick={() => openTaskModalForInsight(rec)}
-                                  className="w-full py-2 px-3 rounded-lg text-[9px] font-black uppercase tracking-wider bg-indigo-600 hover:bg-indigo-500 text-white flex items-center justify-center gap-1.5 transition-all"
-                                >
-                                  <ListTodo size={10} />
-                                  <span>Assign Target</span>
-                                </button>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      ) : (
-                        <p className="text-xs text-slate-500 italic">No progressive targets identified for this week.</p>
-                      )}
+                <div className="space-y-4">
+                  {radarList.length === 0 ? (
+                    <div className="p-6 text-center text-slate-500 text-xs italic">
+                      No hosts available for growth assessment.
                     </div>
-                  ))}
+                  ) : (
+                    <div className="grid grid-cols-1 gap-4">
+                      {radarList.map((radar, index) => (
+                        <div key={index} className="bg-slate-955/40 border border-[#D4AF37]/10 p-4 rounded-xl flex flex-col gap-3">
+                          <div className="flex items-center justify-between border-b border-[#D4AF37]/10 pb-2">
+                            <div className="flex items-center gap-2.5">
+                              <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center font-black text-white text-xs">
+                                {radar.healthScore}
+                              </div>
+                              <div>
+                                <h4 className="text-white text-xs font-black truncate max-w-[150px] sm:max-w-[200px]">{radar.nickname}</h4>
+                                <p className="text-[9px] text-slate-500 font-mono">ID: {radar.poppoId}</p>
+                              </div>
+                            </div>
+                            <span className="text-[8px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full border bg-emerald-500/10 text-emerald-400 border-emerald-500/20">
+                              Health Score
+                            </span>
+                          </div>
+                          
+                          {radar.recommendations.length > 0 ? (
+                            <div className="space-y-2">
+                              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Progressive Targets</p>
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                                {radar.recommendations.map((rec, rIdx) => (
+                                  <div key={rIdx} className="bg-slate-955 border border-[#D4AF37]/10 p-3 rounded-lg flex flex-col justify-between">
+                                    <div>
+                                      <h5 className="text-white text-xs font-bold mb-1">{rec.title}</h5>
+                                      <p className="text-slate-400 text-[10px] leading-relaxed mb-2 line-clamp-2">{rec.description}</p>
+                                    </div>
+                                    <button
+                                      onClick={() => openTaskModalForInsight(rec)}
+                                      className="w-full py-1.5 px-3 rounded-lg text-[9px] font-black uppercase tracking-wider bg-indigo-600 hover:bg-indigo-500 text-white flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                                    >
+                                      <ListTodo size={9} />
+                                      <span>Assign Target</span>
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          ) : (
+                            <p className="text-[11px] text-slate-500 italic">No progressive targets identified for this week.</p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
 
             {/* Recent performance list */}
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden p-5">
+            <div className="bg-slate-900 border border-[#D4AF37]/10 rounded-2xl overflow-hidden p-5">
               <h3 className="text-sm font-black text-white uppercase tracking-wider mb-4">Team Performance Logs</h3>
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse text-xs">
                   <thead>
-                    <tr className="border-b border-slate-800 text-slate-400 font-bold uppercase tracking-wider bg-slate-900/60">
+                    <tr className="border-b border-[#D4AF37]/10 text-slate-400 font-bold uppercase tracking-wider bg-slate-900/60">
                       <th className="py-2.5 px-3">Poppo ID</th>
                       <th className="py-2.5 px-3">Period</th>
                       <th className="py-2.5 px-3">Level</th>
@@ -726,15 +981,15 @@ export const ManagerDashboard: React.FC = () => {
                       <th className="py-2.5 px-3">Party Duration</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-800/40 text-slate-300">
+                  <tbody className="divide-y divide-[#D4AF37]/10 text-slate-300">
                     {performanceReports.length > 0 ? (
                       performanceReports.map((r, i) => (
                         <tr key={i} className="hover:bg-slate-800/20 transition-colors">
                           <td className="py-2.5 px-3 font-mono">{r.poppoId}</td>
                           <td className="py-2.5 px-3 capitalize">{r.periodType} ({r.month}/{r.year})</td>
                           <td className="py-2.5 px-3">Lvl {r.level}</td>
-                          <td className="py-2.5 px-3">{(Number(r.liveDurationMinutes || 0) / 60).toFixed(1)} Hrs</td>
-                          <td className="py-2.5 px-3">{(Number(r.partyHostDurationMinutes || 0) / 60).toFixed(1)} Hrs</td>
+                          <td className="py-2.5 px-3">{(getLiveDurationMins(r) / 60).toFixed(1)} Hrs</td>
+                          <td className="py-2.5 px-3">{(getPartyDurationMins(r) / 60).toFixed(1)} Hrs</td>
                         </tr>
                       ))
                     ) : (
@@ -793,30 +1048,25 @@ export const ManagerDashboard: React.FC = () => {
                 poppoId={formPoppoId}
                 nickname={formNickname}
                 onChange={(id, nick) => { setFormPoppoId(id); setFormNickname(nick); }}
+                managerPoppoId={managerPoppoId}
               />
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-400 mb-1">From Date</label>
-                  <input
-                    type="date"
-                    value={fromDate}
-                    onChange={(e) => setFromDate(e.target.value)}
+              {(reportType !== 'fanbase' || isElevatedStaff) && (
+                <div className="space-y-1">
+                  <label className="block text-xs font-semibold text-slate-400 mb-1">Date Range</label>
+                  <DateRangePicker
+                    startDate={fromDate}
+                    endDate={toDate}
+                    onChange={(start, end) => { setFromDate(start); setToDate(end); }}
                     required
-                    className="w-full px-4 py-2 bg-slate-950 border border-slate-800 rounded-lg text-white"
                   />
+                  {reportType === 'pk' && (
+                    <p className="text-[11px] text-amber-400 bg-amber-500/5 border border-amber-500/20 rounded-lg px-3 py-2 mt-1.5 leading-normal">
+                      💡 <strong>Recommended:</strong> Date range should be weekly Monday to Sunday.
+                    </p>
+                  )}
                 </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-400 mb-1">To Date</label>
-                  <input
-                    type="date"
-                    value={toDate}
-                    onChange={(e) => setToDate(e.target.value)}
-                    required
-                    className="w-full px-4 py-2 bg-slate-950 border border-slate-800 rounded-lg text-white"
-                  />
-                </div>
-              </div>
+              )}
 
               {/* Fanbase fields */}
               {reportType === 'fanbase' && (
@@ -825,6 +1075,8 @@ export const ManagerDashboard: React.FC = () => {
                     <label className="block text-xs font-semibold text-slate-400 mb-1">Current Followers</label>
                     <input
                       type="number"
+                      title="Current Followers"
+                      placeholder="Current Followers"
                       value={currentFollowers}
                       onChange={(e) => setCurrentFollowers(Number(e.target.value))}
                       className="w-full px-4 py-2 bg-slate-955 border border-slate-800 rounded-lg text-white"
@@ -834,6 +1086,8 @@ export const ManagerDashboard: React.FC = () => {
                     <label className="block text-xs font-semibold text-slate-400 mb-1">Fanclub Subscribers</label>
                     <input
                       type="number"
+                      title="Fanclub Subscribers"
+                      placeholder="Fanclub Subscribers"
                       value={fanclubSubscribers}
                       onChange={(e) => setFanclubSubscribers(Number(e.target.value))}
                       className="w-full px-4 py-2 bg-slate-955 border border-slate-800 rounded-lg text-white"
@@ -843,29 +1097,39 @@ export const ManagerDashboard: React.FC = () => {
                     <label className="block text-xs font-semibold text-slate-400 mb-1">Fanclub GC Members</label>
                     <input
                       type="number"
+                      title="Fanclub GC Members"
+                      placeholder="Fanclub GC Members"
                       value={fanclubGcMembers}
                       onChange={(e) => setFanclubGcMembers(Number(e.target.value))}
                       className="w-full px-4 py-2 bg-slate-955 border border-slate-800 rounded-lg text-white"
                     />
                   </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-400 mb-1">GC Updates (Host)</label>
-                    <input
-                      type="number"
-                      value={gcUpdatesHost}
-                      onChange={(e) => setGcUpdatesHost(Number(e.target.value))}
-                      className="w-full px-4 py-2 bg-slate-955 border border-slate-800 rounded-lg text-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-400 mb-1">GC Updates (Fans)</label>
-                    <input
-                      type="number"
-                      value={gcUpdatesFans}
-                      onChange={(e) => setGcUpdatesFans(Number(e.target.value))}
-                      className="w-full px-4 py-2 bg-slate-955 border border-slate-800 rounded-lg text-white"
-                    />
-                  </div>
+                  {isElevatedStaff && (
+                    <>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-400 mb-1">GC Updates (Host)</label>
+                        <input
+                          type="number"
+                          title="GC Updates (Host)"
+                          placeholder="GC Updates (Host)"
+                          value={gcUpdatesHost}
+                          onChange={(e) => setGcUpdatesHost(Number(e.target.value))}
+                          className="w-full px-4 py-2 bg-slate-955 border border-slate-800 rounded-lg text-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-400 mb-1">GC Updates (Fans)</label>
+                        <input
+                          type="number"
+                          title="GC Updates (Fans)"
+                          placeholder="GC Updates (Fans)"
+                          value={gcUpdatesFans}
+                          onChange={(e) => setGcUpdatesFans(Number(e.target.value))}
+                          className="w-full px-4 py-2 bg-slate-955 border border-slate-800 rounded-lg text-white"
+                        />
+                      </div>
+                    </>
+                  )}
                 </div>
               )}
 
@@ -876,6 +1140,8 @@ export const ManagerDashboard: React.FC = () => {
                     <label className="block text-xs font-semibold text-slate-400 mb-1">PK Win Percentage (%)</label>
                     <input
                       type="number"
+                      title="PK Win Percentage (%)"
+                      placeholder="PK Win Percentage (%)"
                       min="0"
                       max="100"
                       value={pkWinPercent}
@@ -887,6 +1153,8 @@ export const ManagerDashboard: React.FC = () => {
                     <label className="block text-xs font-semibold text-slate-400 mb-1">PK Points</label>
                     <input
                       type="number"
+                      title="PK Points"
+                      placeholder="PK Points"
                       value={pkPoints}
                       onChange={(e) => setPkPoints(Number(e.target.value))}
                       className="w-full px-4 py-2 bg-slate-955 border border-slate-800 rounded-lg text-white"
@@ -896,6 +1164,8 @@ export const ManagerDashboard: React.FC = () => {
                     <label className="block text-xs font-semibold text-slate-400 mb-1">PK Sessions</label>
                     <input
                       type="number"
+                      title="PK Sessions"
+                      placeholder="PK Sessions"
                       value={pkSessions}
                       onChange={(e) => setPkSessions(Number(e.target.value))}
                       className="w-full px-4 py-2 bg-slate-955 border border-slate-800 rounded-lg text-white"
@@ -912,6 +1182,8 @@ export const ManagerDashboard: React.FC = () => {
                       <label className="block text-xs font-semibold text-slate-400 mb-1">Year</label>
                       <input
                         type="number"
+                        title="Year"
+                        placeholder="Year"
                         value={year}
                         onChange={(e) => setYear(Number(e.target.value))}
                         className="w-full px-4 py-2 bg-slate-955 border border-slate-800 rounded-lg text-white"
@@ -921,6 +1193,8 @@ export const ManagerDashboard: React.FC = () => {
                       <label className="block text-xs font-semibold text-slate-400 mb-1">Month</label>
                       <input
                         type="number"
+                        title="Month"
+                        placeholder="Month"
                         min="1"
                         max="12"
                         value={month}
@@ -932,6 +1206,8 @@ export const ManagerDashboard: React.FC = () => {
                       <label className="block text-xs font-semibold text-slate-400 mb-1">Level</label>
                       <input
                         type="number"
+                        title="Level"
+                        placeholder="Level"
                         value={level}
                         onChange={(e) => setLevel(Number(e.target.value))}
                         className="w-full px-4 py-2 bg-slate-955 border border-slate-800 rounded-lg text-white"
@@ -940,6 +1216,7 @@ export const ManagerDashboard: React.FC = () => {
                     <div>
                       <label className="block text-xs font-semibold text-slate-400 mb-1">Period Type</label>
                       <select
+                        title="Period Type"
                         value={periodType}
                         onChange={(e) => setPeriodType(e.target.value)}
                         className="w-full px-4 py-2 bg-slate-955 border border-slate-800 rounded-lg text-white"
@@ -955,6 +1232,8 @@ export const ManagerDashboard: React.FC = () => {
                       <label className="block text-xs font-semibold text-slate-400 mb-1">Live Duration (Minutes)</label>
                       <input
                         type="number"
+                        title="Live Duration (Minutes)"
+                        placeholder="Live Duration (Minutes)"
                         value={liveDurationMinutes}
                         onChange={(e) => setLiveDurationMinutes(Number(e.target.value))}
                         className="w-full px-4 py-2 bg-slate-955 border border-slate-800 rounded-lg text-white"
@@ -964,6 +1243,8 @@ export const ManagerDashboard: React.FC = () => {
                       <label className="block text-xs font-semibold text-slate-400 mb-1">Party Host Duration (Minutes)</label>
                       <input
                         type="number"
+                        title="Party Host Duration (Minutes)"
+                        placeholder="Party Host Duration (Minutes)"
                         value={partyHostDurationMinutes}
                         onChange={(e) => setPartyHostDurationMinutes(Number(e.target.value))}
                         className="w-full px-4 py-2 bg-slate-955 border border-slate-800 rounded-lg text-white"
@@ -979,6 +1260,8 @@ export const ManagerDashboard: React.FC = () => {
                         <label className="block text-xs font-semibold text-slate-400 mb-1">Total Duration</label>
                         <input
                           type="number"
+                          title="Total Duration"
+                          placeholder="Total Duration"
                           value={totalDuration}
                           onChange={(e) => setTotalDuration(Number(e.target.value))}
                           className="w-full px-4 py-2 bg-slate-955 border border-slate-800 rounded-lg text-white"
@@ -988,6 +1271,8 @@ export const ManagerDashboard: React.FC = () => {
                         <label className="block text-xs font-semibold text-slate-400 mb-1">Average ACU</label>
                         <input
                           type="number"
+                          title="Average ACU"
+                          placeholder="Average ACU"
                           value={averageAcu}
                           onChange={(e) => setAverageAcu(Number(e.target.value))}
                           className="w-full px-4 py-2 bg-slate-955 border border-slate-800 rounded-lg text-white"
@@ -997,6 +1282,8 @@ export const ManagerDashboard: React.FC = () => {
                         <label className="block text-xs font-semibold text-slate-400 mb-1">New Fans</label>
                         <input
                           type="number"
+                          title="New Fans"
+                          placeholder="New Fans"
                           value={newFans}
                           onChange={(e) => setNewFans(Number(e.target.value))}
                           className="w-full px-4 py-2 bg-slate-955 border border-slate-800 rounded-lg text-white"
@@ -1006,6 +1293,8 @@ export const ManagerDashboard: React.FC = () => {
                         <label className="block text-xs font-semibold text-slate-400 mb-1">New Fanclub Members</label>
                         <input
                           type="number"
+                          title="New Fanclub Members"
+                          placeholder="New Fanclub Members"
                           value={newFanClubMembers}
                           onChange={(e) => setNewFanClubMembers(Number(e.target.value))}
                           className="w-full px-4 py-2 bg-slate-955 border border-slate-800 rounded-lg text-white"
@@ -1015,6 +1304,8 @@ export const ManagerDashboard: React.FC = () => {
                         <label className="block text-xs font-semibold text-slate-400 mb-1">Gifting This Week</label>
                         <input
                           type="number"
+                          title="Gifting This Week"
+                          placeholder="Gifting This Week"
                           value={giftingThisWeek}
                           onChange={(e) => setGiftingThisWeek(Number(e.target.value))}
                           className="w-full px-4 py-2 bg-slate-955 border border-slate-800 rounded-lg text-white"
@@ -1024,6 +1315,8 @@ export const ManagerDashboard: React.FC = () => {
                         <label className="block text-xs font-semibold text-slate-400 mb-1">Unfollowers</label>
                         <input
                           type="number"
+                          title="Unfollowers"
+                          placeholder="Unfollowers"
                           value={unfollowers}
                           onChange={(e) => setUnfollowers(Number(e.target.value))}
                           className="w-full px-4 py-2 bg-slate-955 border border-slate-800 rounded-lg text-white"
@@ -1044,6 +1337,8 @@ export const ManagerDashboard: React.FC = () => {
                           <label className="block text-xs font-semibold text-slate-400 mb-1">Total Earnings points</label>
                           <input
                             type="number"
+                            title="Total Earnings points"
+                            placeholder="Total Earnings points"
                             value={totalEarningsOfPoints}
                             onChange={(e) => setTotalEarningsOfPoints(Number(e.target.value))}
                             className="w-full px-4 py-2 bg-slate-955 border border-emerald-900/30 rounded-lg text-white focus:ring-emerald-500"
@@ -1053,6 +1348,8 @@ export const ManagerDashboard: React.FC = () => {
                           <label className="block text-xs font-semibold text-slate-400 mb-1">Agent Commission</label>
                           <input
                             type="number"
+                            title="Agent Commission"
+                            placeholder="Agent Commission"
                             value={agentCommission}
                             onChange={(e) => setAgentCommission(Number(e.target.value))}
                             className="w-full px-4 py-2 bg-slate-955 border border-emerald-900/30 rounded-lg text-white focus:ring-emerald-500"
@@ -1062,6 +1359,8 @@ export const ManagerDashboard: React.FC = () => {
                           <label className="block text-xs font-semibold text-slate-400 mb-1">Live Earnings</label>
                           <input
                             type="number"
+                            title="Live Earnings"
+                            placeholder="Live Earnings"
                             value={liveEarnings}
                             onChange={(e) => setLiveEarnings(Number(e.target.value))}
                             className="w-full px-4 py-2 bg-slate-955 border border-emerald-900/30 rounded-lg text-white"
@@ -1071,6 +1370,8 @@ export const ManagerDashboard: React.FC = () => {
                           <label className="block text-xs font-semibold text-slate-400 mb-1">Party Earnings</label>
                           <input
                             type="number"
+                            title="Party Earnings"
+                            placeholder="Party Earnings"
                             value={partyEarnings}
                             onChange={(e) => setPartyEarnings(Number(e.target.value))}
                             className="w-full px-4 py-2 bg-slate-955 border border-emerald-900/30 rounded-lg text-white"
@@ -1080,6 +1381,8 @@ export const ManagerDashboard: React.FC = () => {
                           <label className="block text-xs font-semibold text-slate-400 mb-1">Private Chat Earnings</label>
                           <input
                             type="number"
+                            title="Private Chat Earnings"
+                            placeholder="Private Chat Earnings"
                             value={privateChatEarnings}
                             onChange={(e) => setPrivateChatEarnings(Number(e.target.value))}
                             className="w-full px-4 py-2 bg-slate-955 border border-emerald-900/30 rounded-lg text-white"
@@ -1089,6 +1392,8 @@ export const ManagerDashboard: React.FC = () => {
                           <label className="block text-xs font-semibold text-slate-400 mb-1">Tips</label>
                           <input
                             type="number"
+                            title="Tips"
+                            placeholder="Tips"
                             value={tips}
                             onChange={(e) => setTips(Number(e.target.value))}
                             className="w-full px-4 py-2 bg-slate-955 border border-emerald-900/30 rounded-lg text-white"
@@ -1098,6 +1403,8 @@ export const ManagerDashboard: React.FC = () => {
                           <label className="block text-xs font-semibold text-slate-400 mb-1">Platform Reward</label>
                           <input
                             type="number"
+                            title="Platform Reward"
+                            placeholder="Platform Reward"
                             value={platformReward}
                             onChange={(e) => setPlatformReward(Number(e.target.value))}
                             className="w-full px-4 py-2 bg-slate-955 border border-emerald-900/30 rounded-lg text-white"
@@ -1107,6 +1414,8 @@ export const ManagerDashboard: React.FC = () => {
                           <label className="block text-xs font-semibold text-slate-400 mb-1">Other Earnings</label>
                           <input
                             type="number"
+                            title="Other Earnings"
+                            placeholder="Other Earnings"
                             value={otherEarnings}
                             onChange={(e) => setOtherEarnings(Number(e.target.value))}
                             className="w-full px-4 py-2 bg-slate-955 border border-emerald-900/30 rounded-lg text-white"
@@ -1116,6 +1425,8 @@ export const ManagerDashboard: React.FC = () => {
                           <label className="block text-xs font-semibold text-slate-400 mb-1">Platform Hourly Salary</label>
                           <input
                             type="number"
+                            title="Platform Hourly Salary"
+                            placeholder="Platform Hourly Salary"
                             value={platformHourlySalary}
                             onChange={(e) => setPlatformHourlySalary(Number(e.target.value))}
                             className="w-full px-4 py-2 bg-slate-955 border border-emerald-900/30 rounded-lg text-white"
@@ -1125,6 +1436,8 @@ export const ManagerDashboard: React.FC = () => {
                           <label className="block text-xs font-semibold text-slate-400 mb-1">Super Salary</label>
                           <input
                             type="number"
+                            title="Super Salary"
+                            placeholder="Super Salary"
                             value={superSalary}
                             onChange={(e) => setSuperSalary(Number(e.target.value))}
                             className="w-full px-4 py-2 bg-slate-955 border border-emerald-900/30 rounded-lg text-white"
@@ -1134,6 +1447,8 @@ export const ManagerDashboard: React.FC = () => {
                           <label className="block text-xs font-semibold text-slate-400 mb-1">Super Rank</label>
                           <input
                             type="number"
+                            title="Super Rank"
+                            placeholder="Super Rank"
                             value={superRank}
                             onChange={(e) => setSuperRank(Number(e.target.value))}
                             className="w-full px-4 py-2 bg-slate-955 border border-emerald-900/30 rounded-lg text-white"
@@ -1143,6 +1458,8 @@ export const ManagerDashboard: React.FC = () => {
                           <label className="block text-xs font-semibold text-slate-400 mb-1">Total Earnings</label>
                           <input
                             type="number"
+                            title="Total Earnings"
+                            placeholder="Total Earnings"
                             value={totalEarnings}
                             onChange={(e) => setTotalEarnings(Number(e.target.value))}
                             className="w-full px-4 py-2 bg-slate-955 border border-emerald-900/30 rounded-lg text-white"
@@ -1152,6 +1469,8 @@ export const ManagerDashboard: React.FC = () => {
                           <label className="block text-xs font-semibold text-slate-400 mb-1">Earnings Past 3 Months</label>
                           <input
                             type="number"
+                            title="Earnings Past 3 Months"
+                            placeholder="Earnings Past 3 Months"
                             value={totalEarningsPast3Months}
                             onChange={(e) => setTotalEarningsPast3Months(Number(e.target.value))}
                             className="w-full px-4 py-2 bg-slate-955 border border-emerald-900/30 rounded-lg text-white"
@@ -1207,41 +1526,242 @@ export const ManagerDashboard: React.FC = () => {
               <p className="text-slate-400 text-xs mt-1">List of registered hosts assigned to your team.</p>
             </div>
 
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-sm">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse text-xs">
-                  <thead>
-                    <tr className="border-b border-slate-800 text-slate-400 font-bold uppercase tracking-wider bg-slate-900/60">
-                      <th className="py-3 px-4">Nickname</th>
-                      <th className="py-3 px-4">Poppo ID</th>
-                      <th className="py-3 px-4">Role</th>
-                      <th className="py-3 px-4 text-right">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-800/40 text-slate-300">
-                    {managedHosts.length > 0 ? (
-                      managedHosts.map((h, i) => (
-                        <tr key={i} className="hover:bg-slate-800/20 transition-colors">
-                          <td className="py-3 px-4 font-bold">{h.nickname}</td>
-                          <td className="py-3 px-4 font-mono">{h.poppoId}</td>
-                          <td className="py-3 px-4 capitalize">{h.role}</td>
-                          <td className="py-3 px-4 text-right">
-                            <button
-                              onClick={() => setSelectedProfileHost(h)}
-                              className="px-3 py-1.5 bg-slate-800 border border-slate-700 hover:border-indigo-500 hover:text-indigo-400 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer"
-                            >
-                              View Profile
-                            </button>
-                          </td>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Roster Table */}
+              <div className="lg:col-span-2 space-y-4">
+                <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-sm">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse text-xs">
+                      <thead>
+                        <tr className="border-b border-slate-800 text-slate-400 font-bold uppercase tracking-wider bg-slate-900/60">
+                          <th className="py-3 px-4">Nickname</th>
+                          <th className="py-3 px-4">Poppo ID</th>
+                          <th className="py-3 px-4">Role</th>
+                          <th className="py-3 px-4 text-right">Actions</th>
                         </tr>
-                      ))
-                    ) : (
-                      <tr>
-                        <td colSpan={4} className="py-8 text-center text-slate-500 italic">No assigned hosts found on your team.</td>
-                      </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-800/40 text-slate-300">
+                        {managedHosts.length > 0 ? (
+                          managedHosts.map((h, i) => (
+                            <tr key={i} className="hover:bg-slate-800/20 transition-colors">
+                              <td className="py-3 px-4 font-bold">{h.nickname}</td>
+                              <td className="py-3 px-4 font-mono">{h.poppoId}</td>
+                              <td className="py-3 px-4 capitalize">{h.role}</td>
+                              <td className="py-3 px-4 text-right">
+                                <button
+                                  onClick={() => setSelectedProfileHost(h)}
+                                  className="px-3 py-1.5 bg-slate-800 border border-slate-700 hover:border-indigo-500 hover:text-indigo-400 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer"
+                                >
+                                  View Profile
+                                </button>
+                              </td>
+                            </tr>
+                          ))
+                        ) : (
+                          <tr>
+                            <td colSpan={4} className="py-8 text-center text-slate-500 italic">No assigned hosts found on your team.</td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+
+              {/* Intake Request Form & History */}
+              <div className="lg:col-span-1 space-y-6">
+                {/* Submit Form */}
+                <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl space-y-4">
+                  <div>
+                    <h3 className="text-xs font-black text-white uppercase tracking-wider">Request Host Intake</h3>
+                    <p className="text-[10px] text-slate-400 mt-1">Submit a new host to the Director for approval and onboarding.</p>
+                  </div>
+                  <form onSubmit={handleIntakeSubmit} className="space-y-4">
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-bold uppercase text-slate-400 tracking-wider">Poppo ID</label>
+                      <input
+                        type="text"
+                        value={intakePoppoId}
+                        onChange={(e) => setIntakePoppoId(e.target.value)}
+                        placeholder="e.g. 1234567"
+                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:ring-2 focus:ring-indigo-500 outline-none"
+                        required
+                        title="Poppo ID"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-bold uppercase text-slate-400 tracking-wider">Nickname</label>
+                      <input
+                        type="text"
+                        value={intakeNickname}
+                        onChange={(e) => setIntakeNickname(e.target.value)}
+                        placeholder="e.g. SweetHost"
+                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:ring-2 focus:ring-indigo-500 outline-none"
+                        required
+                        title="Nickname"
+                      />
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={isSubmittingIntake}
+                      className="w-full py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-2 shadow-md"
+                    >
+                      {isSubmittingIntake && <Loader2 className="h-3 w-3 animate-spin" />}
+                      <span>{isSubmittingIntake ? 'Submitting...' : 'Request Intake'}</span>
+                    </button>
+
+                    {intakeSuccess && (
+                      <div className="p-2.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-lg text-[10px] font-bold flex items-center gap-1.5">
+                        <CheckCircle size={14} />
+                        <span>{intakeSuccess}</span>
+                      </div>
                     )}
-                  </tbody>
-                </table>
+
+                    {intakeError && (
+                      <div className="p-2.5 bg-red-500/10 border border-red-500/20 text-red-400 rounded-lg text-[10px] font-bold flex items-center gap-1.5">
+                        <AlertTriangle size={14} />
+                        <span>{intakeError}</span>
+                      </div>
+                    )}
+                  </form>
+                </div>
+
+                {/* Status List */}
+                <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl space-y-4">
+                  <h3 className="text-xs font-black text-white uppercase tracking-wider pb-2 border-b border-slate-800">My Requests Status</h3>
+                  {isLoadingIntakes ? (
+                    <div className="flex flex-col items-center justify-center gap-2 py-6">
+                      <Loader2 className="h-5 w-5 text-indigo-500 animate-spin" />
+                      <span className="text-[9px] text-slate-500 uppercase tracking-wider">Loading status...</span>
+                    </div>
+                  ) : intakeRequests.length === 0 ? (
+                    <p className="text-[11px] text-slate-500 italic text-center py-4">No recent requests submitted.</p>
+                  ) : (
+                    <div className="space-y-3 max-h-[250px] overflow-y-auto pr-1">
+                      {intakeRequests.map((req) => (
+                        <div key={req.id} className="bg-slate-950 border border-slate-800/80 p-3 rounded-xl flex items-center justify-between">
+                          <div>
+                            <p className="text-xs font-bold text-white">{req.nickname}</p>
+                            <p className="text-[10px] font-mono text-slate-500">ID: {req.poppoId}</p>
+                          </div>
+                          <span
+                            className={`text-[8px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full border ${
+                              req.status === 'Approved'
+                                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                                : req.status === 'Rejected'
+                                ? 'bg-rose-500/10 text-rose-400 border-rose-500/20'
+                                : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                            }`}
+                          >
+                            {req.status}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Tab 4: Progress Notes */}
+        {subTab === 'notes' && (
+          <div className="space-y-6">
+            <div>
+              <h2 className="text-xl font-black text-white uppercase tracking-wider">Progress Notes & Feedbacks</h2>
+              <p className="text-slate-400 text-xs mt-1">Record performance notes and feedback logs for your hosts.</p>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Note Submission Form */}
+              <div className="lg:col-span-1 bg-slate-900 border border-slate-800 p-5 rounded-2xl space-y-4">
+                <h3 className="text-xs font-black text-white uppercase tracking-wider pb-2 border-b border-slate-800">Add Feedback Note</h3>
+                <form onSubmit={handleNoteSubmit} className="space-y-4">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold uppercase text-slate-400 tracking-wider">Select Host</label>
+                    <select
+                      value={noteHostId}
+                      onChange={(e) => setNoteHostId(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:ring-2 focus:ring-indigo-500 outline-none"
+                      title="Host Selection"
+                    >
+                      <option value="">-- Choose Host --</option>
+                      {managedHosts.map((h) => (
+                        <option key={h.poppoId} value={h.poppoId}>
+                          {h.nickname} - {h.poppoId}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold uppercase text-slate-400 tracking-wider">Feedback Content</label>
+                    <textarea
+                      value={noteContent}
+                      onChange={(e) => setNoteContent(e.target.value)}
+                      placeholder="Write notes, coaching feedback, or action steps..."
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white h-32 resize-none focus:ring-2 focus:ring-indigo-500 outline-none"
+                      required
+                      title="Note Content"
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    className="w-full py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-2 shadow-md"
+                  >
+                    <span>Save Feedback Note</span>
+                  </button>
+
+                  {noteSuccess && (
+                    <div className="p-2.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-lg text-[11px] font-bold flex items-center gap-1.5">
+                      <CheckCircle size={14} />
+                      <span>{noteSuccess}</span>
+                    </div>
+                  )}
+
+                  {noteError && (
+                    <div className="p-2.5 bg-red-500/10 border border-red-500/20 text-red-400 rounded-lg text-[11px] font-bold flex items-center gap-1.5">
+                      <AlertTriangle size={14} />
+                      <span>{noteError}</span>
+                    </div>
+                  )}
+                </form>
+              </div>
+
+              {/* Notes History log */}
+              <div className="lg:col-span-2 bg-slate-900 border border-slate-800 p-5 rounded-2xl flex flex-col gap-4">
+                <h3 className="text-xs font-black text-white uppercase tracking-wider pb-2 border-b border-slate-800">Feedback History</h3>
+                
+                {!noteHostId ? (
+                  <div className="flex-1 flex items-center justify-center text-slate-500 text-xs italic py-12">
+                    Please select a host to view their progress feedback logs.
+                  </div>
+                ) : isLoadingNotes ? (
+                  <div className="flex-1 flex flex-col items-center justify-center gap-3 py-12">
+                    <Loader2 className="h-6 w-6 text-indigo-500 animate-spin" />
+                    <span className="text-[10px] text-slate-500 uppercase tracking-wider">Loading history...</span>
+                  </div>
+                ) : notesHistory.length === 0 ? (
+                  <div className="flex-1 flex items-center justify-center text-slate-500 text-xs italic py-12">
+                    No notes recorded for this host yet.
+                  </div>
+                ) : (
+                  <div className="space-y-3.5 max-h-[400px] overflow-y-auto pr-1">
+                    {notesHistory.map((note) => (
+                      <div key={note.id} className="bg-slate-950 border border-slate-800/80 p-3.5 rounded-xl space-y-2">
+                        <div className="flex items-center justify-between text-[10px]">
+                          <span className="font-bold text-indigo-400">{note.managerName || 'Manager'}</span>
+                          <span className="font-mono text-slate-500">{new Date(note.timestamp).toLocaleString()}</span>
+                        </div>
+                        <p className="text-slate-300 text-xs leading-relaxed whitespace-pre-wrap">{note.content}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -1281,7 +1801,7 @@ export const ManagerDashboard: React.FC = () => {
                 >
                   {managedHosts.map(h => (
                     <option key={h.poppoId} value={h.poppoId}>
-                      {h.nickname} ({h.poppoId})
+                      {h.nickname} - {h.poppoId}
                     </option>
                   ))}
                 </select>
@@ -1330,14 +1850,13 @@ export const ManagerDashboard: React.FC = () => {
 
               <div className="space-y-1.5">
                 <label className="text-[10px] font-bold uppercase text-slate-400 tracking-wider">Due Date</label>
-                <input
-                  type="date"
+                <SingleDatePicker
+                  id="task-due-date"
+                  name="dueDate"
                   value={taskDueDate}
-                  onChange={(e) => setTaskDueDate(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none [color-scheme:dark]"
+                  onChange={(val) => setTaskDueDate(val)}
                   required
                   title="Due Date"
-                  aria-label="Due Date"
                 />
               </div>
 

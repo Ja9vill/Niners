@@ -28,6 +28,7 @@ export const GlossaryTab = () => {
   const handleLogout = async () => {
     await signOut(auth);
     setMessage("Logged out");
+    window.location.href = '/';
   };
 
   return (

@@ -3,56 +3,77 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { DashboardLayout } from './components/DashboardLayout';
 import { RequireAuth } from './components/RequireAuth';
 import { RoleGuard } from './components/RoleGuard';
+import { MobilePreviewFrame } from './components/MobilePreviewFrame';
+import { useViewMode } from './hooks/useViewMode';
 
 // Pages & Tabs
 import { Login } from './pages/Login';
 import { Overview } from './pages/Overview';
 import { RosterTab } from './components/RosterTab';
 import { CalendarTab } from './components/CalendarTab';
-import { DirectorTab } from './components/DirectorTab';
+import { DirectorOperations } from './pages/DirectorOperations';
+import { SystemLogsPage } from './pages/SystemLogsPage';
 import { ManagerDashboard } from './components/ManagerDashboard';
 import { HostProfileEditor } from './components/HostProfileEditor';
 import { ProfilesTab } from './components/ProfilesTab';
 import { PublicLayout } from './components/PublicLayout';
-import { LandingPage } from './pages/LandingPage';
 import { PublicRoster } from './pages/PublicRoster';
 import { PublicCalendar } from './pages/PublicCalendar';
 import { PoppoLivePage } from './pages/PoppoLivePage';
 import { LearningResources } from './pages/LearningResources';
+import { AdminHub } from './components/AdminHub';
+import { ProvisionUser } from './pages/ProvisionUser';
+import { FinancialData } from './pages/FinancialData';
+import { PublicLanding } from './pages/PublicLanding';
+import { AgencyPolicy } from './pages/AgencyPolicy';
+import { OnboardingProcess } from './pages/OnboardingProcess';
+import { Storage } from './lib/storage';
+import { SmartRoute } from './components/SmartRoute';
+
+const RootIndex = () => {
+  const authState = Storage.getAuthState();
+  if (authState.level > 0) {
+    return <Navigate to="/dashboard" replace />;
+  }
+  return <PublicLanding />;
+};
 
 export default function App() {
+  const { currentViewMode, setViewMode } = useViewMode();
+
   return (
-    <BrowserRouter>
+    <MobilePreviewFrame 
+      isMobileView={currentViewMode === 'mobile'}
+      onClose={() => setViewMode('desktop')}
+    >
+      <BrowserRouter>
       <Routes>
+        {/* ── Smart Shared Routes ────────────────────────────────── */}
+        <Route path="roster" element={<SmartRoute publicElement={<PublicRoster />} privateElement={<RosterTab />} />} />
+        <Route path="calendar" element={<SmartRoute publicElement={<PublicCalendar />} privateElement={<CalendarTab />} />} />
+        <Route path="poppo-live" element={<SmartRoute publicElement={<PoppoLivePage />} privateElement={<PoppoLivePage />} />} />
+        <Route path="become-an-agent" element={<Navigate to="/poppo-live" replace />} />
+        <Route path="leaderboards" element={<Navigate to="/roster" replace />} />
 
         {/* ── Public Routes ───────────────────────────────────────── */}
-        <Route path="/" element={<PublicLayout />}>
-          <Route index element={<LandingPage />} />
+        <Route element={<PublicLayout />}>
+          {/* Dynamic Root Index inside public layout so it gets the footer when logged out */}
+          <Route path="/" element={<RootIndex />} />
           <Route path="login" element={<Login />} />
-          <Route path="roster" element={<PublicRoster />} />
-          <Route path="calendar" element={<PublicCalendar />} />
-          <Route path="poppo-live" element={<PoppoLivePage />} />
-          {/* Legacy redirects */}
-          <Route path="become-an-agent" element={<Navigate to="/poppo-live" replace />} />
-          <Route path="leaderboards" element={<Navigate to="/roster" replace />} />
+          <Route path="policy" element={<AgencyPolicy />} />
+          <Route path="onboarding" element={<OnboardingProcess />} />
         </Route>
 
         {/* ── Protected Dashboard ──────────────────────────────────── */}
         <Route
-          path="/app"
           element={
             <RequireAuth>
               <DashboardLayout />
             </RequireAuth>
           }
         >
-          {/* Default landing */}
-          <Route index element={<Navigate to="/app/dashboard" replace />} />
-
           {/* Shared tabs (all authenticated roles) */}
           <Route path="dashboard" element={<Overview />} />
-          <Route path="roster"    element={<RosterTab />} />
-          <Route path="calendar"  element={<CalendarTab />} />
           <Route path="learning"  element={<LearningResources />} />
 
           {/* Host self-profile — Talent / Host roles */}
@@ -65,8 +86,15 @@ export default function App() {
             }
           />
 
-          {/* All-member profile browser — directors, managers, agents */}
-          <Route path="profiles" element={<ProfilesTab />} />
+          {/* All-member profile browser — restricted to director and head admin */}
+          <Route
+            path="profiles"
+            element={
+              <RoleGuard roles={['director', 'head admin', 'head_admin']}>
+                <ProfilesTab />
+              </RoleGuard>
+            }
+          />
 
           {/* Manager operational hub */}
           <Route
@@ -78,12 +106,52 @@ export default function App() {
             }
           />
 
-          {/* Director-only control centre */}
+          {/* Director Operations */}
           <Route
-            path="director"
+            path="director-operations"
+            element={
+              <RoleGuard roles={['director', 'head admin', 'head_admin']}>
+                <DirectorOperations />
+              </RoleGuard>
+            }
+          />
+
+          {/* System Logs */}
+          <Route
+            path="system-logs"
+            element={
+              <RoleGuard roles={['director', 'head admin', 'head_admin']}>
+                <SystemLogsPage />
+              </RoleGuard>
+            }
+          />
+
+          {/* Provision User (Director Only) */}
+          <Route
+            path="provision-user"
             element={
               <RoleGuard roles={['director']}>
-                <DirectorTab />
+                <ProvisionUser />
+              </RoleGuard>
+            }
+          />
+
+          {/* Financial Data (Director Only) */}
+          <Route
+            path="financial-data"
+            element={
+              <RoleGuard roles={['director']}>
+                <FinancialData />
+              </RoleGuard>
+            }
+          />
+
+          {/* Admin Hub page */}
+          <Route
+            path="admin-hub"
+            element={
+              <RoleGuard roles={['admin']}>
+                <AdminHub />
               </RoleGuard>
             }
           />
@@ -97,12 +165,11 @@ export default function App() {
               </div>
             }
           />
-
-          {/* Catch-all inside /app */}
-          <Route path="*" element={<Navigate to="/app/dashboard" replace />} />
         </Route>
 
+        <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
     </BrowserRouter>
+    </MobilePreviewFrame>
   );
 }

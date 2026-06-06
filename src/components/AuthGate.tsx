@@ -5,6 +5,7 @@ import { Storage } from '../lib/storage';
 import { motion } from 'motion/react';
 import { PoppoAuthService } from '../lib/customAuth';
 import { UpdatePasswordTab } from './UpdatePasswordTab';
+import { FirebaseService } from '../lib/firebaseService';
 import appLogo from '../logo.jpg';
 
 const TEXT = {
@@ -33,6 +34,7 @@ interface AuthGateProps {
 type Phase = 'USERNAME_CHECK' | 'SET_PASSWORD' | 'ENTER_PASSWORD';
 
 export const AuthGate: React.FC<AuthGateProps> = ({ children, onAuthChange }) => {
+  const [systemError, setSystemError] = useState<string | null>(null);
   const [authState, setAuthState] = useState(Storage.getAuthState());
   const [initializing, setInitializing] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -59,11 +61,17 @@ export const AuthGate: React.FC<AuthGateProps> = ({ children, onAuthChange }) =>
   const handleCheckUsername = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setSystemError(null);
     setIsSubmitting(true);
 
     const trimmedPoppoId = poppoId.trim();
     if (!trimmedPoppoId) {
       setError('Poppo ID is required.');
+      setIsSubmitting(false);
+      return;
+    }
+    if (!/^\d+$/.test(trimmedPoppoId)) {
+      setError('Poppo ID must contain only numbers.');
       setIsSubmitting(false);
       return;
     }
@@ -135,12 +143,18 @@ export const AuthGate: React.FC<AuthGateProps> = ({ children, onAuthChange }) =>
         const newState = Storage.getAuthState();
         setAuthState(newState);
         Storage.addLog('Auth', `Registered and logged in as ${newState.nickname} (${newState.role})`, newState.nickname);
+        await FirebaseService.logSystemActivity(`User set initial password and logged in: ${newState.nickname} (Poppo ID: ${newState.poppo_id}, Role: ${newState.role})`, 'Info');
         onAuthChange();
       } else {
         setError('Password setup completed, but login session could not be verified.');
+        setSystemError('Password setup succeeded but login verification failed');
       }
     } catch (err: any) {
-      setError(err?.message || 'Failed to set password.');
+      const errMsg = err?.message || 'Failed to set password.';
+        console.error('Set password error:', err);
+        await FirebaseService.logSystemActivity(`Set password error: ${errMsg}`, 'Error');
+        setSystemError(errMsg);
+        setError(errMsg);
     } finally {
       setIsSubmitting(false);
     }
@@ -177,47 +191,29 @@ export const AuthGate: React.FC<AuthGateProps> = ({ children, onAuthChange }) =>
         success = true;
       } catch (err: any) {
         errorMsg = err.message || 'Invalid Poppo ID or Password';
-        
-        // Retry with leading zeros logic
-        if (trimmedPassword.startsWith('0')) {
-          const stripped = trimmedPassword.replace(/^0+/, '');
-          if (stripped !== '') {
-            try {
-              const res2 = await authService.authenticateWithPoppo(trimmedPoppoId, stripped);
-              if (res2.status === 'MIGRATION_REQUIRED') {
-                setRequiresMigration(true);
-                return;
-              }
-              success = true;
-            } catch (err2: any) {
-              errorMsg = err2.message || 'Invalid Poppo ID or Password';
-            }
-          }
-        } else {
-          try {
-            const res3 = await authService.authenticateWithPoppo(trimmedPoppoId, '0' + trimmedPassword);
-            if (res3.status === 'MIGRATION_REQUIRED') {
-              setRequiresMigration(true);
-              return;
-            }
-            success = true;
-          } catch (err3: any) {
-            errorMsg = err3.message || 'Invalid Poppo ID or Password';
-          }
+        if (errorMsg.includes('Too many login attempts')) {
+          errorMsg = 'Too many login attempts. Please wait 15 minutes before trying again.';
         }
+        // Log the error
+        await FirebaseService.logSystemActivity(`Login error for ${trimmedPoppoId}: ${errorMsg}`, 'Warning');
       }
 
       if (success) {
         const newState = Storage.getAuthState();
         setAuthState(newState);
         Storage.addLog('Auth', `Logged in as ${newState.nickname} (${newState.role})`, newState.nickname);
+        await FirebaseService.logSystemActivity(`User logged in: ${newState.nickname} (Poppo ID: ${newState.poppo_id}, Role: ${newState.role})`, 'Info');
         onAuthChange();
       } else {
         setError(errorMsg);
+        setSystemError(errorMsg);
       }
     } catch (err: any) {
       console.error('Login error:', err);
-      setError(err?.message || 'Login failed. Please verify connection and try again.');
+      const errMsg = err?.message || 'Login failed. Please verify connection and try again.';
+      await FirebaseService.logSystemActivity(`Unexpected login error: ${errMsg}`, 'Error');
+      setSystemError(errMsg);
+      setError(errMsg);
     } finally {
       setIsSubmitting(false);
     }
@@ -245,10 +241,11 @@ export const AuthGate: React.FC<AuthGateProps> = ({ children, onAuthChange }) =>
     return (
       <div className="w-full min-h-[80vh] flex items-center justify-center bg-transparent">
         <UpdatePasswordTab 
-          onMigrationComplete={() => {
+          onMigrationComplete={async () => {
             const newState = Storage.getAuthState();
             setAuthState(newState);
             Storage.addLog('Auth', `Logged in and migrated password as ${newState.nickname}`, newState.nickname);
+            await FirebaseService.logSystemActivity(`User logged in and migrated password: ${newState.nickname} (Poppo ID: ${newState.poppo_id}, Role: ${newState.role})`, 'Info');
             onAuthChange();
           }} 
         />
@@ -265,6 +262,12 @@ export const AuthGate: React.FC<AuthGateProps> = ({ children, onAuthChange }) =>
   };
 
   return (
+  <>
+    {systemError && (
+      <div className="w-full mb-4 p-3 bg-red-900/30 text-red-200 rounded-xl text-sm text-center">
+        {systemError}
+      </div>
+    )}
     <div className="w-full flex flex-col items-center justify-center p-4 bg-transparent relative overflow-hidden min-h-[80vh]">
       <div className="w-full max-w-sm border border-[#D4AF37]/20 rounded-[24px] p-6 space-y-6 bg-[#1A1A28] shadow-2xl relative z-10 flex flex-col justify-between">
         
@@ -530,5 +533,6 @@ export const AuthGate: React.FC<AuthGateProps> = ({ children, onAuthChange }) =>
         <div className="border-b border-t border-white/5 py-1 text-center shrink-0" />
       </div>
     </div>
+  </>
   );
 };

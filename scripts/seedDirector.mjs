@@ -45,28 +45,7 @@ const db = getFirestore(undefined, 'ai-studio-f578d03a-99b3-4c41-84dd-9901137e83
       status: ""
     });
 
-    // Create performance_report top-level document
-    const performanceRef = db.collection('performance_reports').doc(`${poppoId}_1`);
-    await performanceRef.set({
-      poppo_id: poppoId,
-      nickname: 'Miss Nine',
-      from_date: "",
-      to_date: "",
-      live_duration: "",
-      party_host_duration: "",
-      total_earnings_of_points: "",
-      agent_commission: "",
-      live_earnings: "",
-      party_earnings: "",
-      private_chat: "",
-      tips: "",
-      platform_reward: "",
-      other_earnings: "",
-      platform_hourly_salary: "",
-      super_salary: "",
-      super_rank: "",
-      level: ""
-    });
+
 
 
     console.log(`✅ Successfully seeded Director Miss Nine (ID: ${poppoId}) to users collection.`);

@@ -9,7 +9,8 @@ import { cn, formatNumber } from '../lib/utils';
 import { MANAGERS, BASE_SALARY_POLICIES } from '../lib/constants';
 import { collection, query, where, getDocs, Timestamp, documentId, doc, setDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, BarChart, Bar, Cell } from 'recharts';
+import { ComposedChart, Area, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, BarChart, Bar, Cell } from 'recharts';
+import { SingleDatePicker, DateRangePicker } from './InteractiveDatePicker';
 
 interface HostProfileViewProps {
   host: Host;
@@ -49,6 +50,87 @@ const formatDateStandard = (dateInput: any): string => {
     return '—';
   }
 };
+
+const formatUpdateMetaDate = (timestampInput: any): string => {
+  if (!timestampInput) return '—';
+  try {
+    let date: Date;
+    if (timestampInput instanceof Timestamp) {
+      date = timestampInput.toDate();
+    } else if (timestampInput?.seconds) {
+      date = new Date(timestampInput.seconds * 1000);
+    } else {
+      date = new Date(timestampInput);
+    }
+    if (isNaN(date.getTime())) return '—';
+    const mm = String(date.getMonth() + 1).padStart(2, '0');
+    const dd = String(date.getDate()).padStart(2, '0');
+    const yy = String(date.getFullYear()).slice(-2);
+    const hh = String(date.getHours()).padStart(2, '0');
+    const min = String(date.getMinutes()).padStart(2, '0');
+    return `${mm}/${dd},${yy} ${hh}/${min}`;
+  } catch (e) {
+    return '—';
+  }
+};
+
+const formatDateYYYYMMDD = (dateInput: any): string => {
+  if (!dateInput) return '—';
+  try {
+    let date: Date;
+    if (dateInput?.seconds) {
+      date = new Date(dateInput.seconds * 1000);
+    } else if (dateInput?.toDate) {
+      date = dateInput.toDate();
+    } else {
+      date = new Date(dateInput);
+    }
+    if (isNaN(date.getTime())) return String(dateInput);
+    const yyyy = date.getFullYear();
+    const mm = String(date.getMonth() + 1).padStart(2, '0');
+    const dd = String(date.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  } catch (e) {
+    return String(dateInput);
+  }
+};
+
+const formatTimeslot = (timeStr: string) => {
+  if (!timeStr) return 'TBA Manila Time PHT';
+  const clean = timeStr.trim();
+  
+  // Extract time part and strip/ignore any existing timezone string to avoid duplicates or misformatting
+  let timePart = clean;
+  const tzMatch = clean.match(/\s*(pht|pst|gmt|utc|est|philippine|manila.*)$/i);
+  if (tzMatch) {
+    timePart = clean.substring(0, tzMatch.index).trim();
+  }
+  
+  let formattedTime = timePart;
+  const ampmMatch = timePart.match(/^(\d{1,2}):(\d{2})\s*([ap]\.?m\.?)/i);
+  if (ampmMatch) {
+    const hours = parseInt(ampmMatch[1], 10);
+    const minutes = ampmMatch[2];
+    const ampm = ampmMatch[3].toUpperCase().replace(/\./g, '');
+    const hoursStr = String(hours).padStart(2, '0');
+    formattedTime = `${hoursStr}:${minutes} ${ampm}`;
+  } else {
+    const match = timePart.match(/^(\d{1,2}):(\d{2})/);
+    if (match) {
+      let hours = parseInt(match[1], 10);
+      const minutes = match[2];
+      const ampm = hours >= 12 ? 'PM' : 'AM';
+      hours = hours % 12;
+      hours = hours ? hours : 12;
+      const hoursStr = String(hours).padStart(2, '0');
+      formattedTime = `${hoursStr}:${minutes} ${ampm}`;
+    }
+  }
+  
+  return `${formattedTime} Manila Time PHT`;
+};
+
+const MONTH_ORDER = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
 // Helper to format period uniformly (e.g. "Jan/26")
 const formatPeriodShort = (monthNameOrNum: any, year: any): string => {
@@ -90,14 +172,16 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
   const [performanceReports, setPerformanceReports] = useState<any[]>([]);
   const [participatedEvents, setParticipatedEvents] = useState<any[]>([]);
   const [pkData, setPkData] = useState<{ win_percentage: number; pk_score: number; sessions: number }>({
-    win_percentage: 73,
-    pk_score: 1800000,
-    sessions: 45
+    win_percentage: 0,
+    pk_score: 0,
+    sessions: 0
   });
+  const [attendedEvents, setAttendedEvents] = useState<any[]>([]);
+  const [totalAgencyEventsCount, setTotalAgencyEventsCount] = useState<number>(0);
   const [isLoading, setIsLoading] = useState(true);
   const [sortAscending, setSortAscending] = useState(true);
 
-  // Dynamic styles based on base salary category
+  // Dynamic styles based on base_salary_category
   const styles = useMemo(() => {
     const getCategoryStyles = (category: string) => {
       const norm = String(category || '').trim().toLowerCase();
@@ -107,6 +191,8 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
           shadow: 'shadow-lg shadow-[#D4AF37]/15',
           badgeText: 'text-[#D4AF37]',
           accentColor: '#D4AF37',
+          topTrim: 'border-t-[#D4AF37] border-t-2',
+          gradientBg: 'bg-gradient-to-br from-[#D4AF37]/20 via-[#D4AF37]/5 to-[#1A1A28]/80',
         };
       }
       if (norm === 's idol') {
@@ -115,6 +201,8 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
           shadow: 'shadow-lg shadow-[#ec4899]/15',
           badgeText: 'text-[#ec4899]',
           accentColor: '#ec4899',
+          topTrim: 'border-t-[#ec4899] border-t-2',
+          gradientBg: 'bg-gradient-to-br from-[#ec4899]/20 via-[#ec4899]/5 to-[#1A1A28]/80',
         };
       }
       if (norm === 'rocket host') {
@@ -123,6 +211,8 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
           shadow: 'shadow-lg shadow-[#3b82f6]/15',
           badgeText: 'text-[#3b82f6]',
           accentColor: '#3b82f6',
+          topTrim: 'border-t-[#3b82f6] border-t-2',
+          gradientBg: 'bg-gradient-to-br from-[#3b82f6]/20 via-[#3b82f6]/5 to-[#1A1A28]/80',
         };
       }
       if (norm === 'esport host' || norm.includes('esport')) {
@@ -131,6 +221,8 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
           shadow: 'shadow-lg shadow-[#a855f7]/15',
           badgeText: 'text-[#a855f7]',
           accentColor: '#a855f7',
+          topTrim: 'border-t-[#a855f7] border-t-2',
+          gradientBg: 'bg-gradient-to-br from-[#a855f7]/20 via-[#a855f7]/5 to-[#1A1A28]/80',
         };
       }
       // Regular Host
@@ -139,24 +231,24 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
         shadow: 'shadow-md',
         badgeText: 'text-[#F0EFE8]',
         accentColor: '#ffffff',
+        topTrim: 'border-t-white/10 border-t-2',
+        gradientBg: 'bg-gradient-to-br from-white/10 via-white/5 to-[#1A1A28]/80',
       };
     };
     return getCategoryStyles(host.base_salary_category || '');
   }, [host.base_salary_category]);
 
   // Profile Edit States
-  const [isEditing, setIsEditing] = useState(false);
   const [editNickname, setEditNickname] = useState(host.nickname || host.name || '');
   const [editPhotoUrl, setEditPhotoUrl] = useState(host.photoUrl || '');
   const [editDescription, setEditDescription] = useState(host.description || '');
-  const [editRole, setEditRole] = useState<string>(host.role || 'Talent');
+  const [editRole, setEditRole] = useState<string>(host.role || 'Host');
   const [editTeam, setEditTeam] = useState<string>(host.team || 'Unassigned');
   const [editManager, setEditManager] = useState<string>(host.manager || 'Nine Management');
   const [editBaseSalaryCategory, setEditBaseSalaryCategory] = useState<string>(host.base_salary_category || 'N/A');
   const [editStatus, setEditStatus] = useState<string>(host.status || 'Active');
-  const [editTier, setEditTier] = useState<string>(host.tier || 'X');
+
   const [editLevel, setEditLevel] = useState<number>(host.level || 1);
-  const [isSaving, setIsSaving] = useState(false);
   const [isProcessingPhoto, setIsProcessingPhoto] = useState(false);
   const [managersList, setManagersList] = useState<{ id: string; name: string }[]>([]);
 
@@ -171,6 +263,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
     host.streaming_hours?.length ? host.streaming_hours : [{ from: '', to: '' }]
   );
   const [isSavingSelf, setIsSavingSelf] = useState(false);
+  const [trendChartViewMode, setTrendChartViewMode] = useState<'area' | 'bar'>('area');
 
   // RPK Reporting States
   const [isRpkFormOpen, setIsRpkFormOpen] = useState(false);
@@ -197,6 +290,15 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
     notes: ''
   });
 
+  // Monthly Live Data Reporting States (For non-Nine Agency)
+  const [isMonthlyDataFormOpen, setIsMonthlyDataFormOpen] = useState(false);
+  const [isSubmittingMonthlyData, setIsSubmittingMonthlyData] = useState(false);
+  const [monthlyDataForm, setMonthlyDataForm] = useState({
+    total_earnings: '',
+    total_duration: '',
+    last_3_months_total_earnings: ''
+  });
+
   // Fanbase latest report (loaded from Firestore)
   const [fanbaseLatest, setFanbaseLatest] = useState<any>(null);
 
@@ -211,19 +313,22 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
 
   // Enhanced metrics state
   const [awards, setAwards] = useState<any[]>([]);
+  const [activeAwards, setActiveAwards] = useState<any[]>([]);
   const [agentNotes, setAgentNotes] = useState<any[]>([]);
   const [weeklyLiveData, setWeeklyLiveData] = useState<any[]>([]);
 
   // New States for dropdown selections, RPK metadata, event form data, and AI reports triggers
-  const [selectedPeriod, setSelectedPeriod] = useState<string>('all');
+  const [analyticsYear, setAnalyticsYear] = useState<string>('all');
+  const [analyticsMonth, setAnalyticsMonth] = useState<string>('all');
   const [eventFormData, setEventFormData] = useState({
-    eventType: 'Solo Livehouse',
+    eventType: 'SOLO LIVEHOUSE',
     eventDate: '',
     timeslot: '',
     description: ''
   });
   const [isAddEventFormOpen, setIsAddEventFormOpen] = useState(false);
   const [isSubmittingEvent, setIsSubmittingEvent] = useState(false);
+  const [eventActiveTab, setEventActiveTab] = useState<'exposure' | 'attendance'>('exposure');
   const [rpkMetadata, setRpkMetadata] = useState<{ lastUpdated: string; updatedBy: string } | null>(null);
   
   // AI report states
@@ -237,14 +342,13 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
     setEditNickname(host.nickname || host.name || '');
     setEditPhotoUrl(host.photoUrl || '');
     setEditDescription(host.description || '');
-    setEditRole(host.role || 'Talent');
+    setEditRole(host.role || 'Host');
     setEditTeam(host.team || 'Unassigned');
     setEditManager(host.manager || 'Nine Management');
     setEditBaseSalaryCategory(host.base_salary_category || 'N/A');
     setEditStatus(host.status || 'Active');
-    setEditTier(host.tier || 'X');
+
     setEditLevel(host.level || 1);
-    setIsEditing(false);
     
     const loadProfileData = async () => {
       setIsLoading(true);
@@ -278,7 +382,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
         });
         perfList.sort((a, b) => {
           if (a.year !== b.year) return b.year - a.year;
-          return b.month - a.month;
+          return a.month - b.month;
         });
         setPerformanceReports(perfList);
 
@@ -332,7 +436,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
               });
               mapped.sort((a: any, b: any) => {
                 if (a.year !== b.year) return b.year - a.year;
-                return b.month - a.month;
+                return a.month - b.month;
               });
               setPerformanceReports(mapped);
             }
@@ -341,14 +445,16 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
           }
         }
 
-        // Section 2: Query events — check both participantIds (new) and participants (legacy) fields
-        const [eventsSnap1, eventsSnap2] = await Promise.all([
-          getDocs(query(collection(db, 'events'), where('participantIds', 'array-contains', host.id))),
-          getDocs(query(collection(db, 'events'), where('participants', 'array-contains', host.id)))
+        // Section 2: Query exposures from 'calendar' collection
+        const [eventsSnap1, eventsSnap2, eventsSnap3, eventsSnap4] = await Promise.all([
+          getDocs(query(collection(db, 'calendar'), where('participantIds', 'array-contains', host.id))),
+          getDocs(query(collection(db, 'calendar'), where('participants', 'array-contains', host.id))),
+          getDocs(query(collection(db, 'calendar'), where('participants_id', 'array-contains', host.id))),
+          getDocs(query(collection(db, 'calendar'), where('poppo_id', '==', host.id)))
         ]);
         const seenEventIds = new Set<string>();
         const eventsList: any[] = [];
-        [...eventsSnap1.docs, ...eventsSnap2.docs].forEach(doc => {
+        [...eventsSnap1.docs, ...eventsSnap2.docs, ...eventsSnap3.docs, ...eventsSnap4.docs].forEach(doc => {
           if (!seenEventIds.has(doc.id)) {
             seenEventIds.add(doc.id);
             eventsList.push({ id: doc.id, ...doc.data() });
@@ -369,57 +475,101 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
         });
         setParticipatedEvents(eventsList);
 
-        // Load PK data from Firestore subcollection if available, else fallback
+        // Load PK data from top-level 'pk_reports' collection (deletes static mocks)
         try {
-          const rpkSnap = await getDocs(collection(db, 'host', host.id, 'rpk_reporting'));
-          if (!rpkSnap.empty) {
-            const reports = rpkSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-            reports.sort((a: any, b: any) => (b.timestamp || '').localeCompare(a.timestamp || ''));
+          const pkSnap = await getDocs(
+            query(
+              collection(db, 'pk_reports'),
+              where('poppo_id', '==', host.id)
+            )
+          );
+          if (!pkSnap.empty) {
+            const reports = pkSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+            reports.sort((a: any, b: any) => {
+              const getReportTime = (r: any) => {
+                if (r.timestamp) return new Date(r.timestamp).getTime();
+                if (r.submittedAt) {
+                  if (r.submittedAt instanceof Timestamp) return r.submittedAt.toDate().getTime();
+                  if (r.submittedAt.seconds) return r.submittedAt.seconds * 1000;
+                  return new Date(r.submittedAt).getTime();
+                }
+                if (r.from_date) return new Date(r.from_date).getTime();
+                return 0;
+              };
+              return getReportTime(b) - getReportTime(a);
+            });
             const latestRpk = reports[0];
             setPkData({
-              win_percentage: parseFloat(latestRpk.pk_wins_percent) || 0,
-              pk_score: parseInt(latestRpk.pk_points) || 0,
-              sessions: parseInt(latestRpk.pk_sessions) || 0
+              win_percentage: parseFloat(latestRpk.pk_wins_percent) || parseFloat(latestRpk.win_percentage) || 0,
+              pk_score: parseInt(latestRpk.pk_points) || parseInt(latestRpk.pk_score) || 0,
+              sessions: parseInt(latestRpk.pk_sessions) || parseInt(latestRpk.sessions) || 0
             });
             setRpkMetadata({
-              lastUpdated: latestRpk.timestamp,
-              updatedBy: latestRpk.reporter_name || latestRpk.reporter_id || 'Unknown'
+              lastUpdated: latestRpk.timestamp || latestRpk.submittedAt,
+              reporterRole: latestRpk.reporter_role || latestRpk.reporterRole || 'Staff',
+              reporterName: latestRpk.reporter_name || latestRpk.reporterName || 'Unknown',
+              reporterId: latestRpk.reporter_id || latestRpk.reporterId || 'Unknown'
             });
           } else {
-            const localPks = Storage.getPKData(host.id);
-            if (localPks && localPks.length > 0) {
-              setPkData({
-                win_percentage: localPks[0].win_percentage,
-                pk_score: localPks[0].pk_score,
-                sessions: localPks[0].sessions
-              });
-            }
+            setPkData({ win_percentage: 0, pk_score: 0, sessions: 0 });
             setRpkMetadata(null);
           }
         } catch (e) {
-          console.warn('Could not load RPK report:', e);
-          const localPks = Storage.getPKData(host.id);
-          if (localPks && localPks.length > 0) {
-            setPkData({
-              win_percentage: localPks[0].win_percentage,
-              pk_score: localPks[0].pk_score,
-              sessions: localPks[0].sessions
-            });
-          }
+          console.warn('Could not load PK report:', e);
+          setPkData({ win_percentage: 0, pk_score: 0, sessions: 0 });
           setRpkMetadata(null);
         }
 
-        // Section 3: Load latest fanbase report from subcollection
+        // Section 3: Load latest fanbase report from top-level 'fanbase_reports' collection
         try {
-          const fanbaseSnap = await getDocs(collection(db, 'host', host.id, 'fanbase_report'));
+          const fanbaseSnap = await getDocs(
+            query(
+              collection(db, 'fanbase_reports'),
+              where('poppo_id', '==', host.id)
+            )
+          );
           if (!fanbaseSnap.empty) {
             const reports = fanbaseSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-            // Sort by timestamp descending and take the latest
-            reports.sort((a: any, b: any) => (b.timestamp || '').localeCompare(a.timestamp || ''));
+            reports.sort((a: any, b: any) => {
+              const getReportTime = (r: any) => {
+                if (r.timestamp) return new Date(r.timestamp).getTime();
+                if (r.submittedAt) {
+                  if (r.submittedAt instanceof Timestamp) return r.submittedAt.toDate().getTime();
+                  if (r.submittedAt.seconds) return r.submittedAt.seconds * 1000;
+                  return new Date(r.submittedAt).getTime();
+                }
+                if (r.from_date) return new Date(r.from_date).getTime();
+                return 0;
+              };
+              return getReportTime(b) - getReportTime(a);
+            });
             setFanbaseLatest(reports[0]);
+          } else {
+            setFanbaseLatest(null);
           }
         } catch (e) {
           console.warn('Could not load fanbase report:', e);
+        }
+
+        // Section 4: Load attendance details for Agency Presence Rating
+        try {
+          const [attSnap, allAttSnap] = await Promise.all([
+            getDocs(query(collection(db, 'attendance'), where('attendeeIds', 'array-contains', host.id))),
+            getDocs(collection(db, 'attendance'))
+          ]);
+          const presenceList = attSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+          presenceList.sort((a: any, b: any) => {
+            const getEvtTime = (x: any) => {
+              if (x.eventDate) return new Date(x.eventDate).getTime();
+              if (x.timestamp) return new Date(x.timestamp).getTime();
+              return 0;
+            };
+            return getEvtTime(b) - getEvtTime(a);
+          });
+          setAttendedEvents(presenceList);
+          setTotalAgencyEventsCount(allAttSnap.size);
+        } catch (e) {
+          console.warn('Could not load attendance logs:', e);
         }
 
         // Load AI reports from Firestore
@@ -474,6 +624,22 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
           });
           setAwards(sortedAwards);
         } catch (e) { console.warn('Could not load awards:', e); }
+
+        // Load active award assignments
+        try {
+          const assignSnap = await getDocs(query(collection(db, 'award_assignments'), where('hostId', '==', host.id)));
+          const assignList: any[] = [];
+          const nowStr = new Date().toISOString().slice(0, 10);
+          assignSnap.forEach(d => {
+            const data = d.data();
+            if (data.startDate && data.endDate && nowStr >= data.startDate && nowStr <= data.endDate) {
+              assignList.push({ id: d.id, ...data });
+            }
+          });
+          setActiveAwards(assignList);
+        } catch (e) {
+          console.warn('Could not load active award assignments:', e);
+        }
 
         // Load agent notes
         try {
@@ -624,61 +790,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
     }
   };
 
-  // Save changes to Firestore and AuthState
-  const handleSaveChanges = async () => {
-    if (!editNickname.trim()) {
-      alert("Nickname cannot be empty.");
-      return;
-    }
-    setIsSaving(true);
-    try {
-      const selectedMgr = managersList.find(m => m.name === editManager);
-      const assignedManagerId = selectedMgr ? selectedMgr.id : null;
 
-      const truncatedDesc = editDescription.slice(0, 100);
-      const updatedHost: Host = {
-        ...host,
-        nickname: editNickname.trim(),
-        name: editNickname.trim() || host.name,
-        photoUrl: editPhotoUrl,
-        description: truncatedDesc,
-        bio: truncatedDesc,
-        role: editRole as any,
-        team: editTeam,
-        manager: editManager,
-        assignedManagerId: assignedManagerId,
-        base_salary_category: editBaseSalaryCategory as any,
-        status: editStatus as any,
-        tier: editTier as any,
-        level: Number(editLevel) || 1,
-        updated_at: new Date().toISOString()
-      };
-
-      await FirebaseService.updateHost(updatedHost);
-
-      // If editing current logged in user's profile, update authState
-      const currentAuth = Storage.getAuthState();
-      if (currentAuth.poppo_id === host.id) {
-        const newAuth = {
-          ...currentAuth,
-          name: editNickname.trim(),
-          nickname: editNickname.trim(),
-          profile_photo: editPhotoUrl
-        };
-        Storage.setAuthState(newAuth);
-      }
-
-      setIsEditing(false);
-      if (onProfileUpdated) {
-        onProfileUpdated();
-      }
-    } catch (err) {
-      console.error("Failed to update profile:", err);
-      alert("Failed to save changes. Please try again.");
-    } finally {
-      setIsSaving(false);
-    }
-  };
 
   // Submit RPK Report
   const handleRpkSubmit = async (e: React.FormEvent) => {
@@ -704,22 +816,37 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
       };
       
       await FirebaseService.submitRpkReport(host.id, rpkFormData.from_date, rpkFormData.to_date, reportData);
+      await FirebaseService.logSystemActivity(`Submitted RPK report for Host: ${host.nickname || host.name} (Poppo ID: ${host.id}) - Period: ${rpkFormData.from_date} to ${rpkFormData.to_date} - Win %: ${rpkFormData.pk_wins_percent}, Points: ${rpkFormData.pk_points}, Sessions: ${rpkFormData.pk_sessions}`, 'Info');
       
-      // Reload latest RPK report immediately
+      // Reload latest RPK report immediately from 'pk_reports'
       try {
-        const rpkSnap = await getDocs(collection(db, 'host', host.id, 'rpk_reporting'));
-        if (!rpkSnap.empty) {
-          const reports = rpkSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-          reports.sort((a: any, b: any) => (b.timestamp || '').localeCompare(a.timestamp || ''));
+        const pkSnap = await getDocs(
+          query(
+            collection(db, 'pk_reports'),
+            where('poppo_id', '==', host.id)
+          )
+        );
+        if (!pkSnap.empty) {
+          const reports = pkSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+          reports.sort((a: any, b: any) => {
+            const getReportTime = (r: any) => {
+              if (r.timestamp) return new Date(r.timestamp).getTime();
+              if (r.from_date) return new Date(r.from_date).getTime();
+              return 0;
+            };
+            return getReportTime(b) - getReportTime(a);
+          });
           const latestRpk = reports[0];
           setPkData({
-            win_percentage: parseFloat(latestRpk.pk_wins_percent) || 0,
-            pk_score: parseInt(latestRpk.pk_points) || 0,
-            sessions: parseInt(latestRpk.pk_sessions) || 0
+            win_percentage: parseFloat(latestRpk.pk_wins_percent) || parseFloat(latestRpk.win_percentage) || 0,
+            pk_score: parseInt(latestRpk.pk_points) || parseInt(latestRpk.pk_score) || 0,
+            sessions: parseInt(latestRpk.pk_sessions) || parseInt(latestRpk.sessions) || 0
           });
           setRpkMetadata({
-            lastUpdated: latestRpk.timestamp,
-            updatedBy: latestRpk.reporter_name || latestRpk.reporter_id || 'Unknown'
+            lastUpdated: latestRpk.timestamp || latestRpk.submittedAt,
+            reporterRole: latestRpk.reporter_role || latestRpk.reporterRole || 'Staff',
+            reporterName: latestRpk.reporter_name || latestRpk.reporterName || 'Unknown',
+            reporterId: latestRpk.reporter_id || latestRpk.reporterId || 'Unknown'
           });
         }
       } catch (e) {
@@ -740,41 +867,84 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
   // Submit Fanbase Report
   const handleFanbaseSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!fanbaseFormData.from_date || !fanbaseFormData.to_date) {
-      alert("From Date and To Date are required.");
-      return;
-    }
+    
     setIsSubmittingFanbase(true);
     try {
       const currentAuth = Storage.getAuthState();
-      const userRoleLower = String(currentAuth?.role || '').toLowerCase();
-      const isStaffUser = ['manager', 'agent', 'admin', 'head admin', 'director'].includes(userRoleLower);
+      const roleLower = String(currentAuth?.role || '').toLowerCase();
+      const isElevatedStaff = ['admin', 'head admin', 'head_admin', 'director'].includes(roleLower);
+      const isManagerAgent = ['manager', 'agent'].includes(roleLower);
+      const isOwnProfile = String(currentAuth?.poppo_id) === String(host.id);
+      const isAssignedManagerAgent = isManagerAgent && String(host.assignedManagerId) === String(currentAuth?.poppo_id);
+      const canSubmit = isOwnProfile || isAssignedManagerAgent || isElevatedStaff;
+
+      if (!canSubmit) {
+        alert("You are not authorized to submit reports for this host.");
+        setIsSubmittingFanbase(false);
+        return;
+      }
+
+      const fromDateVal = isElevatedStaff ? fanbaseFormData.from_date : new Date().toISOString();
+      const toDateVal = isElevatedStaff ? fanbaseFormData.to_date : new Date().toISOString();
+
+      if (!fromDateVal || !toDateVal) {
+        alert("From Date and To Date are required.");
+        setIsSubmittingFanbase(false);
+        return;
+      }
 
       const reportData = {
+        // snake_case fields for subcollection schema
         reporter_id: currentAuth?.poppo_id || "Unknown",
         reporter_name: currentAuth?.name || currentAuth?.nickname || "Unknown",
         reporter_role: currentAuth?.role || "Unknown",
         poppo_id: host.id,
         nickname: host.nickname || host.name,
-        from_date: fanbaseFormData.from_date,
-        to_date: fanbaseFormData.to_date,
+        from_date: fromDateVal,
+        to_date: toDateVal,
         total_followers: parseFloat(fanbaseFormData.total_followers) || 0,
         fanclub_subscribers: parseFloat(fanbaseFormData.fanclub_subscribers) || 0,
         fanclub_gc_members: parseFloat(fanbaseFormData.fanclub_gc_members) || 0,
-        // Exclude host gc posts and fans gc posts if not staff
-        gc_activity_count_host: isStaffUser ? (parseFloat(fanbaseFormData.gc_activity_count_host) || 0) : 0,
-        gc_activity_count_fans: isStaffUser ? (parseFloat(fanbaseFormData.gc_activity_count_fans) || 0) : 0,
-        notes: fanbaseFormData.notes
+        gc_activity_count_host: isElevatedStaff ? (parseFloat(fanbaseFormData.gc_activity_count_host) || 0) : 0,
+        gc_activity_count_fans: isElevatedStaff ? (parseFloat(fanbaseFormData.gc_activity_count_fans) || 0) : 0,
+        notes: fanbaseFormData.notes,
+
+        // camelCase fields for top-level schema compatibility
+        reporterId: currentAuth?.poppo_id || "Unknown",
+        reporterName: currentAuth?.name || currentAuth?.nickname || "Unknown",
+        reporterRole: currentAuth?.role || "Unknown",
+        poppoId: host.id,
+        currentFollowers: parseFloat(fanbaseFormData.total_followers) || 0,
+        fanclubSubscribers: parseFloat(fanbaseFormData.fanclub_subscribers) || 0,
+        fanclubGcMembers: parseFloat(fanbaseFormData.fanclub_gc_members) || 0,
+        gcUpdatesHost: isElevatedStaff ? (parseFloat(fanbaseFormData.gc_activity_count_host) || 0) : 0,
+        gcUpdatesFans: isElevatedStaff ? (parseFloat(fanbaseFormData.gc_activity_count_fans) || 0) : 0,
+        fromDate: fromDateVal,
+        toDate: toDateVal,
+        submittedAt: new Date().toISOString()
       };
 
-      await FirebaseService.submitFanbaseReport(host.id, fanbaseFormData.from_date, fanbaseFormData.to_date, reportData);
+      await FirebaseService.submitFanbaseReport(host.id, fromDateVal, toDateVal, reportData);
+      await FirebaseService.logSystemActivity(`Submitted codebase fanbase report for Host: ${host.nickname || host.name} (Poppo ID: ${host.id}) - Period: ${fromDateVal} to ${toDateVal} - Followers: ${fanbaseFormData.total_followers}, Subscribers: ${fanbaseFormData.fanclub_subscribers}, GC Members: ${fanbaseFormData.fanclub_gc_members}`, 'Info');
       
-      // Reload latest fanbase report immediately
+      // Reload latest fanbase report immediately from 'fanbase_reports'
       try {
-        const fanbaseSnap = await getDocs(collection(db, 'host', host.id, 'fanbase_report'));
+        const fanbaseSnap = await getDocs(
+          query(
+            collection(db, 'fanbase_reports'),
+            where('poppo_id', '==', host.id)
+          )
+        );
         if (!fanbaseSnap.empty) {
           const reports = fanbaseSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-          reports.sort((a: any, b: any) => (b.timestamp || '').localeCompare(a.timestamp || ''));
+          reports.sort((a: any, b: any) => {
+            const getReportTime = (r: any) => {
+              if (r.timestamp) return new Date(r.timestamp).getTime();
+              if (r.from_date) return new Date(r.from_date).getTime();
+              return 0;
+            };
+            return getReportTime(b) - getReportTime(a);
+          });
           setFanbaseLatest(reports[0]);
         }
       } catch (e) {
@@ -795,29 +965,81 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
     }
   };
 
-  // Save host's own bio/social/streaming edits
+  // Save host profile edits (both public self-profile and administrative fields if Director/Head Admin)
   const handleSaveSelf = async () => {
+    const currentAuth = Storage.getAuthState();
+    const isOwnProfile = currentAuth.poppo_id === host.id;
+    const userRoleLower = String(currentAuth?.role || '').toLowerCase();
+    const isDirectorOrHeadAdmin = ['director', 'head admin', 'head_admin'].includes(userRoleLower);
+
+    if (!(isOwnProfile && !isSpotlight) && !isDirectorOrHeadAdmin) {
+      alert("Unauthorized: Only the host themselves through their profile page, director, or head admin can edit profile info.");
+      return;
+    }
+
     setIsSavingSelf(true);
     try {
       const truncatedBio = selfBio.slice(0, 100);
-      const updatedHost: Host = {
-        ...host,
-        bio: truncatedBio,
-        description: truncatedBio,
-        social_links: { ig: selfSocialIg, tiktok: selfSocialTk, fb: selfSocialFb, whatsapp: selfSocialWa },
-        streaming_hours: selfStreamSlots.filter(s => s.from && s.to),
-        updated_at: new Date().toISOString()
-      };
-      await FirebaseService.updateHost(updatedHost);
-      // Update auth state if editing own profile
-      const currentAuth = Storage.getAuthState();
-      if (currentAuth.poppo_id === host.id) {
-        Storage.setAuthState({ ...currentAuth, bio: selfBio });
+      let updatedHost: Host;
+
+      if (isDirectorOrHeadAdmin) {
+        // Director/Head Admin can edit both administrative fields and public profile info
+        const selectedMgr = managersList.find(m => m.name === editManager);
+        const assignedManagerId = selectedMgr ? selectedMgr.id : null;
+
+        updatedHost = {
+          ...host,
+          nickname: editNickname.trim(),
+          name: editNickname.trim() || host.name,
+          photoUrl: editPhotoUrl,
+          description: truncatedBio,
+          bio: truncatedBio,
+          role: editRole as any,
+          team: editTeam,
+          manager: editManager,
+          assignedManagerId: assignedManagerId,
+          base_salary_category: editBaseSalaryCategory as any,
+          status: editStatus as any,
+
+          level: Number(editLevel) || 1,
+          social_links: { ig: selfSocialIg, tiktok: selfSocialTk, fb: selfSocialFb, whatsapp: selfSocialWa },
+          streaming_hours: selfStreamSlots.filter(s => s.from && s.to),
+          updated_at: new Date().toISOString()
+        };
+
+        await FirebaseService.updateHost(updatedHost, host.role);
+        await FirebaseService.logSystemActivity(`Admin edited profile metadata and public info for Host: ${host.nickname || host.name} (Poppo ID: ${host.id}) - New Nickname: ${editNickname.trim()}, Role: ${editRole}, Team: ${editTeam}, Manager: ${editManager}, Base Salary Category: ${editBaseSalaryCategory}, Status: ${editStatus}, Level: ${editLevel}, Bio: "${truncatedBio}"`, 'Warning');
+      } else {
+        // Normal host self-edit
+        updatedHost = {
+          ...host,
+          bio: truncatedBio,
+          description: truncatedBio,
+          social_links: { ig: selfSocialIg, tiktok: selfSocialTk, fb: selfSocialFb, whatsapp: selfSocialWa },
+          streaming_hours: selfStreamSlots.filter(s => s.from && s.to),
+          updated_at: new Date().toISOString()
+        };
+
+        await FirebaseService.updateHost(updatedHost, host.role);
+        await FirebaseService.logSystemActivity(`Host edited self profile public info (Poppo ID: ${host.id}) - Bio: "${truncatedBio}", Socials: ${JSON.stringify(updatedHost.social_links)}, Streaming Slots: ${JSON.stringify(updatedHost.streaming_hours)}`, 'Info');
       }
+
+      // Update auth state if editing own profile
+      if (currentAuth.poppo_id === host.id) {
+        const newAuth = {
+          ...currentAuth,
+          name: updatedHost.nickname || updatedHost.name,
+          nickname: updatedHost.nickname || updatedHost.name,
+          profile_photo: updatedHost.photoUrl,
+          bio: updatedHost.bio
+        };
+        Storage.setAuthState(newAuth);
+      }
+
       setIsSelfEditing(false);
       if (onProfileUpdated) onProfileUpdated();
     } catch (err) {
-      console.error('Failed to save self profile:', err);
+      console.error('Failed to save profile:', err);
       alert('Failed to save. Please try again.');
     } finally {
       setIsSavingSelf(false);
@@ -854,12 +1076,13 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
         timestamp: new Date().toISOString()
       };
 
-      await setDoc(doc(db, 'events', eventId), newEvent);
+      await setDoc(doc(db, 'attendance', eventId), newEvent);
+      await FirebaseService.logSystemActivity(`Added livehouse event details for Host: ${host.nickname || host.name} (Poppo ID: ${host.id}) - Date: ${eventFormData.eventDate}, Timeslot: ${eventFormData.timeslot}, Type: ${eventFormData.eventType}, Desc: "${eventFormData.description}"`, 'Info');
 
       // Refresh participated events list
       const [eventsSnap1, eventsSnap2] = await Promise.all([
-        getDocs(query(collection(db, 'events'), where('participantIds', 'array-contains', host.id))),
-        getDocs(query(collection(db, 'events'), where('participants', 'array-contains', host.id)))
+        getDocs(query(collection(db, 'attendance'), where('participantIds', 'array-contains', host.id))),
+        getDocs(query(collection(db, 'attendance'), where('participants', 'array-contains', host.id)))
       ]);
       const seenEventIds = new Set<string>();
       const eventsList: any[] = [];
@@ -885,7 +1108,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
 
       setIsAddEventFormOpen(false);
       setEventFormData({
-        eventType: 'Solo Livehouse',
+        eventType: 'SOLO LIVEHOUSE',
         eventDate: '',
         timeslot: '',
         description: ''
@@ -908,9 +1131,23 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
     return 0;
   };
 
-  // Aggregate totals from all performance reports
-  const perfTotals = useMemo(() => {
-    const sum = (fn: (r: any) => number) => performanceReports.reduce((s, r) => s + fn(r), 0);
+  // Available years from reports
+  const availableYears = useMemo(() => {
+    const years = Array.from(new Set(performanceReports.map(r => String(r.year)).filter(Boolean)));
+    return years.sort().reverse();
+  }, [performanceReports]);
+
+  // Filtered performance reports based on analyticsYear & analyticsMonth selectors
+  const filteredReports = useMemo(() => {
+    return performanceReports.filter(r => {
+      if (analyticsYear !== 'all' && String(r.year) !== analyticsYear) return false;
+      if (analyticsMonth !== 'all' && String(r.monthName) !== analyticsMonth) return false;
+      return true;
+    });
+  }, [performanceReports, analyticsYear, analyticsMonth]);
+
+  const selectedMetrics = useMemo(() => {
+    const sum = (fn: (r: any) => number) => filteredReports.reduce((s, r) => s + fn(r), 0);
     const liveHrs =       sum(r => getLiveHoursForReport(r));
     const partyHrs =      sum(r => pf(r, 'partyHostDurationMinutes','party_host_duration_minutes','partyHostDuration','partyDuration') / 60);
     const points =        sum(r => pf(r, 'totalEarningsOfPoints','total_earnings_of_points','totalPoints','total_points','points'));
@@ -942,48 +1179,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
       superRank,
       totalEarnings,
     };
-  }, [performanceReports]);
-
-  const activeReport = useMemo(() => {
-    if (selectedPeriod === 'all') return null;
-    return performanceReports.find(r => r.id === selectedPeriod) || null;
-  }, [selectedPeriod, performanceReports]);
-
-  const selectedMetrics = useMemo(() => {
-    if (!activeReport) {
-      return perfTotals;
-    }
-    const liveHrs =       getLiveHoursForReport(activeReport);
-    const partyHrs =      pf(activeReport, 'partyHostDurationMinutes','party_host_duration_minutes','partyHostDuration','partyDuration') / 60;
-    const points =        pf(activeReport, 'totalEarningsOfPoints','total_earnings_of_points','totalPoints','total_points','points');
-    const liveEarnings =  pf(activeReport, 'liveEarnings','live_earnings');
-    const partyEarnings = pf(activeReport, 'partyEarnings','party_earnings');
-    const privateChat =   pf(activeReport, 'privateChatEarnings','private_chat_earnings','privateChat');
-    const tips =          pf(activeReport, 'tips');
-    const platformReward =pf(activeReport, 'platformReward','platform_reward');
-    const otherEarnings = pf(activeReport, 'otherEarnings','other_earnings');
-    const platformHourly =pf(activeReport, 'platformHourlySalary','platform_hourly_salary');
-    const superSalary =   pf(activeReport, 'superSalary','super_salary');
-    const superRank =     pf(activeReport, 'superRank','super_rank');
-    
-    const totalEarnings = liveEarnings + partyEarnings + platformReward + tips + otherEarnings + superSalary + superRank;
-    
-    return {
-      liveHrs,
-      partyHrs,
-      points,
-      liveEarnings,
-      partyEarnings,
-      privateChat,
-      tips,
-      platformReward,
-      otherEarnings,
-      platformHourly,
-      superSalary,
-      superRank,
-      totalEarnings,
-    };
-  }, [activeReport, perfTotals]);
+  }, [filteredReports]);
 
   // Sort performance reports chronologically
   const sortedReportsForRender = useMemo(() => {
@@ -1051,15 +1247,17 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
         liveHrs: r.liveDurationMinutes ? (r.liveDurationMinutes / 60).toFixed(1) : (r.liveDuration || 0),
       }));
 
-      const prompt = `You are an AI analyst for Nine Talent Management, a live streaming agency.
-Analyze the following host data and return EXACTLY three sections with these exact labels on their own lines:
+      const prompt = `You are an AI analyst and mentor for Nine Talent Management, a live streaming agency.
+Analyze the following host data and write a performance report addressed DIRECTLY to the host. Use the second-person perspective ("you", "your", "yours") throughout the entire response. Do not use third-person (e.g. "this host", "she", "he", "their", "Miss Nine").
+
+Return EXACTLY three sections with these exact labels on their own lines:
 [SUMMARY]
 [JOURNEY]
 [RECOMMENDATIONS]
 
 Host: ${host.nickname || host.name} (Poppo ID: ${host.id})
-Status: ${host.status || 'Unknown'} | Tier: ${host.tier || 'X'} | Level: ${host.level || 1}
-Role: ${host.role || 'Talent'} | Manager: ${host.manager || 'N/A'} | Team: ${host.team || 'N/A'}
+Status: ${host.status || 'Unknown'} | Level: ${host.level || 1}
+Role: ${host.role || 'Host'} | Manager: ${host.manager || 'N/A'} | Team: ${host.team || 'N/A'}
 Total Live Earnings: ${perfTotals.liveEarnings.toLocaleString()} | Party Earnings: ${perfTotals.partyEarnings.toLocaleString()}
 Total Points Earned (all time): ${perfTotals.points.toLocaleString()}
 Live Hours (all time): ${perfTotals.liveHrs}h
@@ -1067,7 +1265,6 @@ Events Participated: ${participatedEvents.length}
 PK Win Rate: ${pkData.win_percentage}% over ${pkData.sessions} sessions
 Fanbase: ${fanbaseLatest ? `${fanbaseLatest.total_followers || 0} followers, ${fanbaseLatest.fanclub_subscribers || 0} FC subs, ${fanbaseLatest.fanclub_gc_members || 0} GC members` : 'No fanbase data'}
 Monthly Performance (last 6): ${JSON.stringify(last6)}
-
 CRITICAL REQUIREMENT: When generating the analysis, recommendations, and tasks, you MUST reference ONLY the concepts and terminology from the Nine Pillars of Streaming Success training framework. Categorize your recommendations and tasks strictly using the following 9 Pillars:
 1. Profile Optimization (Digital Handshake - Cover photo billboard, Nametag cognitive fluency, Bio elevator pitch)
 2. Live Quality (Psychological Comfort - Audio priority, lighting, background, camera placement)
@@ -1123,6 +1320,7 @@ CRITICAL REQUIREMENT: When generating the analysis, recommendations, and tasks, 
         isPosted: false
       };
       await setDoc(doc(db, 'ai_reports', reportId), newReportDoc);
+      await FirebaseService.logSystemActivity(`Generated AI performance review report for Host: ${host.nickname || host.name} (Poppo ID: ${host.id}) - Report ID: ${reportId}`, 'Info');
 
       setAiReport({ summary, journey, recommendations });
       setMyRecentAiReport(newReportDoc);
@@ -1141,6 +1339,7 @@ CRITICAL REQUIREMENT: When generating the analysis, recommendations, and tasks, 
     setIsPostingAiReport(true);
     try {
       await setDoc(doc(db, 'ai_reports', reportToPost.reportId), { isPosted: true }, { merge: true });
+      await FirebaseService.logSystemActivity(`Posted shared AI performance review report to Host profile page: Host: ${host.nickname || host.name} (Poppo ID: ${host.id}) - Report ID: ${reportToPost.reportId}`, 'Info');
       alert("Report posted successfully to host profile!");
       setAiReportReloadTrigger(prev => prev + 1);
     } catch (err: any) {
@@ -1152,7 +1351,7 @@ CRITICAL REQUIREMENT: When generating the analysis, recommendations, and tasks, 
   };
 
   // Monthly bar chart data - chronologically ascending (earliest to newest)
-  const monthlyChartData = useMemo(() => {
+  const trendChartData = useMemo(() => {
     const MONTH_ORDER = ['January','February','March','April','May','June','July','August','September','October','November','December'];
     return [...performanceReports]
       .sort((a, b) => {
@@ -1174,6 +1373,7 @@ CRITICAL REQUIREMENT: When generating the analysis, recommendations, and tasks, 
         return {
           label: formatPeriodShort(r.monthName || r.month, r.year),
           points: pf(r, 'totalEarningsOfPoints','total_earnings_of_points','totalPoints','total_points','points'),
+          live_duration: getLiveHoursForReport(r)
         };
       });
   }, [performanceReports]);
@@ -1215,57 +1415,164 @@ CRITICAL REQUIREMENT: When generating the analysis, recommendations, and tasks, 
 
   // Earnings breakdown tiles definition
   const earningTiles = [
-    { label: 'TOTAL LIVE\nDURATION', value: selectedMetrics.liveHrs + selectedMetrics.partyHrs, color: '#06b6d4', fmt: (v: number) => v ? `${v.toFixed(1)}h` : '—' },
-    { label: 'Live\nEarnings',      value: selectedMetrics.liveEarnings,   color: '#3b82f6',  fmt: (v: number) => v ? v.toLocaleString() : '—' },
-    { label: 'Total\nEarnings',     value: selectedMetrics.totalEarnings,  color: '#22d3ee',  fmt: (v: number) => v ? v.toLocaleString() : '—' },
-    { label: 'Total\nPoints',       value: selectedMetrics.points,         color: '#D4AF37',  fmt: (v: number) => v ? v.toLocaleString() : '—' },
-    { label: 'Party\nEarnings',     value: selectedMetrics.partyEarnings,  color: '#8b5cf6',  fmt: (v: number) => v ? v.toLocaleString() : '—' },
-    { label: 'Platform\nReward',    value: selectedMetrics.platformReward, color: '#10b981',  fmt: (v: number) => v ? v.toLocaleString() : '—' },
-    { label: 'Tips',                value: selectedMetrics.tips,           color: '#f59e0b',  fmt: (v: number) => v ? v.toLocaleString() : '—' },
-    { label: 'Other\nEarnings',     value: selectedMetrics.otherEarnings,  color: '#a78bfa',  fmt: (v: number) => v ? v.toLocaleString() : '—' },
-    { label: 'Super\nRank',         value: selectedMetrics.superRank,      color: '#fb923c',  fmt: (v: number) => v ? v.toLocaleString() : '—' },
-    { label: 'Super\nSalary',       value: selectedMetrics.superSalary,    color: '#fbbf24',  fmt: (v: number) => v ? v.toLocaleString() : '—' },
-    { label: 'Party\nHours',        value: selectedMetrics.partyHrs,       color: '#c084fc',  fmt: (v: number) => v ? `${v.toFixed(1)}h` : '—' },
-    { label: 'SOLO LIVE\nHOURS',    value: selectedMetrics.liveHrs,        color: '#22d3ee',  fmt: (v: number) => v ? `${v.toFixed(1)}h` : '—' },
+    // Row 1
+    { 
+      label: 'TOTAL EARNINGS', 
+      value: selectedMetrics.totalEarnings, 
+      bgGradient: 'linear-gradient(to bottom right, #3A2A18, #221A15)', 
+      accentColor: '#FFB800', 
+      hoverBorder: 'hover:border-[#FFB800]/50',
+      fmt: (v: number) => v ? v.toLocaleString() : '0'
+    },
+    { 
+      label: 'TOTAL POINTS', 
+      value: selectedMetrics.points, 
+      bgGradient: 'linear-gradient(to bottom right, #3D221C, #221515)', 
+      accentColor: '#FF7B00', 
+      hoverBorder: 'hover:border-[#FF7B00]/50',
+      fmt: (v: number) => v ? v.toLocaleString() : '0'
+    },
+    { 
+      label: 'TOTAL INCENTIVES', 
+      value: selectedMetrics.superRank + selectedMetrics.superSalary, 
+      bgGradient: 'linear-gradient(to bottom right, #3A1C28, #20131A)', 
+      accentColor: '#FF3B5C', 
+      hoverBorder: 'hover:border-[#FF3B5C]/50',
+      fmt: (v: number) => v ? v.toLocaleString() : '0'
+    },
+    // Row 2
+    { 
+      label: 'SOLO LIVE POINTS', 
+      value: selectedMetrics.liveEarnings, 
+      bgGradient: 'linear-gradient(to bottom right, #3A2A18, #221A15)', 
+      accentColor: '#FFB800', 
+      hoverBorder: 'hover:border-[#FFB800]/50',
+      fmt: (v: number) => v ? v.toLocaleString() : '0'
+    },
+    { 
+      label: 'PARTY LIVE POINTS', 
+      value: selectedMetrics.partyEarnings, 
+      bgGradient: 'linear-gradient(to bottom right, #3D221C, #221515)', 
+      accentColor: '#FF7B00', 
+      hoverBorder: 'hover:border-[#FF7B00]/50',
+      fmt: (v: number) => v ? v.toLocaleString() : '0'
+    },
+    { 
+      label: 'TIPS', 
+      value: selectedMetrics.tips, 
+      bgGradient: 'linear-gradient(to bottom right, #3A1C28, #20131A)', 
+      accentColor: '#FF3B5C', 
+      hoverBorder: 'hover:border-[#FF3B5C]/50',
+      fmt: (v: number) => v ? v.toLocaleString() : '0'
+    },
+    // Row 3
+    { 
+      label: 'SUPER RANK', 
+      value: selectedMetrics.superRank, 
+      bgGradient: 'linear-gradient(to bottom right, #3A2A18, #221A15)', 
+      accentColor: '#FFB800', 
+      hoverBorder: 'hover:border-[#FFB800]/50',
+      fmt: (v: number) => v ? v.toLocaleString() : '0'
+    },
+    { 
+      label: 'SUPER SALARY', 
+      value: selectedMetrics.superSalary, 
+      bgGradient: 'linear-gradient(to bottom right, #3D221C, #221515)', 
+      accentColor: '#FF7B00', 
+      hoverBorder: 'hover:border-[#FF7B00]/50',
+      fmt: (v: number) => v ? v.toLocaleString() : '0'
+    },
+    { 
+      label: 'OTHER EARNINGS', 
+      value: selectedMetrics.otherEarnings, 
+      bgGradient: 'linear-gradient(to bottom right, #3A1C28, #20131A)', 
+      accentColor: '#FF3B5C', 
+      hoverBorder: 'hover:border-[#FF3B5C]/50',
+      fmt: (v: number) => v ? v.toLocaleString() : '0'
+    },
+    // Row 4
+    { 
+      label: 'TOTAL HOURS', 
+      value: selectedMetrics.liveHrs + selectedMetrics.partyHrs, 
+      bgGradient: 'linear-gradient(to bottom right, #3A2A18, #221A15)', 
+      accentColor: '#FFB800', 
+      hoverBorder: 'hover:border-[#FFB800]/50',
+      fmt: (v: number) => v ? `${v.toFixed(1)}h` : '0.0h'
+    },
+    { 
+      label: 'SOLO LIVE HOURS', 
+      value: selectedMetrics.liveHrs, 
+      bgGradient: 'linear-gradient(to bottom right, #3D221C, #221515)', 
+      accentColor: '#FF7B00', 
+      hoverBorder: 'hover:border-[#FF7B00]/50',
+      fmt: (v: number) => v ? `${v.toFixed(1)}h` : '0.0h'
+    },
+    { 
+      label: 'PARTY LIVE HOURS', 
+      value: selectedMetrics.partyHrs, 
+      bgGradient: 'linear-gradient(to bottom right, #3A1C28, #20131A)', 
+      accentColor: '#FF3B5C', 
+      hoverBorder: 'hover:border-[#FF3B5C]/50',
+      fmt: (v: number) => v ? `${v.toFixed(1)}h` : '0.0h'
+    },
   ];
 
   const renderEarningsBreakdown = () => {
     if (performanceReports.length === 0) return null;
     return (
-      <div className={cn("bg-[#1A1A28] border-2 rounded-2xl p-4 transition-all duration-300", styles.borderColor, styles.shadow)}>
-        <div className="flex items-center justify-between mb-3">
-          <p className="text-[9px] font-black text-[#A09E9A]/50 uppercase tracking-[0.2em]">
-            {activeReport ? `PERFORMANCE ANALYTICS — ${formatPeriodShort(activeReport.monthName || activeReport.month, activeReport.year)}` : 'PERFORMANCE ANALYTICS — All Time'}
-          </p>
-          <select
-            value={selectedPeriod}
-            onChange={e => setSelectedPeriod(e.target.value)}
-            className="bg-[#0D0D14] border border-white/10 rounded-xl px-2 py-0.5 text-[8px] font-black text-[#D4AF37] outline-none focus:border-[#D4AF37]/50 cursor-pointer transition-all uppercase tracking-wider"
-          >
-            <option value="all">All Time</option>
-            {performanceReports.map(r => (
-              <option key={r.id} value={r.id}>
-                {formatPeriodShort(r.monthName || r.month, r.year)}
-              </option>
-            ))}
-          </select>
+      <div className={cn("space-y-4 bg-white/5 backdrop-blur-xl border border-white/10 p-5 rounded-3xl transition-all duration-300 hover:border-amber-500/30 group", styles.shadow)}>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-2">
+          <div className="flex items-center gap-2">
+             <div className="w-8 h-8 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-400 text-sm shadow-inner">📈</div>
+             <h4 className="text-xs font-black uppercase tracking-widest text-[#F0EFE8]">PERFORMANCE ANALYTICS</h4>
+          </div>
+          <div className="flex items-center gap-2 relative z-10">
+            <select
+              title="Filter by Year"
+              value={analyticsYear}
+              onChange={e => setAnalyticsYear(e.target.value)}
+              className="bg-[#0D0D14] border border-[#D4AF37]/20 rounded-lg px-3 py-1.5 text-xs font-bold text-[#F0EFE8] outline-none focus:border-[#D4AF37] cursor-pointer shadow-inner"
+            >
+              <option value="all">All Years</option>
+              {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
+            </select>
+            <select
+              title="Filter by Month"
+              value={analyticsMonth}
+              onChange={e => setAnalyticsMonth(e.target.value)}
+              className="bg-[#0D0D14] border border-[#D4AF37]/20 rounded-lg px-3 py-1.5 text-xs font-bold text-[#F0EFE8] outline-none focus:border-[#D4AF37] cursor-pointer shadow-inner"
+            >
+              <option value="all">All Months</option>
+              {MONTH_ORDER.map(m => <option key={m} value={m}>{m}</option>)}
+            </select>
+          </div>
         </div>
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-3 gap-3 pt-1">
           {earningTiles.map((tile, i) => {
             const valStr = tile.fmt(tile.value);
-            const textClass = valStr.length > 7 
-              ? "text-[9px]" 
-              : valStr.length > 5 
-                ? "text-[11px]" 
-                : "text-xs md:text-sm";
+            const textClass = valStr.length > 10
+              ? "text-xs sm:text-sm md:text-base"
+              : valStr.length > 7
+                ? "text-sm sm:text-base md:text-lg"
+                : "text-base sm:text-lg md:text-xl";
             return (
-              <div key={i} className="bg-[#09090e] border border-white/10 rounded-xl p-2.5 flex flex-col items-center text-center hover:border-white/20 transition-all">
-                <p className="text-[7px] font-black uppercase tracking-wider leading-tight mb-1.5 whitespace-pre-line" style={{ color: tile.color + 'aa' }}>
+              <div 
+                key={i} 
+                style={{ background: tile.bgGradient }}
+                className={cn(
+                  "border border-white/5 p-3 sm:p-4.5 rounded-2xl flex flex-col items-center justify-center text-center min-h-[90px] transition-all duration-300 transform group-hover:translate-y-[-2px] shadow-lg gap-1.5",
+                  tile.hoverBorder
+                )}
+              >
+                <span className="text-[8px] sm:text-[9px] md:text-[10px] font-black text-white/50 uppercase tracking-widest leading-tight">
                   {tile.label}
-                </p>
-                <p className={cn("font-black leading-none truncate max-w-full", textClass)} style={{ color: tile.color }}>
+                </span>
+                <span 
+                  style={{ color: tile.accentColor }}
+                  className={cn("font-black tracking-tight drop-shadow-md", textClass)}
+                >
                   {valStr}
-                </p>
+                </span>
               </div>
             );
           })}
@@ -1274,45 +1581,180 @@ CRITICAL REQUIREMENT: When generating the analysis, recommendations, and tasks, 
     );
   };
 
-  const renderMonthlyPointsTrend = () => {
-    if (monthlyChartData.length === 0) return null;
-    const COLORS = ['#D4AF37','#6366f1','#ec4899','#10b981','#f59e0b','#06b6d4','#a78bfa','#fb923c','#38bdf8','#34d399','#f472b6','#818cf8'];
+  const renderMonthlyTrend = () => {
+    if (trendChartData.length === 0) return null;
+
     return (
-      <div className={cn("bg-[#1A1A28] border-2 rounded-2xl p-4 transition-all duration-300", styles.borderColor, styles.shadow)}>
-        <div className="flex items-center gap-2 mb-4">
-          <p className="text-[9px] font-black text-[#A09E9A]/50 uppercase tracking-[0.2em]">Monthly Points Trend</p>
-          <span className="ml-auto text-[8px] text-[#A09E9A]/30 font-mono">{monthlyChartData.length} months</span>
+      <div className={cn("space-y-4 bg-white/5 backdrop-blur-xl border border-white/10 p-5 rounded-3xl transition-all duration-300 hover:border-indigo-500/30 group", styles.shadow)}>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+             <div className="w-8 h-8 rounded-full bg-indigo-500/20 flex items-center justify-center text-indigo-400 text-sm shadow-inner">📊</div>
+             <h4 className="text-xs font-black uppercase tracking-widest text-[#F0EFE8]">Points & Duration Trend</h4>
+          </div>
         </div>
-        <div className="h-44">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={monthlyChartData} margin={{ top: 5, right: 5, left: -25, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#ffffff08" vertical={false} />
-              <XAxis dataKey="label" tick={{ fontSize: 8, fill: '#A09E9A', fontWeight: 'bold' }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fontSize: 8, fill: '#A09E9A' }} axisLine={false} tickLine={false}
-                tickFormatter={v => v >= 1000 ? `${(v/1000).toFixed(0)}K` : String(v)} />
-              <Tooltip
-                contentStyle={{ backgroundColor: '#13131E', borderColor: '#ffffff20', borderRadius: '12px', fontSize: '10px' }}
-                formatter={(v: number) => [v.toLocaleString() + ' pts', 'Points']}
-                labelStyle={{ color: '#D4AF37', fontWeight: 'bold', marginBottom: '4px' }}
-              />
-              <Bar dataKey="points" radius={[4, 4, 0, 0]}>
-                {monthlyChartData.map((_, idx) => (
-                  <Cell key={idx} fill={COLORS[idx % COLORS.length]} fillOpacity={0.85} />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
+        
+        <div className="flex items-center justify-between mt-2 pt-2 border-t border-white/5">
+          {/* Legend */}
+          <div className="flex gap-3 text-[9px] font-black uppercase tracking-widest">
+            <span className="text-[#D4AF37] drop-shadow-sm">● Points</span>
+            <span className="text-[#06b6d4] drop-shadow-sm">● Live Hours</span>
+          </div>
+
+          {/* View Toggle */}
+          <div className="flex items-center gap-1 bg-black/40 p-1 rounded-xl border border-white/5">
+            <button
+              type="button"
+              onClick={() => setTrendChartViewMode('area')}
+              className={cn(
+                "px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer",
+                trendChartViewMode === 'area'
+                  ? "bg-indigo-500/20 text-indigo-400 border border-indigo-500/30"
+                  : "text-white/40 hover:text-white/70 border border-transparent"
+              )}
+            >
+              Area
+            </button>
+            <button
+              type="button"
+              onClick={() => setTrendChartViewMode('bar')}
+              className={cn(
+                "px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer",
+                trendChartViewMode === 'bar'
+                  ? "bg-indigo-500/20 text-indigo-400 border border-indigo-500/30"
+                  : "text-white/40 hover:text-white/70 border border-transparent"
+              )}
+            >
+              Bar
+            </button>
+          </div>
+        </div>
+
+        <div className="h-48 w-full mt-4">
+          {trendChartViewMode === 'area' ? (
+            <ResponsiveContainer width="100%" height="100%">
+              <ComposedChart data={trendChartData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="colorPoints" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#D4AF37" stopOpacity={0.4}/>
+                    <stop offset="95%" stopColor="#D4AF37" stopOpacity={0.01}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" vertical={false} />
+                <XAxis 
+                  dataKey="label" 
+                  tick={{ fontSize: 9, fill: '#A09E9A', fontWeight: 'bold' }}
+                  axisLine={{ stroke: '#ffffff20' }}
+                  tickLine={false}
+                />
+                <YAxis 
+                  yAxisId="left"
+                  tick={{ fontSize: 9, fill: '#A09E9A', fontWeight: 'bold' }}
+                  axisLine={false}
+                  tickLine={false}
+                  tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`}
+                />
+                <YAxis 
+                  yAxisId="right"
+                  orientation="right"
+                  tick={{ fontSize: 9, fill: '#A09E9A', fontWeight: 'bold' }}
+                  axisLine={false}
+                  tickLine={false}
+                  tickFormatter={(value) => `${value.toFixed(0)}h`}
+                />
+                <Tooltip 
+                  contentStyle={{ backgroundColor: '#13131E', borderColor: '#ffffff20', borderRadius: '12px', fontSize: '10px', fontWeight: 'bold' }}
+                  itemStyle={{ color: '#F0EFE8' }}
+                  labelStyle={{ color: '#D4AF37', marginBottom: '4px' }}
+                />
+                <Area 
+                  yAxisId="left"
+                  type="monotone" 
+                  dataKey="points" 
+                  name="Points"
+                  stroke="#D4AF37" 
+                  strokeWidth={2}
+                  fill="url(#colorPoints)"
+                  activeDot={{ r: 6, fill: '#D4AF37', stroke: '#F0EFE8', strokeWidth: 2 }}
+                  animationDuration={1000}
+                />
+                <Line 
+                  yAxisId="right"
+                  type="monotone" 
+                  dataKey="live_duration" 
+                  name="Live Duration"
+                  stroke="#06b6d4" 
+                  strokeWidth={3}
+                  dot={{ r: 4, fill: '#13131E', stroke: '#06b6d4', strokeWidth: 2 }}
+                  activeDot={{ r: 6, fill: '#06b6d4', stroke: '#F0EFE8', strokeWidth: 2 }}
+                  animationDuration={1000}
+                />
+              </ComposedChart>
+            </ResponsiveContainer>
+          ) : (
+            <ResponsiveContainer width="100%" height="100%">
+              <ComposedChart data={trendChartData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" vertical={false} />
+                <XAxis 
+                  dataKey="label" 
+                  tick={{ fontSize: 9, fill: '#A09E9A', fontWeight: 'bold' }}
+                  axisLine={{ stroke: '#ffffff20' }}
+                  tickLine={false}
+                />
+                <YAxis 
+                  yAxisId="left"
+                  tick={{ fontSize: 9, fill: '#A09E9A', fontWeight: 'bold' }}
+                  axisLine={false}
+                  tickLine={false}
+                  tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`}
+                />
+                <YAxis 
+                  yAxisId="right"
+                  orientation="right"
+                  tick={{ fontSize: 9, fill: '#A09E9A', fontWeight: 'bold' }}
+                  axisLine={false}
+                  tickLine={false}
+                  tickFormatter={(value) => `${value.toFixed(0)}h`}
+                />
+                <Tooltip 
+                  contentStyle={{ backgroundColor: '#13131E', borderColor: '#ffffff20', borderRadius: '12px', fontSize: '10px', fontStyle: 'normal', fontWeight: 'bold' }}
+                  itemStyle={{ color: '#F0EFE8' }}
+                  labelStyle={{ color: '#D4AF37', marginBottom: '4px' }}
+                />
+                <Bar 
+                  yAxisId="left"
+                  dataKey="points" 
+                  name="Points"
+                  fill="#D4AF37" 
+                  radius={[4, 4, 0, 0]}
+                  maxBarSize={40}
+                  animationDuration={1000}
+                />
+                <Bar 
+                  yAxisId="right"
+                  dataKey="live_duration" 
+                  name="Live Duration"
+                  fill="#06b6d4" 
+                  radius={[4, 4, 0, 0]}
+                  maxBarSize={40}
+                  animationDuration={1000}
+                />
+              </ComposedChart>
+            </ResponsiveContainer>
+          )}
         </div>
       </div>
     );
   };
 
-  // Self-edit modal: bio, social links, streaming hours only
   const renderSelfEditModal = () => {
     if (!isSelfEditing) return null;
+    const currentAuth = Storage.getAuthState();
+    const userRoleLower = String(currentAuth?.role || '').toLowerCase();
+    const isDirectorOrHeadAdmin = ['director', 'head admin', 'head_admin'].includes(userRoleLower);
+
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-        <div className="bg-[#13131E] border border-white/10 rounded-2xl max-w-md w-full p-5 shadow-2xl relative max-h-[90vh] overflow-y-auto">
+        <div className={cn("bg-[#13131E] border border-white/10 rounded-2xl w-full p-5 shadow-2xl relative max-h-[90vh] overflow-y-auto transition-all duration-300", isDirectorOrHeadAdmin ? "max-w-lg" : "max-w-md")}>
           <button
             title="Close"
             onClick={() => setIsSelfEditing(false)}
@@ -1321,10 +1763,131 @@ CRITICAL REQUIREMENT: When generating the analysis, recommendations, and tasks, 
             <X size={14} />
           </button>
 
-          <h3 className="text-sm font-black uppercase tracking-wider text-[#F0EFE8] mb-0.5">Edit Your Profile</h3>
-          <p className="text-[10px] text-[#A09E9A] mb-4">Update bio, social media links and streaming schedule.</p>
+          <h3 className="text-sm font-black uppercase tracking-wider text-[#F0EFE8] mb-0.5">
+            {isDirectorOrHeadAdmin ? 'Edit Host Profile' : 'Edit Your Profile'}
+          </h3>
+          <p className="text-[10px] text-[#A09E9A] mb-4">
+            {isDirectorOrHeadAdmin 
+              ? "Update host's administrative details, bio, social media links, and streaming schedule." 
+              : "Update bio, social media links and streaming schedule."}
+          </p>
 
           <div className="space-y-4">
+            {isDirectorOrHeadAdmin && (
+              <div className="bg-[#1A1A28] border border-white/5 p-4 rounded-xl space-y-3">
+                <div className="border-b border-white/5 pb-1">
+                  <span className="text-[9px] font-black text-[#D4AF37] uppercase tracking-wider">Administrative Fields</span>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-[8px] font-black text-[#A09E9A] uppercase tracking-widest block">Nickname</label>
+                    <input 
+                      type="text"
+                      title="Nickname"
+                      placeholder="Nickname"
+                      value={editNickname}
+                      onChange={(e) => setEditNickname(e.target.value)}
+                      className="w-full bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-1.5 text-xs font-bold text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[8px] font-black text-[#A09E9A] uppercase tracking-widest block">Role</label>
+                    <select
+                      title="Role"
+                      value={editRole}
+                      onChange={(e) => setEditRole(e.target.value)}
+                      className="w-full bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-1.5 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37] font-bold"
+                    >
+                      {['Host', 'Manager', 'Admin', 'Head Admin', 'Agent']
+                        .concat(host.role === 'Director' ? ['Director'] : [])
+                        .map(r => (
+                          <option key={r} value={r} className="bg-[#1A1A28] text-[#F0EFE8]">{r}</option>
+                        ))
+                      }
+                    </select>
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[8px] font-black text-[#A09E9A] uppercase tracking-widest block">Photo Upload & URL</label>
+                  <div className="flex gap-2 items-center">
+                    <label className="px-3 py-2 bg-[#222235] border border-white/10 hover:bg-[#2A2A3F] rounded-lg text-[9px] font-black uppercase tracking-wider cursor-pointer text-[#F0EFE8] whitespace-nowrap">
+                      {isProcessingPhoto ? 'Uploading...' : 'Choose File'}
+                      <input type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
+                    </label>
+                    <input 
+                      type="text" 
+                      placeholder="Or paste photo URL..." 
+                      value={editPhotoUrl}
+                      onChange={(e) => setEditPhotoUrl(e.target.value)}
+                      className="w-full bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-1.5 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-[8px] font-black text-[#A09E9A] uppercase tracking-widest block">Base Salary Category</label>
+                    <select
+                      title="Base Salary Category"
+                      value={editBaseSalaryCategory}
+                      onChange={(e) => setEditBaseSalaryCategory(e.target.value)}
+                      className="w-full bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-1.5 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37] font-bold"
+                    >
+                      {BASE_SALARY_POLICIES.map(policy => (
+                        <option key={policy} value={policy} className="bg-[#1A1A28] text-[#F0EFE8]">{policy}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[8px] font-black text-[#A09E9A] uppercase tracking-widest block">Assigned Manager</label>
+                    <select
+                      title="Assigned Manager"
+                      value={editManager}
+                      onChange={(e) => setEditManager(e.target.value)}
+                      className="w-full bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-1.5 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37] font-bold"
+                    >
+                      {!managersList.some(m => m.name === editManager) && editManager && (
+                        <option value={editManager} className="bg-[#1A1A28] text-[#F0EFE8]">{editManager}</option>
+                      )}
+                      {managersList.map(mgr => (
+                        <option key={mgr.id} value={mgr.name} className="bg-[#1A1A28] text-[#F0EFE8]">{mgr.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-[8px] font-black text-[#A09E9A] uppercase tracking-widest block">Team / Anchor Group</label>
+                    <input
+                      type="text"
+                      title="Team / Anchor Group"
+                      placeholder="Team / Anchor Group"
+                      value={editTeam}
+                      onChange={(e) => setEditTeam(e.target.value)}
+                      className="w-full bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-1.5 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[8px] font-black text-[#A09E9A] uppercase tracking-widest block">Status</label>
+                    <select
+                      title="Status"
+                      value={editStatus}
+                      onChange={(e) => setEditStatus(e.target.value)}
+                      className="w-full bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-1.5 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37] font-bold"
+                    >
+                      {['Active', 'Inconsistent', 'Released', 'Inactive'].map(s => (
+                        <option key={s} value={s} className="bg-[#1A1A28] text-[#F0EFE8]">{s}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+              </div>
+            )}
             {/* Host Public Message */}
             <div className="space-y-1">
               <div className="flex justify-between items-center">
@@ -1399,7 +1962,7 @@ CRITICAL REQUIREMENT: When generating the analysis, recommendations, and tasks, 
                     className="flex-1 bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-1.5 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
                   />
                   {selfStreamSlots.length > 1 && (
-                    <button type="button" onClick={() => setSelfStreamSlots(selfStreamSlots.filter((_, i) => i !== idx))} className="text-red-400 hover:text-red-300 cursor-pointer">
+                    <button type="button" title="Remove Slot" onClick={() => setSelfStreamSlots(selfStreamSlots.filter((_, i) => i !== idx))} className="text-red-400 hover:text-red-300 cursor-pointer">
                       <X size={12} />
                     </button>
                   )}
@@ -1428,341 +1991,199 @@ CRITICAL REQUIREMENT: When generating the analysis, recommendations, and tasks, 
 
 
 
+  // Helper to render social icons with hover state transitions and muted/grayed-out state if empty
+  const renderSocialIcon = ({ type, url, icon, label, colorClass }: {
+    type: string;
+    url?: string;
+    icon: React.ReactNode;
+    label: string;
+    colorClass: string;
+  }) => {
+    const hasLink = !!url && String(url).trim() !== '';
+    let linkUrl = '';
+    
+    if (hasLink) {
+      const trimmed = String(url).trim();
+      if (type === 'instagram') {
+        linkUrl = trimmed.startsWith('http') ? trimmed : `https://instagram.com/${trimmed.replace('@', '')}`;
+      } else if (type === 'tiktok') {
+        linkUrl = trimmed.startsWith('http') ? trimmed : `https://tiktok.com/@${trimmed.replace('@', '')}`;
+      } else if (type === 'facebook') {
+        linkUrl = trimmed.startsWith('http') ? trimmed : `https://facebook.com/${trimmed}`;
+      } else if (type === 'whatsapp') {
+        const phone = trimmed.replace(/[^0-9+]/g, '');
+        linkUrl = phone.startsWith('+') ? `https://wa.me/${phone.replace('+', '')}` : `https://wa.me/${phone}`;
+      }
+    }
+
+    if (!hasLink) {
+      return (
+        <div 
+          className="w-9 h-9 rounded-xl bg-white/[0.02] border border-white/5 flex items-center justify-center text-[#A09E9A]/20 cursor-not-allowed transition-all duration-300"
+          title={`${label} (Not linked)`}
+        >
+          {icon}
+        </div>
+      );
+    }
+
+    return (
+      <a 
+        href={linkUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className={cn(
+          "w-9 h-9 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center transition-all duration-300 shadow-md cursor-pointer",
+          colorClass
+        )}
+        title={`Visit ${label}: ${url}`}
+      >
+        {icon}
+      </a>
+    );
+  };
+
   const renderIdentityCard = () => {
     const currentAuth = Storage.getAuthState();
     const isOwnProfile = currentAuth.poppo_id === host.id;
     const userRoleLower = String(currentAuth?.role || '').toLowerCase();
-    const isStaffUser = ['manager', 'agent', 'admin', 'head admin', 'director'].includes(userRoleLower);
+    const isDirectorOrHeadAdmin = ['director', 'head admin', 'head_admin'].includes(userRoleLower);
 
     return (
-      <div className={cn("bg-[#1A1A28] border-2 rounded-2xl p-4 flex flex-col gap-4 relative group/card transition-all duration-300", styles.borderColor, styles.shadow)}>
-        {/* Top area: Photo + Nickname/PoppoID/Admin Fields */}
-        <div className="flex gap-4 items-start">
-          {/* Host Photo Section */}
-          <div className="flex flex-col items-center gap-1.5 shrink-0">
-            <span className="text-[8px] font-black text-[#A09E9A]/60 uppercase tracking-widest leading-none">HOST PHOTO</span>
-            <div className="w-16 h-16 rounded-full bg-[#0D0D14] border-2 flex items-center justify-center font-bold text-[#F0EFE8] overflow-hidden shadow-lg relative" style={{ borderColor: styles.accentColor }}>
-              {isProcessingPhoto && (
-                <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
-                  <Loader2 size={16} className="animate-spin text-[#D4AF37]" />
-                </div>
-              )}
-              {editPhotoUrl ? (
-                <img src={editPhotoUrl} alt={host.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-              ) : (
-                <div className="text-lg text-[#A09E9A] font-bold">{editNickname?.[0]?.toUpperCase() || host.name?.[0] || 'JD'}</div>
-              )}
+      <div className={cn("backdrop-blur-xl border-2 rounded-3xl overflow-hidden flex flex-col relative group/card transition-all duration-300", styles.gradientBg, styles.borderColor, styles.shadow, styles.topTrim)}>
+        
+        {/* Full-width square profile photo acting as a header banner */}
+        <div className="w-full aspect-square relative bg-[#0D0D14]">
+          {isProcessingPhoto && (
+            <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-20">
+              <Loader2 size={24} className="animate-spin text-[#D4AF37]" />
             </div>
-            
-            {isEditing && (
-              <div className="flex flex-col items-center gap-1 mt-1">
-                <label className="px-2 py-0.5 bg-[#222235] border border-white/10 hover:bg-[#2A2A3F] rounded text-[7px] font-black uppercase tracking-wider cursor-pointer text-[#F0EFE8]">
-                  Upload
-                  <input type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
-                </label>
-                <input 
-                  type="text" 
-                  placeholder="URL..." 
-                  value={editPhotoUrl}
-                  onChange={(e) => setEditPhotoUrl(e.target.value)}
-                  className="w-14 bg-[#0D0D14] border border-white/10 rounded px-1 py-0.5 text-[6.5px] text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
-                  title="Profile Photo URL"
-                />
-              </div>
-            )}
-
-            {/* Social Media (placed directly under profile photo) */}
-            {host.social_links && (host.social_links.ig || host.social_links.tiktok || host.social_links.fb || host.social_links.whatsapp) && (
-              <div className="flex gap-1.5 mt-2.5 justify-center">
-                {host.social_links.ig && (
-                  <a 
-                    href={host.social_links.ig.startsWith('http') ? host.social_links.ig : `https://instagram.com/${host.social_links.ig.replace('@', '')}`} 
-                    target="_blank" 
-                    rel="noopener noreferrer" 
-                    className="p-1 bg-pink-500/10 hover:bg-pink-500/20 border border-pink-500/20 text-pink-400 rounded-md transition-colors flex items-center justify-center"
-                    title="Instagram"
-                  >
-                    <Instagram size={11} />
-                  </a>
-                )}
-                {host.social_links.tiktok && (
-                  <a 
-                    href={host.social_links.tiktok.startsWith('http') ? host.social_links.tiktok : `https://tiktok.com/@${host.social_links.tiktok.replace('@', '')}`} 
-                    target="_blank" 
-                    rel="noopener noreferrer" 
-                    className="p-1 bg-[#00f2fe]/10 hover:bg-[#00f2fe]/20 border border-[#00f2fe]/20 text-[#00f2fe] rounded-md transition-colors flex items-center justify-center font-bold text-[9px] leading-none"
-                    title="TikTok"
-                  >
-                    <span>🎵</span>
-                  </a>
-                )}
-                {host.social_links.fb && (
-                  <a 
-                    href={host.social_links.fb.startsWith('http') ? host.social_links.fb : `https://facebook.com/${host.social_links.fb}`} 
-                    target="_blank" 
-                    rel="noopener noreferrer" 
-                    className="p-1 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 text-blue-400 rounded-md transition-colors flex items-center justify-center"
-                    title="Facebook"
-                  >
-                    <Facebook size={11} />
-                  </a>
-                )}
-                {host.social_links.whatsapp && (
-                  <a 
-                    href={`https://wa.me/${host.social_links.whatsapp.replace(/[^0-9]/g, '')}`}
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="p-1 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 text-emerald-400 rounded-md transition-colors flex items-center justify-center text-[10px] font-bold"
-                    title="WhatsApp"
-                  >
-                    <span>💬</span>
-                  </a>
-                )}
-              </div>
-            )}
+          )}
+          {editPhotoUrl ? (
+            <img src={editPhotoUrl} alt={host.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center text-7xl text-[#A09E9A] font-black bg-gradient-to-br from-[#1A1A28] to-[#0D0D14]">
+              {editNickname?.[0]?.toUpperCase() || host.name?.[0] || 'JD'}
+            </div>
+          )}
+          
+          {/* Faded gradient overlay at the bottom 25% to merge with profile block */}
+          <div className="absolute bottom-0 inset-x-0 h-1/3 bg-gradient-to-t from-[#1A1A28] via-[#1A1A28]/60 to-transparent z-10" />
+          
+          {/* Absolute positioned badges overlaying the image */}
+          <div className="absolute top-4 right-4 z-20 flex flex-col items-end gap-2">
+             <span className={cn("text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full border backdrop-blur-md shadow-lg", 
+                host.status === 'Active' ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30" : "bg-amber-500/20 text-amber-400 border-amber-500/30")}>
+                {host.status || 'Active'}
+             </span>
+             {/* Base Salary Category glowing badge */}
+             <span className={cn("text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full border backdrop-blur-md shadow-[0_0_15px_rgba(212,175,55,0.3)]", styles.badgeText, styles.borderColor, "bg-black/40")}>
+                {host.base_salary_category || 'Regular Host'}
+             </span>
           </div>
 
-          {/* Identity Details */}
-          <div className="flex-1 min-w-0 space-y-2.5 pr-16">
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <span className="text-[8px] font-black text-[#A09E9A] uppercase tracking-widest block mb-0.5">NICKNAME</span>
-                {isEditing ? (
-                  <input 
-                    type="text"
-                    value={editNickname}
-                    onChange={(e) => setEditNickname(e.target.value)}
-                    className="w-full bg-[#0D0D14] border border-white/10 rounded px-2 py-1 text-xs font-bold text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
-                    required
-                    title="Nickname"
-                    placeholder="Nickname"
-                  />
-                ) : (
-                  <span className="text-sm font-black text-[#F0EFE8] truncate block leading-tight">{host.nickname || host.name}</span>
-                )}
-              </div>
-              <div>
-                <span className="text-[8px] font-black text-[#A09E9A] uppercase tracking-widest block mb-0.5">POPPO ID</span>
-                <span className="text-sm font-black text-[#F0EFE8] truncate block leading-tight">{host.id}</span>
-              </div>
-            </div>
-
-            {isEditing ? (
-              <div className="grid grid-cols-2 gap-3 pt-2 border-t border-white/5 text-[10px] text-[#A09E9A]">
-                <div className="space-y-1">
-                  <label htmlFor="edit-role" className="text-[#A09E9A] font-bold uppercase tracking-wider block">Role:</label>
-                  <select
-                    id="edit-role"
-                    value={editRole}
-                    onChange={(e) => setEditRole(e.target.value)}
-                    className="w-full bg-[#0D0D14] border border-white/10 rounded px-1.5 py-1 text-[11px] text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
-                  >
-                    {['Talent', 'Manager', 'Admin', 'Head Admin', 'Director', 'Agent'].map(r => (
-                      <option key={r} value={r} className="bg-[#1A1A28] text-[#F0EFE8]">{r}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="space-y-1">
-                  <label htmlFor="edit-sal" className="text-[#A09E9A] font-bold uppercase tracking-wider block">Base Salary Category:</label>
-                  <select
-                    id="edit-sal"
-                    value={editBaseSalaryCategory}
-                    onChange={(e) => setEditBaseSalaryCategory(e.target.value)}
-                    className="w-full bg-[#0D0D14] border border-white/10 rounded px-1.5 py-1 text-[11px] text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
-                  >
-                    {BASE_SALARY_POLICIES.map(policy => (
-                      <option key={policy} value={policy} className="bg-[#1A1A28] text-[#F0EFE8]">{policy}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="space-y-1">
-                  <label htmlFor="edit-mgr" className="text-[#A09E9A] font-bold uppercase tracking-wider block">Assigned Manager:</label>
-                  <select
-                    id="edit-mgr"
-                    value={editManager}
-                    onChange={(e) => setEditManager(e.target.value)}
-                    className="w-full bg-[#0D0D14] border border-white/10 rounded px-1.5 py-1 text-[11px] text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
-                  >
-                    {!managersList.some(m => m.name === editManager) && editManager && (
-                      <option value={editManager} className="bg-[#1A1A28] text-[#F0EFE8]">{editManager}</option>
-                    )}
-                    {managersList.map(mgr => (
-                      <option key={mgr.id} value={mgr.name} className="bg-[#1A1A28] text-[#F0EFE8]">{mgr.name}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="space-y-1">
-                  <label htmlFor="edit-team" className="text-[#A09E9A] font-bold uppercase tracking-wider block">Team / Anchor Group:</label>
-                  <input
-                    id="edit-team"
-                    type="text"
-                    value={editTeam}
-                    onChange={(e) => setEditTeam(e.target.value)}
-                    className="w-full bg-[#0D0D14] border border-white/10 rounded px-1.5 py-1 text-[11px] text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label htmlFor="edit-status" className="text-[#A09E9A] font-bold uppercase tracking-wider block">Status:</label>
-                  <select
-                    id="edit-status"
-                    value={editStatus}
-                    onChange={(e) => setEditStatus(e.target.value)}
-                    className="w-full bg-[#0D0D14] border border-white/10 rounded px-1.5 py-1 text-[11px] text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
-                  >
-                    {['Active', 'Inconsistent', 'Released', 'Inactive'].map(s => (
-                      <option key={s} value={s} className="bg-[#1A1A28] text-[#F0EFE8]">{s}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="space-y-1">
-                  <label htmlFor="edit-tier" className="text-[#A09E9A] font-bold uppercase tracking-wider block">Tier:</label>
-                  <select
-                    id="edit-tier"
-                    value={editTier}
-                    onChange={(e) => setEditTier(e.target.value)}
-                    className="w-full bg-[#0D0D14] border border-white/10 rounded px-1.5 py-1 text-[11px] text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
-                  >
-                    {['S', 'A', 'B', 'C', 'X'].map(t => (
-                      <option key={t} value={t} className="bg-[#1A1A28] text-[#F0EFE8]">{t}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="space-y-1">
-                  <label htmlFor="edit-lvl" className="text-[#A09E9A] font-bold uppercase tracking-wider block">Level Snap:</label>
-                  <input
-                    id="edit-lvl"
-                    type="number"
-                    value={editLevel}
-                    onChange={(e) => setEditLevel(parseInt(e.target.value) || 1)}
-                    className="w-full bg-[#0D0D14] border border-white/10 rounded px-1.5 py-1 text-[11px] text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
-                  />
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-1.5 pt-2 border-t border-white/5 text-[10px] text-[#A09E9A]">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[#A09E9A] font-bold uppercase tracking-wider">Role:</span>
-                  <span className="text-[#D4AF37] font-semibold">{host.role === 'Talent' ? 'Star Host' : host.role}</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[#A09E9A] font-bold uppercase tracking-wider">Base Salary Category:</span>
-                  <span className={cn("font-semibold", styles.badgeText)}>{host.base_salary_category || 'Regular Host'}</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[#A09E9A] font-bold uppercase tracking-wider">Assigned Manager:</span>
-                  <span className="text-[#F0EFE8] font-semibold">{host.manager}</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[#A09E9A] font-bold uppercase tracking-wider">Team / Anchor Group:</span>
-                  <span className="text-indigo-400 font-semibold">{host.team}</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[#A09E9A] font-bold uppercase tracking-wider">Status:</span>
-                  <span className={cn("font-semibold", host.status === 'Active' ? "text-emerald-400" : "text-amber-400")}>{host.status}</span>
-                </div>
-              </div>
-            )}
-
-            {/* Streaming Schedule (placed under edit button and details) */}
-            {host.streaming_hours && host.streaming_hours.length > 0 && (
-              <div className="pt-2.5 border-t border-white/5 space-y-1">
-                <span className="text-[8px] font-black text-[#A09E9A] uppercase tracking-widest block">STREAMING SCHEDULE</span>
-                <div className="grid grid-cols-2 gap-2">
-                  {host.streaming_hours.slice(0, 2).map((slot, idx) => (
-                    <div key={idx} className="bg-[#0D0D14] border border-white/5 rounded px-2 py-1 text-center">
-                      <span className="text-[9px] font-bold text-[#F0EFE8]">{slot.from} - {slot.to}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Host Public Message (Biography limited to 100 characters) */}
-        <div className="pt-3 border-t border-white/5 space-y-1">
-          <span className="text-[8px] font-black text-[#A09E9A] uppercase tracking-widest block">Host Public Message</span>
-          <p className="text-xs text-[#A09E9A] leading-relaxed italic whitespace-pre-wrap">
-            "{String(host.bio || host.description || 'No public message set.').slice(0, 100)}"
-          </p>
-        </div>
-
-        {/* Edit / Save Options */}
-        {(!isReadOnly || isOwnProfile) && (
-          <div className="absolute top-4 right-4 z-10 flex gap-2">
-            {isOwnProfile && (
+          {/* Edit / Save Options overlaying the image bottom right */}
+          {((!isReadOnly && isDirectorOrHeadAdmin) || (isOwnProfile && !isSpotlight)) && (
+            <div className="absolute bottom-4 right-4 z-20 flex gap-2">
               <button
                 onClick={() => setIsSelfEditing(true)}
-                className="px-2 py-1 bg-[#222235] hover:bg-[#2A2A3F] border border-white/10 text-[#A09E9A] hover:text-[#D4AF37] rounded-lg text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1 shadow-sm"
+                className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-md border border-white/20 flex items-center justify-center text-white transition-all shadow-xl cursor-pointer"
                 title="Edit Profile"
               >
-                <Edit2 size={11} />
-                Edit Profile
+                <Edit2 size={16} />
               </button>
-            )}
-            {!isReadOnly && isStaffUser && (
-              <>
-                {!isEditing ? (
-                  <button 
-                    onClick={() => setIsEditing(true)}
-                    className="p-1.5 bg-[#222235] hover:bg-[#2A2A3F] text-[#A09E9A] hover:text-[#D4AF37] rounded-lg transition-all border border-white/10 cursor-pointer shadow-sm"
-                    title="Admin Edit"
+            </div>
+          )}
+        </div>
+
+        {/* Identity Details Block (merged below the photo) */}
+        <div className="px-6 pb-6 -mt-8 relative z-20 flex-1 flex flex-col space-y-5">
+          <div>
+            <h2 className="text-3xl md:text-4xl font-black text-[#F0EFE8] tracking-tight drop-shadow-md">{host.nickname || host.name}</h2>
+            <div className="flex items-center flex-wrap gap-2 mt-1.5">
+              <span className="text-xs font-mono font-bold text-[#A09E9A]">ID: {host.id}</span>
+              {activeAwards.map(a => {
+                let badgeStyle = 'bg-amber-500/10 text-amber-400 border-amber-500/20';
+                if (a.awardColor === 'Purple') badgeStyle = 'bg-purple-500/10 text-purple-400 border-purple-500/20';
+                else if (a.awardColor === 'Emerald') badgeStyle = 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
+                else if (a.awardColor === 'Blue') badgeStyle = 'bg-blue-500/10 text-blue-400 border-blue-500/20';
+                else if (a.awardColor === 'Red') badgeStyle = 'bg-red-500/10 text-red-400 border-red-500/20';
+                else if (a.awardColor === 'Orange') badgeStyle = 'bg-orange-500/10 text-orange-400 border-orange-500/20';
+
+                return (
+                  <span 
+                    key={a.id} 
+                    className={cn("text-[8px] font-black uppercase px-2 py-0.5 rounded-full border shrink-0 backdrop-blur-sm", badgeStyle)}
+                    title={`Active Award: ${a.awardName} (${a.startDate} to ${a.endDate})`}
                   >
-                    <Edit2 size={12} />
-                  </button>
-                ) : (
-                  <div className="flex gap-1.5">
-                    <button 
-                      onClick={handleSaveChanges}
-                      disabled={isSaving || isProcessingPhoto}
-                      className="px-2 py-1 bg-emerald-600/90 hover:bg-emerald-500 text-white rounded text-[8px] font-black uppercase tracking-wider transition-all disabled:opacity-50 cursor-pointer"
-                      title="Save Changes"
-                    >
-                      {isSaving ? '...' : 'Save'}
-                    </button>
-                    <button 
-                      onClick={() => {
-                        setIsEditing(false);
-                        setEditNickname(host.nickname || host.name || '');
-                        setEditPhotoUrl(host.photoUrl || '');
-                        setEditDescription(host.description || '');
-                      }}
-                      className="px-2 py-1 bg-[#222235] hover:bg-[#2A2A3F] text-[#A09E9A] hover:text-[#F0EFE8] rounded text-[8px] font-black uppercase tracking-wider transition-all cursor-pointer"
-                      title="Cancel"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                )}
-              </>
-            )}
+                    {a.awardName}
+                  </span>
+                );
+              })}
+            </div>
           </div>
-        )}
+
+          <div className="grid grid-cols-2 gap-y-4 gap-x-4 pt-4 border-t border-white/5 text-xs text-[#A09E9A]">
+            <div className="flex flex-col">
+              <span className="text-[9px] font-black uppercase tracking-widest mb-1 text-white/40">Role</span>
+              <span className="text-[#D4AF37] font-black">{host.role === 'Host' || host.role === 'Talent' ? 'Star Host' : host.role}</span>
+            </div>
+            <div className="flex flex-col">
+              <span className="text-[9px] font-black uppercase tracking-widest mb-1 text-white/40">Base Salary Category</span>
+              <span className={cn("font-black drop-shadow-sm text-sm", styles.badgeText)}>{host.base_salary_category || 'Regular Host'}</span>
+            </div>
+            <div className="flex flex-col">
+              <span className="text-[9px] font-black uppercase tracking-widest mb-1 text-white/40">Assigned Manager</span>
+              <span className="text-[#F0EFE8] font-bold">{host.manager}</span>
+            </div>
+            <div className="flex flex-col">
+              <span className="text-[9px] font-black uppercase tracking-widest mb-1 text-white/40">Team Group</span>
+              <span className="text-indigo-400 font-bold">{host.team}</span>
+            </div>
+          </div>
+
+          {host.streaming_hours && host.streaming_hours.length > 0 && (
+            <div className="pt-2 border-t border-white/5 space-y-2">
+              <span className="text-[9px] font-black text-white/40 uppercase tracking-widest block">Streaming Schedule</span>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {host.streaming_hours.slice(0, 2).map((slot, idx) => (
+                  <div key={idx} className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl px-3 py-2 text-center shadow-inner">
+                    <span className="text-[10px] font-bold text-white/90">{slot.from} - {slot.to}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Host Public Message */}
+          <div className="pt-2 border-t border-white/5 space-y-1.5">
+            <span className="text-[9px] font-black text-white/40 uppercase tracking-widest block">Host Public Message</span>
+            <p className="text-xs text-[#A09E9A] leading-relaxed italic whitespace-pre-wrap bg-black/20 p-3 rounded-xl border border-white/5">
+              "{String(host.bio || host.description || 'No public message set.').slice(0, 100)}"
+            </p>
+          </div>
+
+        </div>
       </div>
     );
   };
 
   const renderPerformanceHistory = () => {
     return (
-      <div className={cn("space-y-3 bg-[#1A1A28]/50 border-2 p-4 rounded-2xl transition-all duration-300", styles.borderColor, styles.shadow)}>
-        <div className="flex items-center justify-between px-1">
+      <div className={cn("space-y-4 bg-white/5 backdrop-blur-xl border border-white/10 p-5 rounded-3xl transition-all duration-300 hover:border-[#D4AF37]/30 group", styles.shadow)}>
+        <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <h4 className="text-[10px] font-black uppercase tracking-[0.15em] text-[#A09E9A] font-outfit">Earning Diversity</h4>
-            <button
+             <div className="w-8 h-8 rounded-full bg-[#D4AF37]/20 flex items-center justify-center text-[#D4AF37] text-sm shadow-inner">💰</div>
+             <h4 className="text-xs font-black uppercase tracking-widest text-[#F0EFE8]">Earning Diversity</h4>
+             <button
               onClick={() => setSortAscending(prev => !prev)}
-              className="p-1 hover:bg-white/5 rounded text-[#A09E9A] hover:text-[#D4AF37] transition-all cursor-pointer"
+              className="p-1.5 ml-1 bg-white/5 hover:bg-white/10 rounded-lg text-[#A09E9A] hover:text-[#D4AF37] transition-all cursor-pointer shadow-sm"
               title="Toggle Chronological Sort"
-            >
-              <ArrowUpDown size={11} />
-            </button>
+             >
+               <ArrowUpDown size={12} />
+             </button>
           </div>
-          <span className="text-[8px] font-bold text-[#D4AF37] border border-[#D4AF37]/20 bg-[#D4AF37]/5 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+          <span className="px-3 py-1 text-[9px] font-black text-[#D4AF37] border border-[#D4AF37]/30 bg-[#D4AF37]/10 rounded-full uppercase tracking-widest shadow-[0_0_10px_rgba(212,175,55,0.2)]">
             Performance Records
           </span>
         </div>
@@ -1806,107 +2227,6 @@ CRITICAL REQUIREMENT: When generating the analysis, recommendations, and tasks, 
     );
   };
 
-  const renderEarningsTrend = () => {
-    if (!performanceReports || performanceReports.length === 0) return null;
-
-    // Sort based on toggle state for the line chart
-    const MONTH_ORDER = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-    const chartData = [...performanceReports]
-      .sort((a, b) => {
-        const yearA = Number(a.year) || 0;
-        const yearB = Number(b.year) || 0;
-        let monthA = Number(a.month) || 0;
-        if (!monthA && a.monthName) {
-          monthA = MONTH_ORDER.findIndex(m => m.toLowerCase() === String(a.monthName).toLowerCase()) + 1;
-        }
-        let monthB = Number(b.month) || 0;
-        if (!monthB && b.monthName) {
-          monthB = MONTH_ORDER.findIndex(m => m.toLowerCase() === String(b.monthName).toLowerCase()) + 1;
-        }
-        if (yearA !== yearB) {
-          return sortAscending ? yearA - yearB : yearB - yearA;
-        }
-        return sortAscending ? monthA - monthB : monthB - monthA;
-      })
-      .map(report => {
-        return {
-          month: formatPeriodShort(report.monthName || report.month, report.year),
-          points: pf(report, 'totalEarningsOfPoints','total_earnings_of_points','totalPoints','total_points','points'),
-          live_duration: getLiveHoursForReport(report)
-        };
-      });
-
-    if (chartData.length === 0) return null;
-
-    return (
-      <div className={cn("space-y-4 bg-[#1A1A28]/50 border-2 p-5 rounded-2xl transition-all duration-300", styles.borderColor, styles.shadow)}>
-        <div className="flex items-center justify-between px-1">
-          <h4 className="text-[10px] font-black uppercase tracking-[0.15em] text-[#A09E9A] font-outfit">Earnings &amp; Duration Trend</h4>
-          <div className="flex gap-3 text-[8px] font-bold">
-            <span className="text-[#D4AF37] uppercase">● Points</span>
-            <span className="text-[#06b6d4] uppercase">● Live Hours</span>
-          </div>
-        </div>
-        
-        <div className="h-48 w-full mt-4">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={chartData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" vertical={false} />
-              <XAxis 
-                dataKey="month" 
-                tick={{ fontSize: 9, fill: '#A09E9A', fontWeight: 'bold' }}
-                axisLine={{ stroke: '#ffffff20' }}
-                tickLine={false}
-              />
-              <YAxis 
-                yAxisId="left"
-                tick={{ fontSize: 9, fill: '#A09E9A', fontWeight: 'bold' }}
-                axisLine={false}
-                tickLine={false}
-                tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`}
-              />
-              <YAxis 
-                yAxisId="right"
-                orientation="right"
-                tick={{ fontSize: 9, fill: '#A09E9A', fontWeight: 'bold' }}
-                axisLine={false}
-                tickLine={false}
-                tickFormatter={(value) => `${value.toFixed(0)}h`}
-              />
-              <Tooltip 
-                contentStyle={{ backgroundColor: '#13131E', borderColor: '#ffffff20', borderRadius: '12px', fontSize: '10px', fontWeight: 'bold' }}
-                itemStyle={{ color: '#F0EFE8' }}
-                labelStyle={{ color: '#D4AF37', marginBottom: '4px' }}
-              />
-              <Line 
-                yAxisId="left"
-                type="monotone" 
-                dataKey="points" 
-                name="Points"
-                stroke="#D4AF37" 
-                strokeWidth={3}
-                dot={{ r: 4, fill: '#13131E', stroke: '#D4AF37', strokeWidth: 2 }}
-                activeDot={{ r: 6, fill: '#D4AF37', stroke: '#F0EFE8', strokeWidth: 2 }}
-                animationDuration={1500}
-              />
-              <Line 
-                yAxisId="right"
-                type="monotone" 
-                dataKey="live_duration" 
-                name="Live Duration"
-                stroke="#06b6d4" 
-                strokeWidth={3}
-                dot={{ r: 4, fill: '#13131E', stroke: '#06b6d4', strokeWidth: 2 }}
-                activeDot={{ r: 6, fill: '#06b6d4', stroke: '#F0EFE8', strokeWidth: 2 }}
-                animationDuration={1500}
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-    );
-  };
-
   const renderRandomPK = () => {
     const currentAuth = Storage.getAuthState();
     const isOwnProfile = currentAuth.poppo_id === host.id;
@@ -1914,140 +2234,358 @@ CRITICAL REQUIREMENT: When generating the analysis, recommendations, and tasks, 
     const isStaffUser = ['manager', 'agent', 'admin', 'head admin', 'director'].includes(userRoleLower);
 
     return (
-      <div className={cn("space-y-3 flex-1 bg-[#1A1A28]/50 border-2 p-4 rounded-2xl transition-all duration-300", styles.borderColor, styles.shadow)}>
-        <div className="flex items-center justify-between px-1">
-          <h4 className="text-[10px] font-black uppercase tracking-[0.15em] text-[#A09E9A] font-outfit">RANDOM PK PERFORMANCE</h4>
-          <div className="px-2.5 py-0.5 text-[8px] font-bold text-[#D4AF37] border border-[#D4AF37]/30 bg-[#D4AF37]/10 rounded-full uppercase tracking-wider">
-            PUBLIC SUMMARY
+      <div className={cn("space-y-4 flex-1 bg-white/5 backdrop-blur-xl border border-white/10 p-5 rounded-3xl transition-all duration-300 hover:border-amber-500/30 group", styles.shadow)}>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+             <div className="w-8 h-8 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-400 text-sm shadow-inner">⚔️</div>
+             <h4 className="text-xs font-black uppercase tracking-widest text-[#F0EFE8]">PK Performance</h4>
           </div>
-        </div>
-        
-        <div className="flex justify-end gap-2 mt-2">
           {(isOwnProfile || isStaffUser) && (
             <button 
               onClick={() => setIsRpkFormOpen(true)}
-              className="px-3 py-1.5 bg-[#D4AF37]/10 hover:bg-[#D4AF37]/20 border border-[#D4AF37]/30 text-[#D4AF37] rounded-lg text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer"
+              className="px-3 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-400 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all cursor-pointer shadow-md hover:shadow-amber-500/20"
             >
-              Submit RPK Report
+              Submit Report
             </button>
           )}
         </div>
-
-        <div className="grid grid-cols-3 gap-2.5 bg-[#0D0D14]/40 border border-white/5 p-3 rounded-2xl">
+        
+        <div className="grid gap-[12px] pt-2" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
           {[
-            { label: 'PK WIN %', value: `${pkData.win_percentage}%`, subLabel: 'Monthly' },
-            { label: 'PK SCORE', value: formatNumber(pkData.pk_score), subLabel: 'Monthly' },
-            { label: 'PK SESSIONS', value: String(pkData.sessions), subLabel: 'Weekly' },
+            { 
+              label: 'WIN %', 
+              value: `${pkData.win_percentage}%`, 
+              subLabel: 'Monthly', 
+              bgGradient: 'linear-gradient(to bottom right, #3A2A18, #221A15)', 
+              accentColor: '#FFB800', 
+              hoverBorder: 'hover:border-[#FFB800]/50' 
+            },
+            { 
+              label: 'SCORE', 
+              value: formatNumber(pkData.pk_score), 
+              subLabel: 'Monthly', 
+              bgGradient: 'linear-gradient(to bottom right, #3D221C, #221515)', 
+              accentColor: '#FF7B00', 
+              hoverBorder: 'hover:border-[#FF7B00]/50' 
+            },
+            { 
+              label: 'SESSIONS', 
+              value: String(pkData.sessions), 
+              subLabel: 'Weekly', 
+              bgGradient: 'linear-gradient(to bottom right, #3A1C28, #20131A)', 
+              accentColor: '#FF3B5C', 
+              hoverBorder: 'hover:border-[#FF3B5C]/50' 
+            },
           ].map((cell, idx) => (
-            <div key={idx} className="bg-[#222235]/40 border border-white/5 p-3 rounded-xl flex flex-col justify-between min-h-[78px] hover:border-[#D4AF37]/20 transition-colors shadow-sm">
-              <span className="text-[8px] font-black text-[#A09E9A] uppercase tracking-widest leading-none">{cell.label}</span>
-              <span className="text-xs md:text-sm font-black text-[#F0EFE8] tracking-tight mt-2.5 block">
+            <div 
+              key={idx} 
+              style={{ background: cell.bgGradient }}
+              className={cn(
+                "border border-white/5 p-2.5 sm:p-4 rounded-2xl flex flex-col justify-between min-h-[85px] sm:min-h-[90px] transition-all duration-300 transform group-hover:translate-y-[-2px] shadow-lg", 
+                cell.hoverBorder
+              )}
+            >
+              <span className="text-[8px] sm:text-[9px] font-black text-[#A09E9A] uppercase tracking-widest leading-none">
+                {cell.label}
+              </span>
+              <span 
+                style={{ color: cell.accentColor }}
+                className="text-sm sm:text-lg md:text-xl font-black tracking-tight mt-2 block drop-shadow-md font-mono"
+              >
                 {cell.value}
               </span>
-              <span className="text-[7px] font-bold text-[#A09E9A]/60 uppercase tracking-wider mt-1">{cell.subLabel}</span>
+              <span className="text-[7px] sm:text-[8px] font-bold text-white/30 uppercase tracking-wider mt-1">
+                {cell.subLabel}
+              </span>
             </div>
           ))}
         </div>
 
         {rpkMetadata && (
-          <p className="text-[8px] text-[#A09E9A]/60 italic px-1">
-            Last updated: {formatDateStandard(rpkMetadata.lastUpdated)} by {rpkMetadata.updatedBy}
-          </p>
+          <div className="flex items-center justify-between mt-4 pt-4 border-t border-white/5">
+            <p className="text-[9px] text-[#A09E9A]/60 italic font-medium">
+              Updated: {formatUpdateMetaDate(rpkMetadata.lastUpdated)}
+            </p>
+          </div>
         )}
       </div>
     );
   };
 
-  const renderEventExposure = () => {
+  const renderExposuresAndAttendance = () => {
     const currentAuth = Storage.getAuthState();
     const isOwnProfile = currentAuth.poppo_id === host.id;
+    
+    const attendedCount = attendedEvents.length;
+    const totalCount = totalAgencyEventsCount || 0;
+    const presenceRatio = totalCount > 0 ? (attendedCount / totalCount) : 0;
+    const presencePercentage = Math.round(presenceRatio * 100);
+
     return (
-      <div className={cn("space-y-3 bg-[#1A1A28]/50 border-2 p-4 rounded-2xl flex-1 transition-all duration-300", styles.borderColor, styles.shadow)}>
-        <div className="flex items-center justify-between px-1">
-          <h4 className="text-[10px] font-black uppercase tracking-[0.15em] text-[#A09E9A] font-outfit">Event Exposure (Section 2)</h4>
+      <div className={cn("space-y-4 flex-1 bg-white/5 backdrop-blur-xl border border-white/10 p-5 rounded-3xl transition-all duration-300 hover:border-amber-500/30 group", styles.shadow)}>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            {isOwnProfile && (
+             <div className="w-8 h-8 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-400 text-sm shadow-inner">📅</div>
+             <h4 className="text-xs font-black uppercase tracking-widest text-[#F0EFE8]">EVENTS</h4>
+          </div>
+          <div className="flex items-center gap-2">
+            {isOwnProfile && eventActiveTab === 'exposure' && (
               <button
                 onClick={() => setIsAddEventFormOpen(true)}
-                className="px-2 py-1 bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 text-indigo-400 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer"
+                className="px-3 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-400 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all cursor-pointer shadow-md"
               >
                 + Add Event
               </button>
             )}
-            <span className="text-[8px] font-bold text-indigo-400 border border-indigo-500/20 bg-indigo-500/5 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
-              Total: {participatedEvents.length}
-            </span>
+            <div className="flex items-center gap-1 bg-black/40 p-1 rounded-xl border border-white/5">
+              <button
+                type="button"
+                onClick={() => setEventActiveTab('exposure')}
+                className={cn(
+                  "px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer",
+                  eventActiveTab === 'exposure'
+                    ? "bg-amber-500/20 text-amber-400 border border-amber-500/30"
+                    : "text-white/40 hover:text-white/70 border border-transparent"
+                )}
+              >
+                Exposures
+              </button>
+              <button
+                type="button"
+                onClick={() => setEventActiveTab('attendance')}
+                className={cn(
+                  "px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer",
+                  eventActiveTab === 'attendance'
+                    ? "bg-amber-500/20 text-amber-400 border border-amber-500/30"
+                    : "text-white/40 hover:text-white/70 border border-transparent"
+                )}
+              >
+                Attendance
+              </button>
+            </div>
           </div>
         </div>
-        <div className="space-y-2 mt-2 max-h-48 overflow-y-auto custom-scrollbar">
-          {participatedEvents.length > 0 ? (
-            participatedEvents.map((e, idx) => {
-              const eventDate = formatDateStandard(e.eventDate || e.date);
-              return (
-                <div key={idx} className="bg-[#222235]/40 border border-white/5 p-3 rounded-xl flex items-center justify-between hover:border-[#D4AF37]/20 transition-colors shadow-sm">
-                  <div className="min-w-0">
-                    <p className="text-xs font-bold text-[#F0EFE8] leading-tight truncate">{e.description || e.eventType}</p>
-                    <p className="text-[8px] text-[#A09E9A] font-medium mt-1 truncate">{eventDate} • {e.timeslot}</p>
-                  </div>
-                  <span className="text-[8px] font-black uppercase tracking-wider bg-[#1A1A28] border border-white/5 px-2 py-0.5 rounded text-[#A09E9A] shrink-0">
-                    {e.status}
+
+        {eventActiveTab === 'exposure' ? (
+          <>
+            <div className="space-y-3 mt-4 max-h-48 overflow-y-auto custom-scrollbar pr-1">
+              {participatedEvents.length > 0 ? (
+                participatedEvents.map((e, idx) => {
+                  const eventDate = formatDateYYYYMMDD(e.eventDate || e.date);
+                  const eventTitle = e.eventType || e.description || e.eventTitle || e.title || 'Event';
+                  const hostName = host.nickname || host.name;
+                  const displayTitle = `${hostName} - ${eventTitle}`;
+
+                  return (
+                    <div key={idx} className="bg-white/5 border border-white/10 p-3 rounded-xl hover:border-amber-500/30 transition-all duration-300 shadow-sm flex flex-col gap-1.5 group/item">
+                      <h4 className="font-bold text-[#F0EFE8] text-sm group-hover/item:text-amber-400 transition-colors truncate">
+                        {displayTitle}
+                      </h4>
+                      <div className="text-xs text-[#A09E9A]">
+                        {eventDate} . {formatTimeslot(e.timeslot)}
+                      </div>
+                      <div className="pt-0.5">
+                        <span className="text-[10px] font-mono text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded border border-amber-400/20 inline-block uppercase tracking-wider">
+                          {e.status || 'Scheduled'}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })
+              ) : (
+                <p className="text-xs text-white/30 italic text-center py-6 font-medium">No historical event participations found.</p>
+              )}
+            </div>
+            {participatedEvents.length > 0 && (
+              <p className="text-[9px] text-[#A09E9A]/60 italic font-medium mt-4 pt-4 border-t border-white/5">
+                Updated by: {participatedEvents[0].created_by_name || 'Unknown'}
+              </p>
+            )}
+          </>
+        ) : (
+          <>
+            <div className="grid grid-cols-2 gap-2.5 pt-2">
+              {[
+                { 
+                  label: 'Events Attended', 
+                  value: `${attendedCount} / ${totalCount}`, 
+                  subLabel: 'Total Agency',
+                  bgGradient: 'linear-gradient(to bottom right, #3A2A18, #221A15)', 
+                  accentColor: '#FFB800', 
+                  hoverBorder: 'hover:border-[#FFB800]/50'
+                },
+                { 
+                  label: 'Presence Score', 
+                  value: `${presencePercentage}%`, 
+                  subLabel: 'Consistency',
+                  bgGradient: 'linear-gradient(to bottom right, #3D221C, #221515)', 
+                  accentColor: '#FF7B00', 
+                  hoverBorder: 'hover:border-[#FF7B00]/50'
+                },
+              ].map((cell, idx) => (
+                <div 
+                  key={idx} 
+                  style={{ background: cell.bgGradient }}
+                  className={cn(
+                    "border border-white/5 p-2.5 sm:p-4 rounded-2xl flex flex-col justify-between min-h-[85px] transition-all duration-300 transform group-hover:translate-y-[-2px] shadow-lg",
+                    cell.hoverBorder
+                  )}
+                >
+                  <span className="text-[8px] sm:text-[9px] font-black text-[#A09E9A] uppercase tracking-widest leading-none">
+                    {cell.label}
+                  </span>
+                  <span 
+                    style={{ color: cell.accentColor }}
+                    className="text-sm sm:text-lg font-black tracking-tight mt-2 block drop-shadow-md font-mono"
+                  >
+                    {cell.value}
+                  </span>
+                  <span className="text-[7px] sm:text-[8px] font-bold text-white/30 uppercase tracking-wider mt-1">
+                    {cell.subLabel}
                   </span>
                 </div>
-              );
-            })
-          ) : (
-            <p className="text-xs text-[#A09E9A]/40 italic text-center py-6">No historical event participations found for this host.</p>
-          )}
-        </div>
+              ))}
+            </div>
+
+            {/* Progress Bar */}
+            <div className="px-1 py-1">
+              <div className="w-full bg-black/40 rounded-full h-1.5 border border-white/5 overflow-hidden">
+                <div 
+                  className="bg-gradient-to-r from-amber-600 via-orange-500 to-yellow-400 h-1.5 rounded-full transition-all duration-500" 
+                  style={{ width: `${Math.min(100, Math.max(0, presencePercentage))}%` }}
+                />
+              </div>
+            </div>
+
+            {/* Scrollable list of attended events */}
+            <div className="space-y-3 mt-4 max-h-48 overflow-y-auto custom-scrollbar pr-1">
+              {attendedEvents.length > 0 ? (
+                attendedEvents.map((e, idx) => {
+                  const eventDate = formatDateStandard(e.eventDate || e.date);
+                  return (
+                    <div key={idx} className="bg-gradient-to-r from-white/5 to-white/[0.02] border border-white/10 p-4 rounded-2xl hover:border-amber-500/30 transition-all duration-300 shadow-sm space-y-2 group/item">
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm font-black text-[#F0EFE8] leading-tight truncate group-hover/item:text-amber-400 transition-colors">{e.eventTitle || e.eventType || 'Unnamed Event'}</p>
+                        <span className="text-[9px] font-black uppercase tracking-widest bg-black/40 border border-white/10 px-3 py-1 rounded-full text-amber-400 shrink-0 shadow-inner">
+                          Attended
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-white/50 font-bold tracking-wide">{eventDate} • {e.timeslot || 'N/A'}</p>
+                      {e.eventFeedback && (
+                        <div className="bg-black/20 border border-white/5 p-3 rounded-xl mt-1.5">
+                          <p className="text-xs text-[#A09E9A] leading-relaxed font-medium">
+                            <span className="font-bold text-[#F0EFE8]/70">Feedback: </span>
+                            {e.eventFeedback}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              ) : (
+                <p className="text-xs text-[#A09E9A]/40 italic text-center py-6 font-medium">No attended agency events found for this host.</p>
+              )}
+            </div>
+          </>
+        )}
       </div>
     );
   };
 
   const renderFanbaseBlock = () => {
     const currentAuth = Storage.getAuthState();
-    const isOwnProfile = currentAuth.poppo_id === host.id;
-    const userRoleLower = String(currentAuth?.role || '').toLowerCase();
-    const isStaffUser = ['manager', 'agent', 'admin', 'head admin', 'director'].includes(userRoleLower);
+    const isOwnProfile = String(currentAuth?.poppo_id) === String(host.id);
+    const roleLower = String(currentAuth?.role || '').toLowerCase();
+    const isElevatedStaff = ['admin', 'head admin', 'head_admin', 'director'].includes(roleLower);
+    const isManagerAgent = ['manager', 'agent'].includes(roleLower);
+    const isAssignedManagerAgent = isManagerAgent && String(host.assignedManagerId) === String(currentAuth?.poppo_id);
+    const canSubmitFanbase = isOwnProfile || isAssignedManagerAgent || isElevatedStaff;
 
     return (
-      <div className={cn("space-y-3 bg-[#1A1A28]/50 border-2 p-4 rounded-2xl transition-all duration-300", styles.borderColor, styles.shadow)}>
-        <div className="flex items-center justify-between px-1">
-          <h4 className="text-[10px] font-black uppercase tracking-[0.15em] text-[#A09E9A] font-outfit">Fanbase Health</h4>
+      <div className={cn("space-y-4 bg-white/5 backdrop-blur-xl border border-white/10 p-5 rounded-3xl transition-all duration-300 hover:border-pink-500/30 group", styles.shadow)}>
+        <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            {(isOwnProfile || isStaffUser) && (
-              <button 
-                onClick={() => setIsFanbaseFormOpen(true)}
-                className="px-2.5 py-1 bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 text-indigo-400 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer"
-              >
-                Submit Fanbase Report
-              </button>
-            )}
+             <div className="w-8 h-8 rounded-full bg-pink-500/20 flex items-center justify-center text-pink-400 text-sm shadow-inner">💖</div>
+             <h4 className="text-xs font-black uppercase tracking-widest text-[#F0EFE8]">Fanbase Health</h4>
+          </div>
+          <div className="flex items-center gap-2">
             {fanbaseLatest?.timestamp && (
-              <span className="text-[8px] font-bold text-indigo-400 border border-indigo-500/20 bg-indigo-500/5 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+              <span className="text-[9px] font-bold text-pink-400 border border-pink-500/20 bg-pink-500/10 px-3 py-1 rounded-full uppercase tracking-widest shadow-[0_0_10px_rgba(244,114,182,0.2)]">
                 {formatDateStandard(fanbaseLatest.timestamp)}
               </span>
             )}
+            {canSubmitFanbase && (
+              <button 
+                onClick={() => setIsFanbaseFormOpen(true)}
+                className="px-3 py-1.5 bg-pink-500/10 hover:bg-pink-500/20 border border-pink-500/30 text-pink-400 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all cursor-pointer shadow-md hover:shadow-pink-500/20"
+              >
+                Submit Report
+              </button>
+            )}
           </div>
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 bg-[#1A1A28]/50 border border-white/5 p-3 rounded-2xl">
+
+        <div className="grid grid-cols-4 gap-3 pt-2 w-full">
           {[
-            { label: 'Followers', value: fanbaseLatest?.total_followers != null ? formatNumber(fanbaseLatest.total_followers) : '—', color: 'text-[#D4AF37]' },
-            { label: 'FC Subscribers', value: fanbaseLatest?.fanclub_subscribers != null ? formatNumber(fanbaseLatest.fanclub_subscribers) : '—', color: 'text-indigo-400' },
-            { label: 'GC Members', value: fanbaseLatest?.fanclub_gc_members != null ? formatNumber(fanbaseLatest.fanclub_gc_members) : '—', color: 'text-emerald-400' },
             { 
-              label: 'GC Activeness', 
+              label: 'Followers', 
+              value: fanbaseLatest?.total_followers != null ? formatNumber(fanbaseLatest.total_followers) : '—', 
+              bgGradient: 'linear-gradient(to bottom right, #3A2A18, #221A15)', 
+              accentColor: '#FFB800', 
+              hoverBorder: 'hover:border-[#FFB800]/50' 
+            },
+            { 
+              label: 'FC Subs', 
+              value: fanbaseLatest?.fanclub_subscribers != null ? formatNumber(fanbaseLatest.fanclub_subscribers) : '—', 
+              bgGradient: 'linear-gradient(to bottom right, #3D221C, #221515)', 
+              accentColor: '#FF7B00', 
+              hoverBorder: 'hover:border-[#FF7B00]/50' 
+            },
+            { 
+              label: 'GC Members', 
+              value: fanbaseLatest?.fanclub_gc_members != null ? formatNumber(fanbaseLatest.fanclub_gc_members) : '—', 
+              bgGradient: 'linear-gradient(to bottom right, #3A1C28, #20131A)', 
+              accentColor: '#FF3B5C', 
+              hoverBorder: 'hover:border-[#FF3B5C]/50' 
+            },
+            { 
+              label: 'GC Activity', 
               value: fanbaseLatest && (fanbaseLatest.gc_activity_count_host != null || fanbaseLatest.gc_activity_count_fans != null)
                 ? formatNumber(Number(fanbaseLatest.gc_activity_count_host || 0) + Number(fanbaseLatest.gc_activity_count_fans || 0)) 
                 : '—', 
-              color: 'text-pink-400' 
+              bgGradient: 'linear-gradient(to bottom right, #2A1C3A, #161220)', 
+              accentColor: '#B388FF', 
+              hoverBorder: 'hover:border-[#B388FF]/50' 
             },
           ].map((cell, idx) => (
-            <div key={idx} className="bg-[#222235]/40 border border-white/5 p-3 rounded-xl flex flex-col justify-between min-h-[78px] hover:border-[#D4AF37]/20 transition-colors">
-              <span className="text-[8px] font-black text-[#A09E9A] uppercase tracking-widest leading-none">{cell.label}</span>
-              <span className={`text-sm font-black tracking-tight mt-2.5 block ${cell.color}`}>{cell.value}</span>
+            <div 
+              key={idx} 
+              style={{ background: cell.bgGradient }}
+              className={cn(
+                "border border-white/5 p-2.5 sm:p-4 rounded-2xl flex flex-col justify-between min-h-[85px] sm:min-h-[90px] transition-all duration-300 transform group-hover:translate-y-[-2px] shadow-lg w-full min-w-0", 
+                cell.hoverBorder
+              )}
+            >
+              <span className="text-[8px] sm:text-[9px] font-black text-[#A09E9A] uppercase tracking-widest leading-none">
+                {cell.label}
+              </span>
+              <span 
+                style={{ color: cell.accentColor }}
+                className="text-sm sm:text-lg md:text-xl font-black tracking-tight mt-2 block drop-shadow-md font-mono"
+              >
+                {cell.value}
+              </span>
             </div>
           ))}
         </div>
+
+        {fanbaseLatest?.timestamp && (
+          <div className="flex items-center justify-between mt-4 pt-4 border-t border-white/5">
+            <p className="text-[9px] text-[#A09E9A]/60 italic font-medium">
+              Updated by: {fanbaseLatest.reporter_name || 'Unknown'}
+            </p>
+          </div>
+        )}
       </div>
     );
   };
@@ -2063,65 +2601,68 @@ CRITICAL REQUIREMENT: When generating the analysis, recommendations, and tasks, 
       (userRoleLower === 'director');
 
     return (
-      <div className={cn("space-y-4 bg-[#1A1A28]/50 border-2 p-4 rounded-2xl transition-all duration-300", styles.borderColor, styles.shadow)}>
-        <div className="flex items-center justify-between px-1">
-          <h4 className="text-[10px] font-black uppercase tracking-[0.15em] text-[#A09E9A] font-outfit">AI Performance Analysis</h4>
-          <span className="text-[8px] font-bold text-[#D4AF37] border border-[#D4AF37]/20 bg-[#D4AF37]/5 px-2.5 py-0.5 rounded-full uppercase tracking-wider">Gemini AI</span>
+      <div className={cn("space-y-4 bg-white/5 backdrop-blur-xl border border-white/10 p-5 rounded-3xl transition-all duration-300 hover:border-[#D4AF37]/30 group", styles.shadow)}>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+             <div className="w-8 h-8 rounded-full bg-[#D4AF37]/20 flex items-center justify-center text-[#D4AF37] text-sm shadow-inner">🤖</div>
+             <h4 className="text-xs font-black uppercase tracking-widest text-[#F0EFE8]">AI Performance Analysis</h4>
+          </div>
+          <span className="px-3 py-1 text-[9px] font-black text-[#D4AF37] border border-[#D4AF37]/30 bg-[#D4AF37]/10 rounded-full uppercase tracking-widest shadow-[0_0_10px_rgba(212,175,55,0.2)]">Gemini AI</span>
         </div>
 
         {/* Generate button (Only visible to managers/admins who can generate) */}
         {!isGeneratingAI && !aiReport && canGenerateAI && (
           <button
             onClick={handleGenerateAI}
-            className="w-full py-3.5 rounded-2xl border border-[#D4AF37]/30 bg-gradient-to-r from-[#D4AF37]/10 to-[#D4AF37]/5 text-[#D4AF37] font-black text-xs uppercase tracking-widest hover:from-[#D4AF37]/20 hover:border-[#D4AF37]/50 transition-all active:scale-[0.99] cursor-pointer flex items-center justify-center gap-2.5 shadow-lg shadow-[#D4AF37]/5"
+            className="w-full py-4 mt-2 rounded-2xl border border-[#D4AF37]/30 bg-gradient-to-r from-[#D4AF37]/20 to-[#D4AF37]/5 text-[#D4AF37] font-black text-xs uppercase tracking-widest hover:from-[#D4AF37]/30 hover:border-[#D4AF37]/50 transition-all active:scale-[0.99] cursor-pointer flex items-center justify-center gap-2.5 shadow-lg shadow-[#D4AF37]/10"
           >
-            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z"/></svg>
+            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z"/></svg>
             Generate AI Report
           </button>
         )}
 
         {/* Placeholder if no report exists and user cannot generate one */}
         {!isGeneratingAI && !aiReport && !canGenerateAI && (
-          <div className="bg-[#1A1A28]/50 border border-white/5 p-4 rounded-2xl text-center text-[#A09E9A]/40 italic text-xs">
+          <div className="bg-black/20 border border-white/5 p-6 rounded-2xl text-center text-white/40 italic text-xs font-medium">
             No AI performance analysis has been posted by management yet.
           </div>
         )}
 
         {/* Loading state */}
         {isGeneratingAI && (
-          <div className="w-full py-8 rounded-2xl border border-[#D4AF37]/20 bg-[#D4AF37]/5 flex flex-col items-center gap-3">
-            <div className="w-6 h-6 border-2 border-[#D4AF37]/20 border-t-[#D4AF37] rounded-full animate-spin" />
-            <p className="text-[10px] font-black uppercase tracking-widest text-[#D4AF37]/60">Analyzing performance data...</p>
+          <div className="w-full py-10 rounded-2xl border border-[#D4AF37]/20 bg-gradient-to-b from-[#D4AF37]/10 to-transparent flex flex-col items-center gap-4">
+            <div className="w-8 h-8 border-2 border-[#D4AF37]/20 border-t-[#D4AF37] rounded-full animate-spin shadow-[0_0_15px_rgba(212,175,55,0.5)]" />
+            <p className="text-[10px] font-black uppercase tracking-widest text-[#D4AF37] animate-pulse">Analyzing performance data...</p>
           </div>
         )}
 
         {/* Error */}
         {aiError && (
-          <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-xs font-bold">{aiError}</div>
+          <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-2xl text-red-400 text-xs font-black tracking-wide shadow-inner">{aiError}</div>
         )}
 
         {/* Report output */}
         {aiReport && (
-          <div className="space-y-3">
+          <div className="space-y-4 mt-4">
             {/* Summary */}
-            <div className="bg-[#1A1A28]/70 border border-[#D4AF37]/15 rounded-2xl p-4 space-y-1.5">
-              <p className="text-[9px] font-black uppercase tracking-widest text-[#D4AF37]/70">Performance Summary</p>
-              <p className="text-xs text-[#F0EFE8]/90 leading-relaxed font-medium">{aiReport.summary}</p>
+            <div className="bg-gradient-to-br from-white/5 to-transparent border border-[#D4AF37]/20 rounded-2xl p-5 space-y-2 shadow-lg">
+              <p className="text-[10px] font-black uppercase tracking-widest text-[#D4AF37]">Performance Summary</p>
+              <p className="text-sm text-white/90 leading-relaxed font-medium">{aiReport.summary}</p>
             </div>
             {/* Journey */}
-            <div className="bg-[#1A1A28]/70 border border-indigo-500/15 rounded-2xl p-4 space-y-1.5">
-              <p className="text-[9px] font-black uppercase tracking-widest text-indigo-400/70">Career Journey</p>
-              <p className="text-xs text-[#F0EFE8]/90 leading-relaxed font-medium">{aiReport.journey}</p>
+            <div className="bg-gradient-to-br from-white/5 to-transparent border border-indigo-500/20 rounded-2xl p-5 space-y-2 shadow-lg">
+              <p className="text-[10px] font-black uppercase tracking-widest text-indigo-400">Career Journey</p>
+              <p className="text-sm text-white/90 leading-relaxed font-medium">{aiReport.journey}</p>
             </div>
             {/* Recommendations */}
             {aiReport.recommendations && aiReport.recommendations.length > 0 && (
-              <div className="bg-[#1A1A28]/70 border border-emerald-500/15 rounded-2xl p-4 space-y-2">
-                <p className="text-[9px] font-black uppercase tracking-widest text-emerald-400/70">Recommendations</p>
-                <ul className="space-y-1.5">
+              <div className="bg-gradient-to-br from-white/5 to-transparent border border-emerald-500/20 rounded-2xl p-5 space-y-3 shadow-lg">
+                <p className="text-[10px] font-black uppercase tracking-widest text-emerald-400">Recommendations</p>
+                <ul className="space-y-2.5">
                   {aiReport.recommendations.map((rec, i) => (
-                    <li key={i} className="flex items-start gap-2">
-                      <span className="text-emerald-400 mt-0.5 shrink-0">›</span>
-                      <span className="text-xs text-[#F0EFE8]/85 leading-relaxed font-medium">{rec}</span>
+                    <li key={i} className="flex items-start gap-3">
+                      <span className="text-emerald-400 mt-1 shrink-0 text-sm">✦</span>
+                      <span className="text-sm text-white/80 leading-relaxed font-medium">{rec}</span>
                     </li>
                   ))}
                 </ul>
@@ -2133,16 +2674,16 @@ CRITICAL REQUIREMENT: When generating the analysis, recommendations, and tasks, 
               <button
                 onClick={handlePostAiReport}
                 disabled={isPostingAiReport}
-                className="w-full mt-2 py-2.5 rounded-xl border border-indigo-500/30 bg-indigo-500/10 text-indigo-400 hover:text-indigo-300 hover:bg-indigo-500/20 font-black text-xs uppercase tracking-widest transition-all cursor-pointer flex items-center justify-center gap-2 shadow-md"
+                className="w-full mt-4 py-3.5 rounded-2xl border border-indigo-500/30 bg-gradient-to-r from-indigo-500/20 to-indigo-500/5 text-indigo-300 hover:text-indigo-200 hover:from-indigo-500/30 hover:border-indigo-500/50 font-black text-xs uppercase tracking-widest transition-all cursor-pointer flex items-center justify-center gap-2 shadow-xl"
               >
-                {isPostingAiReport ? <Loader2 size={12} className="animate-spin" /> : null}
+                {isPostingAiReport ? <Loader2 size={14} className="animate-spin" /> : null}
                 Post Report to Host's Profile
               </button>
             )}
 
             {/* Posted status badge */}
             {myRecentAiReport?.isPosted && (
-              <div className="text-[10px] text-emerald-400 font-bold bg-emerald-500/10 border border-emerald-500/20 px-3 py-2 rounded-xl text-center">
+              <div className="text-[10px] text-emerald-400 font-black uppercase tracking-widest bg-emerald-500/10 border border-emerald-500/30 px-4 py-3 rounded-2xl text-center shadow-inner mt-4">
                 ✓ Report Posted to Host's Profile
               </div>
             )}
@@ -2151,7 +2692,7 @@ CRITICAL REQUIREMENT: When generating the analysis, recommendations, and tasks, 
             {canGenerateAI && (
               <button
                 onClick={handleGenerateAI}
-                className="text-[9px] font-black uppercase tracking-widest text-[#A09E9A]/60 hover:text-[#D4AF37] transition-colors cursor-pointer w-full text-right pr-1"
+                className="text-[10px] font-black uppercase tracking-widest text-white/30 hover:text-[#D4AF37] transition-colors cursor-pointer w-full text-right pr-2 pt-2"
               >
                 ↻ Regenerate Report
               </button>
@@ -2181,29 +2722,18 @@ CRITICAL REQUIREMENT: When generating the analysis, recommendations, and tasks, 
           <p className="text-[10px] text-[#A09E9A] mb-4">Submitting performance data for Host: <span className="text-[#D4AF37] font-bold">{host.nickname || host.name}</span></p>
 
           <form onSubmit={handleRpkSubmit} className="space-y-3">
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <label className="text-[9px] font-black uppercase tracking-wider text-[#A09E9A]">From Date (DD-MM-YYYY)</label>
-                <input 
-                  type="text" 
-                  required
-                  placeholder="DD-MM-YYYY"
-                  value={rpkFormData.from_date}
-                  onChange={(e) => setRpkFormData({...rpkFormData, from_date: e.target.value})}
-                  className="w-full bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-[9px] font-black uppercase tracking-wider text-[#A09E9A]">To Date (DD-MM-YYYY)</label>
-                <input 
-                  type="text" 
-                  required
-                  placeholder="DD-MM-YYYY"
-                  value={rpkFormData.to_date}
-                  onChange={(e) => setRpkFormData({...rpkFormData, to_date: e.target.value})}
-                  className="w-full bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
-                />
-              </div>
+            <div className="space-y-1">
+              <label className="text-[9px] font-black uppercase tracking-wider text-[#A09E9A]">Date Range</label>
+              <DateRangePicker 
+                required
+                startDate={rpkFormData.from_date}
+                endDate={rpkFormData.to_date}
+                onChange={(start, end) => setRpkFormData({...rpkFormData, from_date: start, to_date: end})}
+                dateFormat="dd-MM-yyyy"
+              />
+              <p className="text-[8.5px] text-[#D4AF37]/90 font-medium bg-[#D4AF37]/5 border border-[#D4AF37]/20 rounded-lg px-2.5 py-1.5 mt-1.5 leading-normal">
+                💡 <strong>Recommended:</strong> Date range should be weekly Monday to Sunday.
+              </p>
             </div>
 
             <div className="space-y-1">
@@ -2254,6 +2784,10 @@ CRITICAL REQUIREMENT: When generating the analysis, recommendations, and tasks, 
 
   const renderFanbaseModal = () => {
     if (!isFanbaseFormOpen) return null;
+
+    const currentAuth = Storage.getAuthState();
+    const roleLower = String(currentAuth?.role || '').toLowerCase();
+    const isElevatedStaff = ['admin', 'head admin', 'head_admin', 'director'].includes(roleLower);
     
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
@@ -2270,30 +2804,18 @@ CRITICAL REQUIREMENT: When generating the analysis, recommendations, and tasks, 
           <p className="text-[10px] text-[#A09E9A] mb-4">Submitting data for Host: <span className="text-indigo-400 font-bold">{host.nickname || host.name}</span></p>
 
           <form onSubmit={handleFanbaseSubmit} className="space-y-3">
-            <div className="grid grid-cols-2 gap-3">
+            {isElevatedStaff && (
               <div className="space-y-1">
-                <label className="text-[9px] font-black uppercase tracking-wider text-[#A09E9A]">From Date (DD-MM-YYYY)</label>
-                <input 
-                  type="text" 
+                <label className="text-[9px] font-black uppercase tracking-wider text-[#A09E9A]">Date Range</label>
+                <DateRangePicker 
                   required
-                  placeholder="DD-MM-YYYY"
-                  value={fanbaseFormData.from_date}
-                  onChange={(e) => setFanbaseFormData({...fanbaseFormData, from_date: e.target.value})}
-                  className="w-full bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-indigo-500"
+                  startDate={fanbaseFormData.from_date}
+                  endDate={fanbaseFormData.to_date}
+                  onChange={(start, end) => setFanbaseFormData({...fanbaseFormData, from_date: start, to_date: end})}
+                  dateFormat="dd-MM-yyyy"
                 />
               </div>
-              <div className="space-y-1">
-                <label className="text-[9px] font-black uppercase tracking-wider text-[#A09E9A]">To Date (DD-MM-YYYY)</label>
-                <input 
-                  type="text" 
-                  required
-                  placeholder="DD-MM-YYYY"
-                  value={fanbaseFormData.to_date}
-                  onChange={(e) => setFanbaseFormData({...fanbaseFormData, to_date: e.target.value})}
-                  className="w-full bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-indigo-500"
-                />
-              </div>
-            </div>
+            )}
 
             <div className="space-y-1">
               <label className="text-[9px] font-black uppercase tracking-wider text-[#A09E9A]">Total Followers</label>
@@ -2329,7 +2851,7 @@ CRITICAL REQUIREMENT: When generating the analysis, recommendations, and tasks, 
               </div>
             </div>
 
-            {isStaffUser && (
+            {isElevatedStaff && (
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <label className="text-[9px] font-black uppercase tracking-wider text-[#A09E9A]">GC Host Activity</label>
@@ -2399,35 +2921,35 @@ CRITICAL REQUIREMENT: When generating the analysis, recommendations, and tasks, 
             <div className="space-y-1">
               <label className="text-[9px] font-black uppercase tracking-wider text-[#A09E9A]">Event Type</label>
               <select 
+                title="Event Type"
                 value={eventFormData.eventType}
                 onChange={(e) => setEventFormData({...eventFormData, eventType: e.target.value})}
                 className="w-full bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-indigo-500"
               >
-                <option value="Solo Livehouse" className="bg-[#1A1A28]">Solo Livehouse</option>
-                <option value="Party Livehouse" className="bg-[#1A1A28]">Party Livehouse</option>
-                <option value="Official PK" className="bg-[#1A1A28]">Official PK</option>
-                <option value="Agency Event" className="bg-[#1A1A28]">Agency Event</option>
-                <option value="Other Event" className="bg-[#1A1A28]">Other Event</option>
+                <option value="SOLO LIVEHOUSE" className="bg-[#1A1A28]">SOLO LIVEHOUSE</option>
+                <option value="PARTY LIVEHOUSE" className="bg-[#1A1A28]">PARTY LIVEHOUSE</option>
+                <option value="OFFICIAL PK" className="bg-[#1A1A28]">OFFICIAL PK</option>
+                <option value="AGENCY EVENT" className="bg-[#1A1A28]">AGENCY EVENT</option>
+                <option value="POPPO EVENT" className="bg-[#1A1A28]">POPPO EVENT</option>
+                <option value="EXTERNAL EVENT" className="bg-[#1A1A28]">EXTERNAL EVENT</option>
               </select>
             </div>
 
             <div className="space-y-1">
               <label className="text-[9px] font-black uppercase tracking-wider text-[#A09E9A]">Event Date</label>
-              <input 
-                type="date" 
+              <SingleDatePicker 
                 required
                 value={eventFormData.eventDate}
-                onChange={(e) => setEventFormData({...eventFormData, eventDate: e.target.value})}
-                className="w-full bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-indigo-500"
+                onChange={(val) => setEventFormData({...eventFormData, eventDate: val})}
               />
             </div>
 
             <div className="space-y-1">
-              <label className="text-[9px] font-black uppercase tracking-wider text-[#A09E9A]">Timeslot (e.g. 20:00 - 22:00)</label>
+              <label className="text-[9px] font-black uppercase tracking-wider text-[#A09E9A]">Timeslot (e.g. 08:00 PM - 10:00 PM Manila Time)</label>
               <input 
                 type="text" 
                 required
-                placeholder="20:00 - 22:00"
+                placeholder="08:00 PM - 10:00 PM (Manila Time)"
                 value={eventFormData.timeslot}
                 onChange={(e) => setEventFormData({...eventFormData, timeslot: e.target.value})}
                 className="w-full bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-indigo-500"
@@ -2606,7 +3128,7 @@ CRITICAL REQUIREMENT: When generating the analysis, recommendations, and tasks, 
     const insights = generateCategorizedInsights();
 
     return (
-      <div className={cn("bg-[#1A1A28] border-2 rounded-2xl p-5 space-y-4 transition-all duration-300", styles.borderColor, styles.shadow)}>
+      <div className={cn("bg-[#1A1A28] border-2 rounded-2xl p-5 space-y-4 transition-all duration-300", styles.borderColor, styles.shadow, styles.topTrim)}>
         {/* Header with main badge */}
         <div className="flex items-center justify-between pb-3 border-b border-white/5">
           <div className="flex items-center gap-2">
@@ -2660,30 +3182,42 @@ CRITICAL REQUIREMENT: When generating the analysis, recommendations, and tasks, 
     );
   };
 
-  const renderConsistencyScore = () => null;
+
 
   const renderAwardsBlock = () => {
-    if (awards.length === 0) return null;
-    const ICON_MAP: Record<string, string> = { trophy: '🏆', star: '⭐', medal: '🥇', crown: '👑', badge: '🎖️' };
+    if (activeAwards.length === 0) return null;
     return (
-      <div className={cn("bg-[#1A1A28] border-2 rounded-2xl p-4 space-y-3 transition-all duration-300", styles.borderColor, styles.shadow)}>
+      <div className={cn("space-y-4 bg-white/5 backdrop-blur-xl border border-white/10 p-5 rounded-3xl transition-all duration-300 hover:border-[#D4AF37]/30 group", styles.shadow)}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Award size={12} className="text-[#D4AF37]/60" />
-            <p className="text-[9px] font-black text-[#A09E9A]/50 uppercase tracking-[0.2em]">Agency Awards & Badges</p>
+             <div className="w-8 h-8 rounded-full bg-[#D4AF37]/20 flex items-center justify-center text-[#D4AF37] text-sm shadow-inner">🏆</div>
+             <h4 className="text-xs font-black uppercase tracking-widest text-[#F0EFE8]">Agency Awards</h4>
           </div>
-          <span className="text-[8px] font-bold text-[#D4AF37] border border-[#D4AF37]/20 bg-[#D4AF37]/5 px-2 py-0.5 rounded-full uppercase tracking-wider">{awards.length} earned</span>
+          <span className="px-3 py-1 text-[9px] font-black text-[#D4AF37] border border-[#D4AF37]/30 bg-[#D4AF37]/10 rounded-full uppercase tracking-widest shadow-[0_0_10px_rgba(212,175,55,0.2)]">
+            {activeAwards.length} active
+          </span>
         </div>
         <div className="flex flex-wrap gap-2.5">
-          {awards.map((award: any, i: number) => (
-            <div key={i} className="flex flex-col items-center gap-1.5 bg-[#0D0D14] border border-[#D4AF37]/15 rounded-xl p-3 w-[88px] text-center hover:border-[#D4AF37]/40 transition-all group">
-              <span className="text-2xl group-hover:scale-110 transition-transform inline-block">{ICON_MAP[award.iconType] || '🎖️'}</span>
-              <p className="text-[8px] font-black text-[#F0EFE8] leading-tight">{award.title}</p>
-              {(award.dateAwarded || award.awardedAt) && (
-                <p className="text-[7px] text-[#A09E9A]/40 font-mono">{new Date(award.dateAwarded || award.awardedAt).getFullYear()}</p>
-              )}
-            </div>
-          ))}
+          {activeAwards.map((a: any) => {
+            let badgeColorStyle = 'bg-amber-500/10 text-amber-400 border-amber-500/20 hover:border-amber-500/40';
+            if (a.awardColor === 'Purple') badgeColorStyle = 'bg-purple-500/10 text-purple-400 border-purple-500/20 hover:border-purple-500/40';
+            else if (a.awardColor === 'Emerald') badgeColorStyle = 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 hover:border-emerald-500/40';
+            else if (a.awardColor === 'Blue') badgeColorStyle = 'bg-blue-500/10 text-blue-400 border-blue-500/20 hover:border-blue-500/40';
+            else if (a.awardColor === 'Red') badgeColorStyle = 'bg-red-500/10 text-red-400 border-red-500/20 hover:border-red-500/40';
+            else if (a.awardColor === 'Orange') badgeColorStyle = 'bg-orange-500/10 text-orange-400 border-orange-500/20 hover:border-orange-500/40';
+
+            return (
+              <div 
+                key={a.id} 
+                className={cn("flex flex-col items-center justify-center gap-1.5 bg-[#0D0D14] border rounded-xl p-3 w-[100px] text-center transition-all duration-300 hover:scale-105 shadow-md", badgeColorStyle)}
+                title={`Active Period: ${a.startDate} to ${a.endDate}`}
+              >
+                <span className="text-xl">🏆</span>
+                <p className="text-[10px] font-black uppercase tracking-wider leading-tight text-[#F0EFE8] mt-1">{a.awardName}</p>
+                <p className="text-[8px] opacity-40 font-mono mt-0.5">{a.startDate} to {a.endDate}</p>
+              </div>
+            );
+          })}
         </div>
       </div>
     );
@@ -2692,10 +3226,15 @@ CRITICAL REQUIREMENT: When generating the analysis, recommendations, and tasks, 
   const renderWeeklyLiveStats = () => {
     if (weeklyLiveData.length === 0) return null;
     return (
-      <div className={cn("bg-[#1A1A28] border-2 rounded-2xl p-4 space-y-3 transition-all duration-300", styles.borderColor, styles.shadow)}>
+      <div className={cn("space-y-4 bg-white/5 backdrop-blur-xl border border-white/10 p-5 rounded-3xl transition-all duration-300 hover:border-emerald-500/30 group", styles.shadow)}>
         <div className="flex items-center justify-between">
-          <p className="text-[9px] font-black text-[#A09E9A]/50 uppercase tracking-[0.2em]">Weekly Live Stats</p>
-          <span className="text-[8px] font-bold text-emerald-400 border border-emerald-500/20 bg-emerald-500/5 px-2 py-0.5 rounded-full uppercase tracking-wider">{weeklyLiveData.length} weeks</span>
+          <div className="flex items-center gap-2">
+             <div className="w-8 h-8 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-400 text-sm shadow-inner">📊</div>
+             <h4 className="text-xs font-black uppercase tracking-widest text-[#F0EFE8]">Weekly Live Stats</h4>
+          </div>
+          <span className="px-3 py-1 text-[9px] font-black text-emerald-400 border border-emerald-500/30 bg-emerald-500/10 rounded-full uppercase tracking-widest shadow-[0_0_10px_rgba(16,185,129,0.2)]">
+            {weeklyLiveData.length} weeks
+          </span>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
@@ -2733,13 +3272,15 @@ CRITICAL REQUIREMENT: When generating the analysis, recommendations, and tasks, 
       Feedback: 'text-emerald-400 border-emerald-500/20 bg-emerald-500/5',
     };
     return (
-      <div className={cn("bg-[#1A1A28] border-2 rounded-2xl p-4 space-y-3 transition-all duration-300", styles.borderColor, styles.shadow)}>
+      <div className={cn("space-y-4 bg-white/5 backdrop-blur-xl border border-white/10 p-5 rounded-3xl transition-all duration-300 hover:border-indigo-500/30 group", styles.shadow)}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <MessageSquare size={12} className="text-indigo-400/60" />
-            <p className="text-[9px] font-black text-[#A09E9A]/50 uppercase tracking-[0.2em]">Agent Notes</p>
+             <div className="w-8 h-8 rounded-full bg-indigo-500/20 flex items-center justify-center text-indigo-400 text-sm shadow-inner">📝</div>
+             <h4 className="text-xs font-black uppercase tracking-widest text-[#F0EFE8]">Agent Notes</h4>
           </div>
-          <span className="text-[8px] font-bold text-indigo-400 border border-indigo-500/20 bg-indigo-500/5 px-2 py-0.5 rounded-full uppercase tracking-wider">Read-Only</span>
+          <span className="px-3 py-1 text-[9px] font-black text-indigo-400 border border-indigo-500/30 bg-indigo-500/10 rounded-full uppercase tracking-widest shadow-[0_0_10px_rgba(99,102,241,0.2)]">
+            Read-Only
+          </span>
         </div>
         <div className="space-y-2 max-h-48 overflow-y-auto custom-scrollbar">
           {agentNotes.map((note: any, i: number) => (
@@ -2819,12 +3360,11 @@ CRITICAL REQUIREMENT: When generating the analysis, recommendations, and tasks, 
             <>
               {renderIdentityCard()}
               {renderEarningsBreakdown()}
-              {renderMonthlyPointsTrend()}
+              {renderMonthlyTrend()}
               {renderPerformanceHistory()}
-              {renderEarningsTrend()}
-              <div className="flex flex-col md:flex-row gap-6">
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
                 {renderRandomPK()}
-                {renderEventExposure()}
+                {renderExposuresAndAttendance()}
               </div>
               {renderFanbaseBlock()}
               {renderAwardsBlock()}
@@ -2851,12 +3391,11 @@ CRITICAL REQUIREMENT: When generating the analysis, recommendations, and tasks, 
               {/* Right Column (Performance Stats) */}
               <div className="space-y-6 lg:col-span-2">
                 {renderEarningsBreakdown()}
-                {renderMonthlyPointsTrend()}
-                {renderEarningsTrend()}
+                {renderMonthlyTrend()}
                 {renderPerformanceHistory()}
-                <div className="flex flex-col md:flex-row gap-6">
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
                   {renderRandomPK()}
-                  {renderEventExposure()}
+                  {renderExposuresAndAttendance()}
                 </div>
                 {renderFanbaseBlock()}
                 {renderAwardsBlock()}
@@ -2874,6 +3413,9 @@ CRITICAL REQUIREMENT: When generating the analysis, recommendations, and tasks, 
       {renderFanbaseModal()}
       {renderSelfEditModal()}
       {renderAddEventModal()}
+      {/* renderMonthlyDataModal() */}
     </div>
   );
 };
+
+export default HostProfileView;

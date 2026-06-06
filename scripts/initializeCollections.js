@@ -65,14 +65,41 @@ async function runInitialization() {
   console.log("Seeding users collection...");
   for (const user of seedUsers) {
     const passwordHash = await bcrypt.hash(user.password, 10);
+    const roleLower = user.role.toLowerCase();
+    
+    let level = 1;
+    let assignedHosts = null;
+    let assignedManagerId = null;
+
+    if (roleLower === 'director') {
+      level = 5;
+    } else if (roleLower === 'head admin') {
+      level = 4;
+    } else if (roleLower === 'admin') {
+      level = 3;
+    } else if (roleLower === 'manager' || roleLower === 'agent') {
+      level = 2;
+      assignedHosts = [];
+    } else {
+      level = 1;
+      assignedManagerId = null;
+    }
+
+    const nowStr = new Date().toISOString();
     const userDocData = {
       poppoId: user.poppoId,
       nickname: user.nickname,
-      role: user.role,
+      role: roleLower,
+      level: level,
+      status: "active",
+      is_first_login: false,
       is_temp_password: true,
-      createdAt: admin.firestore.Timestamp.now(),
-      assignedManagerId: null,
-      password: passwordHash
+      createdAt: nowStr,
+      updatedAt: nowStr,
+      assignedManagerId: assignedManagerId,
+      assignedHosts: assignedHosts,
+      password: passwordHash,
+      password_hash: passwordHash
     };
 
     await db.collection("users").doc(user.poppoId).set(userDocData);
@@ -154,8 +181,8 @@ async function runInitialization() {
   await db.collection("pk_reports").doc("_schema_template").set(pkTemplate);
   console.log("✅ Initialized 'pk_reports' collection template.");
 
-  // events template
-  const eventsTemplate = {
+  // attendance template
+  const attendanceTemplate = {
     eventDate: admin.firestore.Timestamp.now(),
     timeslot: "",
     eventType: "",
@@ -167,8 +194,8 @@ async function runInitialization() {
     createdBy: "",
     attendanceSubmittedBy: {}
   };
-  await db.collection("events").doc("_schema_template").set(eventsTemplate);
-  console.log("✅ Initialized 'events' collection template.");
+  await db.collection("attendance").doc("_schema_template").set(attendanceTemplate);
+  console.log("✅ Initialized 'attendance' collection template.");
 
   // tasks template
   const tasksTemplate = {

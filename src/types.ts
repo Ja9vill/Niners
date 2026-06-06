@@ -1,9 +1,8 @@
-export type Role = 'Talent' | 'Manager' | 'Admin' | 'Head Admin' | 'Director' | 'Agent';
+export type Role = 'Talent' | 'Host' | 'Manager' | 'Admin' | 'Head Admin' | 'Director' | 'Agent';
 export type BaseSalaryTier = 'N/A' | 'Rocket Host' | 'Star Host' | 'S idol' | 'ESport Host' | 'Regular Host';
 export type HostStatus = 'Active' | 'Inconsistent' | 'Released' | 'Inactive' | 'Releasing';
 export type AnchorType = 'Nine Agency' | 'Sub Agency' | 'External';
-export type Tier = 'S' | 'A' | 'B' | 'C' | 'X';
-export type EventType = 'Solo Livehouse' | 'Party Livehouse' | 'Poppo Official Event' | 'Niners Day' | 'Agency Event' | 'External Event' | 'PK Tournament' | 'Platform Feature' | 'Collaboration' | 'Broadcast Block' | 'Staff Meeting';
+export type EventType = 'Official PK' | 'Solo Livehouse' | 'Party Livehouse' | 'Agency Event' | 'Poppo Event' | 'External Event';
 export type Trend = 'Growing' | 'Declining' | 'Stable' | 'At Risk' | 'New' | 'Explosive';
 export type NoteType = 'Note' | 'Task' | 'Feedback';
 
@@ -40,29 +39,35 @@ export interface PerformanceGoal {
   deadline: string;
 }
 
-export interface Host {
-  id: string; // POPPO ID (numeric master key)
-  name: string;
+// User Authentication data mapped to `users` collection
+export interface UserAuth {
+  id: string; // POPPO ID
+  poppo_id?: string;
+  nickname: string;
   role: Role;
-  team: string;
-  manager: string;
-  anchor_type: AnchorType;
-  base_salary_category: BaseSalaryTier;
-  status: HostStatus;
-  level: number;
-  tier: Tier;
-  last_login?: string;
-  created_at: string;
-  updated_at: string;
-  photoUrl?: string;
-  nickname?: string;
-  description?: string;
-  password?: string;
-  followers_count?: number;
   is_temp_password?: boolean;
-  reset_requested?: boolean;
-  isActive: boolean;
-  // Profile enhancements
+  password?: string;
+  googleUid?: string;
+  last_login?: string;
+}
+
+// Unified Host interface representing profile data and auth merged
+export interface Host {
+  // Auth mapped
+  id: string; // POPPO ID (numeric master key)
+  poppo_id?: string;
+  name: string;
+  nickname?: string;
+  role: Role;
+  is_temp_password?: boolean;
+  password?: string;
+  googleUid?: string;
+  last_login?: string;
+
+  // Profile data
+  status: HostStatus;
+  tier_pay: BaseSalaryTier;
+  photoUrl?: string;
   bio?: string;
   social_links?: {
     fb?: string;
@@ -70,16 +75,23 @@ export interface Host {
     tiktok?: string;
     whatsapp?: string;
   };
-  streaming_hours?: {
-    from: string;
-    to: string;
-  }[];
-  // Google OAuth fields
-  googleUid?: string;
-  googleEmail?: string;
-  // Legacy fields for compatibility during transition
+  followers_count?: number;
+  created_at: string;
+  updated_at: string;
+  isActive: boolean;
+  reset_requested?: boolean;
+  
+  // Role specific
+  team_anchor?: string;
+  assigned_manager_poppo_id?: string;
+  manager?: string; // Legacy alias for assigned_manager_poppo_id
+  assignedHosts?: string[];
+
+  // Misc legacy
+  level?: number;
+  team?: string;
+  anchor_type?: AnchorType;
   anchor?: AnchorType;
-  baseSalary?: BaseSalaryTier;
 }
 
 export interface PasswordResetRequest {
@@ -91,49 +103,41 @@ export interface PasswordResetRequest {
   resolvedAt?: string;
 }
 
-export interface FanbaseHealthEntry {
-  id: string;
-  hostId: string;
-  subscribers: number;
-  gcMembers: number;
-  preStreamUpdate: string;
-  postStreamUpdate: string;
-  submittedBy: string;
-  submittedAt: string;
-}
-
-export interface CommissionEntry {
+export interface PerformanceReportEntry {
   poppo_id: string;
-  poppo_name: string;
+  nickname: string;
   month: string;
-  live_duration: number;
-  live_earnings: number;
-  video_duration: number;
-  video_earnings: number;
-  agentweb_commission_rate: number;
-  agentweb_commission_earning: number;
-  total_points: number;
-  total_earnings: number;
-  my_commission: number;
-  // Updated fields
-  party_host_duration?: number;
-  party_earnings?: number;
-  private_chat?: number;
-  tips?: number;
-  platform_reward?: number;
-  other_earn?: number;
-  platform_hourly_salary?: number;
-  super_salary?: number;
-  super_rank?: number;
-  level?: number;
-  agency_commission_override?: number;
-  timestamp?: string;
+  year: number;
   from_date?: string;
   to_date?: string;
-  year?: number;
+  level: number;
+  live_duration: number;
+  party_host_duration: number;
+  total_earnings: number; // merged with total_points
+  agent_commission: number;
+  live_earnings: number;
+  party_earnings: number;
+  private_chat: number;
+  tips: number;
+  platform_reward: number;
+  other_earnings: number;
+  platform_hourly_salary: number;
+  super_salary: number;
+  super_rank: number;
+  agentweb_commission_rate: number;
+  _isUnknownHost?: boolean;
+  
+  // legacy fallbacks
+  total_points?: number;
+  agentweb_commission_earning?: number;
+  video_duration?: number;
+  video_earnings?: number;
 }
 
-export interface PKEntry {
+// Ensure CommissionEntry points to PerformanceReportEntry during migration to avoid breaking current code types outright
+export type CommissionEntry = PerformanceReportEntry;
+
+export interface PKReportEntry {
   id: string; // auto_id
   poppo_id: string;
   start_date: string;
@@ -142,24 +146,14 @@ export interface PKEntry {
   pk_score: number;
   sessions: number;
   submitted_by: string;
-  submitted_role: string;
   timestamp: string;
 }
 
-export interface ExposureEntry {
-  id: string; // auto_id
-  poppo_id: string;
-  event_type: string;
-  event_date: string; // YYYY-MM-DD
-  description: string;
-  submitted_by: string;
-  submitted_role: string;
-  timestamp: string;
-  agency_attendance?: string[]; // Array of Poppo IDs
-}
+// Aliased for backwards compatibility during migration
+export type PKEntry = PKReportEntry;
 
 export interface WeeklyLiveDataEntry {
-  id: string;
+  id?: string;
   poppo_id: string;
   nickname: string;
   from_date: string;
@@ -173,31 +167,34 @@ export interface WeeklyLiveDataEntry {
   unfollowers: number;
   total_points: number;
   notes: string;
-  submitted_by: string;
-  submitted_role: string;
-  timestamp: string;
+  submitted_by?: string;
+  timestamp?: string;
 }
 
 export interface MonthlyLiveDataEntry {
-  id: string;
+  id?: string;
   poppo_id: string;
   nickname: string;
-  from_date: string;
-  to_date: string;
-  total_duration: number;
   total_earnings: number;
-  avg_online_users: number;
-  new_fans: number;
-  new_fanclub_members: number;
-  gifting_count: number;
-  unfollowers: number;
-  total_points: number;
-  notes: string;
-  submitted_by: string;
-  submitted_role: string;
-  timestamp: string;
+  total_duration: number;
+  last_3_months_total_earnings: number;
+  timestamp?: string;
 }
 
+export interface FanbaseReportEntry {
+  id?: string;
+  poppo_id: string;
+  total_followers: number;
+  fanclub_subscribers: number;
+  fanclub_gc_members: number;
+  gc_activity_count_host: number;
+  gc_activity_count_fans: number;
+  from_date: string;
+  to_date: string;
+  timestamp?: string;
+}
+
+export type FanbaseHealthEntry = FanbaseReportEntry;
 
 export interface DirectorNote {
   id: string;
@@ -208,21 +205,40 @@ export interface DirectorNote {
 }
 
 export interface CalendarEvent {
-  event_id: string;
-  poppo_id: string;
-  title: string;
+  id: string;
+  type_of_event: string;
+  event_date: string;
   description: string;
-  date: string;
-  time: string; // 12-hour format
+  participants_id: string[];
+  created_by_id: string;
   created_by_name: string;
   created_by_role: string;
-  visibility: 'All' | 'Leadership' | 'Director Only';
   timestamp: string;
+  
+  // Legacy alias fields mapped to frontend
+  event_id?: string;
+  event_host_id?: string;
+  poppo_id?: string;
+  title?: string;
+  date?: string;
+  time?: string;
+  visibility?: string;
   type?: string;
   location?: string;
-  event_host_id?: string;
-  participants?: string[];      // Poppo IDs of participants (display)
-  participantIds?: string[];    // Same data, used for Firestore array-contains queries
+  participants?: string[];
+  participantIds?: string[];
+}
+
+export type ExposureEntry = CalendarEvent;
+
+export interface AttendanceEntry {
+  id?: string;
+  event_id: string;
+  attendees: {
+    poppo_id: string;
+    nickname: string;
+  }[];
+  timestamp?: string;
 }
 
 export interface LivehouseRequest {
@@ -237,6 +253,7 @@ export interface LivehouseRequest {
   proposedBy?: string;
   managerId: string; // Assigned manager's Poppo ID
   notes?: string;
+  livehouseType?: string;
   timestamp: string;
 }
 
@@ -285,7 +302,7 @@ export interface TopNinersEarningsSummary {
 }
 
 export interface EventsCalendarPublic {
-  // Primary schema (structured calendar events)
+  id?: string;
   eventId?: string;
   eventTitle?: string;
   eventDate?: string; // YYYY-MM-DD
@@ -296,8 +313,6 @@ export interface EventsCalendarPublic {
   eventEndTime?: string; // HH:MM
   locationOrPlatform?: string;
   isPublished?: boolean;
-  // Alternative schema (general events collection)
-  id?: string;
   title?: string;
   description?: string;
   startDate?: string;
@@ -306,48 +321,10 @@ export interface EventsCalendarPublic {
   eventType?: string;
   status?: string;
   hostId?: string;
-}
-
-export interface ReportingSubmissionPayload {
-  poppoId: string;
-  nickname: string;
-  // Dates
-  weekStartDate?: string;
-  weekEndDate?: string;
-  from_date?: string;
-  to_date?: string;
-  // Random PK
-  pk_score?: number;
-  win_percentage?: number;
-  sessions?: number;
-  // Fanbase
-  fanclubSubscribers?: number;
-  fanclubGcMembers?: number;
-  preStreamUpdate?: string;
-  postStreamUpdate?: string;
-  // Live Data (Weekly & Monthly)
-  totalDuration?: number;
-  totalEarnings?: number;
-  totalPoints?: number;
-  avg_online_users?: number;
-  new_fans?: number;
-  new_fanclub_members?: number;
-  gifting_count?: number;
-  unfollowers?: number;
-  notes?: string;
-  submitted_by?: string;
-  submitted_role?: string;
-  timestamp?: string;
-  // Legacy
-  "3mosEarnings"?: number;
-}
-
-export interface ReportingSubmission {
-  submissionId: string;
-  reportType: 'random_pk' | 'fanbase' | 'weekly_live_data' | 'monthly_live_data';
-  submittedByUserId: string;
-  status: 'draft' | 'submitted';
-  dataPayload: ReportingSubmissionPayload;
+  timeslot?: string;
+  participantIds?: string[];
+  participants?: string[];
+  [key: string]: any;
 }
 
 export interface Task {
@@ -370,44 +347,31 @@ export interface ActivityAuditLog {
   afterValue: string; // String/JSON
 }
 
-export interface EventsCalendarPublic {
+export interface AwardBadge {
   id: string;
-  eventType?: string;
-  description?: string;
-  date?: string;
-  eventDate?: string;
-  timeslot?: string;
-  status?: string;
-  participantIds?: string[];
-  participants?: string[];
-  [key: string]: any;
+  name: string;
+  color: string;
+  createdAt: string;
+  startDate?: string;
+  endDate?: string;
 }
 
-export interface FanbaseHealthEntry {
-  id?: string;
-  poppo_id?: string;
-  timestamp?: string;
-  from_date?: string;
-  to_date?: string;
-  total_followers?: number;
-  fanclub_subscribers?: number;
-  fanclub_gc_members?: number;
-  gc_activity_count_host?: number;
-  gc_activity_count_fans?: number;
-  notes?: string;
-  reporter_id?: string;
-  reporter_name?: string;
-  [key: string]: any;
+export interface AwardAssignment {
+  id: string;
+  awardId: string;
+  awardName: string;
+  awardColor: string;
+  hostId: string;
+  hostNickname: string;
+  startDate: string;
+  endDate: string;
+  assignedAt: string;
 }
 
-export interface ExposureEntry {
-  id?: string;
-  poppo_id?: string;
-  event_type?: string;
-  description?: string;
-  date?: string;
-  status?: string;
-  notes?: string;
-  [key: string]: any;
+export interface ManagerNote {
+  id: string;
+  managerName: string;
+  hostNickname: string;
+  content: string;
+  timestamp: string;
 }
-

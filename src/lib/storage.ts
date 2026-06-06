@@ -118,6 +118,24 @@ export const Storage = {
         token: String(parsed?.token || ""),
       };
 
+      const mockUserStr = sessionStorage.getItem(`${PREFIX}mock_user`);
+      if (mockUserStr) {
+        try {
+          const mockUser = JSON.parse(mockUserStr);
+          return {
+            ...state,
+            originalRole: state.role,
+            role: String(mockUser.role || '').toLowerCase(),
+            mockRole: String(mockUser.role || '').toLowerCase(),
+            poppo_id: mockUser.poppo_id,
+            nickname: mockUser.nickname || mockUser.name,
+            name: mockUser.name || mockUser.nickname,
+          };
+        } catch (e) {
+          // ignore
+        }
+      }
+
       const mockRole = sessionStorage.getItem(`${PREFIX}mock_role`);
       if (mockRole) {
         return {
@@ -161,7 +179,18 @@ export const Storage = {
     }
   },
 
+  setMockUser(user: any | null) {
+    if (user) {
+      sessionStorage.setItem(`${PREFIX}mock_user`, JSON.stringify(user));
+    } else {
+      sessionStorage.removeItem(`${PREFIX}mock_user`);
+      sessionStorage.removeItem(`${PREFIX}mock_role`);
+    }
+  },
+
   clearAuthState() {
     sessionStorage.removeItem(`${PREFIX}auth`);
+    sessionStorage.removeItem(`${PREFIX}mock_role`);
+    sessionStorage.removeItem(`${PREFIX}mock_user`);
   },
 };

@@ -15,6 +15,7 @@ interface HostLookupSelectProps {
   onChange: (poppoId: string, nickname: string) => void;
   className?: string;
   error?: string;
+  managerPoppoId?: string;
 }
 
 export const HostLookupSelect: React.FC<HostLookupSelectProps> = ({
@@ -22,7 +23,8 @@ export const HostLookupSelect: React.FC<HostLookupSelectProps> = ({
   nickname,
   onChange,
   className = '',
-  error
+  error,
+  managerPoppoId
 }) => {
   const [users, setUsers] = useState<HostUser[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -36,11 +38,14 @@ export const HostLookupSelect: React.FC<HostLookupSelectProps> = ({
         const list: HostUser[] = [];
         querySnapshot.forEach((doc) => {
           const data = doc.data();
-          if (data.poppoId) {
+          const pId = String(data.poppoId || data.poppo_id || data.id || doc.id);
+          const mgrId = String(data.assignedManagerId || data.assigned_manager_poppo_id || '');
+          if (pId && pId !== 'undefined') {
+            if (managerPoppoId && mgrId !== managerPoppoId) return;
             list.push({
-              poppoId: String(data.poppoId),
-              nickname: String(data.nickname || ''),
-              role: String(data.role || '')
+              poppoId: pId,
+              nickname: String(data.nickname || data.name || ''),
+              role: String(data.role || 'host')
             });
           }
         });
@@ -105,6 +110,7 @@ export const HostLookupSelect: React.FC<HostLookupSelectProps> = ({
         <div>
           <label className="block text-xs font-semibold text-slate-400 mb-1">Select Nickname</label>
           <select
+            title="Select Nickname"
             value={poppoId}
             onChange={handleDropdownChange}
             disabled={isLoading}
@@ -113,7 +119,7 @@ export const HostLookupSelect: React.FC<HostLookupSelectProps> = ({
             <option value="">-- Choose Host --</option>
             {users.map((u) => (
               <option key={u.poppoId} value={u.poppoId}>
-                {u.nickname} ({u.poppoId}) - {u.role}
+                {u.nickname} - {u.poppoId}
               </option>
             ))}
           </select>
