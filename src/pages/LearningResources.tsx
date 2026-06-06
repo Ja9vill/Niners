@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Storage } from '../lib/storage';
+import { useLocation } from 'react-router-dom';
 
 // Types & interfaces
 interface QuizQuestion {
@@ -22,12 +23,125 @@ interface Quiz {
   questions: QuizQuestion[];
 }
 
+interface ExamScore {
+  category: string; // 'foundations' | 'growth' | 'mastery'
+  score: number;
+  total: number;
+  passed: boolean;
+  timestamp: string;
+}
+
+const FLASHCARDS = [
+  {
+    id: 1,
+    pillar: 'Pillar 1: Profile Optimization',
+    question: 'What is the "Digital Handshake" and how long does it take?',
+    answer: 'It is the visual trust and cognitive fluency built with viewers in under 3 seconds. The core elements are a professional solo cover photo, a clear memorizable nametag, and an elevator-pitch bio.'
+  },
+  {
+    id: 2,
+    pillar: 'Pillar 2: Live Quality',
+    question: 'Why is audio quality prioritized over video quality?',
+    answer: 'Viewers will tolerate average video clarity, but bad, noisy, echoing, or distorted audio triggers subconscious cognitive load and causes immediate room exits.'
+  },
+  {
+    id: 3,
+    pillar: 'Pillar 3: Timing & Consistency',
+    question: 'What is the standard procedure for an emergency stream cancellation?',
+    answer: 'Write and post a formatted update in your Fanclub Group Chat at least 2 hours before the schedule starts. State the absence date, reason, and return live date.'
+  },
+  {
+    id: 4,
+    pillar: 'Pillar 4: Visibility Investment',
+    question: 'What is the algorithmic timing for dropping a Lucky Box before a Random PK?',
+    answer: 'Deploy the Lucky Box exactly 2 minutes before triggering the PK match. The countdown draws traffic and spikes room counts just when the algorithmic multiplier evaluates PK engagement.'
+  },
+  {
+    id: 5,
+    pillar: 'Pillar 5: In-Stream Interaction',
+    question: 'What is "Dead Air" and how do you prevent it?',
+    answer: 'Dead Air is silence or visual inactivity. Combat it by speaking continuously (telling personal stories, playing games, explaining coin goals, reading usernames) even if the chat is quiet.'
+  },
+  {
+    id: 6,
+    pillar: 'Pillar 6: Fanbase Development',
+    question: 'What is the viewer conversion funnel order?',
+    answer: 'The conversion path is: Scrolling Visitor → Active Chat Participant → Follower → Fanclub Subscriber → Loyal VIP/Gifter.'
+  },
+  {
+    id: 7,
+    pillar: 'Pillar 7: Retention',
+    question: 'How do you maintain emotional continuity outside live hours?',
+    answer: 'Maintain daily offline check-ins in your Fanclub Group Chat, share schedules/highlights, run Sunday requests, and celebrate supporter milestones.'
+  },
+  {
+    id: 8,
+    pillar: 'Pillar 8: Monetization',
+    question: 'What is a "Gratitude Loop" and its 3 steps?',
+    answer: 'A structured reaction system that rewards donors: 1. Intense emotional validation (surprise), 2. Action cue (dance/sound effect), 3. Prestige marker (writing their name on your whiteboard).'
+  },
+  {
+    id: 9,
+    pillar: 'Pillar 9: Intentional Goal Setting',
+    question: 'What are the "Four Goal Arches"?',
+    answer: 'Targets set across 4 areas: 1. Financial (Coins), 2. Audience (Community/Follows), 3. Skill (Talent/Vocal), and 4. Infrastructure (Live Quality).'
+  }
+];
+
 export function LearningResources() {
+  const location = useLocation();
+
   // Navigation & View settings
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'pillars' | 'labs' | 'certifications' | 'ai-coach'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'onboarding' | 'dashboard' | 'pillars' | 'labs' | 'certifications' | 'ai-coach'>(() => {
+    const params = new URLSearchParams(location.search);
+    const tabParam = params.get('tab') as any;
+    if (['onboarding', 'dashboard', 'pillars', 'labs', 'certifications', 'ai-coach'].includes(tabParam)) {
+      return tabParam;
+    }
+    return 'onboarding';
+  });
   const [persona, setPersona] = useState<'host' | 'manager'>('host');
   const [selectedPillar, setSelectedPillar] = useState<number>(0);
+
+  // Sync tab with URL query parameter changes
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const tabParam = params.get('tab') as any;
+    if (tabParam && ['onboarding', 'dashboard', 'pillars', 'labs', 'certifications', 'ai-coach'].includes(tabParam)) {
+      setActiveTab(tabParam);
+    }
+  }, [location.search]);
+
+  // Onboarding 101 state hooks
+  const [onboardAudioChecked, setOnboardAudioChecked] = useState(false);
+  const [onboardAudioVolume, setOnboardAudioVolume] = useState(0); // 0 = silent, 50 = perfect, 100 = too loud
+  const [onboardLightingValue, setOnboardLightingValue] = useState(50);
+  const [onboardNoticePosted, setOnboardNoticePosted] = useState(false);
+  const [onboardGoalText, setOnboardGoalText] = useState('');
+  const [onboardGoalDeclared, setOnboardGoalDeclared] = useState(false);
+  const [onboardCheckedCount, setOnboardCheckedCount] = useState(0);
+  const [onboardStreamReady, setOnboardStreamReady] = useState(false);
   
+  // Onboard Mock PK Arena state hooks
+  const [pkArenaActive, setPkArenaActive] = useState(false);
+  const [pkArenaTimer, setPkArenaTimer] = useState(30);
+  const [pkHostPoints, setPkHostPoints] = useState(10000);
+  const [pkOpponentPoints, setPkOpponentPoints] = useState(9500);
+  const [pkArenaLog, setPkArenaLog] = useState<string[]>([]);
+  const [pkArenaResult, setPkArenaResult] = useState<'win' | 'lose' | null>(null);
+
+  // Onboard Coaching Roleplay state hooks
+  const [roleplayScenarioIdx, setRoleplayScenarioIdx] = useState(0);
+  const [roleplayScore, setRoleplayScore] = useState(0);
+  const [roleplayChoiceFeedback, setRoleplayChoiceFeedback] = useState<string | null>(null);
+  const [roleplayFinished, setRoleplayFinished] = useState(false);
+
+  // Onboard Compliance Audit Sandbox state hooks
+  const [auditProfileIdx, setAuditProfileIdx] = useState(0);
+  const [auditScore, setAuditScore] = useState(0);
+  const [auditFeedback, setAuditFeedback] = useState<string | null>(null);
+  const [auditFinished, setAuditFinished] = useState(false);
+
   // Storage auth context
   const authState = Storage.getAuthState();
   
@@ -40,6 +154,168 @@ export function LearningResources() {
       setPersona('host');
     }
   }, [authState.role]);
+
+  // Onboarding Pre-stream checklist count check
+  useEffect(() => {
+    let count = 0;
+    if (onboardAudioChecked && onboardAudioVolume >= 40 && onboardAudioVolume <= 70) count++;
+    if (onboardLightingValue >= 75) count++;
+    if (onboardNoticePosted) count++;
+    if (onboardGoalDeclared && onboardGoalText.trim().length > 0) count++;
+    setOnboardCheckedCount(count);
+  }, [onboardAudioChecked, onboardAudioVolume, onboardLightingValue, onboardNoticePosted, onboardGoalDeclared, onboardGoalText]);
+
+  // Onboard Mock PK Arena Timer tick
+  useEffect(() => {
+    let timerId: any;
+    if (pkArenaActive && pkArenaTimer > 0 && !pkArenaResult) {
+      timerId = setInterval(() => {
+        setPkArenaTimer(prev => {
+          if (prev <= 1) {
+            clearInterval(timerId);
+            if (pkHostPoints > pkOpponentPoints) {
+              setPkArenaResult('win');
+            } else {
+              setPkArenaResult('lose');
+            }
+            return 0;
+          }
+          // Opponent randomly gains points
+          setPkOpponentPoints(opp => opp + Math.floor(Math.random() * 800) + 200);
+          return prev - 1;
+        });
+      }, 1000);
+    }
+    return () => clearInterval(timerId);
+  }, [pkArenaActive, pkArenaTimer, pkHostPoints, pkOpponentPoints, pkArenaResult]);
+
+  const handlePkAction = (actionType: 'gratitude' | 'cta' | 'double') => {
+    if (!pkArenaActive || pkArenaResult) return;
+    if (actionType === 'gratitude') {
+      setPkHostPoints(prev => prev + 2500);
+      setPkArenaLog(prev => ['[Gratitude Loop] Thanked donors and played signature sound effect! (+2,500 pts)', ...prev]);
+    } else if (actionType === 'cta') {
+      setPkHostPoints(prev => prev + 1800);
+      setPkArenaLog(prev => ['[Call-to-Action] Shared the stream goal mission and asked for support! (+1,800 pts)', ...prev]);
+    } else {
+      setPkHostPoints(prev => prev + 3500);
+      setPkArenaLog(prev => ['[Double Booster] Synchronized box timing with random PK boost! (+3,500 pts)', ...prev]);
+    }
+  };
+
+  const resetPkArena = () => {
+    setPkArenaActive(false);
+    setPkArenaTimer(30);
+    setPkHostPoints(10000);
+    setPkOpponentPoints(9500);
+    setPkArenaLog([]);
+    setPkArenaResult(null);
+  };
+
+  // Coaching Roleplay Scenarios
+  const coachingScenarios = [
+    {
+      title: 'Discouraged Host',
+      desc: 'Host Lily calls you crying because she streamed for 3 hours and only made 150 points. She wants to quit.',
+      options: [
+        {
+          text: 'Enforce consistency: Tell her streaming is hard work and she needs to hit her 6-hour daily quota.',
+          score: 10,
+          feedback: 'Lily feels pressured and unheard. She ends up failing to log on next week. (Poor coaching choice)'
+        },
+        {
+          text: 'Pillar 9 Goal-Setting audit: Help her set a micro-goal for community growth and restructure her screen goals.',
+          score: 100,
+          feedback: 'Lily realizes she focused only on earnings, neglecting the Community and Skill arches. She returns with renewed purpose. (Excellent coaching choice!)'
+        }
+      ]
+    },
+    {
+      title: 'Technical Discomfort',
+      desc: 'Host Mike has a noisy fan in the background and poor face lighting, causing viewers to leave within seconds.',
+      options: [
+        {
+          text: 'Pillar 2 Live Quality enforcement: Complete a scorecard, ask him to use a headset, and adjust camera angle to eye-level.',
+          score: 100,
+          feedback: 'Mike instantly resolves echo and shadows. Watch duration triples. (Excellent coaching choice!)'
+        },
+        {
+          text: 'Suggest he buy professional studio microphone and camera gear.',
+          score: 30,
+          feedback: 'Mike does not have the budget for high-end gear and feels discouraged from streaming. (Suboptimal choice)'
+        }
+      ]
+    }
+  ];
+
+  const handleRoleplayChoice = (optionIdx: number) => {
+    const scenario = coachingScenarios[roleplayScenarioIdx];
+    const option = scenario.options[optionIdx];
+    setRoleplayScore(prev => prev + option.score);
+    setRoleplayChoiceFeedback(option.feedback);
+  };
+
+  const handleNextRoleplay = () => {
+    setRoleplayChoiceFeedback(null);
+    if (roleplayScenarioIdx < coachingScenarios.length - 1) {
+      setRoleplayScenarioIdx(prev => prev + 1);
+    } else {
+      setRoleplayFinished(true);
+    }
+  };
+
+  const resetRoleplay = () => {
+    setRoleplayScenarioIdx(0);
+    setRoleplayScore(0);
+    setRoleplayChoiceFeedback(null);
+    setRoleplayFinished(false);
+  };
+
+  // Compliance Audit Sandbox Profiles
+  const auditProfiles = [
+    {
+      name: '✨💎_CuteGamer999_💎✨',
+      cover: 'Group photo at a restaurant, dimly lit.',
+      bio: 'Placeholder bio text here...',
+      issues: ['Group photo', 'Confusing nametag symbols', 'Generic placeholder bio'],
+      isCompliant: false,
+      explanation: 'Violates Pillar 1 Profile Optimization: Nametag lacks fluency, cover photo lacks solo focus, and bio is a placeholder.'
+    },
+    {
+      name: 'EmmaLive',
+      cover: 'Solo portrait, clear face, ring light reflections in eyes, aesthetic bedroom backdrop.',
+      bio: 'Late night cozy chats & live music requests! 🎤 Daily streams starting 9 PM EST. Join the Emma family! ✨',
+      issues: [],
+      isCompliant: true,
+      explanation: 'Fully compliant! Solo cover photo, readable nametag, clear bio with scheduled times and Follow CTAs.'
+    }
+  ];
+
+  const handleAuditAction = (userChoice: boolean) => {
+    const profile = auditProfiles[auditProfileIdx];
+    if (profile.isCompliant === userChoice) {
+      setAuditScore(prev => prev + 50);
+      setAuditFeedback(`Correct! ${profile.explanation}`);
+    } else {
+      setAuditFeedback(`Incorrect. ${profile.explanation}`);
+    }
+  };
+
+  const handleNextAudit = () => {
+    setAuditFeedback(null);
+    if (auditProfileIdx < auditProfiles.length - 1) {
+      setAuditProfileIdx(prev => prev + 1);
+    } else {
+      setAuditFinished(true);
+    }
+  };
+
+  const resetAudit = () => {
+    setAuditProfileIdx(0);
+    setAuditScore(0);
+    setAuditFeedback(null);
+    setAuditFinished(false);
+  };
 
   // Certifications / Quiz States
   const [selectedQuizLevel, setSelectedQuizLevel] = useState<string | null>(null);
@@ -58,30 +334,40 @@ export function LearningResources() {
   // Certificate Viewer Modal
   const [viewingCertificate, setViewingCertificate] = useState<string | null>(null);
 
-  // Active Tool Lab States
-  const [activeLabTool, setActiveLabTool] = useState<string>('photo-analyzer');
-
-  // Cover Photo Analyzer States
-  const [selectedPhotoTemplate, setSelectedPhotoTemplate] = useState<string | null>(null);
-  const [analyzingPhoto, setAnalyzingPhoto] = useState(false);
-  const [photoScore, setPhotoScore] = useState<any | null>(null);
+  // Active Tool Lab States (defaulting to bio-builder since photo analyzer is removed)
+  const [activeLabTool, setActiveLabTool] = useState<string>('bio-builder');
 
   // Bio Builder States
-  const [bioText, setBioText] = useState('');
-  const [bioKeywords, setBioKeywords] = useState<string[]>(['Poppo Live', 'Talent', 'Singer', 'PK', 'Gamer', 'Chatting']);
-  const [selectedBioKeywords, setSelectedBioKeywords] = useState<string[]>([]);
-  const [bioTemplates, setBioTemplates] = useState([
-    { name: 'Friendly Late-Night Chat', text: 'Hey guys! Welcome to my cozy late-night corner. I love sharing music, talking about life, and playing interactive PK games. Tune in for good vibes every night at 9 PM!' },
-    { name: 'Talented Vocalist & Musician', text: '🎵 Singing live is my passion. Requests are always welcome! Host of daily themed rooms and music PK challenges. Join the fam and support the music journey!' },
-    { name: 'Casual Gamer & PK Competitor', text: 'Gaming enthusiast & PK warrior! 🎮 Join me for live gaming drills, random PK battles, and community chats. Daily streams starting 4 PM EST.' }
+  const [bioText, setBioText] = useState('Hey guys! Welcome to my profile! I am a **Singer** who loves **Interactive PK Battles**. 💖 Daily streams starting **9 PM EST**! Join the **Luna Family 🌙**!');
+  const [bioTalent, setBioTalent] = useState('Singer');
+  const [bioStyle, setBioStyle] = useState('Interactive PK Battles');
+  const [bioSchedule, setBioSchedule] = useState('Daily at 9 PM EST');
+  const [bioTribe, setBioTribe] = useState('Luna Family 🌙');
+  const [bioStep, setBioStep] = useState<'questionnaire' | 'generated'>('questionnaire');
+
+  const [bioTemplates] = useState([
+    { name: 'Friendly Late-Night Chat', talent: 'Chitchat Host', style: 'Late-Night Cozy Vibes', schedule: 'Every night at 9 PM EST', tribe: 'Cozy Clan ✨' },
+    { name: 'Talented Vocalist', talent: 'Singer', style: 'Live Song Requests', schedule: 'Daily at 6 PM EST', tribe: 'Melody Fam 🎤' },
+    { name: 'Casual Gamer', talent: 'Gamer', style: 'Live Gaming Drills & PKs', schedule: 'Mon-Fri 4 PM EST', tribe: 'GG Warriors 🎮' }
   ]);
 
   // Name Readability States
   const [nametagText, setNametagText] = useState('');
   const [nametagResult, setNametagResult] = useState<any | null>(null);
 
-  // Lighting Simulator States
-  const [lightingPreset, setLightingPreset] = useState<'backlit' | 'overhead' | 'lowlight' | 'ringlight' | 'studio'>('overhead');
+  // Lucky Box Setup Simulator States
+  const [luckyGameType, setLuckyGameType] = useState<'split' | 'draw'>('split');
+  const [luckyCoinPool, setLuckyCoinPool] = useState<number>(100);
+  const [luckyWinners, setLuckyWinners] = useState<number>(10);
+  const [luckyCustomWinners, setLuckyCustomWinners] = useState<string>('');
+  const [luckyWinnersMode, setLuckyWinnersMode] = useState<'preset' | 'custom'>('preset');
+  const [luckyCondition, setLuckyCondition] = useState<'all' | 'follow' | 'fanclub' | 'code'>('all');
+  const [luckyClaimMethod, setLuckyClaimMethod] = useState<'grab' | 'random'>('grab');
+  const [luckyTimer, setLuckyTimer] = useState<'3min' | '5min' | '10min'>('3min');
+  const [luckyBoxSimStatus, setLuckyBoxSimStatus] = useState<'idle' | 'countdown' | 'claimed'>('idle');
+  const [luckyBoxTimeRemaining, setLuckyBoxTimeRemaining] = useState<number>(0);
+  const [luckyBudgetPeriod, setLuckyBudgetPeriod] = useState<'daily' | 'weekly'>('daily');
+  const [luckyBudgetCoins, setLuckyBudgetCoins] = useState<number>(5000);
 
   // Visibility Budget States
   const [visibilityCoins, setVisibilityCoins] = useState(10000);
@@ -89,11 +375,27 @@ export function LearningResources() {
   const [visibilityBoxes, setVisibilityBoxes] = useState(1);
   const [calculatedVisibility, setCalculatedVisibility] = useState<any | null>(null);
 
-  // No-Stream Generator States
+  // GC Announcements Hub States
+  const [gcActiveTab, setGcActiveTab] = useState<'no-stream' | 'pre-stream' | 'post-stream'>('no-stream');
+  
+  // No-Stream settings
   const [noStreamReason, setNoStreamReason] = useState<'sick' | 'family' | 'travel' | 'recharge'>('sick');
   const [noStreamDate, setNoStreamDate] = useState('');
   const [noStreamReturnDate, setNoStreamReturnDate] = useState('');
   const [generatedNoStreamText, setGeneratedNoStreamText] = useState('');
+  
+  // Pre-Stream Settings
+  const [preStreamTheme, setPreStreamTheme] = useState('Vocal Requests & Cozy Chats');
+  const [preStreamTime, setPreStreamTime] = useState('8:00 PM EST');
+  const [preStreamGoal, setPreStreamGoal] = useState('Unlock the level 3 Lucky Box');
+  const [generatedPreStreamText, setGeneratedPreStreamText] = useState('');
+
+  // Post-Stream Settings
+  const [postStreamCoins, setPostStreamCoins] = useState('45,000');
+  const [postStreamDonors, setPostStreamDonors] = useState('Alex, Sarah, Mark');
+  const [postStreamNote, setPostStreamNote] = useState('We defended the board 3 times in a row!');
+  const [generatedPostStreamText, setGeneratedPostStreamText] = useState('');
+
   const [copiedStatus, setCopiedStatus] = useState(false);
 
   // Comment Speed Drill States
@@ -110,54 +412,71 @@ export function LearningResources() {
   const [generatingPlan, setGeneratingPlan] = useState(false);
   const [generatedPlan, setGeneratedPlan] = useState<any | null>(null);
 
-  // Triggering photo analysis
-  const runPhotoAnalysis = (templateId: string) => {
-    setSelectedPhotoTemplate(templateId);
-    setAnalyzingPhoto(true);
-    setPhotoScore(null);
-    setTimeout(() => {
-      setAnalyzingPhoto(false);
-      if (templateId === 'poor-selfie') {
-        setPhotoScore({
-          overall: 45,
-          framing: 'Poor (Off-center, cropped head)',
-          lighting: 'Harsh backlight, dark face shadow',
-          haloEffect: 'Low trust engagement index',
-          status: 'REJECTED',
-          feedback: [
-            'Avoid shooting with windows or bright lights behind you.',
-            'Ensure your face occupies at least 50% of the cover frame.',
-            'Use a soft frontal ring light to avoid dark facial shadows.'
-          ]
-        });
-      } else if (templateId === 'group-photo') {
-        setPhotoScore({
-          overall: 55,
-          framing: 'Crowded (Multiple subjects present)',
-          lighting: 'Adequate, but lacks focus',
-          haloEffect: 'Confusing brand presentation',
-          status: 'REJECTED',
-          feedback: [
-            'A cover photo is your billboard. Viewers must know exactly who is broadcasting.',
-            'Group photos dilute the Halo Effect. Keep it strictly solo.',
-            'Use a clean, non-distracting background.'
-          ]
-        });
-      } else {
-        setPhotoScore({
-          overall: 95,
-          framing: 'Excellent (Rule of Thirds met, clear face visibility)',
-          lighting: 'Balanced 3-point soft illumination',
-          haloEffect: 'Strong cognitive fluency and premium look',
-          status: 'APPROVED',
-          feedback: [
-            'Perfect frontal posture creating psychological eye contact.',
-            'Excellent color contrast between subject and background.',
-            'Meets all 4 non-negotiables of the Digital Handshake.'
-          ]
-        });
-      }
-    }, 1200);
+  // Exam Score logs
+  const [examScores, setExamScores] = useState<ExamScore[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem('nine_examination_scores') || '[]');
+    } catch {
+      return [];
+    }
+  });
+
+  // Flashcards States
+  const [currentFlashcardIndex, setCurrentFlashcardIndex] = useState(0);
+  const [isFlashcardFlipped, setIsFlashcardFlipped] = useState(false);
+
+  const [shuffledCards, setShuffledCards] = useState(FLASHCARDS);
+
+  // Regenerate bio statement whenever any of the questionnaire answers change
+  useEffect(() => {
+    if (bioStep === 'questionnaire') {
+      const formattedText = `Welcome! I am a **${bioTalent}** and my room vibe is **${bioStyle}**. 💖 Daily live stream starting at **${bioSchedule}**! Join the **${bioTribe}** tribe! ✨`;
+      setBioText(formattedText.slice(0, 250));
+    }
+  }, [bioTalent, bioStyle, bioSchedule, bioTribe, bioStep]);
+
+  // Lucky Box Budget Recommendation logic
+  const getLuckyRecommendation = (period: 'daily' | 'weekly', coins: number) => {
+    let structure = '';
+    let justification = '';
+    let condition = '';
+    let timer = '5min';
+    let PKAdvice = '';
+
+    if (coins <= 0) {
+      structure = 'No coins budgeted';
+      condition = 'All audiences';
+      justification = 'Please input a budget to see suggestions.';
+      PKAdvice = 'Investing even a small amount helps with discovery.';
+    } else if (coins < 1000) {
+      structure = `${period === 'daily' ? '1 drop' : '2 drops'} of 100 Coins (Even Split, 10 Winners)`;
+      condition = 'Follow the host';
+      justification = 'Low budget starter drop to quickly inflate follower count and trigger search rankings.';
+      PKAdvice = 'Use when starting your live stream to greet newcomers.';
+    } else if (coins < 10000) {
+      const drops = period === 'daily' ? 2 : 5;
+      const amount = Math.floor(coins / drops);
+      structure = `${drops} drops of ${amount} Coins (Even Split, 50 Winners)`;
+      condition = 'Follow the host';
+      justification = 'Mid-tier budget plan to trigger organic discovery. Broad splits invite high-volume clicking.';
+      PKAdvice = 'Deploy drops exactly 2 minutes before entering a co-host or Random PK match.';
+    } else if (coins < 50000) {
+      const drops = period === 'daily' ? 3 : 8;
+      const amount = Math.floor(coins / drops);
+      structure = `${drops} drops of ${amount.toLocaleString()} Coins (Lucky Draw, 5-10 Winners)`;
+      condition = 'Join Fan Club';
+      justification = 'High-traffic conversion plan. Fanclub requirements filter transient scrolling accounts and lock in committed tribe members.';
+      PKAdvice = 'Deploy 1 box at the start of your hour, and another right before a high-stakes PK.';
+    } else {
+      const drops = period === 'daily' ? 5 : 12;
+      const amount = Math.floor(coins / drops);
+      structure = `${drops} drops of ${amount.toLocaleString()} Coins (Lucky Draw, 10 Winners)`;
+      condition = 'Join Fan Club';
+      justification = 'Whale attraction plan. Large chest sizes appeal to VIP users looking to farm coins, converting them into active supporters.';
+      PKAdvice = 'Always sync boxes with multi-host PK rooms for maximum algorithm multiplier exposure.';
+    }
+
+    return { structure, condition, justification, timer, PKAdvice };
   };
 
   // Naming standards evaluator
@@ -206,6 +525,23 @@ export function LearningResources() {
     });
   };
 
+  // Lucky Box Countdown Timer simulation
+  useEffect(() => {
+    let timerId: any;
+    if (luckyBoxSimStatus === 'countdown' && luckyBoxTimeRemaining > 0) {
+      timerId = setInterval(() => {
+        setLuckyBoxTimeRemaining(prev => {
+          if (prev <= 1) {
+            setLuckyBoxSimStatus('claimed');
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+    return () => clearInterval(timerId);
+  }, [luckyBoxSimStatus, luckyBoxTimeRemaining]);
+
   // Calculate Visibility
   useEffect(() => {
     const organicReachBase = 150;
@@ -229,32 +565,34 @@ export function LearningResources() {
     });
   }, [visibilityCoins, visibilityPKs, visibilityBoxes]);
 
-  // Generate No-Stream Status Update
+  // Generate Announcements GC Copy-paste texts
   useEffect(() => {
+    // 1. No Stream Announcement
     const dateStr = noStreamDate ? new Date(noStreamDate).toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' }) : 'today';
     const returnStr = noStreamReturnDate ? new Date(noStreamReturnDate).toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' }) : 'our next scheduled slot';
-    
-    let text = '';
-    switch (noStreamReason) {
-      case 'sick':
-        text = `🚨 STREAM UPDATE 🚨\n\nHey family! Unfortunately, I am feeling a bit under the weather today (${dateStr}) and need to rest my voice to make sure I can bring 100% energy to our streams. 🤒\n\nI will be taking the night off to recover and will see you all back on ${returnStr}! Thank you so much for understanding. Please stay safe and healthy! ❤️✨`;
-        break;
-      case 'family':
-        text = `🚨 IMPORTANT NOTICE 🚨\n\nHello everyone! I have an urgent family commitment to attend to today (${dateStr}) and won't be able to go live. 🏠👨‍👩‍👧‍👦\n\nI hate missing our time together, but family comes first. I'll be back live on ${returnStr} and can't wait to catch up with all of you! Miss you guys already! 💖`;
-        break;
-      case 'travel':
-        text = `✈️ TRAVEL ANNOUNCEMENT ✈️\n\nHey tribe! Just a heads up that I am traveling today (${dateStr}) and will have limited network signal. As a result, today's stream is cancelled. 🗺️\n\nI will keep you updated in the group chat and will return live on ${returnStr} with lots of stories to share! Have a wonderful day! 🌟`;
-        break;
-      case 'recharge':
-        text = `🔋 BATTERY RECHARGE DAY 🔋\n\nHey lovely team! To keep our stream quality high and avoid burnout, I am taking a scheduled creative recharge day today (${dateStr}). 🧘‍♀️✨\n\nTaking care of mental health is what keeps us consistent in the long run! I'll be active in our Discord/Group Chats and will return live on ${returnStr} stronger than ever. Thank you for your endless love! 💎`;
-        break;
-    }
-    setGeneratedNoStreamText(text);
-  }, [noStreamReason, noStreamDate, noStreamReturnDate]);
+    let absenceReason = '';
+    if (noStreamReason === 'sick') absenceReason = 'feeling under the weather and need to rest my voice';
+    else if (noStreamReason === 'family') absenceReason = 'handling an urgent family commitment';
+    else if (noStreamReason === 'travel') absenceReason = 'traveling and will have limited network signal';
+    else absenceReason = 'taking a creative rest day to recharge my energy';
 
-  // Copy Status Update Helper
-  const copyToClipboard = () => {
-    navigator.clipboard.writeText(generatedNoStreamText);
+    setGeneratedNoStreamText(`🚨 STREAM ABSENCE NOTICE 🚨\n\nHey family! Unfortunately, I won't be able to go live on ${dateStr} because I am ${absenceReason}. 🤒\n\nI want to make sure I bring 100% energy to our room! I'll be taking tonight off to recover and see you all back on ${returnStr}. Thank you so much for understanding. Please stay safe and healthy! ❤️✨`);
+
+    // 2. Pre-Stream Announcement
+    setGeneratedPreStreamText(`🔔 GOING LIVE SOON! 🔔\n\nHey tribe! We are launching in 15 minutes! 🚀\n\n🎤 Vibe Tonight: **${preStreamTheme}**\n⏰ Start Time: **${preStreamTime}**\n🏆 Today's Mission: **${preStreamGoal}**\n\nClick the link, grab your seats, and let's conquer the leaderboard together! See you in a bit! 💖✨`);
+
+    // 3. Post-Stream Announcement
+    setGeneratedPostStreamText(`💖 STREAM RETROSPECTIVE 💖\n\nThank you all for an incredible stream tonight! Together, we raised **${postStreamCoins}** points! 🎉\n\n🏆 Special MVP Shoutouts: **${postStreamDonors}**\n📝 Note: ${postStreamNote}\n\nI appreciate the endless love and support, team. Rest up, and see you all in the next schedule! Goodnight! 💤✨`);
+
+  }, [
+    noStreamReason, noStreamDate, noStreamReturnDate,
+    preStreamTheme, preStreamTime, preStreamGoal,
+    postStreamCoins, postStreamDonors, postStreamNote
+  ]);
+
+  // Copy Update Helper
+  const copyToClipboard = (textToCopy: string) => {
+    navigator.clipboard.writeText(textToCopy);
     setCopiedStatus(true);
     setTimeout(() => setCopiedStatus(false), 2000);
   };
@@ -371,161 +709,188 @@ export function LearningResources() {
     }, 1500);
   };
 
-  // Quizzes list data
+  // Quizzes list data (3 Category Exams: Foundations, Growth, Mastery)
   const quizzes: Quiz[] = [
     {
-      level: 'beginner',
-      title: 'Beginner Certification Quiz',
+      level: 'foundations',
+      title: 'Category A: Foundations Exam (Pillars 1-3)',
       questions: [
         {
-          question: 'What is the "Digital Handshake" goal in Profile Optimization?',
+          question: 'What is the "Digital Handshake" goal in Profile Optimization (Pillar 1)?',
           options: [
-            'Make viewers support you with coins.',
-            'Build trust and interest in under 3 seconds.',
-            'Convince a manager to sign your contract.',
-            'Create a group chat with 100 members.'
+            'Forcing viewers to immediately purchase coins.',
+            'Establishing visual trust and viewer interest within 3 seconds.',
+            'Getting signed to a head agency contract.',
+            'Setting up a community group chat with 100 people.'
           ],
           correctAnswer: 1,
           explanation: 'Profile Optimization acts as your digital billboard. The visual elements must establish cognitive fluency and trust within 3 seconds.'
         },
         {
-          question: 'Which of the following is considered the #1 hardware priority for psychological comfort?',
+          question: 'Which hardware element is considered the #1 priority for psychological comfort (Pillar 2)?',
           options: [
-            'Expensive video editing software.',
-            'A high-end ring light.',
-            'Audio quality (Microphone/clarity).',
-            'A DSLR camera setup.'
+            'High-end DSLR video capture setup.',
+            'A professional ring light with adjustable colors.',
+            'Audio quality (Microphone clarity / lack of background noise).',
+            'Advanced screen green screen software.'
           ],
           correctAnswer: 2,
           explanation: 'Audio quality is #1. Viewers will tolerate average video, but bad, noisy, or distorted audio will drive them away instantly.'
         },
         {
-          question: 'What does "Nametag Cognitive Fluency" mean?',
+          question: 'What does "Nametag Cognitive Fluency" mean (Pillar 1)?',
           options: [
-            'Having as many emojis and special characters as possible.',
-            'A name that is simple, pronounceable, search-friendly, and memorable.',
-            'A name that only has numbers to protect privacy.',
-            'Translating your name into multiple languages.'
+            'Having multiple emojis and special characters to look fancy.',
+            'A name that is simple, pronounceable, search-friendly, and easy to memorize.',
+            'Protecting your privacy by using random number strings.',
+            'Translating your username into three different languages.'
           ],
           correctAnswer: 1,
           explanation: 'Nametags should avoid complex punctuation, symbols, and random numbers so that they are highly readable and easy to call out.'
+        },
+        {
+          question: 'How should you communicate a schedule shift or emergency absence to your audience (Pillar 3)?',
+          options: [
+            'Remain silent and disappear to build mystery.',
+            'Post a detailed update in the Fanclub GC at least 2 hours before the scheduled slot.',
+            'Contact only your manager and leave the room offline.',
+            'Start a stream, turn off your video, and keep silent.'
+          ],
+          correctAnswer: 1,
+          explanation: 'Consistency builds habits. In case of an emergency, write an update containing the date of absence, reason, and return date.'
+        },
+        {
+          question: 'In profile optimization, what is the "Halo Effect" (Pillar 1)?',
+          options: [
+            'The visual trust created by a warm, friendly solo cover photo.',
+            'The ring light reflection visible in the host\'s eyes.',
+            'A special shiny frame earned by ranking on the leaderboard.',
+            'Streaming only in a room with a white circular background.'
+          ],
+          correctAnswer: 0,
+          explanation: 'A warm, friendly, solo cover photo creates psychological comfort and trust (the Halo Effect) compared to blurry, off-center, or group photos.'
         }
       ]
     },
     {
-      level: 'intermediate',
-      title: 'Intermediate Certification Quiz',
+      level: 'growth',
+      title: 'Category B: Growth Exam (Pillars 4-6)',
       questions: [
         {
-          question: 'How should you schedule updates when you cannot stream due to an emergency?',
+          question: 'What is the algorithmic purpose of dropping a Lucky Box (Pillar 4)?',
           options: [
-            'Say nothing and hope they do not notice.',
-            'Post a detailed "No-Stream Announcement" in community chats at least 2 hours before the scheduled slot.',
-            'Text your manager to stream for you.',
-            'Go live for 2 seconds and turn off the phone.'
+            'To spend excess coins to reduce tax penalties.',
+            'To draw in crowd traffic to spike room metrics and algorithmic traction.',
+            'To automatically earn coins back from the platform.',
+            'To verify if the stream network connection is stable.'
           ],
           correctAnswer: 1,
-          explanation: 'Consistency builds habit and loyalty. If an emergency arises, write an update containing the date of absence, reason, and return date.'
+          explanation: 'Lucky Boxes draw in audience traffic, which spikes active room counts and algorithmic discovery.'
         },
         {
-          question: 'What is the algorithmic purpose of combining Lucky Boxes and Random PKs?',
+          question: 'How do you prevent "Dead Air" when there are no active comments (Pillar 5)?',
           options: [
-            'To spend as many coins as possible.',
-            'To draw in crowd traffic to spike room metrics exactly when the PK engagement boosts are active.',
-            'To get coins back from the platform.',
-            'To bypass security filters.'
-          ],
-          correctAnswer: 1,
-          explanation: 'Lucky Boxes draw in audience traffic, which spikes active room counts. Conducting a PK during this period maximizes algorithmic visibility.'
-        },
-        {
-          question: 'How do you prevent "Dead Air" in interaction?',
-          options: [
-            'By remaining silent when nobody is chatting.',
-            'By playing music at max volume to drown out silence.',
-            'By speaking continuously, telling stories, asking open-ended questions, and keeping energy up even if the chat is quiet.',
-            'By turning off the stream.'
+            'Remain silent and look at your phone until someone chats.',
+            'Play background music at maximum volume to block the silence.',
+            'Speak continuously (storytelling, reciting goals, describing ambient room details).',
+            'Shut down the stream immediately and retry later.'
           ],
           correctAnswer: 2,
           explanation: 'Dead air kills viewer retention. Dynamic hosts maintain a continuous flow of commentary, reading names, and asking questions.'
-        }
-      ]
-    },
-    {
-      level: 'advanced',
-      title: 'Advanced Certification Quiz',
-      questions: [
+        },
         {
-          question: 'What is the viewer retention funnel order?',
+          question: 'What is the correct synchronization for a Lucky Box drop and a Random PK (Pillar 4)?',
           options: [
-            'Follow CTA → Fanclub CTA → Group Chat Retention → Milestone Celebrations.',
-            'Coin donation → Follow → Private Message → Exit.',
-            'Fanclub → Roster → Admin upgrade → Agency sign.',
-            'There is no funnel in streaming.'
+            'Deploy the Lucky Box exactly 2 minutes before launching the Random PK.',
+            'Drop the Lucky Box right after the Random PK has ended.',
+            'Deploy the Lucky Box only during silent, off-peak hours.',
+            'Lucky Boxes and Random PKs should never be done in the same hour.'
           ],
           correctAnswer: 0,
-          explanation: 'A structured retention path moves a viewer from clicking Follow, subscribing to the Fanclub, joining community Group Chats, and participating in Milestones.'
+          explanation: 'Deploying a Lucky Box 2 minutes before a PK pulls in traffic, maximizing your active viewer count just as the PK begins and metrics are evaluated.'
         },
         {
-          question: 'Which goal setting principle represents the "Four Goal Arches"?',
+          question: 'In fanbase development, what is the main goal of the Fanclub (Pillar 6)?',
           options: [
-            'Stream time, follower count, gifts received, and PK wins.',
-            'Earnings/Coins, Community Growth, Talent Development, and Technical Quality.',
-            'Sleeping, eating, streaming, and relaxing.',
-            'Weekly, monthly, quarterly, and yearly metrics.'
+            'Allowing other hosts to moderate your room.',
+            'Building tribe identity, custom badges, and rules to turn followers into committed members.',
+            'Receiving coin incentives directly from the platform.',
+            'Arranging meetings with managers outside the application.'
           ],
           correctAnswer: 1,
-          explanation: 'A host must balance their routine across all four pillars: Financial (Earnings), Audience (Community), Skill (Talent), and Infrastructure (Quality).'
+          explanation: 'A Fanclub provides exclusive perks and prestige, forming a dedicated community tribe that defends your board.'
         },
         {
-          question: 'How does the principle of Reciprocity apply to monetization?',
+          question: 'When a new, silent viewer enters your room, how should you greet them (Pillar 5)?',
           options: [
-            'Demanding that viewers pay for your time.',
-            'Creating mutual value: providing emotional support, high entertainment, and celebrating their presence prior to asking for goals.',
-            'Offering free cash giveaways to top gifters.',
-            'Ignoring small gifters and focusing only on whales.'
+            'Demand they send a gift or leave the room.',
+            'Ignore them completely until they write something in chat.',
+            'Ask an open-ended question that connects their username to an engaging topic.',
+            'Immediately flag them as spam to keep the chat clean.'
           ],
-          correctAnswer: 1,
-          explanation: 'Reciprocity triggers generosity naturally when viewers feel valued, heard, and emotionally connected to the host and community.'
+          correctAnswer: 2,
+          explanation: 'Personalized open-ended greetings help viewers feel seen and welcome, prompting them to start chatting.'
         }
       ]
     },
     {
-      level: 'pro',
-      title: 'Pro Master Final Certification Quiz',
+      level: 'mastery',
+      title: 'Category C: Mastery Exam (Pillars 7-9)',
       questions: [
         {
-          question: 'How should a manager handle a host with poor background and bad lighting?',
+          question: 'How do you maintain "Emotional Continuity" outside live hours (Pillar 7)?',
           options: [
-            'Nuke their account immediately.',
-            'Conduct a Quality Audit, fill the Live Quality Scorecard, and coach them through a 3-point light setup.',
-            'Ignore it as long as they generate points.',
-            'Stream for them to show them how it is done.'
+            'Post schedules, highlights, and check in on regulars in the Fanclub GC.',
+            'Ignore viewers completely until you go live again.',
+            'Request personal donations through private messaging channels.',
+            'Share private family details with all scrolling visitors.'
           ],
-          correctAnswer: 1,
-          explanation: 'Managers are coaches. They enforce standards by auditing background noise, lighting, and placement, providing clear actionable plans.'
+          correctAnswer: 0,
+          explanation: 'Emotional continuity builds relationships and retention between broadcasts through group chats and offline community engagement.'
         },
         {
-          question: 'What is a "Gratitude Loop" in Monetization Coaching?',
+          question: 'What are the three steps of a professional "Gratitude Loop" (Pillar 8)?',
           options: [
-            'A repetitive thank-you script.',
-            'A systematic 3-step response (emotion, sound cue, naming/whiteboard writing) that validates donor support.',
-            'Giving coins back to the donor.',
-            'Banning people who do not donate.'
+            'Greeting, thanking, and telling them to donate more.',
+            'Emotional validation (surprise), action cue (sound effect/dance), and prestige marker (name on board).',
+            'Sending coins back, muting the sender, and resetting goals.',
+            'Muting the microphone, playing a song, and ignoring the notification.'
           ],
           correctAnswer: 1,
-          explanation: 'A loop turns single-time donations into recurring support by rewarding the donor with intense emotional validation and community prestige.'
+          explanation: 'A gratitude loop validates donor support, encouraging recurring gifting through intense positive reinforcement.'
         },
         {
-          question: 'What is the primary objective of the Review & Examination Platform?',
+          question: 'Which of the following describes the "Four Goal Arches" in Intentional Goal Setting (Pillar 9)?',
           options: [
-            'To test internet connections.',
-            'To serve as the master knowledge base for AI coaching, trend detection, and skill evaluation.',
-            'To rank agencies on the global leaderboards.',
-            'To store password archives.'
+            'Stream time, follower count, PK victories, and total gifts.',
+            'Financial (Earnings), Audience (Community), Skill (Talent), and Infrastructure (Quality).',
+            'Morning, afternoon, evening, and night schedules.',
+            'Weekly, monthly, quarterly, and annual agency targets.'
           ],
           correctAnswer: 1,
-          explanation: 'The training framework is the single source of truth for the AI coaching engine to diagnose and generate personalized recommendations.'
+          explanation: 'Balancing goals across the Four Arches ensures sustainable growth without focusing exclusively on earnings or ignoring infrastructure.'
+        },
+        {
+          question: 'Why should you avoid begging or guilt-tripping viewers for coins (Pillar 8)?',
+          options: [
+            'It violates psychological safety and drives high-value supporters away.',
+            'The platform system will automatically deduct 50% of your earnings.',
+            'It is actually the fastest way to get certified.',
+            'It causes network lag on your streaming device.'
+          ],
+          correctAnswer: 0,
+          explanation: 'Generosity is inspired when supporters share in a positive mission. Begging creates guilt and pressure, which ruins community safety.'
+        },
+        {
+          question: 'What is the correct feedback loop for goal setting (Pillar 9)?',
+          options: [
+            'Declare goals pre-stream, track progress mid-stream, and review outcomes post-stream.',
+            'Allow the agency to set all goals and only check results monthly.',
+            'Declare goals only when the room is empty and delete them when people arrive.',
+            'Goals should be decided after the stream is already finished.'
+          ],
+          correctAnswer: 0,
+          explanation: 'The feedback loop of Declare -> Track -> Review keeps the host and the chat aligned on a shared daily purpose.'
         }
       ]
     }
@@ -544,27 +909,41 @@ export function LearningResources() {
   };
 
   const handleNextQuestion = (correctAnswerIndex: number) => {
-    if (selectedOption === correctAnswerIndex) {
-      setQuizScore(prev => prev + 1);
-    }
-    
-    const quiz = quizzes.find(q => q.level === selectedQuizLevel);
-    if (!quiz) return;
+    const isCorrect = selectedOption === correctAnswerIndex;
+    const currentQuiz = quizzes.find(q => q.level === selectedQuizLevel);
+    if (!currentQuiz) return;
 
-    if (currentQuizQuestionIndex < quiz.questions.length - 1) {
+    const updatedScore = isCorrect ? quizScore + 1 : quizScore;
+    
+    if (currentQuizQuestionIndex < currentQuiz.questions.length - 1) {
+      setQuizScore(updatedScore);
       setCurrentQuizQuestionIndex(prev => prev + 1);
       setSelectedOption(null);
     } else {
-      // Calculate final score
-      const finalScore = selectedOption === correctAnswerIndex ? quizScore + 1 : quizScore;
-      const totalQ = quiz.questions.length;
-      
-      if (finalScore === totalQ) {
-        // Passed!
-        const updated = { ...quizResultsHistory, [selectedQuizLevel]: true };
-        setQuizResultsHistory(updated);
-        localStorage.setItem('nine_certification_status', JSON.stringify(updated));
+      // Finished the quiz!
+      const totalQ = currentQuiz.questions.length;
+      const passed = updatedScore === totalQ; // Must score 100% to pass
+
+      // Save score log in array
+      const scoreEntry: ExamScore = {
+        category: selectedQuizLevel || 'unknown',
+        score: updatedScore,
+        total: totalQ,
+        passed,
+        timestamp: new Date().toLocaleString()
+      };
+
+      const newHistory = [scoreEntry, ...examScores];
+      setExamScores(newHistory);
+      localStorage.setItem('nine_examination_scores', JSON.stringify(newHistory));
+
+      if (passed) {
+        const updatedCert = { ...quizResultsHistory, [selectedQuizLevel || '']: true };
+        setQuizResultsHistory(updatedCert);
+        localStorage.setItem('nine_certification_status', JSON.stringify(updatedCert));
       }
+      
+      setQuizScore(updatedScore);
       setQuizFinished(true);
     }
   };
@@ -583,9 +962,8 @@ export function LearningResources() {
         'Bio = elevator pitch. Express what viewers get in 3 sentences.'
       ],
       why: 'Viewers scrolling through recommendations select channels on instant visual appeal. A poor layout makes you invisible to high-value traffic.',
-      tools: ['Cover Photo Analyzer', 'Bio Builder', 'Name Readability Test'],
+      tools: ['Bio Builder', 'Name Readability Test'],
       drills: [
-        'Upload 3 cover options and run through critical checklist voting.',
         'Rewrite bio under a 60-second timer restriction.',
         'Perform the "Would You Click?" thumb-stop scroll test.'
       ],
@@ -609,7 +987,7 @@ export function LearningResources() {
         'Device placement = eye contact. Lens at eye level to form connection.'
       ],
       why: 'Technical friction creates subconscious discomfort. High-quality production retains sophisticated viewers who support financially.',
-      tools: ['Audio Test Lab', 'Lighting Simulator', 'Background Cleanliness Score'],
+      tools: ['Audio Test Lab', 'Name Readability Test', 'Background Cleanliness Score'],
       drills: [
         'Conduct a 30-second silent audio room sweep checking for fans or echo.',
         'Play the "Spot the Distraction" background grid test.',
@@ -635,7 +1013,7 @@ export function LearningResources() {
         'No-stream updates. Never disappear without warning.'
       ],
       why: 'Unpredictable streaming schedules signal lack of professionalism, damaging trust with regular donors who build their calendars around you.',
-      tools: ['Schedule Builder', 'Consistency Tracker', 'No-Stream Update Generator'],
+      tools: ['Schedule Builder', 'Consistency Tracker', 'GC Announcements Hub'],
       drills: [
         'Draft 3 different pre-stream countdown updates.',
         'Map out a 3-month consistency routine with scheduled breaks.',
@@ -660,7 +1038,7 @@ export function LearningResources() {
         'Visibility budget allocation. Spend coins to make coins.'
       ],
       why: 'Relying solely on organic discovery is extremely slow. Using tools like Lucky Boxes draws high-volume traffic to kickstart active algorithms.',
-      tools: ['Visibility Budget Calculator', 'PK Strategy Simulator', 'Lucky Box Timing Planner'],
+      tools: ['Lucky Box Setup Simulator', 'Visibility Budget Calculator', 'PK Strategy Simulator'],
       drills: [
         'Run 3 consecutive PK matches back-to-back.',
         'Calculate ROI on a 5,000 Coin box visibility drop.',
@@ -736,7 +1114,7 @@ export function LearningResources() {
         'Creating scheduled weekly stream rituals and traditions.'
       ],
       why: 'It is 5x cheaper to keep an existing viewer than to find a new one. Loyalty is maintained through emotional check-ins between broadcasts.',
-      tools: ['GC Update Writer', 'Retention Calendar', 'Milestone Tracker'],
+      tools: ['GC Announcements Hub', 'Retention Calendar', 'Milestone Tracker'],
       drills: [
         'Write 3 engaging, interactive offline group chat updates.',
         'Create a blueprint for a weekly community ritual (e.g., Sunday Requests).',
@@ -824,6 +1202,16 @@ export function LearningResources() {
 
           <div className="flex flex-wrap gap-2 shrink-0">
             <button
+              onClick={() => setActiveTab('onboarding')}
+              className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all border ${
+                activeTab === 'onboarding'
+                  ? 'border-[#D4AF37] bg-[#D4AF37]/10 text-[#D4AF37]'
+                  : 'border-white/5 bg-[#1A1A28] text-[#A09E9A] hover:text-[#F0EFE8] hover:border-white/10'
+              }`}
+            >
+              Onboarding 101
+            </button>
+            <button
               onClick={() => setActiveTab('dashboard')}
               className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all border ${
                 activeTab === 'dashboard'
@@ -886,6 +1274,495 @@ export function LearningResources() {
           exit={{ opacity: 0, y: -15 }}
           transition={{ duration: 0.2 }}
         >
+          {/* ==================== TAB: ONBOARDING 101 ==================== */}
+          {activeTab === 'onboarding' && (
+            <div className="space-y-6">
+              {/* Persona Switcher & Header */}
+              <div className="glass-card flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border border-[#D4AF37]/10 bg-[#1A1A28] p-5">
+                <div>
+                  <h2 className="text-lg font-black text-white uppercase tracking-widest flex items-center gap-2">
+                    <Sparkles className="text-[#D4AF37] animate-pulse" size={18} />
+                    <span>Quick Start Onboarding</span>
+                  </h2>
+                  <p className="text-xs text-[#A09E9A] mt-1">Get certified for your role through simulated exercises.</p>
+                </div>
+                <div className="flex items-center gap-1.5 bg-[#0D0D14] border border-white/5 rounded-xl p-1">
+                  <button
+                    onClick={() => setPersona('host')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-black uppercase transition-all flex items-center gap-1.5 ${
+                      persona === 'host' ? 'bg-[#D4AF37] text-[#0D0D14]' : 'text-[#A09E9A] hover:text-[#F0EFE8]'
+                    }`}
+                  >
+                    <User size={13} />
+                    <span>Streaming 101</span>
+                  </button>
+                  <button
+                    onClick={() => setPersona('manager')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-black uppercase transition-all flex items-center gap-1.5 ${
+                      persona === 'manager' ? 'bg-purple-600 text-white' : 'text-[#A09E9A] hover:text-[#F0EFE8]'
+                    }`}
+                  >
+                    <Users size={13} />
+                    <span>Managing 101</span>
+                  </button>
+                </div>
+              </div>
+
+              {persona === 'host' ? (
+                /* ================= STREAMING 101 (HOSTS) ================= */
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  {/* Left Column: Onboarding Roadmap & Pre-stream Checklist */}
+                  <div className="lg:col-span-1 flex flex-col gap-6">
+                    {/* Roadmap Card */}
+                    <div className="glass-card flex flex-col gap-4">
+                      <span className="text-[10px] font-black text-[#5A5865] uppercase tracking-wider block">STREAMER ROADMAP</span>
+                      <div className="space-y-4">
+                        <div className="flex gap-3">
+                          <div className="w-5 h-5 rounded-full bg-[#D4AF37] text-black text-[10px] font-black flex items-center justify-center mt-0.5">1</div>
+                          <div>
+                            <p className="text-xs font-black text-white uppercase">Profile Optimization</p>
+                             <p className="text-[10px] text-[#A09E9A] mt-0.5">Use Name Readability Test & Bio Builder in Practice Labs.</p>
+                          </div>
+                        </div>
+                        <div className="flex gap-3">
+                          <div className={`w-5 h-5 rounded-full text-black text-[10px] font-black flex items-center justify-center mt-0.5 ${onboardStreamReady ? 'bg-[#D4AF37]' : 'bg-white/10 text-[#A09E9A]'}`}>2</div>
+                          <div>
+                            <p className="text-xs font-black text-white uppercase">Pre-Stream Checklist</p>
+                            <p className="text-[10px] text-[#A09E9A] mt-0.5">Verify audio, lighting, schedules, and goals below.</p>
+                          </div>
+                        </div>
+                        <div className="flex gap-3">
+                          <div className={`w-5 h-5 rounded-full text-black text-[10px] font-black flex items-center justify-center mt-0.5 ${pkArenaResult === 'win' ? 'bg-[#D4AF37]' : 'bg-white/10 text-[#A09E9A]'}`}>3</div>
+                          <div>
+                            <p className="text-xs font-black text-white uppercase">Mock PK Victory</p>
+                            <p className="text-[10px] text-[#A09E9A] mt-0.5">Complete a simulated PK battle and beat your co-host.</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Pre-stream Checklist */}
+                    <div className="glass-card flex flex-col gap-4">
+                      <div className="flex justify-between items-center border-b border-white/5 pb-2">
+                        <span className="text-xs font-black text-white uppercase tracking-wider">Pre-Stream Check ({onboardCheckedCount}/4)</span>
+                        {onboardStreamReady && (
+                          <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 text-[8px] font-black uppercase">VERIFIED READY</span>
+                        )}
+                      </div>
+
+                      <div className="space-y-4">
+                        {/* Audio Check */}
+                        <div className="space-y-2">
+                          <label className="flex items-center justify-between text-xs font-bold cursor-pointer">
+                            <span className="text-white">1. Audio Input Sweep</span>
+                            <input
+                              type="checkbox"
+                              checked={onboardAudioChecked}
+                              onChange={(e) => {
+                                setOnboardAudioChecked(e.target.checked);
+                                if (e.target.checked && onboardAudioVolume === 0) setOnboardAudioVolume(55);
+                              }}
+                              className="accent-[#D4AF37]"
+                            />
+                          </label>
+                          {onboardAudioChecked && (
+                            <div className="space-y-1 bg-[#0D0D14] p-2.5 rounded-xl border border-white/5">
+                              <div className="flex justify-between text-[10px]">
+                                <span className="text-[#A09E9A]">Volume Level (dB)</span>
+                                <span className={onboardAudioVolume >= 40 && onboardAudioVolume <= 70 ? 'text-[#D4AF37]' : 'text-red-400'}>
+                                  {onboardAudioVolume} {onboardAudioVolume >= 40 && onboardAudioVolume <= 70 ? '(Optimal)' : '(Adjust slider)'}
+                                </span>
+                              </div>
+                              <input
+                                type="range"
+                                min="0"
+                                max="100"
+                                value={onboardAudioVolume}
+                                onChange={(e) => setOnboardAudioVolume(Number(e.target.value))}
+                                className="w-full accent-[#D4AF37]"
+                              />
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Lighting Check */}
+                        <div className="space-y-2">
+                          <div className="flex justify-between text-xs font-bold">
+                            <span className="text-white">2. Ring Light Intensity</span>
+                            <span className={onboardLightingValue >= 75 ? 'text-cyan-400' : 'text-[#A09E9A]'}>
+                              {onboardLightingValue}% {onboardLightingValue >= 75 ? '(Excellent)' : '(Too dark)'}
+                            </span>
+                          </div>
+                          <input
+                            type="range"
+                            min="0"
+                            max="100"
+                            value={onboardLightingValue}
+                            onChange={(e) => setOnboardLightingValue(Number(e.target.value))}
+                            className="w-full accent-cyan-400"
+                          />
+                        </div>
+
+                        {/* Notice Checkbox */}
+                        <label className="flex items-center justify-between text-xs font-bold cursor-pointer">
+                          <span className="text-white">3. Posted Live announcement</span>
+                          <input
+                            type="checkbox"
+                            checked={onboardNoticePosted}
+                            onChange={(e) => setOnboardNoticePosted(e.target.checked)}
+                            className="accent-[#D4AF37]"
+                          />
+                        </label>
+
+                        {/* Goal widget check */}
+                        <div className="space-y-2">
+                          <label className="flex items-center justify-between text-xs font-bold cursor-pointer">
+                            <span className="text-white">4. Declared Daily Goal</span>
+                            <input
+                              type="checkbox"
+                              checked={onboardGoalDeclared}
+                              onChange={(e) => setOnboardGoalDeclared(e.target.checked)}
+                              className="accent-[#D4AF37]"
+                            />
+                          </label>
+                          {onboardGoalDeclared && (
+                            <input
+                              type="text"
+                              value={onboardGoalText}
+                              onChange={(e) => setOnboardGoalText(e.target.value)}
+                              placeholder="e.g. Upgrade microphone for audio comfort..."
+                              className="w-full bg-[#0D0D14] border border-white/10 rounded-xl p-2.5 text-xs text-white focus:outline-none"
+                            />
+                          )}
+                        </div>
+                      </div>
+
+                      <button
+                        disabled={onboardCheckedCount < 4 || onboardStreamReady}
+                        onClick={() => {
+                          setOnboardStreamReady(true);
+                          Storage.addNotification({
+                            title: 'Stream Verified Ready',
+                            message: 'Onboarding checklist completed! Your hardware and goals are fully Pillar-compliant.',
+                            type: 'success'
+                          });
+                        }}
+                        className={`w-full py-2.5 text-center text-xs font-black uppercase rounded-xl transition-all ${
+                          onboardCheckedCount === 4 && !onboardStreamReady
+                            ? 'bg-gradient-to-r from-[#D4AF37] to-[#B8960C] text-black font-bold shadow-[0_2px_12px_rgba(212,175,55,0.2)]'
+                            : 'bg-white/5 text-[#5A5865] cursor-not-allowed border border-white/5'
+                        }`}
+                      >
+                        {onboardStreamReady ? 'Verification Complete' : 'Verify Stream-Ready'}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Right Column: Mock PK Arena game */}
+                  <div className="lg:col-span-2 flex flex-col gap-6">
+                    <div className="glass-card flex-1 flex flex-col gap-4 relative overflow-hidden">
+                      <div className="absolute right-0 top-0 w-48 h-48 bg-radial from-[#D4AF37]/5 to-transparent blur-3xl pointer-events-none" />
+
+                      <div className="flex justify-between items-center border-b border-white/5 pb-2">
+                        <div className="flex items-center gap-2">
+                          <Flame className="text-[#D4AF37]" size={16} />
+                          <span className="text-xs font-black text-white uppercase tracking-wider">Pillar 4: Mock PK Arena</span>
+                        </div>
+                        {pkArenaActive && (
+                          <span className="px-2 py-0.5 rounded bg-red-600 text-white text-[8px] font-black tracking-widest animate-pulse">
+                            TIME LEFT: {pkArenaTimer}S
+                          </span>
+                        )}
+                      </div>
+
+                      {!pkArenaActive ? (
+                        <div className="flex flex-col items-center justify-center flex-1 text-center p-8 gap-4">
+                          <div className="w-16 h-16 rounded-2xl bg-red-950/20 border border-red-500/20 flex items-center justify-center text-3xl">⚔️</div>
+                          <div>
+                            <h3 className="text-sm font-black text-white uppercase tracking-wider">Practice PK Match Drills</h3>
+                            <p className="text-xs text-[#A09E9A] mt-2 max-w-sm leading-relaxed">
+                              Experience a live competitive match. Gain points by deploying Gratitude Loops, Call-to-Actions, and Double Booster Boxes to defend your board!
+                            </p>
+                          </div>
+                          <button
+                            onClick={() => {
+                              setPkArenaActive(true);
+                              setPkArenaTimer(30);
+                              setPkHostPoints(10000);
+                              setPkOpponentPoints(9500);
+                              setPkArenaLog(['PK Battle started! Opponent matching details loaded...', 'You entered with 10,000 points.']);
+                              setPkArenaResult(null);
+                            }}
+                            className="btn-gold px-6 py-2.5 text-xs font-black uppercase"
+                          >
+                            Enter Arena
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex-1 flex flex-col gap-4">
+                          {/* Split screen stream simulator */}
+                          <div className="grid grid-cols-2 gap-4">
+                            {/* Left: You */}
+                            <div className="bg-[#0D0D14] rounded-2xl border border-[#D4AF37]/20 p-3 flex flex-col justify-between aspect-video relative">
+                              <span className="absolute top-2 left-2 px-1.5 py-0.5 rounded bg-black/50 text-[8px] font-bold text-[#D4AF37]">YOU</span>
+                              <div className="flex flex-col items-center justify-center flex-1">
+                                <span className="text-3xl">👩‍🎤</span>
+                              </div>
+                              <div className="w-full text-center mt-2">
+                                <p className="text-[10px] text-[#A09E9A] uppercase">Your Points</p>
+                                <p className="text-sm font-black text-[#D4AF37]">{pkHostPoints.toLocaleString()}</p>
+                              </div>
+                            </div>
+
+                            {/* Right: Opponent */}
+                            <div className="bg-[#0D0D14] rounded-2xl border border-red-500/10 p-3 flex flex-col justify-between aspect-video relative">
+                              <span className="absolute top-2 left-2 px-1.5 py-0.5 rounded bg-black/50 text-[8px] font-bold text-red-400">OPPONENT</span>
+                              <div className="flex flex-col items-center justify-center flex-1">
+                                <span className="text-3xl">🧝‍♀️</span>
+                              </div>
+                              <div className="w-full text-center mt-2">
+                                <p className="text-[10px] text-[#A09E9A] uppercase">Their Points</p>
+                                <p className="text-sm font-black text-red-400">{pkOpponentPoints.toLocaleString()}</p>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Points bar comparison slider */}
+                          <div className="space-y-1">
+                            <div className="flex justify-between text-[8px] font-black text-[#A09E9A]">
+                              <span>YOU ({(pkHostPoints / (pkHostPoints + pkOpponentPoints) * 100).toFixed(0)}%)</span>
+                              <span>OPPONENT ({(pkOpponentPoints / (pkHostPoints + pkOpponentPoints) * 100).toFixed(0)}%)</span>
+                            </div>
+                            <div className="h-3 bg-red-950/20 rounded-full overflow-hidden flex">
+                              <div className="h-full bg-gradient-to-r from-[#D4AF37] to-[#E8C44A]" style={{ width: `${(pkHostPoints / (pkHostPoints + pkOpponentPoints) * 100)}%` }} />
+                              <div className="h-full bg-red-600" style={{ width: `${(pkOpponentPoints / (pkHostPoints + pkOpponentPoints) * 100)}%` }} />
+                            </div>
+                          </div>
+
+                          {/* Gameplay console log */}
+                          <div className="bg-[#0D0D14] border border-white/5 rounded-2xl p-3 h-24 overflow-y-auto custom-scrollbar font-mono text-[9px] text-[#A09E9A] space-y-1 flex flex-col justify-end">
+                            {pkArenaLog.slice(0, 3).map((log, i) => (
+                              <p key={i}>{log}</p>
+                            ))}
+                          </div>
+
+                          {/* Action controls */}
+                          {!pkArenaResult ? (
+                            <div className="grid grid-cols-3 gap-2">
+                              <button
+                                onClick={() => handlePkAction('gratitude')}
+                                className="px-2 py-2 bg-[#1A1A28] border border-white/5 hover:border-[#D4AF37]/30 rounded-xl text-[9px] font-bold text-white transition-all cursor-pointer"
+                              >
+                                Gratitude Loop
+                              </button>
+                              <button
+                                onClick={() => handlePkAction('cta')}
+                                className="px-2 py-2 bg-[#1A1A28] border border-white/5 hover:border-cyan-500/30 rounded-xl text-[9px] font-bold text-white transition-all cursor-pointer"
+                              >
+                                Follow CTA
+                              </button>
+                              <button
+                                onClick={() => handlePkAction('double')}
+                                className="px-2 py-2 bg-[#D4AF37]/10 hover:bg-[#D4AF37]/20 border border-[#D4AF37]/25 rounded-xl text-[9px] font-bold text-[#D4AF37] transition-all cursor-pointer"
+                              >
+                                Double Booster Box
+                              </button>
+                            </div>
+                          ) : (
+                            /* Victory/defeat state */
+                            <div className="text-center py-4 space-y-4">
+                              <div>
+                                <h3 className={`text-base font-black uppercase tracking-wider ${pkArenaResult === 'win' ? 'text-[#D4AF37]' : 'text-red-400'}`}>
+                                  {pkArenaResult === 'win' ? '🏆 Victory! You Defended the Board!' : '❌ Match Defeat! Opponent Outscored You'}
+                                </h3>
+                                <p className="text-[10px] text-[#A09E9A] mt-1">
+                                  Final Score: {pkHostPoints.toLocaleString()} vs {pkOpponentPoints.toLocaleString()}
+                                </p>
+                              </div>
+                              <button
+                                onClick={resetPkArena}
+                                className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/5 rounded-xl text-xs font-bold text-white transition-all cursor-pointer"
+                              >
+                                {pkArenaResult === 'win' ? 'Compete Again' : 'Retry Drill'}
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                /* ================= MANAGING 101 (MANAGERS) ================= */
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  {/* Left Column: Manager Roadmap & Checklist */}
+                  <div className="lg:col-span-1 flex flex-col gap-6">
+                    <div className="glass-card flex flex-col gap-4">
+                      <span className="text-[10px] font-black text-[#5A5865] uppercase tracking-wider block">MANAGER ROADMAP</span>
+                      <div className="space-y-4">
+                        <div className="flex gap-3">
+                          <div className={`w-5 h-5 rounded-full text-black text-[10px] font-black flex items-center justify-center mt-0.5 ${auditFinished ? 'bg-purple-600 text-white' : 'bg-white/10 text-[#A09E9A]'}`}>1</div>
+                          <div>
+                            <p className="text-xs font-black text-white uppercase">Compliance Audit Sandbox</p>
+                            <p className="text-[10px] text-[#A09E9A] mt-0.5">Audit host submissions and flag violations.</p>
+                          </div>
+                        </div>
+                        <div className="flex gap-3">
+                          <div className={`w-5 h-5 rounded-full text-black text-[10px] font-black flex items-center justify-center mt-0.5 ${roleplayFinished ? 'bg-purple-600 text-white' : 'bg-white/10 text-[#A09E9A]'}`}>2</div>
+                          <div>
+                            <p className="text-xs font-black text-white uppercase">Coaching Roleplay</p>
+                            <p className="text-[10px] text-[#A09E9A] mt-0.5">Guide discouraged or underperforming hosts.</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="glass-card flex flex-col gap-2.5">
+                      <span className="text-[10px] font-black text-[#5A5865] uppercase tracking-wider block">MANAGEMENT GUIDELINES</span>
+                      <p className="text-xs text-[#A09E9A] leading-relaxed">
+                        Managers teach and enforce the 9 Pillars. Set up checks for background noise, approve cover photos, and support monetization frameworks. Always coach with micro-goals and empathy.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Middle Column: Compliance Audit Sandbox */}
+                  <div className="lg:col-span-1 flex flex-col gap-6">
+                    <div className="glass-card flex-1 flex flex-col gap-4 relative overflow-hidden">
+                      <div className="flex items-center gap-2 border-b border-white/5 pb-2">
+                        <Shield className="text-purple-400" size={16} />
+                        <span className="text-xs font-black text-white uppercase tracking-wider">Compliance Audit Sandbox</span>
+                      </div>
+
+                      {!auditFinished ? (
+                        <div className="flex-1 flex flex-col gap-4">
+                          <div className="bg-[#0D0D14] border border-white/5 p-3.5 rounded-2xl space-y-3">
+                            <div className="flex justify-between items-center text-[10px]">
+                              <span className="text-[#A09E9A]">Profile Submission #{auditProfileIdx + 1}</span>
+                              <span className="text-purple-400 font-bold">Pending Review</span>
+                            </div>
+                            <div className="space-y-1">
+                              <p className="text-xs text-white font-bold">Nickname: {auditProfiles[auditProfileIdx].name}</p>
+                              <p className="text-[11px] text-[#A09E9A]">Cover Photo: {auditProfiles[auditProfileIdx].cover}</p>
+                              <p className="text-[11px] text-[#A09E9A] italic">Bio: "{auditProfiles[auditProfileIdx].bio}"</p>
+                            </div>
+                          </div>
+
+                          {!auditFeedback ? (
+                            <div className="grid grid-cols-2 gap-2 mt-auto">
+                              <button
+                                onClick={() => handleAuditAction(true)}
+                                className="px-3 py-2 bg-emerald-600 hover:bg-emerald-500 rounded-xl text-xs font-bold text-white transition-all cursor-pointer text-center"
+                              >
+                                Approve Profile
+                              </button>
+                              <button
+                                onClick={() => handleAuditAction(false)}
+                                className="px-3 py-2 bg-red-600 hover:bg-red-500 rounded-xl text-xs font-bold text-white transition-all cursor-pointer text-center"
+                              >
+                                Reject Profile
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="space-y-4 mt-auto">
+                              <p className="text-xs text-[#A09E9A] leading-relaxed border-l-2 border-purple-500 pl-3">
+                                {auditFeedback}
+                              </p>
+                              <button
+                                onClick={handleNextAudit}
+                                className="w-full py-2 bg-white/5 hover:bg-white/10 rounded-xl text-xs font-bold text-white transition-all cursor-pointer text-center"
+                              >
+                                Next Submission
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="flex-col flex items-center justify-center text-center p-8 gap-4 flex-1">
+                          <div className="w-12 h-12 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-[#D4AF37] text-2xl">🏆</div>
+                          <div>
+                            <h3 className="text-sm font-black text-white uppercase">Audit Training Completed</h3>
+                            <p className="text-xs text-[#A09E9A] mt-2">
+                              Your compliance score: {auditScore} points
+                            </p>
+                          </div>
+                          <button
+                            onClick={resetAudit}
+                            className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/5 rounded-xl text-xs font-bold text-white transition-all cursor-pointer"
+                          >
+                            Retry Sandbox
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Right Column: Coaching Roleplay */}
+                  <div className="lg:col-span-1 flex flex-col gap-6">
+                    <div className="glass-card flex-1 flex flex-col gap-4 relative overflow-hidden">
+                      <div className="flex items-center gap-2 border-b border-white/5 pb-2">
+                        <Users className="text-purple-400" size={16} />
+                        <span className="text-xs font-black text-white uppercase tracking-wider">Coaching Roleplay Simulator</span>
+                      </div>
+
+                      {!roleplayFinished ? (
+                        <div className="flex-1 flex flex-col gap-4">
+                          <div className="bg-[#0D0D14] border border-white/5 p-3.5 rounded-2xl space-y-3">
+                            <span className="text-[10px] text-[#A09E9A] block uppercase font-bold">Scenario: {coachingScenarios[roleplayScenarioIdx].title}</span>
+                            <p className="text-xs text-white leading-relaxed font-semibold">
+                              {coachingScenarios[roleplayScenarioIdx].desc}
+                            </p>
+                          </div>
+
+                          {!roleplayChoiceFeedback ? (
+                            <div className="flex flex-col gap-2 mt-auto">
+                              {coachingScenarios[roleplayScenarioIdx].options.map((opt, oIdx) => (
+                                <button
+                                  key={oIdx}
+                                  onClick={() => handleRoleplayChoice(oIdx)}
+                                  className="w-full text-left p-3 rounded-xl bg-[#0D0D14] hover:bg-[#13131E] border border-white/5 hover:border-purple-500/30 text-xs font-semibold text-[#A09E9A] hover:text-white transition-all"
+                                >
+                                  {opt.text}
+                                </button>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="space-y-4 mt-auto">
+                              <p className="text-xs text-[#A09E9A] leading-relaxed border-l-2 border-[#D4AF37] pl-3">
+                                {roleplayChoiceFeedback}
+                              </p>
+                              <button
+                                onClick={handleNextRoleplay}
+                                className="w-full py-2 bg-white/5 hover:bg-white/10 rounded-xl text-xs font-bold text-white transition-all cursor-pointer text-center"
+                              >
+                                Next Scenario
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="flex-col flex items-center justify-center text-center p-8 gap-4 flex-1">
+                          <div className="w-12 h-12 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-emerald-400 text-2xl">🏆</div>
+                          <div>
+                            <h3 className="text-sm font-black text-white uppercase">Coaching Certification Completed</h3>
+                            <p className="text-xs text-[#A09E9A] mt-2">
+                              Your coaching scorecard: {roleplayScore} points
+                            </p>
+                          </div>
+                          <button
+                            onClick={resetRoleplay}
+                            className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/5 rounded-xl text-xs font-bold text-white transition-all cursor-pointer"
+                          >
+                            Retry Roleplay
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* ==================== TAB: OVERVIEW DASHBOARD ==================== */}
           {activeTab === 'dashboard' && (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -922,33 +1799,37 @@ export function LearningResources() {
                   <span className="text-[10px] font-black text-[#5A5865] uppercase tracking-wider block">UNLOCKED CERTIFICATES</span>
                   
                   <div className="flex flex-col gap-2">
-                    <div className="flex items-center gap-2 p-2 rounded-xl bg-white/5 border border-white/5">
-                      <Trophy size={16} className="text-[#D4AF37]" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs font-bold text-white truncate">Beginner Cert</p>
-                        <p className="text-[9px] text-[#A09E9A]">Unlocked 2 days ago</p>
-                      </div>
-                      <button 
-                        onClick={() => setViewingCertificate('beginner')}
-                        className="text-[10px] font-bold text-[#D4AF37] hover:underline shrink-0"
-                      >
-                        View
-                      </button>
-                    </div>
-
-                    <div className="flex items-center gap-2 p-2 rounded-xl bg-white/5 border border-white/5 opacity-50">
-                      <Trophy size={16} className="text-[#A09E9A]" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs font-bold text-white truncate">Intermediate Cert</p>
-                        <p className="text-[9px] text-[#A09E9A]">Locked (Take Quiz)</p>
-                      </div>
-                      <button 
-                        onClick={() => setActiveTab('certifications')}
-                        className="text-[10px] font-bold text-[#A09E9A] hover:text-[#F0EFE8] shrink-0"
-                      >
-                        Unlock
-                      </button>
-                    </div>
+                    {[
+                      { id: 'foundations', label: 'Foundations (Cat A)' },
+                      { id: 'growth', label: 'Growth (Cat B)' },
+                      { id: 'mastery', label: 'Mastery (Cat C)' }
+                    ].map((cert) => {
+                      const completed = quizResultsHistory[cert.id];
+                      return (
+                        <div key={cert.id} className={`flex items-center gap-2 p-2 rounded-xl bg-white/5 border border-white/5 transition-all ${completed ? '' : 'opacity-50'}`}>
+                          <Trophy size={16} className={completed ? 'text-[#D4AF37]' : 'text-[#A09E9A]'} />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-bold text-white truncate">{cert.label}</p>
+                            <p className="text-[9px] text-[#A09E9A]">{completed ? 'Unlocked / Certified' : 'Locked (Take Exam)'}</p>
+                          </div>
+                          {completed ? (
+                            <button 
+                              onClick={() => setViewingCertificate(cert.id)}
+                              className="text-[10px] font-bold text-[#D4AF37] hover:underline shrink-0 cursor-pointer"
+                            >
+                              View
+                            </button>
+                          ) : (
+                            <button 
+                              onClick={() => setActiveTab('certifications')}
+                              className="text-[10px] font-bold text-[#A09E9A] hover:text-[#F0EFE8] shrink-0 cursor-pointer"
+                            >
+                              Unlock
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
 
@@ -958,10 +1839,10 @@ export function LearningResources() {
                     <span className="text-xs font-black text-white uppercase tracking-wider">AI Coach Alert</span>
                   </div>
                   <p className="text-xs text-[#A09E9A] leading-relaxed">
-                    "Your lighting score dropped below standard during yesterday's stream. Try running the Lighting Simulator in Practice Labs."
+                    "Your profile optimization audit is pending feedback. Let's make sure your Bio matches the Pillars by generating it in the Bio Builder."
                   </p>
                   <button
-                    onClick={() => { setActiveTab('labs'); setActiveLabTool('lighting'); }}
+                    onClick={() => { setActiveTab('labs'); setActiveLabTool('bio-builder'); }}
                     className="btn-gold py-1.5 w-full text-center text-xs"
                   >
                     Open Simulator
@@ -1008,7 +1889,7 @@ export function LearningResources() {
                       </div>
                       <div>
                         <h4 className="text-xs font-black text-white uppercase tracking-wider group-hover:text-cyan-400 transition-colors">3. Interactive Practice Labs</h4>
-                        <p className="text-[11px] text-[#A09E9A] mt-1 leading-relaxed">Playable simulators: Bio Builder, Camera Light controller, and the speed response game to hone timing drills.</p>
+                        <p className="text-[11px] text-[#A09E9A] mt-1 leading-relaxed">Playable tools: Bio Builder wizard, Lucky Box simulator, GC Announcements Hub, and reaction speed game.</p>
                       </div>
                     </div>
 
@@ -1020,7 +1901,7 @@ export function LearningResources() {
                       </div>
                       <div>
                         <h4 className="text-xs font-black text-white uppercase tracking-wider group-hover:text-emerald-400 transition-colors">4. Certification Path</h4>
-                        <p className="text-[11px] text-[#A09E9A] mt-1 leading-relaxed">Prove streaming mastery from Beginner level through Pro certification. Qualifies hosts for priority agency spotlight.</p>
+                        <p className="text-[11px] text-[#A09E9A] mt-1 leading-relaxed">Complete the Foundations, Growth, and Mastery Category Exams. Unlocks official certifications and agency spotlights.</p>
                       </div>
                     </div>
 
@@ -1049,250 +1930,410 @@ export function LearningResources() {
                     </button>
                     <button 
                       onClick={() => setActiveTab('pillars')}
-                      className="px-3 py-2 bg-white/5 border border-white/5 hover:bg-white/10 rounded-xl text-[10px] font-bold text-white transition-all"
+                      className="px-3 py-2 bg-white/5 border border-white/5 hover:bg-white/10 rounded-xl text-[10px] font-bold text-white transition-all cursor-pointer"
                     >
-                      Review 9 Pillars
+                      Study 9 Pillars
                     </button>
                   </div>
                 </div>
+
               </div>
+
             </div>
           )}
 
           {/* ==================== TAB: 9 PILLARS CURRICULUM ==================== */}
-          {activeTab === 'pillars' && (
-            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-              {/* Pillar Selector Sidebar */}
-              <div className="glass-card flex flex-col gap-4 h-fit">
-                <div className="flex justify-between items-center border-b border-white/5 pb-3">
-                  <span className="text-xs font-black text-white uppercase tracking-wider">Curriculum Path</span>
-                  <div className="flex items-center gap-1 bg-[#0D0D14] border border-white/5 rounded-lg p-0.5">
-                    <button
-                      onClick={() => setPersona('host')}
-                      className={`px-2 py-1 rounded text-[10px] font-black uppercase transition-all ${
-                        persona === 'host' ? 'bg-[#D4AF37] text-[#0D0D14]' : 'text-[#A09E9A] hover:text-[#F0EFE8]'
-                      }`}
-                    >
-                      Host
-                    </button>
-                    <button
-                      onClick={() => setPersona('manager')}
-                      className={`px-2 py-1 rounded text-[10px] font-black uppercase transition-all ${
-                        persona === 'manager' ? 'bg-purple-600 text-white' : 'text-[#A09E9A] hover:text-[#F0EFE8]'
-                      }`}
-                    >
-                      Manager
-                    </button>
-                  </div>
-                </div>
+          {activeTab === 'pillars' && (() => {
+            const handlePrevFlashcard = () => {
+              setIsFlashcardFlipped(false);
+              if (currentFlashcardIndex > 0) {
+                setCurrentFlashcardIndex(prev => prev - 1);
+              }
+            };
+            const handleNextFlashcard = () => {
+              setIsFlashcardFlipped(false);
+              if (currentFlashcardIndex < shuffledCards.length - 1) {
+                setCurrentFlashcardIndex(prev => prev + 1);
+              }
+            };
+            const shuffleFlashcards = () => {
+              setIsFlashcardFlipped(false);
+              const shuffled = [...shuffledCards].sort(() => Math.random() - 0.5);
+              setShuffledCards(shuffled);
+              setCurrentFlashcardIndex(0);
+            };
+            const resetFlashcards = () => {
+              setIsFlashcardFlipped(false);
+              setShuffledCards(FLASHCARDS);
+              setCurrentFlashcardIndex(0);
+            };
 
-                <div className="space-y-1.5 max-h-[500px] overflow-y-auto custom-scrollbar pr-1">
-                  {pillars.map((p, idx) => (
-                    <button
-                      key={p.id}
-                      onClick={() => setSelectedPillar(idx)}
-                      className={`w-full text-left p-3 rounded-xl transition-all border flex items-center gap-3 ${
-                        selectedPillar === idx
-                          ? persona === 'host'
-                            ? 'bg-[#D4AF37]/15 border-[#D4AF37]/45 text-[#D4AF37]'
-                            : 'bg-purple-600/15 border-purple-500/45 text-purple-400'
-                          : 'bg-white/02 border-transparent text-[#A09E9A] hover:bg-white/05 hover:text-[#F0EFE8]'
-                      }`}
-                    >
-                      <div className={`w-6 h-6 rounded-lg text-xs font-black flex items-center justify-center shrink-0 ${
-                        selectedPillar === idx
-                          ? persona === 'host'
-                            ? 'bg-[#D4AF37] text-[#0D0D14]'
-                            : 'bg-purple-600 text-white'
-                          : 'bg-white/5 text-[#A09E9A]'
+            return (
+              <div className="space-y-6">
+                <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                  {/* Pillar Selector Sidebar */}
+                  <div className="glass-card flex flex-col gap-4 h-fit">
+                    <div className="flex justify-between items-center border-b border-white/5 pb-3">
+                      <span className="text-xs font-black text-white uppercase tracking-wider">Curriculum Path</span>
+                      <div className="flex items-center gap-1 bg-[#0D0D14] border border-white/5 rounded-lg p-0.5">
+                        <button
+                          onClick={() => setPersona('host')}
+                          className={`px-2 py-1 rounded text-[10px] font-black uppercase transition-all ${
+                            persona === 'host' ? 'bg-[#D4AF37] text-[#0D0D14]' : 'text-[#A09E9A] hover:text-[#F0EFE8]'
+                          }`}
+                        >
+                          Host
+                        </button>
+                        <button
+                          onClick={() => setPersona('manager')}
+                          className={`px-2 py-1 rounded text-[10px] font-black uppercase transition-all ${
+                            persona === 'manager' ? 'bg-purple-600 text-white' : 'text-[#A09E9A] hover:text-[#F0EFE8]'
+                          }`}
+                        >
+                          Manager
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5 max-h-[500px] overflow-y-auto custom-scrollbar pr-1">
+                      {pillars.map((p, idx) => (
+                        <button
+                          key={p.id}
+                          onClick={() => setSelectedPillar(idx)}
+                          className={`w-full text-left p-3 rounded-xl transition-all border flex items-center gap-3 ${
+                            selectedPillar === idx
+                              ? persona === 'host'
+                                ? 'bg-[#D4AF37]/15 border-[#D4AF37]/45 text-[#D4AF37]'
+                                : 'bg-purple-600/15 border-purple-500/45 text-purple-400'
+                              : 'bg-white/02 border-transparent text-[#A09E9A] hover:bg-white/05 hover:text-[#F0EFE8]'
+                          }`}
+                        >
+                          <div className={`w-6 h-6 rounded-lg text-xs font-black flex items-center justify-center shrink-0 ${
+                            selectedPillar === idx
+                              ? persona === 'host'
+                                ? 'bg-[#D4AF37] text-[#0D0D14]'
+                                : 'bg-purple-600 text-white'
+                              : 'bg-white/5 text-[#A09E9A]'
+                          }`}>
+                            {p.id}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-xs font-bold truncate leading-tight">{p.title}</p>
+                            <p className="text-[9px] text-[#A09E9A]/60 truncate mt-0.5">{p.sub}</p>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Pillar Detailed View */}
+                  <div className="lg:col-span-3 glass-card flex flex-col gap-6 relative overflow-hidden">
+                    {/* Decorative theme color splash */}
+                    <div className={`absolute top-0 right-0 w-80 h-80 bg-radial ${
+                      persona === 'host' ? 'from-[#D4AF37]/5' : 'from-purple-500/5'
+                    } to-transparent blur-3xl pointer-events-none`} />
+
+                    <div className="flex flex-wrap justify-between items-start gap-4 border-b border-white/5 pb-4 relative z-10">
+                      <div className="space-y-1">
+                        <p className={`text-[10px] font-black uppercase tracking-widest ${
+                          persona === 'host' ? 'text-[#D4AF37]' : 'text-purple-400'
+                        }`}>
+                          {persona === 'host' ? 'Host Pillar' : 'Manager Coaching Path'} {pillars[selectedPillar].id}
+                        </p>
+                        <h2 className="text-2xl font-black text-white font-['Outfit'] tracking-wide uppercase">
+                          {pillars[selectedPillar].title}
+                        </h2>
+                        <p className="text-xs text-[#A09E9A] italic">"{pillars[selectedPillar].sub}"</p>
+                      </div>
+
+                      <div className={`px-4 py-2 rounded-2xl text-xs font-black uppercase tracking-wider flex items-center gap-2 border ${
+                        persona === 'host' 
+                          ? 'border-[#D4AF37]/20 bg-[#D4AF37]/5 text-[#D4AF37]' 
+                          : 'border-purple-500/20 bg-purple-500/5 text-purple-400'
                       }`}>
-                        {p.id}
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-xs font-bold truncate leading-tight">{p.title}</p>
-                        <p className="text-[9px] text-[#A09E9A]/60 truncate mt-0.5">{p.sub}</p>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Pillar Detailed View */}
-              <div className="lg:col-span-3 glass-card flex flex-col gap-6 relative overflow-hidden">
-                {/* Decorative theme color splash */}
-                <div className={`absolute top-0 right-0 w-80 h-80 bg-radial ${
-                  persona === 'host' ? 'from-[#D4AF37]/5' : 'from-purple-500/5'
-                } to-transparent blur-3xl pointer-events-none`} />
-
-                <div className="flex flex-wrap justify-between items-start gap-4 border-b border-white/5 pb-4 relative z-10">
-                  <div className="space-y-1">
-                    <p className={`text-[10px] font-black uppercase tracking-widest ${
-                      persona === 'host' ? 'text-[#D4AF37]' : 'text-purple-400'
-                    }`}>
-                      {persona === 'host' ? 'Host Pillar' : 'Manager Coaching Path'} {pillars[selectedPillar].id}
-                    </p>
-                    <h2 className="text-2xl font-black text-white font-['Outfit'] tracking-wide uppercase">
-                      {pillars[selectedPillar].title}
-                    </h2>
-                    <p className="text-xs text-[#A09E9A] italic">"{pillars[selectedPillar].sub}"</p>
-                  </div>
-
-                  <div className={`px-4 py-2 rounded-2xl text-xs font-black uppercase tracking-wider flex items-center gap-2 border ${
-                    persona === 'host' 
-                      ? 'border-[#D4AF37]/20 bg-[#D4AF37]/5 text-[#D4AF37]' 
-                      : 'border-purple-500/20 bg-purple-500/5 text-purple-400'
-                  }`}>
-                    <Target size={14} />
-                    <span>Goal: {pillars[selectedPillar].goal}</span>
-                  </div>
-                </div>
-
-                {persona === 'host' ? (
-                  /* ================= HOST PATH DETAIL ================= */
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 relative z-10">
-                    <div className="space-y-5">
-                      <div className="space-y-2">
-                        <h3 className="text-xs font-black text-white uppercase tracking-wider flex items-center gap-1.5">
-                          <BookOpen size={14} className="text-[#D4AF37]" />
-                          What Hosts Must Learn
-                        </h3>
-                        <ul className="space-y-1.5">
-                          {pillars[selectedPillar].learn.map((item, idx) => (
-                            <li key={idx} className="text-xs text-[#A09E9A] flex gap-2 items-start leading-relaxed">
-                              <span className="text-[#D4AF37] font-bold mt-0.5">•</span>
-                              {item}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-
-                      <div className="space-y-2">
-                        <h3 className="text-xs font-black text-white uppercase tracking-wider flex items-center gap-1.5">
-                          <Info size={14} className="text-cyan-400" />
-                          Why It Matters
-                        </h3>
-                        <p className="text-xs text-[#A09E9A] leading-relaxed bg-[#0D0D14] p-3 rounded-xl border border-white/5">
-                          {pillars[selectedPillar].why}
-                        </p>
+                        <Target size={14} />
+                        <span>Goal: {pillars[selectedPillar].goal}</span>
                       </div>
                     </div>
 
-                    <div className="space-y-5">
-                      <div className="space-y-2">
-                        <h3 className="text-xs font-black text-white uppercase tracking-wider flex items-center gap-1.5">
-                          <Settings size={14} className="text-purple-400" />
-                          Interactive Tools Included
-                        </h3>
-                        <div className="flex flex-wrap gap-2">
-                          {pillars[selectedPillar].tools.map((t, idx) => (
-                            <span 
-                              key={idx} 
-                              onClick={() => {
-                                setActiveTab('labs');
-                                // Map string names to the key identifiers
-                                const lower = t.toLowerCase();
-                                if (lower.includes('photo')) setActiveLabTool('photo-analyzer');
-                                else if (lower.includes('bio')) setActiveLabTool('bio-builder');
-                                else if (lower.includes('readability')) setActiveLabTool('name-readability');
-                                else if (lower.includes('light')) setActiveLabTool('lighting');
-                                else if (lower.includes('budget')) setActiveLabTool('visibility-budget');
-                                else if (lower.includes('update')) setActiveLabTool('no-stream-generator');
-                                else if (lower.includes('speed') || lower.includes('comment')) setActiveLabTool('comment-drill');
-                              }}
-                              className="px-2.5 py-1.5 rounded-lg bg-white/5 border border-white/5 hover:border-[#D4AF37]/40 text-[10px] font-bold text-white transition-all cursor-pointer"
-                            >
-                              {t}
-                            </span>
-                          ))}
+                    {persona === 'host' ? (
+                      /* ================= HOST PATH DETAIL ================= */
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 relative z-10">
+                        <div className="space-y-5">
+                          <div className="space-y-2">
+                            <h3 className="text-xs font-black text-white uppercase tracking-wider flex items-center gap-1.5">
+                              <BookOpen size={14} className="text-[#D4AF37]" />
+                              What Hosts Must Learn
+                            </h3>
+                            <ul className="space-y-1.5">
+                              {pillars[selectedPillar].learn.map((item, idx) => (
+                                <li key={idx} className="text-xs text-[#A09E9A] flex gap-2 items-start leading-relaxed">
+                                  <span className="text-[#D4AF37] font-bold mt-0.5">•</span>
+                                  {item}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+
+                          <div className="space-y-2">
+                            <h3 className="text-xs font-black text-white uppercase tracking-wider flex items-center gap-1.5">
+                              <Info size={14} className="text-cyan-400" />
+                              Why It Matters
+                            </h3>
+                            <p className="text-xs text-[#A09E9A] leading-relaxed bg-[#0D0D14] p-3 rounded-xl border border-white/5">
+                              {pillars[selectedPillar].why}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="space-y-5">
+                          <div className="space-y-2">
+                            <h3 className="text-xs font-black text-white uppercase tracking-wider flex items-center gap-1.5">
+                              <Settings size={14} className="text-purple-400" />
+                              Interactive Tools Included
+                            </h3>
+                            <div className="flex flex-wrap gap-2">
+                              {pillars[selectedPillar].tools.map((t, idx) => (
+                                <span 
+                                  key={idx} 
+                                  onClick={() => {
+                                    setActiveTab('labs');
+                                    const lower = t.toLowerCase();
+                                    if (lower.includes('photo')) setActiveLabTool('bio-builder');
+                                    else if (lower.includes('bio')) setActiveLabTool('bio-builder');
+                                    else if (lower.includes('readability')) setActiveLabTool('name-readability');
+                                    else if (lower.includes('lucky')) setActiveLabTool('lucky-box');
+                                    else if (lower.includes('budget')) setActiveLabTool('visibility-budget');
+                                    else if (lower.includes('update') || lower.includes('announcement') || lower.includes('gc')) setActiveLabTool('gc-announcements');
+                                    else if (lower.includes('speed') || lower.includes('comment')) setActiveLabTool('comment-drill');
+                                  }}
+                                  className="px-2.5 py-1.5 rounded-lg bg-white/5 border border-white/5 hover:border-[#D4AF37]/40 text-[10px] font-bold text-white transition-all cursor-pointer"
+                                >
+                                  {t}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+
+                          <div className="space-y-2">
+                            <h3 className="text-xs font-black text-white uppercase tracking-wider flex items-center gap-1.5">
+                              <Flame size={14} className="text-amber-500 font-bold" />
+                              Host Drills
+                            </h3>
+                            <ul className="space-y-1.5">
+                              {pillars[selectedPillar].drills.map((drill, idx) => (
+                                <li key={idx} className="text-xs text-[#A09E9A] flex gap-2 items-start leading-relaxed">
+                                  <input type="checkbox" className="mt-1 accent-[#D4AF37] cursor-pointer" />
+                                  <span>{drill}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+
+                          <div className="space-y-2">
+                            <h3 className="text-xs font-black text-white uppercase tracking-wider flex items-center gap-1.5">
+                              <Award size={14} className="text-emerald-400" />
+                              Official Assessment
+                            </h3>
+                            <p className="text-xs text-[#A09E9A] leading-relaxed border-l-2 border-emerald-500 pl-3">
+                              {pillars[selectedPillar].assessment}
+                            </p>
+                          </div>
                         </div>
                       </div>
+                    ) : (
+                      /* ================= MANAGER PATH DETAIL ================= */
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 relative z-10">
+                        <div className="space-y-5">
+                          <div className="space-y-2">
+                            <h3 className="text-xs font-black text-white uppercase tracking-wider flex items-center gap-1.5">
+                              <Shield size={14} className="text-purple-400" />
+                              What Managers Evaluate
+                            </h3>
+                            <p className="text-xs text-[#A09E9A] leading-relaxed border-l-2 border-purple-500 pl-3">
+                              {pillars[selectedPillar].managerRoles.audit}
+                            </p>
+                          </div>
 
-                      <div className="space-y-2">
-                        <h3 className="text-xs font-black text-white uppercase tracking-wider flex items-center gap-1.5">
-                          <Flame size={14} className="text-amber-500 font-bold" />
-                          Host Drills
-                        </h3>
-                        <ul className="space-y-1.5">
-                          {pillars[selectedPillar].drills.map((drill, idx) => (
-                            <li key={idx} className="text-xs text-[#A09E9A] flex gap-2 items-start leading-relaxed">
-                              <input type="checkbox" className="mt-1 accent-[#D4AF37] cursor-pointer" />
-                              <span>{drill}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
+                          <div className="space-y-2">
+                            <h3 className="text-xs font-black text-white uppercase tracking-wider flex items-center gap-1.5">
+                              <Users size={14} className="text-[#D4AF37]" />
+                              What Managers Coach
+                            </h3>
+                            <p className="text-xs text-[#A09E9A] leading-relaxed bg-[#0D0D14] p-3 rounded-xl border border-white/5">
+                              {pillars[selectedPillar].managerRoles.coach}
+                            </p>
+                          </div>
+                        </div>
 
-                      <div className="space-y-2">
-                        <h3 className="text-xs font-black text-white uppercase tracking-wider flex items-center gap-1.5">
-                          <Award size={14} className="text-emerald-400" />
-                          Official Assessment
-                        </h3>
-                        <p className="text-xs text-[#A09E9A] leading-relaxed border-l-2 border-emerald-500 pl-3">
-                          {pillars[selectedPillar].assessment}
-                        </p>
+                        <div className="space-y-5">
+                          <div className="space-y-2">
+                            <h3 className="text-xs font-black text-white uppercase tracking-wider flex items-center gap-1.5">
+                              <AlertTriangle size={14} className="text-amber-500" />
+                              What Managers Enforce
+                            </h3>
+                            <p className="text-xs text-[#A09E9A] leading-relaxed border-l-2 border-amber-500 pl-3">
+                              {pillars[selectedPillar].managerRoles.enforce}
+                            </p>
+                          </div>
+
+                          <div className="space-y-2">
+                            <h3 className="text-xs font-black text-white uppercase tracking-wider flex items-center gap-1.5">
+                              <Settings size={14} className="text-cyan-400" />
+                              Management Tools (Built-in)
+                            </h3>
+                            <div className="flex flex-wrap gap-2">
+                              {pillars[selectedPillar].managerRoles.tools.map((mt, idx) => (
+                                <span 
+                                  key={idx} 
+                                  className="px-2.5 py-1.5 rounded-lg bg-white/5 border border-white/5 text-[10px] font-bold text-white"
+                                >
+                                  {mt}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
                       </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* ==================== Flashcard Study Room ==================== */}
+                <div className="glass-card bg-[#13131E] border border-[#D4AF37]/20 relative overflow-hidden p-6 sm:p-8 rounded-3xl shadow-[0_4px_30px_rgba(0,0,0,0.4)]">
+                  <div className="absolute right-0 top-0 w-64 h-64 bg-radial from-[#D4AF37]/5 to-transparent blur-3xl pointer-events-none" />
+                  
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-white/5 pb-4 mb-6">
+                    <div>
+                      <h3 className="text-base font-black text-white uppercase tracking-widest flex items-center gap-2">
+                        <Sparkles size={18} className="text-[#D4AF37]" />
+                        <span>Interactive Flashcard Study Room</span>
+                      </h3>
+                      <p className="text-xs text-[#A09E9A] mt-1">Practice key concepts from the 9 Pillars to prepare for Category Exams.</p>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={shuffleFlashcards}
+                        className="px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/5 hover:border-[#D4AF37]/35 rounded-xl text-[10px] font-bold text-white transition-all flex items-center gap-1"
+                      >
+                        <RefreshCw size={11} />
+                        <span>Shuffle</span>
+                      </button>
+                      <button
+                        onClick={resetFlashcards}
+                        className="px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/5 rounded-xl text-[10px] font-bold text-white transition-all"
+                      >
+                        Reset Deck
+                      </button>
                     </div>
                   </div>
-                ) : (
-                  /* ================= MANAGER PATH DETAIL ================= */
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 relative z-10">
-                    <div className="space-y-5">
-                      <div className="space-y-2">
-                        <h3 className="text-xs font-black text-white uppercase tracking-wider flex items-center gap-1.5">
-                          <Shield size={14} className="text-purple-400" />
-                          What Managers Evaluate
-                        </h3>
-                        <p className="text-xs text-[#A09E9A] leading-relaxed border-l-2 border-purple-500 pl-3">
-                          {pillars[selectedPillar].managerRoles.audit}
-                        </p>
-                      </div>
 
-                      <div className="space-y-2">
-                        <h3 className="text-xs font-black text-white uppercase tracking-wider flex items-center gap-1.5">
-                          <Users size={14} className="text-[#D4AF37]" />
-                          What Managers Coach
-                        </h3>
-                        <p className="text-xs text-[#A09E9A] leading-relaxed bg-[#0D0D14] p-3 rounded-xl border border-white/5">
-                          {pillars[selectedPillar].managerRoles.coach}
-                        </p>
+                  <div className="space-y-6">
+                    {/* Deck Progress Bar */}
+                    <div className="w-full space-y-1.5 max-w-xl mx-auto">
+                      <div className="flex justify-between text-[10px] font-black text-[#A09E9A] uppercase tracking-wider">
+                        <span>Progress</span>
+                        <span>Card {currentFlashcardIndex + 1} of {shuffledCards.length}</span>
+                      </div>
+                      <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
+                        <div 
+                          className="h-full bg-gradient-to-r from-[#D4AF37] to-[#B8960C] transition-all duration-300"
+                          style={{ width: `${((currentFlashcardIndex + 1) / shuffledCards.length) * 100}%` }}
+                        />
                       </div>
                     </div>
 
-                    <div className="space-y-5">
-                      <div className="space-y-2">
-                        <h3 className="text-xs font-black text-white uppercase tracking-wider flex items-center gap-1.5">
-                          <AlertTriangle size={14} className="text-amber-500" />
-                          What Managers Enforce
-                        </h3>
-                        <p className="text-xs text-[#A09E9A] leading-relaxed border-l-2 border-amber-500 pl-3">
-                          {pillars[selectedPillar].managerRoles.enforce}
-                        </p>
-                      </div>
+                    {/* Flipping Card container */}
+                    <div 
+                      className="w-full max-w-xl mx-auto h-60 cursor-pointer relative"
+                      style={{ perspective: '1000px' }}
+                      onClick={() => setIsFlashcardFlipped(!isFlashcardFlipped)}
+                    >
+                      <div 
+                        className="w-full h-full relative transition-transform duration-500"
+                        style={{ 
+                          transformStyle: 'preserve-3d', 
+                          transform: isFlashcardFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)' 
+                        }}
+                      >
+                        {/* Front Card Face (Question) */}
+                        <div 
+                          className="absolute inset-0 w-full h-full bg-[#181825] border border-[#D4AF37]/25 rounded-2xl p-6 flex flex-col justify-between shadow-[0_8px_30px_rgba(0,0,0,0.5)]"
+                          style={{ backfaceVisibility: 'hidden' }}
+                        >
+                          <div className="flex justify-between items-center border-b border-white/5 pb-2">
+                            <span className="text-[10px] font-black text-[#D4AF37] uppercase tracking-wider">{shuffledCards[currentFlashcardIndex].pillar}</span>
+                            <HelpCircle size={14} className="text-[#D4AF37] animate-pulse" />
+                          </div>
+                          <div className="flex-1 flex items-center justify-center text-center px-4 py-2">
+                            <p className="text-sm sm:text-base font-black text-white leading-relaxed uppercase tracking-wide">
+                              {shuffledCards[currentFlashcardIndex].question}
+                            </p>
+                          </div>
+                          <div className="text-center text-[9px] text-[#A09E9A] font-bold uppercase tracking-wider bg-white/5 py-1 rounded-lg">
+                            👇 Click card to flip and reveal answer
+                          </div>
+                        </div>
 
-                      <div className="space-y-2">
-                        <h3 className="text-xs font-black text-white uppercase tracking-wider flex items-center gap-1.5">
-                          <Settings size={14} className="text-cyan-400" />
-                          Management Tools (Built-in)
-                        </h3>
-                        <div className="flex flex-wrap gap-2">
-                          {pillars[selectedPillar].managerRoles.tools.map((mt, idx) => (
-                            <span 
-                              key={idx} 
-                              className="px-2.5 py-1.5 rounded-lg bg-white/5 border border-white/5 text-[10px] font-bold text-white"
-                            >
-                              {mt}
-                            </span>
-                          ))}
+                        {/* Back Card Face (Answer) */}
+                        <div 
+                          className="absolute inset-0 w-full h-full bg-[#0D0D14] border border-emerald-500/25 rounded-2xl p-6 flex flex-col justify-between shadow-[0_8px_30px_rgba(0,0,0,0.5)]"
+                          style={{ 
+                            backfaceVisibility: 'hidden', 
+                            transform: 'rotateY(180deg)' 
+                          }}
+                        >
+                          <div className="flex justify-between items-center border-b border-white/5 pb-2">
+                            <span className="text-[10px] font-black text-emerald-400 uppercase tracking-wider">{shuffledCards[currentFlashcardIndex].pillar}</span>
+                            <CheckCircle2 size={14} className="text-emerald-400" />
+                          </div>
+                          <div className="flex-1 flex items-center justify-center text-center px-4 py-2 overflow-y-auto max-h-[120px] custom-scrollbar">
+                            <p className="text-xs sm:text-sm text-[#F0EFE8] leading-relaxed">
+                              {shuffledCards[currentFlashcardIndex].answer}
+                            </p>
+                          </div>
+                          <div className="text-center text-[9px] text-[#A09E9A] font-bold uppercase tracking-wider bg-white/5 py-1 rounded-lg">
+                            👇 Click card to flip back to question
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
 
-          {/* ==================== TAB: PRACTICE LABS (7 INTERACTIVE TOOLS) ==================== */}
+                    {/* Navigation Buttons */}
+                    <div className="flex items-center justify-center gap-4 max-w-xl mx-auto">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handlePrevFlashcard(); }}
+                        disabled={currentFlashcardIndex === 0}
+                        className={`px-4 py-2 rounded-xl text-xs font-black uppercase transition-all ${
+                          currentFlashcardIndex === 0
+                            ? 'bg-white/2 text-[#5A5865] cursor-not-allowed border border-white/5'
+                            : 'bg-[#1A1A28] border border-white/5 hover:border-white/10 text-[#F0EFE8]'
+                        }`}
+                      >
+                        Prev Card
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleNextFlashcard(); }}
+                        disabled={currentFlashcardIndex === shuffledCards.length - 1}
+                        className={`px-4 py-2 rounded-xl text-xs font-black uppercase transition-all ${
+                          currentFlashcardIndex === shuffledCards.length - 1
+                            ? 'bg-white/2 text-[#5A5865] cursor-not-allowed border border-white/5'
+                            : 'bg-[#D4AF37] text-black font-bold shadow-[0_2px_12px_rgba(212,175,55,0.2)]'
+                        }`}
+                      >
+                        Next Card
+                      </button>
+                    </div>
+
+                  </div>
+                </div>
+
+              </div>
+            );
+          })()}
+
+          {/* ==================== TAB: PRACTICE LABS ==================== */}
           {activeTab === 'labs' && (
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
               {/* Lab Navigation Selector */}
@@ -1300,16 +2341,6 @@ export function LearningResources() {
                 <span className="text-xs font-black text-white uppercase tracking-wider border-b border-white/5 pb-2">Practice Tools</span>
                 
                 <div className="flex flex-col gap-1.5">
-                  <button
-                    onClick={() => setActiveLabTool('photo-analyzer')}
-                    className={`w-full text-left px-3 py-2.5 rounded-xl transition-all border text-xs font-bold flex items-center gap-2.5 ${
-                      activeLabTool === 'photo-analyzer' ? 'bg-[#D4AF37]/15 border-[#D4AF37]/30 text-[#D4AF37]' : 'bg-transparent border-transparent text-[#A09E9A] hover:bg-white/03'
-                    }`}
-                  >
-                    <Upload size={14} />
-                    <span>Cover Photo Analyzer</span>
-                  </button>
-
                   <button
                     onClick={() => setActiveLabTool('bio-builder')}
                     className={`w-full text-left px-3 py-2.5 rounded-xl transition-all border text-xs font-bold flex items-center gap-2.5 ${
@@ -1331,13 +2362,13 @@ export function LearningResources() {
                   </button>
 
                   <button
-                    onClick={() => setActiveLabTool('lighting')}
+                    onClick={() => setActiveLabTool('lucky-box')}
                     className={`w-full text-left px-3 py-2.5 rounded-xl transition-all border text-xs font-bold flex items-center gap-2.5 ${
-                      activeLabTool === 'lighting' ? 'bg-[#D4AF37]/15 border-[#D4AF37]/30 text-[#D4AF37]' : 'bg-transparent border-transparent text-[#A09E9A] hover:bg-white/03'
+                      activeLabTool === 'lucky-box' ? 'bg-[#D4AF37]/15 border-[#D4AF37]/30 text-[#D4AF37]' : 'bg-transparent border-transparent text-[#A09E9A] hover:bg-white/03'
                     }`}
                   >
-                    <Sun size={14} />
-                    <span>Lighting Simulator</span>
+                    <Settings size={14} />
+                    <span>Lucky Box Simulator</span>
                   </button>
 
                   <button
@@ -1351,13 +2382,13 @@ export function LearningResources() {
                   </button>
 
                   <button
-                    onClick={() => setActiveLabTool('no-stream-generator')}
+                    onClick={() => setActiveLabTool('gc-announcements')}
                     className={`w-full text-left px-3 py-2.5 rounded-xl transition-all border text-xs font-bold flex items-center gap-2.5 ${
-                      activeLabTool === 'no-stream-generator' ? 'bg-[#D4AF37]/15 border-[#D4AF37]/30 text-[#D4AF37]' : 'bg-transparent border-transparent text-[#A09E9A] hover:bg-white/03'
+                      activeLabTool === 'gc-announcements' ? 'bg-[#D4AF37]/15 border-[#D4AF37]/30 text-[#D4AF37]' : 'bg-transparent border-transparent text-[#A09E9A] hover:bg-white/03'
                     }`}
                   >
                     <Calendar size={14} />
-                    <span>No-Stream Generator</span>
+                    <span>GC Announcements Hub</span>
                   </button>
 
                   <button
@@ -1375,205 +2406,196 @@ export function LearningResources() {
               {/* Playable Lab Sandbox */}
               <div className="lg:col-span-3 glass-card flex flex-col gap-6">
                 
-                {/* 1. COVER PHOTO ANALYZER */}
-                {activeLabTool === 'photo-analyzer' && (
-                  <div className="space-y-6">
-                    <div>
-                      <h3 className="text-base font-black text-white uppercase tracking-widest">Cover Photo Analyzer</h3>
-                      <p className="text-xs text-[#A09E9A] mt-1">Audit cover photos against Poppo's non-negotiable guidelines.</p>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="space-y-4">
-                        <span className="text-[10px] font-black text-[#5A5865] uppercase tracking-wider block">CHOOSE A MOCK UPLOAD TEMPLATE</span>
-                        
-                        <div className="grid grid-cols-3 gap-3">
-                          <button 
-                            onClick={() => runPhotoAnalysis('poor-selfie')}
-                            className={`p-2.5 rounded-xl bg-[#0D0D14] border transition-all flex flex-col items-center gap-2 ${
-                              selectedPhotoTemplate === 'poor-selfie' ? 'border-red-500/50 bg-red-950/5' : 'border-white/5 hover:border-white/10'
-                            }`}
-                          >
-                            <div className="w-full aspect-square rounded-lg bg-red-950/20 flex items-center justify-center text-xl">👤❌</div>
-                            <span className="text-[10px] font-bold text-white text-center">Dark Selfie</span>
-                          </button>
-
-                          <button 
-                            onClick={() => runPhotoAnalysis('group-photo')}
-                            className={`p-2.5 rounded-xl bg-[#0D0D14] border transition-all flex flex-col items-center gap-2 ${
-                              selectedPhotoTemplate === 'group-photo' ? 'border-red-500/50 bg-red-950/5' : 'border-white/5 hover:border-white/10'
-                            }`}
-                          >
-                            <div className="w-full aspect-square rounded-lg bg-yellow-950/20 flex items-center justify-center text-xl">👥❌</div>
-                            <span className="text-[10px] font-bold text-white text-center">Group Photo</span>
-                          </button>
-
-                          <button 
-                            onClick={() => runPhotoAnalysis('approved-cover')}
-                            className={`p-2.5 rounded-xl bg-[#0D0D14] border transition-all flex flex-col items-center gap-2 ${
-                              selectedPhotoTemplate === 'approved-cover' ? 'border-[#D4AF37]/50 bg-[#D4AF37]/5' : 'border-white/5 hover:border-white/10'
-                            }`}
-                          >
-                            <div className="w-full aspect-square rounded-lg bg-[#D4AF37]/15 flex items-center justify-center text-xl">👑✅</div>
-                            <span className="text-[10px] font-bold text-white text-center">Premium Solo</span>
-                          </button>
-                        </div>
-
-                        <div className="p-4 rounded-2xl bg-[#0D0D14] border border-white/5 space-y-2">
-                          <span className="text-[10px] font-black text-white tracking-widest uppercase block">Photo Standards</span>
-                          <p className="text-[11px] text-[#A09E9A] leading-relaxed">
-                            Must be a solo portrait with clear facial features, neutral or aesthetic backdrop, adequate brightness, and look high-end. Group portraits or pixelated shots will reduce visibility indexing.
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="p-5 rounded-2xl bg-[#0D0D14] border border-white/5 flex flex-col justify-center min-h-[220px] relative">
-                        {analyzingPhoto ? (
-                          <div className="flex flex-col items-center gap-3">
-                            <RefreshCw className="animate-spin text-[#D4AF37]" size={28} />
-                            <span className="text-xs text-[#A09E9A] font-bold uppercase tracking-wider">AI Reading File & Scanning Face...</span>
-                          </div>
-                        ) : photoScore ? (
-                          <div className="space-y-4">
-                            <div className="flex items-center justify-between">
-                              <span className="text-xs font-black text-white uppercase tracking-wider">Analysis Results</span>
-                              <span className={`px-2 py-0.5 rounded text-[10px] font-black ${
-                                photoScore.status === 'APPROVED' ? 'bg-[#D4AF37] text-black' : 'bg-red-500/20 text-red-400'
-                              }`}>
-                                {photoScore.status}
-                              </span>
-                            </div>
-
-                            <div className="flex items-end gap-2">
-                              <span className="text-3xl font-black text-white">{photoScore.overall}</span>
-                              <span className="text-xs text-[#A09E9A] font-bold mb-1">/100 points</span>
-                            </div>
-
-                            <div className="space-y-1.5 text-xs">
-                              <p className="text-[#A09E9A]"><strong className="text-white font-semibold">Framing:</strong> {photoScore.framing}</p>
-                              <p className="text-[#A09E9A]"><strong className="text-white font-semibold">Lighting:</strong> {photoScore.lighting}</p>
-                              <p className="text-[#A09E9A]"><strong className="text-white font-semibold">Halo Effect:</strong> {photoScore.haloEffect}</p>
-                            </div>
-
-                            <div className="border-t border-white/5 pt-3 space-y-1.5">
-                              <span className="text-[10px] font-black text-[#5A5865] uppercase tracking-wider block">RECOMMENDED DRILLS</span>
-                              {photoScore.feedback.map((f: string, i: number) => (
-                                <p key={i} className="text-[11px] text-[#A09E9A] flex gap-2">
-                                  <span className="text-[#D4AF37]">•</span>
-                                  <span>{f}</span>
-                                </p>
-                              ))}
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="text-center text-[#5A5865] italic text-xs">
-                            Select a template on the left to trigger the Cover Photo Analyzer simulation.
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* 2. BIO BUILDER */}
+                {/* 1. BIO BUILDER & PROFILE PREVIEW */}
                 {activeLabTool === 'bio-builder' && (
                   <div className="space-y-6">
                     <div>
-                      <h3 className="text-base font-black text-white uppercase tracking-widest">Bio Builder & Preview</h3>
-                      <p className="text-xs text-[#A09E9A] mt-1">Design an elegant bio with cognitive readability analysis.</p>
+                      <h3 className="text-base font-black text-white uppercase tracking-widest">Bio Builder & Profile Preview</h3>
+                      <p className="text-xs text-[#A09E9A] mt-1">Answer simple questions to generate a formatted bio (max 250 chars) and see it on your profile.</p>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div className="space-y-4">
-                        <div>
-                          <label className="text-[10px] font-black text-[#5A5865] uppercase tracking-wider block mb-2">CHOOSE A BIO TEMPLATE</label>
-                          <div className="flex flex-wrap gap-2">
-                            {bioTemplates.map((t, idx) => (
+                        {bioStep === 'questionnaire' ? (
+                          <div className="space-y-4 animate-fadeIn">
+                            <span className="text-[10px] font-black text-white tracking-widest uppercase block border-b border-white/5 pb-1">Profile Questionnaire Wizard</span>
+                            
+                            {/* Choose template */}
+                            <div className="space-y-1.5">
+                              <label className="text-[10px] text-[#A09E9A] uppercase tracking-wider block">Or Pre-fill with a Template</label>
+                              <div className="flex flex-wrap gap-2">
+                                {bioTemplates.map((t, idx) => (
+                                  <button
+                                    key={idx}
+                                    onClick={() => {
+                                      setBioTalent(t.talent);
+                                      setBioStyle(t.style);
+                                      setBioSchedule(t.schedule);
+                                      setBioTribe(t.tribe);
+                                    }}
+                                    className="px-2.5 py-1.5 rounded-xl bg-white/5 border border-white/5 hover:border-[#D4AF37]/35 text-[10px] text-white font-bold transition-all cursor-pointer"
+                                  >
+                                    {t.name}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+
+                            {/* Question 1: Talent */}
+                            <div className="space-y-1.5">
+                              <label className="text-[10px] text-[#A09E9A] uppercase tracking-wider block">1. What is your main talent or streaming focus?</label>
+                              <input
+                                type="text"
+                                value={bioTalent}
+                                onChange={(e) => setBioTalent(e.target.value)}
+                                placeholder="e.g. Singer, Gamer, Late-Night Chitchat"
+                                className="w-full bg-[#0D0D14] border border-white/10 rounded-xl p-2.5 text-xs text-white focus:border-[#D4AF37] focus:outline-none"
+                              />
+                            </div>
+
+                            {/* Question 2: Style */}
+                            <div className="space-y-1.5">
+                              <label className="text-[10px] text-[#A09E9A] uppercase tracking-wider block">2. Describe your room vibe or streaming style</label>
+                              <input
+                                type="text"
+                                value={bioStyle}
+                                onChange={(e) => setBioStyle(e.target.value)}
+                                placeholder="e.g. Cozy Cozy Chats, Interactive PK Battles, Live Requests"
+                                className="w-full bg-[#0D0D14] border border-white/10 rounded-xl p-2.5 text-xs text-white focus:border-[#D4AF37] focus:outline-none"
+                              />
+                            </div>
+
+                            {/* Question 3: Schedule */}
+                            <div className="space-y-1.5">
+                              <label className="text-[10px] text-[#A09E9A] uppercase tracking-wider block">3. What is your daily schedule?</label>
+                              <input
+                                type="text"
+                                value={bioSchedule}
+                                onChange={(e) => setBioSchedule(e.target.value)}
+                                placeholder="e.g. Daily at 9 PM EST, Mon-Fri 6 PM"
+                                className="w-full bg-[#0D0D14] border border-white/10 rounded-xl p-2.5 text-xs text-white focus:border-[#D4AF37] focus:outline-none"
+                              />
+                            </div>
+
+                            {/* Question 4: Tribe */}
+                            <div className="space-y-1.5">
+                              <label className="text-[10px] text-[#A09E9A] uppercase tracking-wider block">4. What is your Tribe / Fan Club name?</label>
+                              <input
+                                type="text"
+                                value={bioTribe}
+                                onChange={(e) => setBioTribe(e.target.value)}
+                                placeholder="e.g. Luna Family 🌙, Starry Night ✨"
+                                className="w-full bg-[#0D0D14] border border-white/10 rounded-xl p-2.5 text-xs text-white focus:border-[#D4AF37] focus:outline-none"
+                              />
+                            </div>
+
+                            <button
+                              onClick={() => setBioStep('generated')}
+                              className="w-full py-2.5 text-center text-xs font-black uppercase rounded-xl bg-gradient-to-r from-[#D4AF37] to-[#B8960C] text-black font-bold transition-all shadow-[0_2px_12px_rgba(212,175,55,0.2)]"
+                            >
+                              Generate Bio Statement
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="space-y-4 animate-fadeIn">
+                            <div className="flex justify-between items-center border-b border-white/5 pb-1">
+                              <span className="text-[10px] font-black text-white tracking-widest uppercase">Edit Generated Bio</span>
                               <button
-                                key={idx}
-                                onClick={() => {
-                                  setBioText(t.text);
-                                  setSelectedBioKeywords([]);
-                                }}
-                                className="px-2.5 py-1.5 rounded-lg bg-white/5 border border-white/5 hover:border-[#D4AF37]/35 text-[10px] text-white font-bold transition-all"
+                                onClick={() => setBioStep('questionnaire')}
+                                className="text-[10px] font-bold text-[#D4AF37] hover:underline"
                               >
-                                {t.name}
+                                Modify Answers
                               </button>
-                            ))}
-                          </div>
-                        </div>
+                            </div>
 
-                        <div className="space-y-2">
-                          <label className="text-[10px] font-black text-[#5A5865] uppercase tracking-wider block">WRITE YOUR CUSTOM BIO ({bioText.length}/200 chars)</label>
-                          <textarea
-                            value={bioText}
-                            onChange={(e) => setBioText(e.target.value.slice(0, 200))}
-                            placeholder="Type your elevator pitch..."
-                            className="w-full h-32 bg-[#0D0D14] border border-white/10 rounded-xl p-3 text-xs text-[#F0EFE8] focus:border-[#D4AF37] focus:outline-none resize-none"
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <label className="text-[10px] font-black text-[#5A5865] uppercase tracking-wider block">SUGGESTED KEYWORDS</label>
-                          <div className="flex flex-wrap gap-1.5">
-                            {bioKeywords.map((k) => {
-                              const included = bioText.toLowerCase().includes(k.toLowerCase());
-                              return (
-                                <span
-                                  key={k}
-                                  className={`px-2 py-1 rounded text-[10px] font-bold ${
-                                    included ? 'bg-[#D4AF37]/15 border border-[#D4AF37]/30 text-[#D4AF37]' : 'bg-white/5 border border-transparent text-[#A09E9A]'
-                                  }`}
-                                >
-                                  {k}
+                            <div className="space-y-1.5">
+                              <div className="flex justify-between text-[10px] text-[#A09E9A]">
+                                <span>Copy-Paste Text (Markdown format)</span>
+                                <span className={bioText.length > 250 ? 'text-red-400 font-bold' : 'text-[#D4AF37]'}>
+                                  {bioText.length} / 250 characters
                                 </span>
-                              );
-                            })}
+                              </div>
+                              <textarea
+                                value={bioText}
+                                onChange={(e) => setBioText(e.target.value.slice(0, 250))}
+                                placeholder="Edit your bio statement..."
+                                className="w-full h-32 bg-[#0D0D14] border border-white/10 rounded-xl p-3 text-xs text-[#F0EFE8] focus:border-[#D4AF37] focus:outline-none resize-none font-mono"
+                              />
+                              {bioText.length >= 250 && (
+                                <p className="text-[10px] text-red-400 font-bold">⚠️ Maximum character limit of 250 reached.</p>
+                              )}
+                            </div>
+
+                            <button
+                              onClick={() => copyToClipboard(bioText)}
+                              className="w-full py-2.5 text-center text-xs font-black uppercase rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 text-white transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                            >
+                              {copiedStatus ? (
+                                <>
+                                  <Check size={13} className="text-emerald-400" />
+                                  <span className="text-emerald-400 font-bold">Copied Bio!</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Copy size={13} />
+                                  <span>Copy Bio Text</span>
+                                </>
+                              )}
+                            </button>
                           </div>
-                        </div>
+                        )}
                       </div>
 
-                      {/* Mock Poppo Profile Overlay */}
+                      {/* Mock Poppo Livestream Frame Overlay */}
                       <div className="p-5 rounded-2xl bg-[#0D0D14] border border-white/5 flex flex-col gap-4">
-                        <span className="text-[10px] font-black text-[#5A5865] uppercase tracking-wider block">LIVE PROFILE OVERLAY PREVIEW</span>
+                        <span className="text-[10px] font-black text-[#5A5865] uppercase tracking-wider block">POPPO MOBILE APP PREVIEW</span>
                         
                         <div className="w-full bg-[#13131E] rounded-3xl border border-white/5 overflow-hidden shadow-2xl p-4 flex flex-col gap-4">
-                          <div className="flex items-center gap-3">
-                            <div className="w-12 h-12 rounded-full bg-[#D4AF37]/20 border-2 border-[#D4AF37] flex items-center justify-center font-bold text-white">
-                              {authState.name?.[0] || 'T'}
+                          <div className="flex items-center gap-3 border-b border-white/5 pb-3">
+                            <div className="w-10 h-10 rounded-full bg-gradient-to-r from-[#D4AF37] to-[#B8960C] flex items-center justify-center font-black text-black">
+                              {authState.name?.[0]?.toUpperCase() || 'H'}
                             </div>
                             <div>
                               <div className="flex items-center gap-1.5">
-                                <span className="text-xs font-bold text-white">{authState.name || 'Your Nametag'}</span>
-                                <span className="px-1.5 py-0.5 rounded bg-[#D4AF37] text-black text-[8px] font-bold uppercase">LVL 12</span>
+                                <span className="text-xs font-bold text-white">{authState.name || 'Your Name'}</span>
+                                <span className="px-1.5 py-0.2 rounded bg-amber-400 text-black text-[7px] font-black uppercase">LV 10</span>
                               </div>
-                              <span className="text-[10px] text-[#A09E9A] font-mono">ID: {authState.poppo_id || '987654321'}</span>
+                              <span className="text-[9px] text-[#A09E9A] font-mono">ID: {authState.poppo_id || '98765432'}</span>
                             </div>
                           </div>
 
-                          <div className="bg-[#1A1A28] border border-white/5 rounded-2xl p-3">
-                            <span className="text-[8px] font-black text-[#5A5865] uppercase tracking-wider block mb-1">BIO STATEMENT</span>
+                          <div className="bg-[#1A1A28] border border-white/5 rounded-2xl p-3.5 space-y-2">
+                            <span className="text-[8px] font-black text-[#5A5865] uppercase tracking-wider block">Bio Self-Introduction</span>
                             <p className="text-[11px] text-[#F0EFE8] leading-relaxed whitespace-pre-line">
-                              {bioText || 'No bio written yet. Select a template or write in the editor.'}
+                              {(() => {
+                                // Renders bold formatting helper in the HTML overlay preview
+                                const text = bioText || 'Welcome to my room!';
+                                const parts = text.split(/\*\*([^*]+)\*\*/g);
+                                return parts.map((part, i) => {
+                                  if (i % 2 === 1) {
+                                    return <strong key={i} className="text-[#D4AF37] font-extrabold">{part}</strong>;
+                                  }
+                                  return part;
+                                });
+                              })()}
                             </p>
                           </div>
                         </div>
 
                         {/* Cognitive Analysis */}
-                        <div className="bg-[#1A1A28] border border-white/5 rounded-2xl p-4 space-y-2">
-                          <span className="text-[10px] font-black text-white uppercase tracking-wider block">BIO QUALITY ANALYSIS</span>
-                          
-                          <div className="grid grid-cols-2 gap-4 text-xs">
+                        <div className="bg-[#1A1A28] border border-white/5 rounded-2xl p-4 space-y-2 text-xs">
+                          <span className="text-[10px] font-black text-white uppercase tracking-wider block">COGNITIVE ANALYSIS</span>
+                          <div className="grid grid-cols-2 gap-4">
                             <div>
-                              <span className="text-[#A09E9A]">Length Score:</span>
-                              <p className={`font-bold mt-0.5 ${bioText.length > 50 ? 'text-[#D4AF37]' : 'text-amber-500'}`}>
-                                {bioText.length === 0 ? 'Empty' : bioText.length < 50 ? 'Too Short' : 'Optimal'}
+                              <span className="text-[#A09E9A]">Length Count:</span>
+                              <p className={`font-bold mt-0.5 ${bioText.length > 250 ? 'text-red-400' : 'text-[#D4AF37]'}`}>
+                                {bioText.length} / 250
                               </p>
                             </div>
                             <div>
-                              <span className="text-[#A09E9A]">Call To Action:</span>
-                              <p className={`font-bold mt-0.5 ${bioText.toLowerCase().includes('follow') || bioText.toLowerCase().includes('join') ? 'text-[#D4AF37]' : 'text-[#A09E9A]'}`}>
-                                {bioText.toLowerCase().includes('follow') || bioText.toLowerCase().includes('join') ? 'Detected' : 'Missing'}
+                              <span className="text-[#A09E9A]">Bold Highlights:</span>
+                              <p className={`font-bold mt-0.5 ${bioText.includes('**') ? 'text-emerald-400' : 'text-amber-500'}`}>
+                                {bioText.includes('**') ? 'Active (Good)' : 'None (Add bold)'}
                               </p>
                             </div>
                           </div>
@@ -1583,7 +2605,7 @@ export function LearningResources() {
                   </div>
                 )}
 
-                {/* 3. NAME READABILITY TEST */}
+                {/* 2. NAME READABILITY TEST */}
                 {activeLabTool === 'name-readability' && (
                   <div className="space-y-6">
                     <div>
@@ -1643,97 +2665,361 @@ export function LearningResources() {
                   </div>
                 )}
 
-                {/* 4. LIGHTING SIMULATOR */}
-                {activeLabTool === 'lighting' && (
-                  <div className="space-y-6">
+                {/* 3. LUCKY BOX SETUP SIMULATOR */}
+                {activeLabTool === 'lucky-box' && (
+                  <div className="space-y-6 animate-fadeIn">
                     <div>
-                      <h3 className="text-base font-black text-white uppercase tracking-widest">Lighting Simulator</h3>
-                      <p className="text-xs text-[#A09E9A] mt-1">Preview how different physical lighting setups affect video quality and user trust.</p>
+                      <h3 className="text-base font-black text-white uppercase tracking-widest">Lucky Box Setup Simulator</h3>
+                      <p className="text-xs text-[#A09E9A] mt-1">Practice setting up a Lucky Box chest with specific prize structures, distribution parameters, and requirements.</p>
+                    </div>
+
+                    {/* Lucky Box Budget Planner */}
+                    <div className="glass-card bg-[#1A1A28] border border-[#D4AF37]/35 rounded-3xl p-5 relative overflow-hidden flex flex-col gap-4">
+                      <div className="absolute right-0 top-0 w-32 h-32 bg-radial from-[#D4AF37]/10 to-transparent blur-2xl pointer-events-none" />
+                      <div className="flex items-center gap-3">
+                        <Calculator className="text-[#D4AF37]" size={18} />
+                        <div>
+                          <h4 className="text-xs font-black text-white uppercase tracking-widest">Lucky Box Budget Planner</h4>
+                          <p className="text-[10px] text-[#A09E9A] mt-0.5 font-bold">Plan daily or weekly coins allocation to recommend optimal chest drops.</p>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-5 items-center border-b border-white/5 pb-4">
+                        {/* Period & Coins inputs */}
+                        <div className="space-y-3">
+                          <div className="flex gap-1 bg-[#0D0D14] border border-white/5 p-1 rounded-xl">
+                            <button
+                              onClick={() => setLuckyBudgetPeriod('daily')}
+                              className={`flex-1 py-1 rounded-lg text-[10px] font-bold uppercase transition-all cursor-pointer ${
+                                luckyBudgetPeriod === 'daily' ? 'bg-[#D4AF37] text-black font-black' : 'text-[#A09E9A] hover:text-[#F0EFE8]'
+                              }`}
+                            >
+                              Daily
+                            </button>
+                            <button
+                              onClick={() => setLuckyBudgetPeriod('weekly')}
+                              className={`flex-1 py-1 rounded-lg text-[10px] font-bold uppercase transition-all cursor-pointer ${
+                                luckyBudgetPeriod === 'weekly' ? 'bg-[#D4AF37] text-black font-black' : 'text-[#A09E9A] hover:text-[#F0EFE8]'
+                              }`}
+                            >
+                              Weekly
+                            </button>
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="text-[9px] text-[#A09E9A] uppercase tracking-wider block font-bold">Coins Allocation Budget</label>
+                            <div className="flex gap-2">
+                              <input
+                                type="number"
+                                value={luckyBudgetCoins || ''}
+                                onChange={(e) => setLuckyBudgetCoins(Math.max(0, Number(e.target.value)))}
+                                placeholder="e.g. 5000"
+                                className="flex-1 bg-[#0D0D14] border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:border-[#D4AF37] focus:outline-none"
+                              />
+                            </div>
+                            <div className="flex gap-1.5 mt-1.5 flex-wrap">
+                              {[1000, 5000, 10000, 50000].map((preset) => (
+                                <button
+                                  key={preset}
+                                  onClick={() => setLuckyBudgetCoins(preset)}
+                                  className={`px-2 py-0.5 rounded bg-white/5 border border-white/5 hover:bg-white/10 text-[9px] font-bold text-white transition-all cursor-pointer`}
+                                >
+                                  {preset.toLocaleString()}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Distribution Plan Recommendations */}
+                        <div className="md:col-span-2 p-4 bg-[#0D0D14] border border-white/5 rounded-2xl flex flex-col gap-2">
+                          <span className="text-[9px] font-black text-[#D4AF37] uppercase tracking-wider">RECOMMENDED PROMOTION STRUCTURE</span>
+                          {(() => {
+                            const rec = getLuckyRecommendation(luckyBudgetPeriod, luckyBudgetCoins);
+                            return (
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs leading-normal">
+                                <div className="space-y-0.5">
+                                  <span className="text-[9px] text-[#A09E9A] uppercase tracking-wider">Recommended drop:</span>
+                                  <p className="font-extrabold text-white">{rec.structure}</p>
+                                </div>
+                                <div className="space-y-0.5">
+                                  <span className="text-[9px] text-[#A09E9A] uppercase tracking-wider">Claim restriction:</span>
+                                  <p className="font-extrabold text-[#D4AF37]">{rec.condition}</p>
+                                </div>
+                                <div className="space-y-0.5 sm:col-span-2 text-[10.5px] text-[#A09E9A] leading-relaxed border-t border-white/5 pt-2">
+                                  <strong>Why this?</strong> {rec.justification}
+                                  <p className="text-cyan-400 mt-1 font-bold">⚡ PK Synchronization: {rec.PKAdvice}</p>
+                                </div>
+                              </div>
+                            );
+                          })()}
+                        </div>
+                      </div>
+
+                      <div className="bg-[#D4AF37]/5 border border-[#D4AF37]/15 p-3.5 rounded-2xl text-[11px] text-[#A09E9A] leading-relaxed flex items-start gap-2.5">
+                        <AlertTriangle className="text-[#D4AF37] shrink-0 mt-0.5" size={14} />
+                        <div>
+                          <strong className="text-white font-black block mb-0.5 uppercase tracking-wider text-[10px]">Why you must invest in Lucky Boxes</strong>
+                          Bypassing the slow, passive organic discovery lists is crucial for host growth. Dropping a Lucky Box chest draws active scroll traffic, search ranking points, and room counts. Syncing your chest timer to expire 2 minutes before triggering a co-host or Random PK match ensures you have maximum active viewers ready to defend your board. Doing this is heavily encouraged if you are suffering from low room discoverability!
+                        </div>
+                      </div>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div className="space-y-4">
-                        <span className="text-[10px] font-black text-[#5A5865] uppercase tracking-wider block">SELECT LIGHTING SETUP</span>
-                        
-                        <div className="flex flex-col gap-2">
-                          {[
-                            { id: 'backlit', label: 'Windows Backlit (Harsh Backlight)', score: 30, desc: 'Camera auto-exposure darkens the subject face to a complete silhouette.' },
-                            { id: 'overhead', label: 'Overhead Room Bulb (Harsh Shadows)', score: 50, desc: 'Creates deep shadows under the eyes and nose. Looks amateur.' },
-                            { id: 'lowlight', label: 'Low Light (Pixelated & Dark)', score: 20, desc: 'Triggers camera digital noise and extreme video grain. Viewers leave instantly.' },
-                            { id: 'ringlight', label: 'Frontal Ring Light (Balanced)', score: 80, desc: 'Smooth, soft frontal glow. Excellent facial detail and catchlight in eyes.' },
-                            { id: 'studio', label: '3-Point Studio (Premium Setup)', score: 98, desc: 'Key light, fill light, and background rim light. Professional 3D depth.' }
-                          ].map((preset) => (
+                        {/* Game Type Top Tabs */}
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] text-[#A09E9A] uppercase tracking-wider block">1. Game Type prize structure</label>
+                          <div className="grid grid-cols-2 gap-2 bg-[#0D0D14] border border-white/5 rounded-xl p-1">
                             <button
-                              key={preset.id}
-                              onClick={() => setLightingPreset(preset.id as any)}
-                              className={`w-full text-left p-3 rounded-xl border transition-all flex items-center justify-between ${
-                                lightingPreset === preset.id ? 'bg-[#D4AF37]/10 border-[#D4AF37]/35 text-white' : 'bg-[#0D0D14] border-white/5 text-[#A09E9A] hover:bg-white/03'
+                              onClick={() => { setLuckyGameType('split'); setLuckyWinnersMode('preset'); }}
+                              className={`py-2 rounded-lg text-xs font-bold transition-all uppercase tracking-wider cursor-pointer ${
+                                luckyGameType === 'split' ? 'bg-[#D4AF37] text-black font-black' : 'text-[#A09E9A] hover:text-[#F0EFE8]'
                               }`}
                             >
-                              <div>
-                                <p className="text-xs font-bold">{preset.label}</p>
-                                <p className="text-[10px] text-[#A09E9A] mt-0.5 truncate max-w-[240px]">{preset.desc}</p>
-                              </div>
-                              <span className={`text-xs font-black ${preset.score >= 80 ? 'text-[#D4AF37]' : 'text-red-400'}`}>
-                                {preset.score}/100
-                              </span>
+                              Even Split
                             </button>
-                          ))}
+                            <button
+                              onClick={() => { setLuckyGameType('draw'); setLuckyWinnersMode('preset'); }}
+                              className={`py-2 rounded-lg text-xs font-bold transition-all uppercase tracking-wider cursor-pointer ${
+                                luckyGameType === 'draw' ? 'bg-[#D4AF37] text-black font-black' : 'text-[#A09E9A] hover:text-[#F0EFE8]'
+                              }`}
+                            >
+                              Lucky Draw
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Coin Settings (Pool Total) */}
+                        <div className="space-y-2">
+                          <label className="text-[10px] text-[#A09E9A] uppercase tracking-wider block">
+                            2. Coin Settings (Pool Total): <strong className="text-white">{luckyCoinPool.toLocaleString()} Coins</strong>
+                          </label>
+                          <div className="flex flex-wrap gap-2">
+                            {luckyGameType === 'split' ? (
+                              [10, 50, 100, 500, 1000].map((val) => (
+                                <button
+                                  key={val}
+                                  onClick={() => setLuckyCoinPool(val)}
+                                  className={`px-3 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                                    luckyCoinPool === val ? 'bg-[#D4AF37]/10 border-[#D4AF37] text-[#D4AF37]' : 'bg-[#0D0D14] border-white/5 text-[#A09E9A]'
+                                  }`}
+                                >
+                                  {val}
+                                </button>
+                              ))
+                            ) : (
+                              [100, 1000, 10000, 50000, 200000].map((val) => (
+                                <button
+                                  key={val}
+                                  onClick={() => setLuckyCoinPool(val)}
+                                  className={`px-3 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                                    luckyCoinPool === val ? 'bg-[#D4AF37]/10 border-[#D4AF37] text-[#D4AF37]' : 'bg-[#0D0D14] border-white/5 text-[#A09E9A]'
+                                  }`}
+                                >
+                                  {val.toLocaleString()}
+                                </button>
+                              ))
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Distribution Winners Count */}
+                        <div className="space-y-2.5">
+                          <div className="flex justify-between items-center">
+                            <label className="text-[10px] text-[#A09E9A] uppercase tracking-wider block">
+                              3. Distribution Amount (Winners): <strong className="text-white">{luckyWinnersMode === 'custom' ? luckyCustomWinners || '0' : luckyWinners} winners</strong>
+                            </label>
+                            {luckyGameType === 'split' && (
+                              <button
+                                onClick={() => setLuckyWinnersMode(prev => prev === 'preset' ? 'custom' : 'preset')}
+                                className="text-[10px] font-bold text-[#D4AF37] hover:underline"
+                              >
+                                {luckyWinnersMode === 'preset' ? 'Use Custom Input' : 'Use Quick Select'}
+                              </button>
+                            )}
+                          </div>
+
+                          {luckyWinnersMode === 'preset' ? (
+                            <div className="flex flex-wrap gap-2">
+                              {luckyGameType === 'split' ? (
+                                [5, 10, 50, 100, 200].map((val) => (
+                                  <button
+                                    key={val}
+                                    onClick={() => setLuckyWinners(val)}
+                                    className={`px-3 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                                      luckyWinners === val ? 'bg-[#D4AF37]/10 border-[#D4AF37] text-[#D4AF37]' : 'bg-[#0D0D14] border-white/5 text-[#A09E9A]'
+                                    }`}
+                                  >
+                                    {val} gifts
+                                  </button>
+                                ))
+                              ) : (
+                                [5, 10].map((val) => (
+                                  <button
+                                    key={val}
+                                    onClick={() => setLuckyWinners(val)}
+                                    className={`px-3 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                                      luckyWinners === val ? 'bg-[#D4AF37]/10 border-[#D4AF37] text-[#D4AF37]' : 'bg-[#0D0D14] border-white/5 text-[#A09E9A]'
+                                    }`}
+                                  >
+                                    {val} gifts
+                                  </button>
+                                ))
+                              )}
+                            </div>
+                          ) : (
+                            <input
+                              type="number"
+                              value={luckyCustomWinners}
+                              onChange={(e) => setLuckyCustomWinners(e.target.value.replace(/[^0-9]/g, ''))}
+                              placeholder="Type custom winner count (e.g. 25)..."
+                              className="w-full bg-[#0D0D14] border border-white/10 rounded-xl p-2.5 text-xs text-white focus:border-[#D4AF37] focus:outline-none"
+                            />
+                          )}
+                        </div>
+
+                        {/* Participation Conditions */}
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] text-[#A09E9A] uppercase tracking-wider block">4. Participation Conditions</label>
+                          <div className="grid grid-cols-2 gap-2">
+                            {[
+                              { id: 'all', label: 'All audiences' },
+                              { id: 'follow', label: 'Follow the host' },
+                              { id: 'fanclub', label: 'Join Fan Club' },
+                              { id: 'code', label: 'Send Code' }
+                            ].map((cond) => (
+                              <button
+                                key={cond.id}
+                                onClick={() => setLuckyCondition(cond.id as any)}
+                                className={`p-2.5 rounded-xl border text-xs font-bold text-left transition-all cursor-pointer ${
+                                  luckyCondition === cond.id ? 'bg-[#D4AF37]/10 border-[#D4AF37] text-[#D4AF37]' : 'bg-[#0D0D14] border-white/5 text-[#A09E9A]'
+                                }`}
+                              >
+                                {cond.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Claim Method */}
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] text-[#A09E9A] uppercase tracking-wider block">5. Claim Method</label>
+                          <div className="grid grid-cols-2 gap-2">
+                            {[
+                              { id: 'grab', label: 'Grab (First-Come, First-Served)' },
+                              { id: 'random', label: 'Random (Distributed Chance)' }
+                            ].map((method) => (
+                              <button
+                                key={method.id}
+                                onClick={() => setLuckyClaimMethod(method.id as any)}
+                                className={`p-2.5 rounded-xl border text-xs font-bold text-left transition-all cursor-pointer ${
+                                  luckyClaimMethod === method.id ? 'bg-[#D4AF37]/10 border-[#D4AF37] text-[#D4AF37]' : 'bg-[#0D0D14] border-white/5 text-[#A09E9A]'
+                                }`}
+                              >
+                                {method.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Countdown Timer */}
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] text-[#A09E9A] uppercase tracking-wider block">6. Countdown Timer</label>
+                          <div className="flex gap-2">
+                            {['3min', '5min', '10min'].map((tVal) => (
+                              <button
+                                key={tVal}
+                                onClick={() => setLuckyTimer(tVal as any)}
+                                className={`px-4 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer flex-1 text-center ${
+                                  luckyTimer === tVal ? 'bg-[#D4AF37]/10 border-[#D4AF37] text-[#D4AF37]' : 'bg-[#0D0D14] border-white/5 text-[#A09E9A]'
+                                }`}
+                              >
+                                {tVal}
+                              </button>
+                            ))}
+                          </div>
                         </div>
                       </div>
 
-                      {/* Visual Sandbox Frame rendering */}
+                      {/* Simulated Livestream preview screen */}
                       <div className="p-5 rounded-2xl bg-[#0D0D14] border border-white/5 flex flex-col gap-4 items-center justify-center">
-                        <span className="text-[10px] font-black text-[#5A5865] uppercase tracking-wider self-start">SIMULATED VIDEO MONITOR</span>
+                        <span className="text-[10px] font-black text-[#5A5865] uppercase tracking-wider self-start">STREAM SIMULATION MONITOR</span>
                         
-                        <div className="w-full max-w-[280px] aspect-[9/16] rounded-3xl border border-white/10 overflow-hidden relative flex flex-col justify-between p-4 shadow-2xl transition-all duration-300"
-                          style={{
-                            boxShadow: lightingPreset === 'studio' ? '0 0 35px rgba(212,175,55,0.15)' : 'none',
-                            background: 
-                              lightingPreset === 'backlit' ? 'linear-gradient(to top, #111 40%, #fff 100%)' :
-                              lightingPreset === 'overhead' ? 'linear-gradient(to bottom, #444 0%, #111 80%)' :
-                              lightingPreset === 'lowlight' ? '#07070a' :
-                              lightingPreset === 'ringlight' ? '#181825' : '#222235'
-                          }}
-                        >
-                          {/* Live Indicator */}
+                        <div className="w-full max-w-[280px] aspect-[9/16] rounded-3xl border border-white/10 overflow-hidden relative flex flex-col justify-between p-4 bg-[#13131E] shadow-2xl">
+                          {/* Live indicator top */}
                           <div className="flex justify-between items-center w-full">
                             <span className="px-2 py-0.5 rounded bg-red-600 text-[8px] font-black text-white uppercase tracking-wider animate-pulse">LIVE</span>
-                            <span className="text-[8px] text-white/50 font-bold bg-black/40 px-1.5 py-0.5 rounded-full">👤 142</span>
+                            <span className="text-[8px] text-white/50 font-bold bg-black/40 px-1.5 py-0.5 rounded-full">👤 2,419</span>
                           </div>
 
-                          {/* Simulated Face Image Mock */}
-                          <div className="flex flex-col items-center justify-center flex-1">
-                            <div className="w-20 h-20 rounded-full border-2 border-white/25 flex items-center justify-center relative overflow-hidden transition-all duration-300"
-                              style={{
-                                filter: 
-                                  lightingPreset === 'backlit' ? 'brightness(0.3) contrast(1.5)' :
-                                  lightingPreset === 'overhead' ? 'brightness(0.7) contrast(1.2)' :
-                                  lightingPreset === 'lowlight' ? 'brightness(0.3) blur(1px)' :
-                                  lightingPreset === 'ringlight' ? 'brightness(1.1)' : 'brightness(1.2) contrast(1.05)'
-                              }}
-                            >
-                              <span className="text-3xl">👩‍🎤</span>
-                            </div>
-                            <span className="text-[9px] text-white/60 font-bold mt-2 uppercase tracking-widest">Host Camera</span>
+                          {/* Floating Lucky Box Widget in Livestream */}
+                          <div className="flex flex-col items-center justify-center flex-1 relative">
+                            {luckyBoxSimStatus === 'idle' ? (
+                              <div className="flex flex-col items-center gap-2 bg-black/50 p-4 rounded-2xl border border-white/10 text-center max-w-[200px]">
+                                <span className="text-4xl">🎁</span>
+                                <p className="text-[10px] text-white font-bold uppercase">Ready to drop</p>
+                              </div>
+                            ) : luckyBoxSimStatus === 'countdown' ? (
+                              <div className="flex flex-col items-center gap-2 bg-[#D4AF37]/20 border-2 border-[#D4AF37] p-4 rounded-2xl text-center max-w-[200px] animate-pulse">
+                                <span className="text-4xl">🎁</span>
+                                <p className="text-[10px] text-[#D4AF37] font-black uppercase tracking-wider">Ticking Down...</p>
+                                <span className="px-2 py-0.5 bg-black/60 rounded text-[10px] font-bold text-white font-mono">
+                                  {Math.floor(luckyBoxTimeRemaining / 60)}:{(luckyBoxTimeRemaining % 60).toString().padStart(2, '0')}
+                                </span>
+                              </div>
+                            ) : (
+                              <div className="flex flex-col items-center gap-2 bg-emerald-950/30 border-2 border-emerald-500 p-4 rounded-2xl text-center max-w-[200px] animate-bounce">
+                                <span className="text-4xl">💥</span>
+                                <p className="text-[10px] text-emerald-400 font-black uppercase">CLAIMED!</p>
+                                <p className="text-[8px] text-[#A09E9A] leading-relaxed">
+                                  {luckyCoinPool.toLocaleString()} coins distributed to winners!
+                                </p>
+                              </div>
+                            )}
                           </div>
 
-                          {/* Bottom Stats Overlay */}
-                          <div className="w-full bg-black/40 backdrop-blur-md rounded-xl p-2 text-[9px] text-white/80 space-y-1">
-                            <p className="font-bold">Ambient Scan: {
-                              lightingPreset === 'backlit' ? 'Backlit Silhouette Detected' :
-                              lightingPreset === 'overhead' ? 'Under-eye Shadow Warn' :
-                              lightingPreset === 'lowlight' ? 'Extreme Video Noise' :
-                              lightingPreset === 'ringlight' ? 'Optimal Brightness' : 'Balanced Studio Output'
-                            }</p>
+                          {/* Room bottom overlays */}
+                          <div className="w-full bg-black/40 backdrop-blur-md rounded-xl p-2.5 text-[8px] text-white/80 space-y-1">
+                            <p className="font-bold">Lucky Box: {luckyGameType === 'split' ? 'Even Split' : 'Lucky Draw'}</p>
+                            <p className="text-[#A09E9A]">Winners limit: {luckyWinnersMode === 'custom' ? luckyCustomWinners || '0' : luckyWinners} gifts</p>
+                            <p className="text-[#A09E9A]">Claim condition: Requirement - <span className="text-yellow-400 font-bold uppercase">{luckyCondition}</span></p>
+                            <p className="text-[#A09E9A]">Timer set: {luckyTimer}</p>
                           </div>
                         </div>
+
+                        {luckyBoxSimStatus === 'idle' ? (
+                          <button
+                            onClick={() => {
+                              const duration = luckyTimer === '3min' ? 180 : luckyTimer === '5min' ? 300 : 600;
+                              setLuckyBoxTimeRemaining(duration);
+                              setLuckyBoxSimStatus('countdown');
+                            }}
+                            className="w-full py-2 bg-gradient-to-r from-[#D4AF37] to-[#B8960C] text-black font-black uppercase tracking-widest rounded-xl text-xs text-center cursor-pointer shadow-lg"
+                          >
+                            Drop Lucky Box
+                          </button>
+                        ) : luckyBoxSimStatus === 'countdown' ? (
+                          <button
+                            onClick={() => setLuckyBoxSimStatus('claimed')}
+                            className="w-full py-2 bg-white/10 hover:bg-white/20 border border-white/5 text-white font-bold rounded-xl text-xs text-center cursor-pointer"
+                          >
+                            Instantly Open Box
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => setLuckyBoxSimStatus('idle')}
+                            className="w-full py-2 bg-[#0D0D14] border border-white/10 text-white font-bold rounded-xl text-xs text-center cursor-pointer"
+                          >
+                            Reset Simulator
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>
                 )}
 
-                {/* 5. VISIBILITY BUDGET CALCULATOR */}
+                {/* 4. VISIBILITY BUDGET CALCULATOR */}
                 {activeLabTool === 'visibility-budget' && (
                   <div className="space-y-6">
                     <div>
@@ -1814,89 +3100,215 @@ export function LearningResources() {
                   </div>
                 )}
 
-                {/* 6. NO-STREAM UPDATE GENERATOR */}
-                {activeLabTool === 'no-stream-generator' && (
+                {/* 5. GC ANNOUNCEMENTS HUB */}
+                {activeLabTool === 'gc-announcements' && (
                   <div className="space-y-6">
                     <div>
-                      <h3 className="text-base font-black text-white uppercase tracking-widest">No-Stream Update Generator</h3>
-                      <p className="text-xs text-[#A09E9A] mt-1">Generate professional pre-written notices to maintain fanbase loyalty when you cannot stream.</p>
+                      <h3 className="text-base font-black text-white uppercase tracking-widest">GC Announcements Hub</h3>
+                      <p className="text-xs text-[#A09E9A] mt-1">Generate pre-formatted teaser and update templates to copy and paste to your Fanclub Group Chat.</p>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div className="space-y-4">
-                        <span className="text-[10px] font-black text-[#5A5865] uppercase tracking-wider block">REASON FOR ABSENCE</span>
-                        <div className="grid grid-cols-2 gap-2">
-                          {[
-                            { id: 'sick', label: 'Illness / Rest' },
-                            { id: 'family', label: 'Family Commitment' },
-                            { id: 'travel', label: 'Travel / Shift' },
-                            { id: 'recharge', label: 'Mental Recharge' }
-                          ].map((r) => (
-                            <button
-                              key={r.id}
-                              onClick={() => setNoStreamReason(r.id as any)}
-                              className={`p-3 rounded-xl border text-xs font-bold text-left transition-all ${
-                                noStreamReason === r.id ? 'bg-[#D4AF37]/10 border-[#D4AF37]/35 text-white' : 'bg-[#0D0D14] border-white/5 text-[#A09E9A] hover:bg-white/03'
-                              }`}
-                            >
-                              {r.label}
-                            </button>
-                          ))}
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-3">
-                          <div className="space-y-1.5">
-                            <label className="text-[10px] text-[#A09E9A] uppercase tracking-wider block">Date of Absence</label>
-                            <input
-                              type="date"
-                              value={noStreamDate}
-                              onChange={(e) => setNoStreamDate(e.target.value)}
-                              className="w-full bg-[#0D0D14] border border-white/10 rounded-xl p-2.5 text-xs text-white focus:outline-none"
-                            />
-                          </div>
-                          <div className="space-y-1.5">
-                            <label className="text-[10px] text-[#A09E9A] uppercase tracking-wider block">Return Live Date</label>
-                            <input
-                              type="date"
-                              value={noStreamReturnDate}
-                              onChange={(e) => setNoStreamReturnDate(e.target.value)}
-                              className="w-full bg-[#0D0D14] border border-white/10 rounded-xl p-2.5 text-xs text-white focus:outline-none"
-                            />
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Generated Text & Copy */}
-                      <div className="p-5 rounded-2xl bg-[#0D0D14] border border-white/5 flex flex-col gap-3">
-                        <div className="flex justify-between items-center">
-                          <span className="text-[10px] font-black text-[#5A5865] uppercase tracking-wider">GENERATED STATUS ANNOUNCEMENT</span>
+                        {/* Tab Selector */}
+                        <div className="flex gap-1.5 bg-[#0D0D14] border border-white/5 p-1 rounded-xl">
                           <button
-                            onClick={copyToClipboard}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 border border-white/5 hover:bg-white/10 text-xs font-bold text-white transition-all cursor-pointer"
+                            onClick={() => setGcActiveTab('no-stream')}
+                            className={`flex-1 py-1.5 rounded-lg text-[10px] font-bold uppercase cursor-pointer ${
+                              gcActiveTab === 'no-stream' ? 'bg-[#D4AF37] text-black font-black' : 'text-[#A09E9A] hover:text-[#F0EFE8]'
+                            }`}
                           >
-                            {copiedStatus ? (
-                              <>
-                                <Check size={12} className="text-emerald-400" />
-                                <span className="text-emerald-400">Copied!</span>
-                              </>
-                            ) : (
-                              <>
-                                <Copy size={12} />
-                                <span>Copy Text</span>
-                              </>
-                            )}
+                            No-Stream Notice
+                          </button>
+                          <button
+                            onClick={() => setGcActiveTab('pre-stream')}
+                            className={`flex-1 py-1.5 rounded-lg text-[10px] font-bold uppercase cursor-pointer ${
+                              gcActiveTab === 'pre-stream' ? 'bg-[#D4AF37] text-black font-black' : 'text-[#A09E9A] hover:text-[#F0EFE8]'
+                            }`}
+                          >
+                            Pre-Stream Teaser
+                          </button>
+                          <button
+                            onClick={() => setGcActiveTab('post-stream')}
+                            className={`flex-1 py-1.5 rounded-lg text-[10px] font-bold uppercase cursor-pointer ${
+                              gcActiveTab === 'post-stream' ? 'bg-[#D4AF37] text-black font-black' : 'text-[#A09E9A] hover:text-[#F0EFE8]'
+                            }`}
+                          >
+                            Post-Stream Recap
                           </button>
                         </div>
 
-                        <div className="flex-1 bg-[#13131E] border border-white/5 rounded-2xl p-4 font-mono text-[10px] leading-relaxed text-[#A09E9A] whitespace-pre-wrap select-all max-h-[220px] overflow-y-auto">
-                          {generatedNoStreamText}
-                        </div>
+                        {/* Fields based on active tab */}
+                        {gcActiveTab === 'no-stream' && (
+                          <div className="space-y-3 animate-fadeIn">
+                            <span className="text-[10px] font-black text-white tracking-widest uppercase block">Absence Information</span>
+                            
+                            <div className="space-y-1">
+                              <label className="text-[10px] text-[#A09E9A] uppercase tracking-wider block">Reason for absence</label>
+                              <div className="grid grid-cols-2 gap-2">
+                                {[
+                                  { id: 'sick', label: 'Illness / Recovery' },
+                                  { id: 'family', label: 'Family Commitment' },
+                                  { id: 'travel', label: 'Travel / Shift' },
+                                  { id: 'recharge', label: 'Creative Recharge' }
+                                ].map((r) => (
+                                  <button
+                                    key={r.id}
+                                    onClick={() => setNoStreamReason(r.id as any)}
+                                    className={`p-2.5 rounded-xl border text-[11px] font-bold text-left transition-all cursor-pointer ${
+                                      noStreamReason === r.id ? 'bg-[#D4AF37]/10 border-[#D4AF37] text-[#D4AF37]' : 'bg-[#0D0D14] border-white/5 text-[#A09E9A]'
+                                    }`}
+                                  >
+                                    {r.label}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3">
+                              <div className="space-y-1.5">
+                                <label className="text-[10px] text-[#A09E9A] uppercase tracking-wider block">Date of Absence</label>
+                                <input
+                                  type="date"
+                                  value={noStreamDate}
+                                  onChange={(e) => setNoStreamDate(e.target.value)}
+                                  className="w-full bg-[#0D0D14] border border-white/10 rounded-xl p-2.5 text-xs text-white focus:outline-none"
+                                />
+                              </div>
+                              <div className="space-y-1.5">
+                                <label className="text-[10px] text-[#A09E9A] uppercase tracking-wider block">Return Live Date</label>
+                                <input
+                                  type="date"
+                                  value={noStreamReturnDate}
+                                  onChange={(e) => setNoStreamReturnDate(e.target.value)}
+                                  className="w-full bg-[#0D0D14] border border-white/10 rounded-xl p-2.5 text-xs text-white focus:outline-none"
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {gcActiveTab === 'pre-stream' && (
+                          <div className="space-y-3 animate-fadeIn">
+                            <span className="text-[10px] font-black text-white tracking-widest uppercase block">Teaser Details</span>
+
+                            <div className="space-y-1.5">
+                              <label className="text-[10px] text-[#A09E9A] uppercase tracking-wider block">Tonight's Stream Theme</label>
+                              <input
+                                type="text"
+                                value={preStreamTheme}
+                                onChange={(e) => setPreStreamTheme(e.target.value)}
+                                placeholder="e.g. Vocal Requests & Cozy Chats"
+                                className="w-full bg-[#0D0D14] border border-white/10 rounded-xl p-2.5 text-xs text-white focus:outline-none"
+                              />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3">
+                              <div className="space-y-1.5">
+                                <label className="text-[10px] text-[#A09E9A] uppercase tracking-wider block">Start Time</label>
+                                <input
+                                  type="text"
+                                  value={preStreamTime}
+                                  onChange={(e) => setPreStreamTime(e.target.value)}
+                                  placeholder="e.g. 9:00 PM EST"
+                                  className="w-full bg-[#0D0D14] border border-white/10 rounded-xl p-2.5 text-xs text-white focus:outline-none"
+                                />
+                              </div>
+                              <div className="space-y-1.5">
+                                <label className="text-[10px] text-[#A09E9A] uppercase tracking-wider block">Stream Mission / Target Goal</label>
+                                <input
+                                  type="text"
+                                  value={preStreamGoal}
+                                  onChange={(e) => setPreStreamGoal(e.target.value)}
+                                  placeholder="e.g. 10k coins PK goal"
+                                  className="w-full bg-[#0D0D14] border border-white/10 rounded-xl p-2.5 text-xs text-white focus:outline-none"
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {gcActiveTab === 'post-stream' && (
+                          <div className="space-y-3 animate-fadeIn">
+                            <span className="text-[10px] font-black text-white tracking-widest uppercase block">Recap & Appreciation Data</span>
+
+                            <div className="grid grid-cols-2 gap-3">
+                              <div className="space-y-1.5">
+                                <label className="text-[10px] text-[#A09E9A] uppercase tracking-wider block">Total Coins Raised</label>
+                                <input
+                                  type="text"
+                                  value={postStreamCoins}
+                                  onChange={(e) => setPostStreamCoins(e.target.value)}
+                                  placeholder="e.g. 45,000"
+                                  className="w-full bg-[#0D0D14] border border-white/10 rounded-xl p-2.5 text-xs text-white focus:outline-none"
+                                />
+                              </div>
+                              <div className="space-y-1.5">
+                                <label className="text-[10px] text-[#A09E9A] uppercase tracking-wider block">MVPs / Top Donors</label>
+                                <input
+                                  type="text"
+                                  value={postStreamDonors}
+                                  onChange={(e) => setPostStreamDonors(e.target.value)}
+                                  placeholder="e.g. Alex, Sarah, Mark"
+                                  className="w-full bg-[#0D0D14] border border-white/10 rounded-xl p-2.5 text-xs text-white focus:outline-none"
+                                />
+                              </div>
+                            </div>
+
+                            <div className="space-y-1.5">
+                              <label className="text-[10px] text-[#A09E9A] uppercase tracking-wider block">Custom Appreciation Note</label>
+                              <textarea
+                                value={postStreamNote}
+                                onChange={(e) => setPostStreamNote(e.target.value)}
+                                placeholder="Write a short custom message to your tribe..."
+                                className="w-full h-20 bg-[#0D0D14] border border-white/10 rounded-xl p-2.5 text-xs text-white focus:outline-none resize-none"
+                              />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Generated Status Text */}
+                      <div className="p-5 rounded-2xl bg-[#0D0D14] border border-white/5 flex flex-col gap-3">
+                        {(() => {
+                          const activeText = 
+                            gcActiveTab === 'no-stream' ? generatedNoStreamText :
+                            gcActiveTab === 'pre-stream' ? generatedPreStreamText : generatedPostStreamText;
+
+                          return (
+                            <>
+                              <div className="flex justify-between items-center">
+                                <span className="text-[10px] font-black text-[#5A5865] uppercase tracking-wider">GENERATED CHAT MESSAGE</span>
+                                <button
+                                  onClick={() => copyToClipboard(activeText)}
+                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 border border-white/5 hover:bg-white/10 text-xs font-bold text-white transition-all cursor-pointer"
+                                >
+                                  {copiedStatus ? (
+                                    <>
+                                      <Check size={12} className="text-emerald-400" />
+                                      <span className="text-emerald-400 font-bold">Copied!</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Copy size={12} />
+                                      <span>Copy Text</span>
+                                    </>
+                                  )}
+                                </button>
+                              </div>
+
+                              <div className="flex-1 bg-[#13131E] border border-white/5 rounded-2xl p-4 font-mono text-[10px] leading-relaxed text-[#A09E9A] whitespace-pre-wrap select-all min-h-[160px] max-h-[200px] overflow-y-auto">
+                                {activeText}
+                              </div>
+                            </>
+                          );
+                        })()}
                       </div>
                     </div>
                   </div>
                 )}
 
-                {/* 7. COMMENT RESPONSE SPEED DRILL */}
+                {/* 6. COMMENT RESPONSE SPEED DRILL */}
                 {activeLabTool === 'comment-drill' && (
                   <div className="space-y-6">
                     <div>
@@ -1964,25 +3376,25 @@ export function LearningResources() {
                                 <div className="grid grid-cols-2 gap-1.5 mt-1 border-t border-white/5 pt-1.5">
                                   <button
                                     onClick={() => handleRespondToComment(comment.id, 'greeting')}
-                                    className="px-2 py-1 rounded bg-[#D4AF37]/10 hover:bg-[#D4AF37]/20 text-[9px] font-bold text-[#D4AF37]"
+                                    className="px-2 py-1 rounded bg-[#D4AF37]/10 hover:bg-[#D4AF37]/20 text-[9px] font-bold text-[#D4AF37] cursor-pointer"
                                   >
                                     Welcome Tag
                                   </button>
                                   <button
                                     onClick={() => handleRespondToComment(comment.id, 'question')}
-                                    className="px-2 py-1 rounded bg-cyan-500/10 hover:bg-cyan-500/20 text-[9px] font-bold text-cyan-400"
+                                    className="px-2 py-1 rounded bg-cyan-500/10 hover:bg-cyan-500/20 text-[9px] font-bold text-cyan-400 cursor-pointer"
                                   >
                                     Answer Ques
                                   </button>
                                   <button
                                     onClick={() => handleRespondToComment(comment.id, 'gift')}
-                                    className="px-2 py-1 rounded bg-emerald-500/10 hover:bg-emerald-500/20 text-[9px] font-bold text-emerald-400"
+                                    className="px-2 py-1 rounded bg-emerald-500/10 hover:bg-emerald-500/20 text-[9px] font-bold text-emerald-400 cursor-pointer"
                                   >
                                     Thank Gift
                                   </button>
                                   <button
                                     onClick={() => handleRespondToComment(comment.id, 'spam')}
-                                    className="px-2 py-1 rounded bg-red-500/10 hover:bg-red-500/20 text-[9px] font-bold text-red-400"
+                                    className="px-2 py-1 rounded bg-red-500/10 hover:bg-red-500/20 text-[9px] font-bold text-red-400 cursor-pointer"
                                   >
                                     Flag Spam
                                   </button>
@@ -2015,48 +3427,103 @@ export function LearningResources() {
 
               {!selectedQuizLevel ? (
                 /* List of available quizzes */
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                  {[
-                    { id: 'beginner', title: 'Beginner Certification', desc: 'Focuses on profile design standards, digital handshake, basic live setups, and lighting.', icon: Trophy, color: 'text-amber-500' },
-                    { id: 'intermediate', title: 'Intermediate Certification', desc: 'Consistency models, Lucky Box integration, random PK timing strategies, and dead air control.', icon: Trophy, color: 'text-slate-400' },
-                    { id: 'advanced', title: 'Advanced Certification', desc: 'Monetization psychology, audience conversion funnels, group chat retention calendars.', icon: Trophy, color: 'text-yellow-400' },
-                    { id: 'pro', title: 'Pro Streamer Certification', desc: 'Mastery class final check. Enforces professional coaching tools, loops, and diagnostic checklists.', icon: Award, color: 'text-emerald-400' }
-                  ].map((cert) => {
-                    const completed = quizResultsHistory[cert.id];
-                    return (
-                      <div key={cert.id} className="glass-card flex flex-col justify-between gap-4 border border-white/5 hover:border-[#D4AF37]/20 transition-all">
-                        <div className="space-y-3">
-                          <div className="flex justify-between items-center">
-                            <div className={`w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center ${cert.color}`}>
-                              <cert.icon size={22} />
+                <div className="space-y-8 animate-fadeIn">
+                  {/* Warning Notice Banner */}
+                  <div className="bg-[#D4AF37]/5 border border-[#D4AF37]/15 p-4 rounded-2xl flex items-center gap-3">
+                    <AlertTriangle className="text-[#D4AF37] shrink-0" size={18} />
+                    <p className="text-xs text-[#D4AF37] font-semibold">
+                      ⚠️ Note: Your examination scores will be officially recorded in your training history.
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    {[
+                      { id: 'foundations', title: 'Category A: Foundations Exam', desc: 'Focuses on Profile Optimization (Pillar 1), Live Quality (Pillar 2), and Consistency Models (Pillar 3).', icon: Trophy, color: 'text-amber-500' },
+                      { id: 'growth', title: 'Category B: Growth Exam', desc: 'Focuses on Interactive Tools & Lucky Boxes (Pillar 4), Comment & Reaction Speeds (Pillar 5), and Fanbase Development (Pillar 6).', icon: Trophy, color: 'text-slate-400' },
+                      { id: 'mastery', title: 'Category C: Mastery Exam', desc: 'Focuses on Retention & GC Calendars (Pillar 7), Monetization & Gratitude Loops (Pillar 8), and Intentional Goal Setting (Pillar 9).', icon: Award, color: 'text-yellow-400' }
+                    ].map((cert) => {
+                      const completed = quizResultsHistory[cert.id];
+                      return (
+                        <div key={cert.id} className="glass-card flex flex-col justify-between gap-4 border border-white/5 hover:border-[#D4AF37]/20 transition-all">
+                          <div className="space-y-3">
+                            <div className="flex justify-between items-center">
+                              <div className={`w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center ${cert.color}`}>
+                                <cert.icon size={22} />
+                              </div>
+                              {completed && (
+                                <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 text-[9px] font-black uppercase">PASSED</span>
+                              )}
                             </div>
-                            {completed && (
-                              <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 text-[9px] font-black uppercase">PASSED</span>
-                            )}
+
+                            <h3 className="text-sm font-black text-white uppercase tracking-wider">{cert.title}</h3>
+                            <p className="text-xs text-[#A09E9A] leading-relaxed">{cert.desc}</p>
                           </div>
 
-                          <h3 className="text-sm font-black text-white uppercase tracking-wider">{cert.title}</h3>
-                          <p className="text-xs text-[#A09E9A] leading-relaxed">{cert.desc}</p>
+                          {completed ? (
+                            <button
+                              onClick={() => setViewingCertificate(cert.id)}
+                              className="w-full py-2 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 rounded-xl text-xs font-bold text-emerald-400 transition-all text-center cursor-pointer"
+                            >
+                              View Certificate
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => handleStartQuiz(cert.id)}
+                              className="btn-gold py-2 w-full text-center cursor-pointer"
+                            >
+                              Take Exam
+                            </button>
+                          )}
                         </div>
+                      );
+                    })}
+                  </div>
 
-                        {completed ? (
-                          <button
-                            onClick={() => setViewingCertificate(cert.id)}
-                            className="w-full py-2 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 rounded-xl text-xs font-bold text-emerald-400 transition-all text-center"
-                          >
-                            View Certificate
-                          </button>
-                        ) : (
-                          <button
-                            onClick={() => handleStartQuiz(cert.id)}
-                            className="btn-gold py-2 w-full text-center"
-                          >
-                            Take Quiz
-                          </button>
-                        )}
+                  {/* History Transcripts Log Table */}
+                  <div className="bg-[#0D0D14] border border-white/5 rounded-3xl p-6 space-y-4">
+                    <div className="flex items-center gap-2 border-b border-white/5 pb-3">
+                      <GraduationCap className="text-[#D4AF37]" size={18} />
+                      <h3 className="text-sm font-black text-white uppercase tracking-widest">Examination Scores History</h3>
+                    </div>
+                    {examScores.length === 0 ? (
+                      <p className="text-xs text-[#A09E9A] italic py-4">No examination history found. Take your first quiz to record your score.</p>
+                    ) : (
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left text-xs border-collapse font-sans">
+                          <thead>
+                            <tr className="border-b border-white/10 text-[#5A5865] font-black uppercase text-[10px] tracking-wider">
+                              <th className="py-3 px-2">Category</th>
+                              <th className="py-3 px-2">Score</th>
+                              <th className="py-3 px-2">Percentage</th>
+                              <th className="py-3 px-2">Date & Time</th>
+                              <th className="py-3 px-2 text-right">Status</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-white/5">
+                            {examScores.map((score, index) => (
+                              <tr key={index} className="text-[#A09E9A] hover:bg-white/03 transition-colors">
+                                <td className="py-3 px-2 font-bold text-white">
+                                  {score.category === 'foundations' ? 'Category A: Foundations Exam' :
+                                   score.category === 'growth' ? 'Category B: Growth Exam' :
+                                   score.category === 'mastery' ? 'Category C: Mastery Exam' : score.category}
+                                </td>
+                                <td className="py-3 px-2 font-mono">{score.score} / {score.total}</td>
+                                <td className="py-3 px-2 font-mono">{Math.round((score.score / score.total) * 100)}%</td>
+                                <td className="py-3 px-2 text-[11px]">{score.timestamp}</td>
+                                <td className="py-3 px-2 text-right">
+                                  <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${
+                                    score.passed ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'
+                                  }`}>
+                                    {score.passed ? 'PASSED' : 'RETRY REQUIRED'}
+                                  </span>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
                       </div>
-                    );
-                  })}
+                    )}
+                  </div>
                 </div>
               ) : (
                 /* Quiz Game Active */
@@ -2320,9 +3787,9 @@ export function LearningResources() {
 
                 <div className="space-y-1">
                   <p className="text-lg font-black text-white tracking-widest uppercase">
-                    {viewingCertificate === 'beginner' ? 'Beginner Streaming Badge' :
-                     viewingCertificate === 'intermediate' ? 'Intermediate Streaming Specialist' :
-                     viewingCertificate === 'advanced' ? 'Advanced Retention Strategist' : 'Pro Streaming Master'}
+                    {viewingCertificate === 'foundations' ? 'Category A: Foundations Certificate' :
+                     viewingCertificate === 'growth' ? 'Category B: Growth Certificate' :
+                     viewingCertificate === 'mastery' ? 'Category C: Mastery Certificate' : 'Accredited Specialist'}
                   </p>
                   <p className="text-[9px] text-[#A09E9A]/60 font-mono">CERTIFICATE ID: NTM-{viewingCertificate?.toUpperCase()}-{authState.poppo_id || '98765'}</p>
                 </div>

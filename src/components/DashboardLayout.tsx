@@ -14,6 +14,7 @@ export const DashboardLayout = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const authState = Storage.getAuthState();
+  const role = (authState.role || '').toLowerCase();
 
   const handleLogout = async () => {
     await signOut(auth);
@@ -28,8 +29,6 @@ export const DashboardLayout = () => {
       { path: '/app/calendar', label: 'Calendar', icon: Calendar },
       { path: '/app/learning', label: 'Learning', icon: BookOpen },
     ];
-    
-    const role = (authState.role || '').toLowerCase();
     
     if (role === 'director' || role === 'admin' || role === 'head admin') {
       links.push({ path: '/app/director', label: 'Hub', icon: Shield });
@@ -118,7 +117,21 @@ export const DashboardLayout = () => {
             })}
           </div>
 
-          <div className="p-4 border-t border-white/5">
+          <div className="p-4 border-t border-white/5 space-y-1">
+            <Link
+              to="/app/learning?tab=onboarding"
+              onClick={() => setIsSidebarOpen(false)}
+              className={cn(
+                "flex items-center gap-3 px-3 py-3 rounded-xl transition-all font-bold text-sm",
+                location.pathname.startsWith('/app/learning') && location.search.includes('tab=onboarding')
+                  ? "bg-[#D4AF37]/10 text-[#D4AF37] shadow-[inset_0_0_12px_rgba(212,175,55,0.05)]" 
+                  : "text-[#A09E9A] hover:bg-white/[0.02] hover:text-[#F0EFE8]"
+              )}
+            >
+              <BookOpen size={18} />
+              <span>{role === 'host' ? 'Streaming 101' : 'Managing 101'}</span>
+            </Link>
+
             <button 
               onClick={handleLogout}
               className="flex items-center gap-3 px-3 py-3 w-full text-left rounded-xl transition-all text-red-400 hover:bg-red-500/10 font-bold text-sm"
