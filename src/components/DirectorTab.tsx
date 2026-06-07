@@ -1923,7 +1923,7 @@ export const DirectorTab = () => {
                           name: String(formData.get('name')),
                           nickname: String(formData.get('name')),
                           role: 'Talent',
-                          team: String(formData.get('team') || 'Unassigned'),
+                          teamAnchor: String(formData.get('teamAnchor') || 'Unassigned'),
                           manager: 'Nine Management',
                           anchor_type: 'Nine Agency',
                           tier_pay: 'N/A',
@@ -1949,7 +1949,7 @@ export const DirectorTab = () => {
                         name: String(formData.get('name')),
                         nickname: String(formData.get('name')),
                         role: 'Talent',
-                        team: String(formData.get('team') || 'Unassigned'),
+                        teamAnchor: String(formData.get('teamAnchor') || 'Unassigned'),
                         manager: String(formData.get('manager') || 'Nine Management'),
                         anchor_type: 'Nine Agency',
                         tier_pay: 'N/A',
@@ -1984,8 +1984,8 @@ export const DirectorTab = () => {
                       <input id="reg-name" name="name" type="text" placeholder="Display name" className="w-full glass-input text-xs text-[#F0EFE8]" required title="Enter Display Name" aria-label="Enter Display Name" />
                     </div>
                     <div className="space-y-1.5">
-                      <label htmlFor="reg-team" className="text-[9px] font-black uppercase text-[#A09E9A]/40 tracking-wider">Team Group</label>
-                      <input id="reg-team" name="team" type="text" placeholder="Unassigned" className="w-full glass-input text-xs text-[#F0EFE8]" title="Enter Team Group" aria-label="Enter Team Group" />
+                      <label htmlFor="reg-team" className="text-[9px] font-black uppercase text-[#A09E9A]/40 tracking-wider">Team Anchor</label>
+                      <input id="reg-team" name="teamAnchor" type="text" placeholder="Unassigned" className="w-full glass-input text-xs text-[#F0EFE8]" title="Enter Team Anchor" aria-label="Enter Team Anchor" />
                     </div>
                     <button type="submit" className="py-3 btn-gold rounded-xl text-xs font-black uppercase tracking-widest text-[#0D0D14] transition-all shadow-lg active:scale-95 cursor-pointer">
                       Register Host
@@ -2330,11 +2330,11 @@ export const DirectorTab = () => {
                                       alert("Failed to update status");
                                     }
                                   }}
-                                  className="bg-transparent border-none rounded text-xs text-[#A09E9A] hover:text-[#F0EFE8] focus:ring-1 focus:ring-indigo-500 cursor-pointer"
+                                  className={`bg-transparent border-none rounded text-xs focus:ring-1 focus:ring-indigo-500 cursor-pointer font-bold ${host.status === 'Active' ? 'text-emerald-400' : 'text-[#A09E9A] hover:text-[#F0EFE8]'}`}
                                   title="Select status"
                                   aria-label="Select status"
                                 >
-                                  {['Active', 'Inconsistent', 'Released', 'Inactive'].map(s => (
+                                  {['Active', 'Intermittent', 'Released', 'Inactive'].map(s => (
                                     <option key={s} value={s} className="bg-[#0A0A0B] text-[#F0EFE8]">{s}</option>
                                   ))}
                                 </select>
@@ -2940,12 +2940,10 @@ export const DirectorTab = () => {
                 {[
                   { field: 'nickname', label: 'Nickname / Alias' },
                   { field: 'role', label: 'Role' },
-                  { field: 'role', label: 'Role' },
-                  { field: 'team', label: 'Team Group' },
+                  { field: 'teamAnchor', label: 'Team Anchor' },
                   { field: 'manager', label: 'Assigned Manager' },
                   { field: 'tier_pay', label: 'Salary Class' },
                   { field: 'status', label: 'Roster Status' },
-
                   { field: 'level', label: 'Level Snapshot' }
                 ].map(({ field, label }) => {
                   const existVal = (existingHost as any)[field];

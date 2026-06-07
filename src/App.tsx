@@ -13,7 +13,6 @@ import { RosterTab } from './components/RosterTab';
 import { CalendarTab } from './components/CalendarTab';
 import { DirectorOperations } from './pages/DirectorOperations';
 import { SystemLogsPage } from './pages/SystemLogsPage';
-import { ManagerDashboard } from './components/ManagerDashboard';
 import { HostProfileEditor } from './components/HostProfileEditor';
 import { ProfilesTab } from './components/ProfilesTab';
 import { PublicLayout } from './components/PublicLayout';
@@ -28,6 +27,7 @@ import { AgencyPolicy } from './pages/AgencyPolicy';
 import { OnboardingProcess } from './pages/OnboardingProcess';
 import { Storage } from './lib/storage';
 import { SmartRoute } from './components/SmartRoute';
+import { Analytics } from './pages/TeamAnalytics';
 
 const RootIndex = () => {
   const authState = Storage.getAuthState();
@@ -74,11 +74,11 @@ export default function App() {
           {/* Shared tabs (all authenticated roles) */}
           <Route path="dashboard" element={<Overview />} />
 
-          {/* Host self-profile — Talent / Host roles */}
+          {/* My Profile — accessible to hosts and admin/manager/agent/head admin roles */}
           <Route
             path="my-profile"
             element={
-              <RoleGuard roles={['host']}>
+              <RoleGuard roles={['host', 'admin', 'manager', 'agent', 'head admin', 'head_admin', 'director']}>
                 <HostProfileEditor />
               </RoleGuard>
             }
@@ -94,12 +94,13 @@ export default function App() {
             }
           />
 
-          {/* Manager operational hub */}
+
+          {/* Team Analytics */}
           <Route
-            path="hub"
+            path="analytics"
             element={
-              <RoleGuard roles={['director', 'manager', 'agent']}>
-                <ManagerDashboard />
+              <RoleGuard roles={['manager', 'agent']}>
+                <Analytics />
               </RoleGuard>
             }
           />

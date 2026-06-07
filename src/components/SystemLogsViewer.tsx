@@ -38,6 +38,17 @@ export const SystemLogsViewer: React.FC = () => {
     return true;
   });
 
+  const formatTimestamp = (timestamp: any) => {
+    try {
+      if (!timestamp) return 'No Date';
+      const date = new Date(timestamp);
+      if (isNaN(date.getTime())) return String(timestamp);
+      return format(date, 'MMM dd, HH:mm:ss');
+    } catch {
+      return String(timestamp || 'Invalid Date');
+    }
+  };
+
   const getSeverityIcon = (severity: LogSeverity) => {
     switch (severity) {
       case 'Error': return <XCircle className="text-red-500" size={16} />;
@@ -105,7 +116,7 @@ export const SystemLogsViewer: React.FC = () => {
               filteredLogs.map((log, i) => (
                 <tr key={i} className="border-b border-[#D4AF37]/10 hover:bg-slate-800/20 transition-colors">
                   <td className="p-4 whitespace-nowrap">
-                    {format(new Date(log.timestamp), 'MMM dd, HH:mm:ss')}
+                    {formatTimestamp(log.timestamp)}
                   </td>
                   <td className="p-4">
                     <div className="flex items-center gap-2">

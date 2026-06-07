@@ -113,7 +113,7 @@ export const ProfilesTab: React.FC<ProfilesTabProps> = ({ isReadOnly = false }) 
 
       // 3. Tier Pay Filter
       if (tierFilter !== 'All Tiers') {
-        const tierPay = (host.tier_pay || host.tierPay || '').toLowerCase();
+        const tierPay = (host.tier_pay || '').toLowerCase();
         if (tierPay !== tierFilter.toLowerCase()) return false;
       }
 
@@ -209,7 +209,7 @@ export const ProfilesTab: React.FC<ProfilesTabProps> = ({ isReadOnly = false }) 
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {filteredHosts.map(host => {
-            const tierPay = String((host as any).tier_pay || host.tierPay || 'N/A');
+            const tierPay = String(host.tier_pay || 'N/A');
             const blockStyles = getTierBlockStyles(tierPay);
             return (
               <div
@@ -245,7 +245,7 @@ export const ProfilesTab: React.FC<ProfilesTabProps> = ({ isReadOnly = false }) 
                 <div className="mt-2 flex items-center gap-3">
                   <div className="flex items-center gap-1 text-[10px] text-amber-400 font-bold bg-amber-400/10 px-2 py-1 rounded-md border border-amber-400/20">
                     <Star size={10} />
-                    {(host as any).tier_pay || host.tierPay || 'N/A'}
+                    {host.tier_pay || 'N/A'}
                   </div>
                   {host.status === 'Active' && (
                     <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"></div>

@@ -1,14 +1,14 @@
 /* eslint-disable */
 /* eslint-disable */
 import React, { useState, useEffect, useMemo } from 'react';
-import { X, Calendar, ChevronLeft, Edit2, Loader2, Save, Instagram, Twitter, Facebook, TrendingUp, TrendingDown, Minus, ArrowUpDown, Award, MessageSquare, Star } from 'lucide-react';
-import { Host, CommissionEntry, CalendarEvent } from '../types';
+import { X, Calendar, ChevronLeft, Edit2, Loader2, Save, Instagram, Twitter, Facebook, TrendingUp, TrendingDown, Minus, ArrowUpDown, Award, MessageSquare, Star, Users, Send, ClipboardList, Trash2, Clock, Plus, CheckCircle2, AlertCircle, Briefcase, ListTodo, Activity } from 'lucide-react';
+import { Host, CommissionEntry, CalendarEvent, Task, AwardBadge, AwardAssignment } from '../types';
 import { FirebaseService } from '../lib/firebaseService';
 import { Storage } from '../lib/storage';
 import { cn, formatNumber } from '../lib/utils';
 import { MANAGERS, BASE_SALARY_POLICIES } from '../lib/constants';
-import { collection, query, where, getDocs, Timestamp, documentId, doc, setDoc } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { collection, query, where, getDocs, Timestamp, documentId, doc, setDoc, addDoc, onSnapshot, deleteDoc } from 'firebase/firestore';
+import { db, auth } from '../lib/firebase';
 import { ComposedChart, Area, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, BarChart, Bar, Cell } from 'recharts';
 import { SingleDatePicker, DateRangePicker } from './InteractiveDatePicker';
 
@@ -17,6 +17,7 @@ interface HostProfileViewProps {
   isReadOnly?: boolean;
   onClose?: () => void;
   onProfileUpdated?: () => void;
+  hidePerformanceStats?: boolean;
 }
 
 // Helper to determine live hours from report safely
@@ -28,10 +29,169 @@ const getLiveHoursForReport = (r: any): number => {
   return 0;
 };
 
+// Helper to abbreviate month names in award titles
+const abbreviateMonths = (text: string): string => {
+  if (!text) return '';
+  const monthReplacements: Record<string, string> = {
+    'JANUARY': 'JAN',
+    'FEBRUARY': 'FEB',
+    'MARCH': 'MAR',
+    'APRIL': 'APR',
+    'MAY': 'MAY',
+    'JUNE': 'JUN',
+    'JULY': 'JUL',
+    'AUGUST': 'AUG',
+    'SEPTEMBER': 'SEP',
+    'OCTOBER': 'OCT',
+    'NOVEMBER': 'NOV',
+    'DECEMBER': 'DEC'
+  };
+  let result = text.toUpperCase();
+  for (const [full, short] of Object.entries(monthReplacements)) {
+    result = result.replace(new RegExp(`\\b${full}\\b`, 'g'), short);
+  }
+  return result;
+};
+
+const getIsLastMonth = (startDateStr: string, endDateStr: string): boolean => {
+  if (!startDateStr || !endDateStr) return false;
+  try {
+    const today = new Date();
+    let lastMonthYear = today.getFullYear();
+    let lastMonthIndex = today.getMonth() - 1;
+    if (lastMonthIndex < 0) {
+      lastMonthIndex = 11;
+      lastMonthYear -= 1;
+    }
+
+    const startParts = startDateStr.split('-');
+    const endParts = endDateStr.split('-');
+    if (startParts.length < 3 || endParts.length < 3) return false;
+
+    const startYear = parseInt(startParts[0], 10);
+    const startMonth = parseInt(startParts[1], 10) - 1;
+    
+    const endYear = parseInt(endParts[0], 10);
+    const endMonth = parseInt(endParts[1], 10) - 1;
+
+    return startYear === lastMonthYear && startMonth === lastMonthIndex &&
+           endYear === lastMonthYear && endMonth === lastMonthIndex;
+  } catch (e) {
+    return false;
+  }
+};
+
+// Helper to format date and time like "Jun 6/26 7PM"
+const formatLogDateAndTime = (dateInput: any, timeInput: string): string => {
+  if (!dateInput) return '';
+  let year = 26;
+  let monthIndex = 5;
+  let day = 6;
+
+  try {
+    if (typeof dateInput === 'string') {
+      const match = dateInput.trim().match(/^(\d{4})-(\d{2})-(\d{2})/);
+      if (match) {
+        const y = parseInt(match[1], 10);
+        const m = parseInt(match[2], 10);
+        const d = parseInt(match[3], 10);
+        year = y % 100;
+        monthIndex = m - 1;
+        day = d;
+      } else {
+        const d = new Date(dateInput);
+        if (!isNaN(d.getTime())) {
+          year = d.getFullYear() % 100;
+          monthIndex = d.getMonth();
+          day = d.getDate();
+        }
+      }
+    } else if (dateInput?.toDate) {
+      const d = dateInput.toDate();
+      year = d.getFullYear() % 100;
+      monthIndex = d.getMonth();
+      day = d.getDate();
+    } else if (dateInput?.seconds) {
+      const d = new Date(dateInput.seconds * 1000);
+      year = d.getFullYear() % 100;
+      monthIndex = d.getMonth();
+      day = d.getDate();
+    } else {
+      const d = new Date(dateInput);
+      if (!isNaN(d.getTime())) {
+        year = d.getFullYear() % 100;
+        monthIndex = d.getMonth();
+        day = d.getDate();
+      }
+    }
+  } catch (e) {
+    // Fallback
+  }
+
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const monthName = months[monthIndex] || 'Jun';
+  
+  let formattedTime = '';
+  if (timeInput) {
+    // Grab first part before '-' or space
+    const parts = timeInput.split('-');
+    const startPart = (parts[0] || '').trim();
+    
+    // Extract hour, minute, and AM/PM
+    const matchAMPM = startPart.match(/^(\d{1,2})(?::(\d{2}))?\s*([ap]m)/i);
+    if (matchAMPM) {
+      const h = parseInt(matchAMPM[1], 10);
+      const mStr = matchAMPM[2]; // minutes if present
+      const ampm = matchAMPM[3].toUpperCase();
+      
+      if (mStr && mStr !== '00') {
+        formattedTime = `${h}:${mStr}${ampm}`;
+      } else {
+        formattedTime = `${h}${ampm}`;
+      }
+    } else {
+      const match24h = startPart.match(/^(\d{1,2}):(\d{2})/);
+      if (match24h) {
+        let h = parseInt(match24h[1], 10);
+        const mStr = match24h[2];
+        const ampm = h >= 12 ? 'PM' : 'AM';
+        h = h % 12;
+        h = h ? h : 12;
+        
+        if (mStr && mStr !== '00') {
+          formattedTime = `${h}:${mStr}${ampm}`;
+        } else {
+          formattedTime = `${h}${ampm}`;
+        }
+      } else {
+        formattedTime = startPart.replace(/\s+/g, '').toUpperCase();
+      }
+    }
+  }
+  
+  return `${monthName} ${day}/${year}${formattedTime ? ' ' + formattedTime : ''}`;
+};
+
 // Helper to format date uniformly (e.g. "Jun 02, 2026")
 const formatDateStandard = (dateInput: any): string => {
   if (!dateInput) return '—';
   try {
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    
+    // First try to parse YYYY-MM-DD string directly to avoid local timezone offset shifting
+    if (typeof dateInput === 'string') {
+      const clean = dateInput.trim();
+      const match = clean.match(/^(\d{4})-(\d{2})-(\d{2})/);
+      if (match) {
+        const yyyy = parseInt(match[1], 10);
+        const mm = parseInt(match[2], 10);
+        const dd = parseInt(match[3], 10);
+        const monthName = months[mm - 1] || 'Jun';
+        const dayStr = String(dd).padStart(2, '0');
+        return `${monthName} ${dayStr}, ${yyyy}`;
+      }
+    }
+
     let date: Date;
     if (dateInput instanceof Timestamp) {
       date = dateInput.toDate();
@@ -41,10 +201,13 @@ const formatDateStandard = (dateInput: any): string => {
       date = new Date(dateInput);
     }
     if (isNaN(date.getTime())) return '—';
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    const day = String(date.getDate()).padStart(2, '0');
-    const month = months[date.getMonth()];
-    const year = date.getFullYear();
+    
+    // Detect if Date object represents UTC midnight date (common for date strings parsed in JS)
+    const isUTCDate = date.getUTCHours() === 0 && date.getUTCMinutes() === 0 && date.getUTCSeconds() === 0 && date.getUTCMilliseconds() === 0;
+    
+    const day = String(isUTCDate ? date.getUTCDate() : date.getDate()).padStart(2, '0');
+    const month = months[isUTCDate ? date.getUTCMonth() : date.getMonth()];
+    const year = isUTCDate ? date.getUTCFullYear() : date.getFullYear();
     return `${month} ${day}, ${year}`;
   } catch (e) {
     return '—';
@@ -68,15 +231,50 @@ const formatUpdateMetaDate = (timestampInput: any): string => {
     const yy = String(date.getFullYear()).slice(-2);
     const hh = String(date.getHours()).padStart(2, '0');
     const min = String(date.getMinutes()).padStart(2, '0');
-    return `${mm}/${dd},${yy} ${hh}/${min}`;
+    return `${mm}/${dd}/${yy} ${hh}:${min}`;
   } catch (e) {
     return '—';
   }
 };
 
+const renderCardFooter = (dateInput: any, role?: string, nickname?: string) => {
+  if (!dateInput) return null;
+  const formattedDate = formatDateStandard(dateInput);
+  if (formattedDate === '—') return null;
+
+  const cleanRole = role && role.trim() !== 'Unknown' ? role.trim() : '';
+  const cleanNickname = nickname && nickname.trim() !== 'Unknown' ? nickname.trim() : '';
+
+  let userStr = '';
+  if (cleanRole && cleanNickname) {
+    userStr = ` by ${cleanRole} ${cleanNickname}`;
+  } else if (cleanNickname) {
+    userStr = ` by ${cleanNickname}`;
+  } else if (cleanRole) {
+    userStr = ` by ${cleanRole}`;
+  }
+
+  return (
+    <div className="flex items-center justify-between mt-4 pt-4 border-t border-white/5 w-full">
+      <p className="text-[9px] text-[#A09E9A]/60 italic font-medium">
+        Last Updated on {formattedDate}{userStr}
+      </p>
+    </div>
+  );
+};
+
 const formatDateYYYYMMDD = (dateInput: any): string => {
   if (!dateInput) return '—';
   try {
+    // First try to parse YYYY-MM-DD string directly to avoid local timezone offset shifting
+    if (typeof dateInput === 'string') {
+      const clean = dateInput.trim();
+      const match = clean.match(/^(\d{4})-(\d{2})-(\d{2})/);
+      if (match) {
+        return `${match[1]}-${match[2]}-${match[3]}`;
+      }
+    }
+
     let date: Date;
     if (dateInput?.seconds) {
       date = new Date(dateInput.seconds * 1000);
@@ -86,17 +284,63 @@ const formatDateYYYYMMDD = (dateInput: any): string => {
       date = new Date(dateInput);
     }
     if (isNaN(date.getTime())) return String(dateInput);
-    const yyyy = date.getFullYear();
-    const mm = String(date.getMonth() + 1).padStart(2, '0');
-    const dd = String(date.getDate()).padStart(2, '0');
+    
+    const isUTCDate = date.getUTCHours() === 0 && date.getUTCMinutes() === 0 && date.getUTCSeconds() === 0 && date.getUTCMilliseconds() === 0;
+    
+    const yyyy = isUTCDate ? date.getUTCFullYear() : date.getFullYear();
+    const mm = String((isUTCDate ? date.getUTCMonth() : date.getMonth()) + 1).padStart(2, '0');
+    const dd = String(isUTCDate ? date.getUTCDate() : date.getDate()).padStart(2, '0');
     return `${yyyy}-${mm}-${dd}`;
   } catch (e) {
     return String(dateInput);
   }
 };
 
+const formatDateMMDDYYYY = (dateInput: any): string => {
+  if (!dateInput) return '—';
+  try {
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    
+    // First try to parse YYYY-MM-DD string directly to avoid local timezone offset shifting
+    if (typeof dateInput === 'string') {
+      const clean = dateInput.trim();
+      const match = clean.match(/^(\d{4})-(\d{2})-(\d{2})/);
+      if (match) {
+        const yyyy = parseInt(match[1], 10);
+        const mm = parseInt(match[2], 10);
+        const dd = parseInt(match[3], 10);
+        const monthName = months[mm - 1] || 'Jun';
+        const dayStr = String(dd).padStart(2, '0');
+        return `${monthName} ${dayStr} - ${yyyy}`;
+      }
+    }
+
+    let date: Date;
+    if (dateInput?.seconds) {
+      date = new Date(dateInput.seconds * 1000);
+    } else if (dateInput?.toDate) {
+      date = dateInput.toDate();
+    } else {
+      date = new Date(dateInput);
+    }
+    if (isNaN(date.getTime())) return String(dateInput);
+    
+    const isUTCDate = date.getUTCHours() === 0 && date.getUTCMinutes() === 0 && date.getUTCSeconds() === 0 && date.getUTCMilliseconds() === 0;
+    
+    const yyyy = isUTCDate ? date.getUTCFullYear() : date.getFullYear();
+    const mm = (isUTCDate ? date.getUTCMonth() : date.getMonth()) + 1;
+    const dd = isUTCDate ? date.getUTCDate() : date.getDate();
+    
+    const monthName = months[mm - 1] || 'Jun';
+    const dayStr = String(dd).padStart(2, '0');
+    return `${monthName} ${dayStr} - ${yyyy}`;
+  } catch (e) {
+    return String(dateInput);
+  }
+};
+
 const formatTimeslot = (timeStr: string) => {
-  if (!timeStr) return 'TBA Manila Time PHT';
+  if (!timeStr) return 'TBA Manila Time';
   const clean = timeStr.trim();
   
   // Extract time part and strip/ignore any existing timezone string to avoid duplicates or misformatting
@@ -127,7 +371,133 @@ const formatTimeslot = (timeStr: string) => {
     }
   }
   
-  return `${formattedTime} Manila Time PHT`;
+  return `${formattedTime} Manila Time`;
+};
+
+const convertManilaToLocal = (dateInput: any, timeStr: string): Date | null => {
+  try {
+    if (!dateInput) return null;
+    let baseDateStr = '';
+    
+    // First try to parse YYYY-MM-DD string directly to avoid local timezone offset shifting
+    if (typeof dateInput === 'string') {
+      const cleanInput = dateInput.trim();
+      const match = cleanInput.match(/^(\d{4})-(\d{2})-(\d{2})/);
+      if (match) {
+        baseDateStr = `${match[1]}-${match[2]}-${match[3]}`;
+      }
+    }
+    
+    if (!baseDateStr) {
+      let date: Date;
+      if (dateInput?.seconds) {
+        date = new Date(dateInput.seconds * 1000);
+      } else if (typeof dateInput?.toDate === 'function') {
+        date = dateInput.toDate();
+      } else {
+        date = new Date(dateInput);
+      }
+      
+      if (!isNaN(date.getTime())) {
+        const isUTCDate = date.getUTCHours() === 0 && date.getUTCMinutes() === 0 && date.getUTCSeconds() === 0 && date.getUTCMilliseconds() === 0;
+        const yyyy = isUTCDate ? date.getUTCFullYear() : date.getFullYear();
+        const mm = String((isUTCDate ? date.getUTCMonth() : date.getMonth()) + 1).padStart(2, '0');
+        const dd = String(isUTCDate ? date.getUTCDate() : date.getDate()).padStart(2, '0');
+        baseDateStr = `${yyyy}-${mm}-${dd}`;
+      } else {
+        return null;
+      }
+    }
+
+    let hour = 19; // Default to 7:00 PM if parsing fails
+    let min = 0;
+    
+    if (timeStr) {
+      const clean = timeStr.trim();
+      let timePart = clean;
+      const tzMatch = clean.match(/\s*(pht|pst|gmt|utc|est|philippine|manila.*)$/i);
+      if (tzMatch) {
+        timePart = clean.substring(0, tzMatch.index).trim();
+      }
+      
+      const ampmMatch = timePart.match(/^(\d{1,2}):(\d{2})\s*([ap]\.?m\.?)/i);
+      if (ampmMatch) {
+        let h = parseInt(ampmMatch[1], 10);
+        const m = parseInt(ampmMatch[2], 10);
+        const ampm = ampmMatch[3].toUpperCase().replace(/\./g, '');
+        if (ampm === 'PM' && h < 12) h += 12;
+        if (ampm === 'AM' && h === 12) h = 0;
+        hour = h;
+        min = m;
+      } else {
+        const match = timePart.match(/^(\d{1,2}):(\d{2})/);
+        if (match) {
+          hour = parseInt(match[1], 10);
+          min = parseInt(match[2], 10);
+        }
+      }
+    }
+
+    const hourStr = String(hour).padStart(2, '0');
+    const minStr = String(min).padStart(2, '0');
+    const isoString = `${baseDateStr}T${hourStr}:${minStr}:00+08:00`;
+    const localDate = new Date(isoString);
+    if (isNaN(localDate.getTime())) return null;
+    return localDate;
+  } catch (e) {
+    return null;
+  }
+};
+
+const formatToLocalTimezone = (date: Date): string => {
+  const mm = String(date.getMonth() + 1).padStart(2, '0');
+  const dd = String(date.getDate()).padStart(2, '0');
+  const yyyy = date.getFullYear();
+  
+  let hours = date.getHours();
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  const ampm = hours >= 12 ? 'PM' : 'AM';
+  hours = hours % 12;
+  hours = hours ? hours : 12;
+  const hoursStr = String(hours).padStart(2, '0');
+  
+  let tzAbbr = '';
+  try {
+    const tzName = new Intl.DateTimeFormat('en-US', { timeZoneName: 'short' })
+      .formatToParts(date)
+      .find(p => p.type === 'timeZoneName')?.value;
+    if (tzName) tzAbbr = tzName;
+  } catch (e) {}
+  
+  if (!tzAbbr) {
+    const offset = date.getTimezoneOffset();
+    const absOffset = Math.abs(offset);
+    const sign = offset <= 0 ? '+' : '-';
+    const hrs = String(Math.floor(absOffset / 60)).padStart(2, '0');
+    const mins = String(absOffset % 60).padStart(2, '0');
+    tzAbbr = `UTC${sign}${hrs}:${mins}`;
+  }
+  
+  return `Local Time: ${mm}-${dd}-${yyyy} • ${hoursStr}:${minutes} ${ampm} (${tzAbbr})`;
+};
+
+const getSocialLink = (type: string, url?: string): string | null => {
+  if (!url || String(url).trim() === '') return null;
+  const trimmed = String(url).trim();
+  if (type === 'instagram') {
+    return trimmed.startsWith('http') ? trimmed : `https://instagram.com/${trimmed.replace('@', '')}`;
+  }
+  if (type === 'tiktok') {
+    return trimmed.startsWith('http') ? trimmed : `https://tiktok.com/@${trimmed.replace('@', '')}`;
+  }
+  if (type === 'facebook') {
+    return trimmed.startsWith('http') ? trimmed : `https://facebook.com/${trimmed}`;
+  }
+  if (type === 'whatsapp') {
+    const phone = trimmed.replace(/[^0-9+]/g, '');
+    return phone.startsWith('+') ? `https://wa.me/${phone.replace('+', '')}` : `https://wa.me/${phone}`;
+  }
+  return null;
 };
 
 const MONTH_ORDER = ['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -167,8 +537,2384 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
   host, 
   isReadOnly = false, 
   onClose,
-  onProfileUpdated 
+  onProfileUpdated,
+  hidePerformanceStats = false
 }) => {
+  const rootAuth = Storage.getAuthState();
+  const managerPoppoId = String(rootAuth?.poppo_id || rootAuth?.poppoId || rootAuth?.id || '');
+  const [toasts, setToasts] = useState<{ id: number; type: 'success' | 'error'; message: string }[]>([]);
+  const [toastIdCounter, setToastIdCounter] = useState(0);
+  const [assignedHostsList, setAssignedHostsList] = useState<any[]>([]);
+  const [isLoadingAssignedHosts, setIsLoadingAssignedHosts] = useState(false);
+  const [spotlightHost, setSpotlightHost] = useState<Host | null>(null);
+
+  // States for Badge & Task Assignment
+  const [opsHosts, setOpsHosts] = useState<Host[]>([]);
+  const [opsTasks, setOpsTasks] = useState<Task[]>([]);
+  const [opsAwards, setOpsAwards] = useState<AwardBadge[]>([]);
+  const [opsAwardAssignments, setOpsAwardAssignments] = useState<AwardAssignment[]>([]);
+  const [isOpsLoading, setIsOpsLoading] = useState(false);
+  const [opsErrorMessage, setOpsErrorMessage] = useState<string | null>(null);
+  const [opsSuccessMessage, setOpsSuccessMessage] = useState('');
+
+  // Task form states
+  const [taskDueDateVal, setTaskDueDateVal] = useState('');
+  const [taskTitle, setTaskTitle] = useState('');
+  const [taskDescription, setTaskDescription] = useState('');
+  const [isSubmittingTask, setIsSubmittingTask] = useState(false);
+
+  // Award form states
+  const [newAwardName, setNewAwardName] = useState('');
+  const [newAwardColor, setNewAwardColor] = useState('Gold');
+  const [newAwardStartDate, setNewAwardStartDate] = useState('');
+  const [newAwardEndDate, setNewAwardEndDate] = useState('');
+  const [isCreatingAward, setIsCreatingAward] = useState(false);
+  const [awardCreateMode, setAwardCreateMode] = useState<'single' | 'bulk'>('single');
+  const [bulkMonth, setBulkMonth] = useState('06');
+  const [bulkYear, setBulkYear] = useState('2026');
+
+  const [assignAwardId, setAssignAwardId] = useState('');
+  const [assignHostId, setAssignHostId] = useState('');
+  const [assignRoleFilter, setAssignRoleFilter] = useState('All');
+  const [awardStartDate, setAwardStartDate] = useState('');
+  const [awardEndDate, setAwardEndDate] = useState('');
+  const [isAssigningAward, setIsAssigningAward] = useState(false);
+
+  const loggedInUserRole = String(rootAuth?.role || '').toLowerCase();
+  const isDirectorOrHeadAdmin = loggedInUserRole === 'director' || loggedInUserRole === 'head admin' || loggedInUserRole === 'head_admin';
+
+  // Inherit dates when selecting an award to assign
+  useEffect(() => {
+    if (assignAwardId) {
+      const match = opsAwards.find(a => a.id === assignAwardId);
+      if (match) {
+        setAwardStartDate(match.startDate || '');
+        setAwardEndDate(match.endDate || '');
+      }
+    } else {
+      setAwardStartDate('');
+      setAwardEndDate('');
+    }
+  }, [assignAwardId, opsAwards]);
+
+  const loadOpsData = async () => {
+    if (!isDirectorOrHeadAdmin || onClose) return;
+    setIsOpsLoading(true);
+    try {
+      const [h, t, a, aa] = await Promise.all([
+        FirebaseService.getHosts(),
+        FirebaseService.getTasks(),
+        FirebaseService.getAwards(),
+        FirebaseService.getAwardAssignments()
+      ]);
+      setOpsHosts(h);
+      setOpsTasks(t);
+      setOpsAwards(a);
+      setOpsAwardAssignments(aa);
+    } catch (err) {
+      console.error(err);
+      setOpsErrorMessage("Failed to load badge & task data.");
+    } finally {
+      setIsOpsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isDirectorOrHeadAdmin && !onClose) {
+      loadOpsData();
+    }
+  }, [onClose]);
+
+  const showOpsSuccess = (msg: string) => {
+    setOpsSuccessMessage(msg);
+    setTimeout(() => setOpsSuccessMessage(''), 4000);
+  };
+
+  const auditOpsLogAction = async (actionType: string, beforeValue: any, afterValue: any) => {
+    try {
+      let systemDescription = `Administrative action performed: ${actionType}`;
+      await FirebaseService.logSystemActivity(systemDescription, 'Info');
+    } catch (err) {
+      console.error("Audit log failed", err);
+    }
+  };
+
+  // Create Task
+  const handleCreateTask = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!taskTitle || !taskDescription || !taskDueDateVal) return;
+    setIsSubmittingTask(true);
+    
+    const newTask: Task = {
+      taskId: crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 15),
+      assignedToUserId: 'agency_wide', // Defaulting for simple task form
+      relatedPoppoId: '',
+      taskType: 'Operational',
+      title: taskTitle,
+      description: taskDescription,
+      status: 'Assigned',
+      dueDate: taskDueDateVal
+    };
+
+    try {
+      await FirebaseService.saveTasks([newTask]);
+      await auditOpsLogAction('CREATE_TASK', null, newTask);
+      showOpsSuccess('Task assigned to agency queue.');
+      setTaskTitle('');
+      setTaskDescription('');
+      loadOpsData();
+    } catch (err: any) {
+      setOpsErrorMessage("Failed to delegate task: " + (err.message || String(err)));
+    } finally {
+      setIsSubmittingTask(false);
+    }
+  };
+
+  // Delete Task
+  const handleDirectorDeleteTask = async (taskId: string) => {
+    if (!confirm('Hard delete this task assignment?')) return;
+    try {
+      await FirebaseService.deleteTask(taskId);
+      showOpsSuccess('Task removed.');
+      loadOpsData();
+    } catch (err: any) {
+      setOpsErrorMessage("Failed to delete task: " + (err.message || String(err)));
+    }
+  };
+
+  // Create Award template
+  const handleCreateAward = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newAwardName || !newAwardStartDate || !newAwardEndDate) return;
+    setIsCreatingAward(true);
+    try {
+      const awardId = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 15);
+      const award: AwardBadge = {
+        id: awardId,
+        name: newAwardName,
+        color: newAwardColor,
+        startDate: newAwardStartDate,
+        endDate: newAwardEndDate,
+        createdAt: new Date().toISOString()
+      };
+      await FirebaseService.saveAwards([award]);
+      showOpsSuccess('Custom award tag created.');
+      setNewAwardName('');
+      setNewAwardStartDate('');
+      setNewAwardEndDate('');
+      loadOpsData();
+    } catch (err: any) {
+      setOpsErrorMessage('Failed to create award: ' + (err.message || String(err)));
+    } finally {
+      setIsCreatingAward(false);
+    }
+  };
+
+  // Bulk Generate Awards
+  const handleBulkGenerateAwards = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!bulkMonth || !bulkYear) return;
+    setIsCreatingAward(true);
+    try {
+      const months = [
+        "January", "February", "March", "April", "May", "June",
+        "July", "August", "September", "October", "November", "December"
+      ];
+      const monthIndex = parseInt(bulkMonth, 10) - 1;
+      const monthName = months[monthIndex];
+      const yearNum = parseInt(bulkYear, 10);
+
+      // Compute start and end dates
+      const pad = (n: number) => String(n).padStart(2, '0');
+      const startDateStr = `${yearNum}-${pad(bulkMonth)}-01`;
+      
+      const lastDay = new Date(yearNum, monthIndex + 1, 0).getDate();
+      const endDateStr = `${yearNum}-${pad(bulkMonth)}-${pad(lastDay)}`;
+
+      const newAwardsList: AwardBadge[] = [];
+
+      for (let rank = 1; rank <= 9; rank++) {
+        const awardId = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 15);
+        
+        let color = 'Gold';
+        if (rank >= 4 && rank <= 6) color = 'Orange';
+        else if (rank >= 7) color = 'Red';
+
+        const newAward: AwardBadge = {
+          id: awardId,
+          name: `Top ${rank} Niner - ${monthName} ${bulkYear}`,
+          color,
+          startDate: startDateStr,
+          endDate: endDateStr,
+          createdAt: new Date().toISOString()
+        };
+
+        newAwardsList.push(newAward);
+      }
+
+      await FirebaseService.saveAwards(newAwardsList);
+      await FirebaseService.logSystemActivity(`Director/Admin bulk generated Monthly Top Niners awards templates for ${monthName} ${bulkYear}`, 'Info');
+      
+      showOpsSuccess(`Successfully generated 9 Monthly Top Niner awards for ${monthName} ${bulkYear}!`);
+      loadOpsData();
+    } catch (err: any) {
+      setOpsErrorMessage('Failed to bulk generate awards: ' + (err.message || String(err)));
+    } finally {
+      setIsCreatingAward(false);
+    }
+  };
+
+  // Assign Award
+  const handleAssignAward = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!assignAwardId || !assignHostId || !awardStartDate || !awardEndDate) return;
+    setIsAssigningAward(true);
+    try {
+      const award = opsAwards.find(a => a.id === assignAwardId);
+      const hostUser = opsHosts.find(h => h.id === assignHostId);
+      if (!award || !hostUser) throw new Error('Invalid selection');
+
+      const assignmentId = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 15);
+      const assignment: AwardAssignment = {
+        id: assignmentId,
+        awardId: award.id,
+        awardName: award.name,
+        awardColor: award.color,
+        hostId: hostUser.id,
+        hostNickname: hostUser.nickname || hostUser.name,
+        startDate: awardStartDate,
+        endDate: awardEndDate,
+        assignedAt: new Date().toISOString()
+      };
+      await FirebaseService.saveAwardAssignments([assignment]);
+      showOpsSuccess('Award tag assigned to member.');
+      setAssignHostId('');
+      loadOpsData();
+    } catch (err: any) {
+      setOpsErrorMessage('Failed to assign award: ' + (err.message || String(err)));
+    } finally {
+      setIsAssigningAward(false);
+    }
+  };
+
+  // Revoke Assignment
+  const handleRevokeAssignment = async (id: string) => {
+    if (!confirm('Revoke this award tag assignment?')) return;
+    try {
+      await FirebaseService.deleteAwardAssignment(id);
+      showOpsSuccess('Award tag revoked.');
+      loadOpsData();
+    } catch (err: any) {
+      setOpsErrorMessage('Failed to revoke award: ' + (err.message || String(err)));
+    }
+  };
+
+  const filteredAssignHosts = useMemo(() => {
+    return opsHosts.filter(h => {
+      const roleLower = String(h.role || '').toLowerCase().replace('_', ' ');
+      if (roleLower === 'director') return false;
+
+      if (assignRoleFilter === 'All') return true;
+      if (assignRoleFilter === 'Host' && (roleLower === 'host' || roleLower === 'talent')) return true;
+      const filterRoleLower = assignRoleFilter.toLowerCase().replace('_', ' ');
+      return roleLower === filterRoleLower;
+    });
+  }, [opsHosts, assignRoleFilter]);
+
+  // Intake Request States
+  const [intakePoppoId, setIntakePoppoId] = useState('');
+  const [intakeNickname, setIntakeNickname] = useState('');
+  const [intakeSuccess, setIntakeSuccess] = useState('');
+  const [intakeError, setIntakeError] = useState('');
+  const [isSubmittingIntake, setIsSubmittingIntake] = useState(false);
+
+  // Progress Notes States
+  const [noteHostId, setNoteHostId] = useState('');
+  const [noteContent, setNoteContent] = useState('');
+  const [notesHistory, setNotesHistory] = useState<any[]>([]);
+  const [isLoadingNotes, setIsLoadingNotes] = useState(false);
+  const [noteSuccess, setNoteSuccess] = useState('');
+  const [noteError, setNoteError] = useState('');
+  const [activeTab, setActiveTab] = useState<'todo' | 'add' | 'history'>('todo');
+  const [todoList, setTodoList] = useState<any[]>([]);
+  const [newTodoTitle, setNewTodoTitle] = useState('');
+  const [newTodoHostId, setNewTodoHostId] = useState('');
+  const [isAddingTodo, setIsAddingTodo] = useState(false);
+  const [recSelectedHosts, setRecSelectedHosts] = useState<Record<string, string>>({});
+
+  const showToast = (type: 'success' | 'error', message: string) => {
+    const id = toastIdCounter;
+    setToastIdCounter(prev => prev + 1);
+    setToasts(prev => [...prev, { id, type, message }]);
+    setTimeout(() => {
+      setToasts(prev => prev.filter(t => t.id !== id));
+    }, 4000);
+  };
+
+  // User Impersonation States
+  const [allUsers, setAllUsers] = useState<any[]>([]);
+  const [impersonationSearch, setImpersonationSearch] = useState('');
+  const [selectedImpersonationUser, setSelectedImpersonationUser] = useState<any | null>(null);
+  const [isImpersonateDropdownOpen, setIsImpersonateDropdownOpen] = useState(false);
+
+  // Admin Fanbase Report Form States
+  const [fanReportHostId, setFanReportHostId] = useState('');
+  const [currentFollowers, setCurrentFollowers] = useState('');
+  const [fanclubGcMembers, setFanclubGcMembers] = useState('');
+  const [fanclubSubscribers, setFanclubSubscribers] = useState('');
+  const [gcUpdatesFans, setGcUpdatesFans] = useState('');
+  const [gcUpdatesHost, setGcUpdatesHost] = useState('');
+  const [fanRangeStart, setFanRangeStart] = useState('');
+  const [fanRangeEnd, setFanRangeEnd] = useState('');
+  const [isFanProcessing, setIsFanProcessing] = useState(false);
+  const [fanErrors, setFanErrors] = useState<string[]>([]);
+  const [fanSuccessMsg, setFanSuccessMsg] = useState('');
+  const [hostSearchQuery, setHostSearchQuery] = useState('');
+  const [selectedHostUser, setSelectedHostUser] = useState<any | null>(null);
+  const [isHostDropdownOpen, setIsHostDropdownOpen] = useState(false);
+
+  // Admins Log States
+  const [rawFanbase, setRawFanbase] = useState<any[]>([]);
+  const [rawAttendance, setRawAttendance] = useState<any[]>([]);
+  const [rawCalendar, setRawCalendar] = useState<any[]>([]);
+
+  // Roster Events & Attendance States
+  const [rosterEvents, setRosterEvents] = useState<any[]>([]);
+  const [rosterAttendance, setRosterAttendance] = useState<any[]>([]);
+  const [isLoadingRosterData, setIsLoadingRosterData] = useState(false);
+
+  // Edit target and states
+  const [editTargetLogItem, setEditTargetLogItem] = useState<any | null>(null);
+  const [logErrors, setLogErrors] = useState<string[]>([]);
+  const [logSuccessMsg, setLogSuccessMsg] = useState('');
+  const [isLogProcessing, setIsLogProcessing] = useState(false);
+
+  // Edit fanbase report fields
+  const [editFollowers, setEditFollowers] = useState('');
+  const [editSubscribers, setEditSubscribers] = useState('');
+  const [editGcMembers, setEditGcMembers] = useState('');
+  const [editGcUpdatesHost, setEditGcUpdatesHost] = useState('');
+  const [editGcUpdatesFans, setEditGcUpdatesFans] = useState('');
+  const [editRangeStart, setEditRangeStart] = useState('');
+  const [editRangeEnd, setEditRangeEnd] = useState('');
+
+  // Edit attendance fields
+  const [editEventId, setEditEventId] = useState('');
+  const [editEventTitle, setEditEventTitle] = useState('');
+  const [editEventDate, setEditEventDate] = useState('');
+  const [editTimeslot, setEditTimeslot] = useState('');
+  const [editAttendees, setEditAttendees] = useState<any[]>([]);
+  const [editFeedback, setEditFeedback] = useState('');
+  const [editSearch, setEditSearch] = useState('');
+  const [editRoleFilter, setEditRoleFilter] = useState('All Roles');
+
+  // Edit calendar fields
+  const [editCalTitle, setEditCalTitle] = useState('');
+  const [editCalDescription, setEditCalDescription] = useState('');
+  const [editCalDate, setEditCalDate] = useState('');
+  const [editCalTime, setEditCalTime] = useState('');
+  const [editCalType, setEditCalType] = useState('solo livehouse');
+  const [editCalLocation, setEditCalLocation] = useState('');
+  const [editCalParticipants, setEditCalParticipants] = useState<any[]>([]);
+  const [editCalSearch, setEditCalSearch] = useState('');
+  const [editCalRoleFilter, setEditCalRoleFilter] = useState('All Roles');
+
+  const filteredHostUsersForSearch = useMemo(() => {
+    if (!hostSearchQuery.trim()) return [];
+    const q = hostSearchQuery.toLowerCase();
+    return allUsers.filter(u => {
+      const uRole = String(u.role || '').toLowerCase();
+      if (uRole !== 'host' && uRole !== 'talent') return false;
+
+      const id = String(u.poppo_id || u.poppoId || u.id || '');
+      const name = String(u.name || '').toLowerCase();
+      const nickname = String(u.nickname || '').toLowerCase();
+      
+      return id.includes(q) || name.includes(q) || nickname.includes(q);
+    });
+  }, [allUsers, hostSearchQuery]);
+
+  useEffect(() => {
+    const userRoleLower = String(rootAuth?.role || '').toLowerCase();
+    if (userRoleLower === 'director' || userRoleLower === 'admin') {
+      const fetchAllUsers = async () => {
+        try {
+          const list = await FirebaseService.getAllRoleMetadata();
+          setAllUsers(list || []);
+        } catch (err) {
+          console.error("Failed to load all users:", err);
+        }
+      };
+      fetchAllUsers();
+    }
+  }, []);
+
+  useEffect(() => {
+    const userRoleLower = String(rootAuth?.role || '').toLowerCase();
+    const poppoId = rootAuth?.poppo_id || rootAuth?.poppoId || rootAuth?.id;
+    if ((userRoleLower === 'agent' || userRoleLower === 'manager') && poppoId) {
+      const fetchAssignedHosts = async () => {
+        setIsLoadingAssignedHosts(true);
+        try {
+          const list = await FirebaseService.getAllRoleMetadata();
+          const filtered = list.filter(u => {
+            const uRole = String(u.role || '').toLowerCase();
+            const mgrId = String(u.assigned_manager_poppo_id || u.assignedManagerId || '');
+            return (uRole === 'host' || uRole === 'talent') && mgrId === String(poppoId);
+          });
+          setAssignedHostsList(filtered);
+        } catch (err) {
+          console.error("Failed to load assigned hosts:", err);
+        } finally {
+          setIsLoadingAssignedHosts(false);
+        }
+      };
+      fetchAssignedHosts();
+    }
+  }, [rootAuth?.role, rootAuth?.poppo_id, rootAuth?.poppoId, rootAuth?.id]);
+
+  useEffect(() => {
+    const userRoleLower = String(rootAuth?.role || '').toLowerCase();
+    const poppoId = rootAuth?.poppo_id || rootAuth?.poppoId || rootAuth?.id;
+    const isManagerOrAgent = userRoleLower === 'manager' || userRoleLower === 'agent';
+
+    if (isManagerOrAgent && poppoId && assignedHostsList.length > 0) {
+      const fetchRosterData = async () => {
+        setIsLoadingRosterData(true);
+        try {
+          const [calendarSnap, attendanceSnap] = await Promise.all([
+            getDocs(collection(db, 'calendar')),
+            getDocs(collection(db, 'attendance'))
+          ]);
+
+          const calList: any[] = [];
+          calendarSnap.forEach(docSnap => {
+            calList.push({ id: docSnap.id, ...docSnap.data() });
+          });
+
+          const attList: any[] = [];
+          attendanceSnap.forEach(docSnap => {
+            attList.push({ id: docSnap.id, ...docSnap.data() });
+          });
+
+          setRosterEvents(calList);
+          setRosterAttendance(attList);
+        } catch (err) {
+          console.error("Failed to fetch roster events & attendance:", err);
+        } finally {
+          setIsLoadingRosterData(false);
+        }
+      };
+      fetchRosterData();
+    } else {
+      setRosterEvents([]);
+      setRosterAttendance([]);
+    }
+  }, [assignedHostsList, rootAuth?.role, rootAuth?.poppo_id, rootAuth?.poppoId, rootAuth?.id]);
+
+  useEffect(() => {
+    const userRoleLower = String(rootAuth?.role || '').toLowerCase();
+    const poppoId = rootAuth?.poppo_id || rootAuth?.poppoId || rootAuth?.id;
+    const isManagerOrAgent = userRoleLower === 'manager' || userRoleLower === 'agent';
+
+    if (isManagerOrAgent && poppoId) {
+      const q = query(
+        collection(db, 'todos'),
+        where('managerId', '==', String(poppoId))
+      );
+      const unsub = onSnapshot(q, (snapshot) => {
+        const list = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        list.sort((a: any, b: any) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+        setTodoList(list);
+      }, (err) => {
+        console.error("Failed to sync todos:", err);
+      });
+      return () => unsub();
+    } else {
+      setTodoList([]);
+    }
+  }, [rootAuth?.role, rootAuth?.poppo_id, rootAuth?.poppoId, rootAuth?.id]);
+
+  const handleIntakeSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const userRoleLower = String(rootAuth?.role || '').toLowerCase();
+    const managerPoppoId = rootAuth?.poppo_id || rootAuth?.poppoId || rootAuth?.id;
+    if (userRoleLower !== 'agent') {
+      setIntakeError('Exclusion error: Only Agent accounts are permitted to request host intake.');
+      return;
+    }
+    if (!intakePoppoId.trim() || !intakeNickname.trim()) {
+      setIntakeError('Please enter both Poppo ID and Nickname.');
+      return;
+    }
+    setIsSubmittingIntake(true);
+    setIntakeError('');
+    setIntakeSuccess('');
+
+    try {
+      // Check for an existing request first
+      const q = query(
+        collection(db, 'host_requests'),
+        where('poppoId', '==', intakePoppoId.trim())
+      );
+      const snap = await getDocs(q);
+      let existingStatus = '';
+      snap.forEach(d => {
+        const data = d.data();
+        existingStatus = data.status || 'Pending';
+      });
+
+      if (existingStatus) {
+        const msg = `Intake request has been sent! Status: ${existingStatus}`;
+        showToast('success', msg);
+        setIntakeSuccess(msg);
+        setIntakePoppoId('');
+        setIntakeNickname('');
+        return;
+      }
+
+      // Otherwise create a new request
+      const managerName = rootAuth.nickname || rootAuth.name || 'Agent';
+      const requestId = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 15);
+      const newRequest = {
+        poppoId: intakePoppoId.trim(),
+        nickname: intakeNickname.trim(),
+        managerId: String(managerPoppoId),
+        managerName,
+        status: 'Pending',
+        timestamp: new Date().toISOString()
+      };
+
+      await setDoc(doc(db, 'host_requests', requestId), newRequest);
+      await FirebaseService.logSystemActivity(`Agent ${managerName} requested intake for host "${intakeNickname}" (Poppo ID: ${intakePoppoId.trim()})`, 'Info');
+      
+      const msg = `Intake request has been sent! Status: Pending`;
+      showToast('success', msg);
+      setIntakeSuccess(msg);
+      setIntakePoppoId('');
+      setIntakeNickname('');
+    } catch (err: any) {
+      console.error('Error submitting intake request:', err);
+      setIntakeError(err.message || 'Failed to submit intake request.');
+    } finally {
+      setIsSubmittingIntake(false);
+    }
+  };
+
+  // Fetch progress notes when selected host or manager changes
+  useEffect(() => {
+    const fetchNotesHistory = async () => {
+      const managerPoppoId = rootAuth?.poppo_id || rootAuth?.poppoId || rootAuth?.id;
+      if (!noteHostId || !managerPoppoId) {
+        setNotesHistory([]);
+        return;
+      }
+      setIsLoadingNotes(true);
+      try {
+        const q = query(
+          collection(db, 'notes'),
+          where('hostId', '==', noteHostId)
+        );
+        const snap = await getDocs(q);
+        const list: any[] = [];
+        snap.forEach((doc) => {
+          const data = doc.data();
+          if (data.managerId === String(managerPoppoId)) {
+            list.push({ id: doc.id, ...data });
+          }
+        });
+        list.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+        setNotesHistory(list);
+      } catch (err) {
+        console.error('Error fetching notes history:', err);
+      } finally {
+        setIsLoadingNotes(false);
+      }
+    };
+
+    fetchNotesHistory();
+  }, [noteHostId, rootAuth?.poppo_id, rootAuth?.poppoId, rootAuth?.id]);
+
+  const handleNoteSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const managerPoppoId = rootAuth?.poppo_id || rootAuth?.poppoId || rootAuth?.id;
+    if (!noteHostId || !noteContent.trim() || !managerPoppoId) {
+      setNoteError('Please select a host and enter note content.');
+      return;
+    }
+    setNoteError('');
+    setNoteSuccess('');
+    
+    const selectedHost = assignedHostsList.find(h => (h.poppo_id || h.poppoId || h.id) === noteHostId);
+    const hostNickname = selectedHost ? (selectedHost.nickname || selectedHost.name) : '';
+    
+    try {
+      const managerName = rootAuth.nickname || rootAuth.name || 'Manager';
+      const newNote = {
+        hostId: noteHostId,
+        hostNickname,
+        managerId: String(managerPoppoId),
+        managerName,
+        content: noteContent,
+        timestamp: new Date().toISOString()
+      };
+      
+      const docRef = await addDoc(collection(db, 'notes'), newNote);
+      await FirebaseService.logSystemActivity(`Manager/Agent ${managerName} added coaching feedback note for host "${hostNickname}" (Poppo ID: ${noteHostId})`, 'Info');
+      setNoteSuccess('Note successfully saved!');
+      setNoteContent('');
+      setNotesHistory(prev => [{ id: docRef.id, ...newNote }, ...prev]);
+      setActiveTab('history');
+    } catch (err: any) {
+      console.error('Error adding note:', err);
+      setNoteError(err.message || 'Failed to save note.');
+    }
+  };
+
+  const handleAddTodo = async (title: string, hostId: string) => {
+    const managerPoppoId = rootAuth?.poppo_id || rootAuth?.poppoId || rootAuth?.id;
+    if (!title.trim() || !managerPoppoId) return;
+
+    try {
+      const selectedHost = assignedHostsList.find(h => String(h.poppo_id || h.poppoId || h.id || '') === String(hostId));
+      const hostNickname = selectedHost ? (selectedHost.nickname || selectedHost.name) : 'Roster';
+      const todoId = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 15);
+      
+      const newTodo = {
+        todoId,
+        managerId: String(managerPoppoId),
+        hostId: hostId || 'roster',
+        hostNickname,
+        title: title.trim(),
+        completed: false,
+        createdAt: new Date().toISOString()
+      };
+
+      await setDoc(doc(db, 'todos', todoId), newTodo);
+      showToast('success', `Added to-do: "${title}"`);
+    } catch (err) {
+      console.error("Failed to add todo:", err);
+      showToast('error', "Failed to add to-do item.");
+    }
+  };
+
+  const handleToggleTodo = async (todo: any) => {
+    const managerPoppoId = rootAuth?.poppo_id || rootAuth?.poppoId || rootAuth?.id;
+    if (!managerPoppoId) return;
+
+    const nextCompleted = !todo.completed;
+
+    try {
+      await setDoc(doc(db, 'todos', todo.todoId), {
+        ...todo,
+        completed: nextCompleted,
+        completedAt: nextCompleted ? new Date().toISOString() : null
+      });
+
+      if (nextCompleted) {
+        const selectedHost = assignedHostsList.find(h => String(h.poppo_id || h.poppoId || h.id || '') === String(todo.hostId));
+        const hostNickname = selectedHost ? (selectedHost.nickname || selectedHost.name) : 'Roster';
+        const managerName = rootAuth.nickname || rootAuth.name || 'Manager';
+
+        const completionNote = {
+          hostId: todo.hostId || 'roster',
+          hostNickname,
+          managerId: String(managerPoppoId),
+          managerName,
+          content: `[To-Do Completed] Task: "${todo.title}"`,
+          timestamp: new Date().toISOString()
+        };
+
+        const docRef = await addDoc(collection(db, 'notes'), completionNote);
+        await FirebaseService.logSystemActivity(`Manager/Agent ${managerName} completed task "${todo.title}" for host "${hostNickname}"`, 'Info');
+        
+        if (todo.hostId === noteHostId) {
+          setNotesHistory(prev => [{ id: docRef.id, ...completionNote }, ...prev]);
+        }
+      }
+
+      showToast('success', nextCompleted ? `Completed: "${todo.title}"` : `Reopened: "${todo.title}"`);
+    } catch (err) {
+      console.error("Failed to toggle todo status:", err);
+      showToast('error', "Failed to update task status.");
+    }
+  };
+
+  const handleDeleteTodo = async (todoId: string) => {
+    try {
+      await deleteDoc(doc(db, 'todos', todoId));
+      showToast('success', "To-do item deleted.");
+    } catch (err) {
+      console.error("Failed to delete todo:", err);
+      showToast('error', "Failed to delete to-do item.");
+    }
+  };
+
+  useEffect(() => {
+    const userRoleLower = String(rootAuth?.role || '').toLowerCase();
+    const poppoId = rootAuth?.poppo_id || rootAuth?.poppoId || rootAuth?.id;
+    
+    if (userRoleLower === 'admin' && poppoId) {
+      // 1. Subscribe to fanbase reports
+      const qFanbase = query(collection(db, 'fanbase_reports'), where('reporterId', '==', poppoId));
+      const unsubFanbase = onSnapshot(qFanbase, (snapshot) => {
+        const list = snapshot.docs.map(doc => {
+          const data = doc.data();
+          const sortDate = data.submittedAt?.toDate ? data.submittedAt.toDate() : new Date(data.timestamp || data.submittedAt || Date.now());
+          return {
+            id: doc.id,
+            logType: 'fanbase',
+            sortDate,
+            ...data
+          };
+        });
+        setRawFanbase(list);
+      });
+
+      // 2. Subscribe to attendance logs
+      const qAttendance = query(collection(db, 'attendance'), where('reporterId', '==', poppoId));
+      const unsubAttendance = onSnapshot(qAttendance, (snapshot) => {
+        const list = snapshot.docs.map(doc => {
+          const data = doc.data();
+          const sortDate = data.submittedAt?.toDate ? data.submittedAt.toDate() : new Date(data.timestamp || data.submittedAt || Date.now());
+          return {
+            id: doc.id,
+            logType: 'attendance',
+            sortDate,
+            ...data
+          };
+        });
+        setRawAttendance(list);
+      });
+
+      // 3. Subscribe to calendar events
+      const qCalendar = query(collection(db, 'calendar'), where('created_by_id', '==', poppoId));
+      const unsubCalendar = onSnapshot(qCalendar, (snapshot) => {
+        const list = snapshot.docs.map(doc => {
+          const data = doc.data();
+          let sortDate = new Date();
+          if (data.created_at) {
+            sortDate = new Date(data.created_at);
+          } else if (data.date) {
+            sortDate = new Date(data.date);
+          }
+          return {
+            id: doc.id,
+            logType: 'calendar',
+            sortDate,
+            ...data
+          };
+        });
+        setRawCalendar(list);
+      });
+
+      return () => {
+        unsubFanbase();
+        unsubAttendance();
+        unsubCalendar();
+      };
+    }
+  }, [rootAuth?.role, rootAuth?.poppo_id, rootAuth?.poppoId, rootAuth?.id]);
+
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('.impersonation-search-container')) {
+        setIsImpersonateDropdownOpen(false);
+      }
+      if (!target.closest('.host-search-container')) {
+        setIsHostDropdownOpen(false);
+      }
+    };
+    document.addEventListener('click', handleOutsideClick);
+    return () => document.removeEventListener('click', handleOutsideClick);
+  }, []);
+
+  const filteredSearchUsers = useMemo(() => {
+    if (!impersonationSearch.trim()) return [];
+    const q = impersonationSearch.toLowerCase();
+    return allUsers.filter(u => {
+      const id = String(u.poppo_id || u.id || '');
+      const name = String(u.name || '').toLowerCase();
+      const nickname = String(u.nickname || '').toLowerCase();
+      return id.includes(q) || name.includes(q) || nickname.includes(q);
+    });
+  }, [allUsers, impersonationSearch]);
+
+  const handleImpersonate = async () => {
+    if (!selectedImpersonationUser) return;
+    try {
+      await FirebaseService.logSystemActivity(
+        `Director "${rootAuth.nickname || rootAuth.name}" started impersonating user "${selectedImpersonationUser.nickname || selectedImpersonationUser.name}" (Poppo ID: ${selectedImpersonationUser.poppo_id || selectedImpersonationUser.id})`,
+        'Warning'
+      );
+    } catch (err) {
+      console.error("Failed to log impersonation start:", err);
+    }
+    Storage.setMockUser({
+      role: selectedImpersonationUser.role,
+      poppo_id: selectedImpersonationUser.poppo_id || selectedImpersonationUser.id,
+      nickname: selectedImpersonationUser.nickname || selectedImpersonationUser.name,
+      name: selectedImpersonationUser.name || selectedImpersonationUser.nickname,
+    });
+    window.location.href = '/dashboard';
+  };
+
+  const renderImpersonationBlock = () => {
+    return (
+      <div className="bg-white/5 backdrop-blur-xl border border-white/10 p-5 rounded-3xl transition-all duration-300 hover:border-indigo-500/30 group space-y-4 shadow-lg">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-full bg-indigo-500/20 flex items-center justify-center text-indigo-400 text-sm shadow-inner">👤</div>
+          <div>
+            <h4 className="text-xs font-black uppercase tracking-widest text-[#F0EFE8]">User Impersonation</h4>
+            <p className="text-[9px] text-[#A09E9A] uppercase tracking-wider mt-0.5 font-bold">Director Control Panel</p>
+          </div>
+        </div>
+        
+        <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
+          <div className="impersonation-search-container relative flex-1">
+            <input
+              type="text"
+              placeholder="Search member by Name, Nickname or Poppo ID..."
+              value={impersonationSearch}
+              onChange={(e) => {
+                setImpersonationSearch(e.target.value);
+                setIsImpersonateDropdownOpen(true);
+                if (selectedImpersonationUser) {
+                  setSelectedImpersonationUser(null);
+                }
+              }}
+              onFocus={() => setIsImpersonateDropdownOpen(true)}
+              className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-[#F0EFE8] outline-none focus:border-indigo-500/50 placeholder:text-white/20 transition-all font-medium"
+            />
+            {isImpersonateDropdownOpen && filteredSearchUsers.length > 0 && (
+              <div className="absolute left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-[#11111A]/95 border border-white/10 backdrop-blur-md rounded-xl shadow-2xl z-55 custom-scrollbar p-1">
+                {filteredSearchUsers.map((user) => (
+                  <button
+                    key={user.id}
+                    type="button"
+                    onClick={() => {
+                      setSelectedImpersonationUser(user);
+                      setImpersonationSearch(user.nickname || user.name || user.id);
+                      setIsImpersonateDropdownOpen(false);
+                    }}
+                    className="w-full text-left px-3 py-2 text-xs text-slate-300 hover:text-white hover:bg-white/5 rounded-lg transition-colors flex justify-between items-center cursor-pointer"
+                  >
+                    <span className="font-bold">{user.nickname || user.name}</span>
+                    <span className="text-[10px] text-slate-500 font-mono">ID: {user.poppo_id || user.id} ({user.role})</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          
+          <button
+            type="button"
+            disabled={!selectedImpersonationUser}
+            onClick={handleImpersonate}
+            className={cn(
+              "px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-md whitespace-nowrap",
+              selectedImpersonationUser
+                ? "bg-indigo-500 hover:bg-indigo-400 text-white shadow-[0_0_15px_rgba(99,102,241,0.3)] cursor-pointer"
+                : "bg-white/5 text-slate-500 border border-white/5 cursor-not-allowed"
+            )}
+          >
+            View as {selectedImpersonationUser ? (selectedImpersonationUser.nickname || selectedImpersonationUser.name) : 'User'}
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  const renderBadgeAndTaskAssignment = () => {
+    return (
+      <div className="bg-white/5 backdrop-blur-xl border border-white/10 p-6 rounded-3xl space-y-6 shadow-lg">
+        {/* Title block */}
+        <div className="flex items-center gap-2.5 pb-4 border-b border-white/5">
+          <div className="w-8 h-8 rounded-full bg-indigo-500/20 flex items-center justify-center text-indigo-400 text-sm shadow-inner">
+            <Award size={16} />
+          </div>
+          <div>
+            <h4 className="text-xs font-black uppercase tracking-widest text-[#F0EFE8]">Badge &amp; Task Assignment</h4>
+            <p className="text-[9px] text-[#A09E9A] uppercase tracking-wider mt-0.5 font-bold">Admin Delegation Control Panel</p>
+          </div>
+        </div>
+
+        {/* Global Messages inside Ops */}
+        {opsErrorMessage && (
+          <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-2xl flex items-start gap-3">
+            <AlertCircle size={16} className="text-red-400 mt-0.5" />
+            <div className="space-y-1">
+              <p className="text-[11px] font-black uppercase text-red-400">System Alert</p>
+              <p className="text-[10px] text-red-300 font-mono leading-relaxed">{opsErrorMessage}</p>
+            </div>
+            <button onClick={() => setOpsErrorMessage(null)} className="ml-auto text-red-400">✕</button>
+          </div>
+        )}
+        {opsSuccessMessage && (
+          <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl flex items-center gap-3">
+            <CheckCircle2 size={16} className="text-emerald-400" />
+            <p className="text-[11px] font-bold text-emerald-400 uppercase tracking-tight">{opsSuccessMessage}</p>
+            <button onClick={() => setOpsSuccessMessage('')} className="ml-auto text-emerald-400">✕</button>
+          </div>
+        )}
+
+        {isOpsLoading ? (
+          <div className="flex justify-center py-12">
+            <Loader2 className="animate-spin text-indigo-400" size={32} />
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 pt-2">
+            
+            {/* LEFT COLUMN: Badge (former Awards Desk) */}
+            <div className="space-y-6">
+              <div className="flex items-center gap-2 border-b border-white/5 pb-2">
+                <Award size={18} className="text-indigo-400" />
+                <h5 className="font-black text-xs uppercase tracking-wider text-[#F0EFE8]">Badge</h5>
+              </div>
+
+              {/* Create Award Form */}
+              <div className="bg-[#11111A]/40 border border-white/5 p-5 rounded-2xl space-y-4 shadow-md">
+                <div className="flex items-center justify-between pb-2 border-b border-white/5">
+                  <h6 className="text-[10px] font-black uppercase tracking-wider text-[#F0EFE8]">Create Badge Template</h6>
+                  <div className="flex gap-1 bg-[#0D0D14] p-1 rounded-lg border border-white/5">
+                    <button
+                      type="button"
+                      onClick={() => setAwardCreateMode('single')}
+                      className={cn("px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider transition-all cursor-pointer",
+                        awardCreateMode === 'single' ? "bg-indigo-600 text-white shadow-sm font-extrabold" : "text-[#A09E9A] hover:text-[#F0EFE8]")}
+                    >
+                      Single
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAwardCreateMode('bulk')}
+                      className={cn("px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider transition-all cursor-pointer",
+                        awardCreateMode === 'bulk' ? "bg-indigo-600 text-white shadow-sm font-extrabold" : "text-[#A09E9A] hover:text-[#F0EFE8]")}
+                    >
+                      Bulk Top 9
+                    </button>
+                  </div>
+                </div>
+
+                {awardCreateMode === 'single' ? (
+                  <form onSubmit={handleCreateAward} className="space-y-4">
+                    <div className="space-y-1.5">
+                      <label className="text-[9px] font-black uppercase text-[#A09E9A] tracking-wider">Badge Name</label>
+                      <input type="text" value={newAwardName} onChange={e => setNewAwardName(e.target.value)} placeholder="e.g. Star Host" className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-indigo-500/50" required />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[9px] font-black uppercase text-[#A09E9A] tracking-wider">Badge Color</label>
+                      <select value={newAwardColor} onChange={e => setNewAwardColor(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-indigo-500/50 cursor-pointer">
+                        <option value="Gold">🏆 Gold</option>
+                        <option value="Purple">⭐ Purple</option>
+                        <option value="Emerald">💚 Emerald</option>
+                        <option value="Blue">💙 Blue</option>
+                        <option value="Red">❤️ Red</option>
+                        <option value="Orange">🧡 Orange</option>
+                      </select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[9px] font-black uppercase text-[#A09E9A] tracking-wider">Effectivity Period</label>
+                      <div className="grid grid-cols-2 gap-3">
+                        <SingleDatePicker id="new-start" name="newStart" value={newAwardStartDate} onChange={setNewAwardStartDate} required />
+                        <SingleDatePicker id="new-end" name="newEnd" value={newAwardEndDate} onChange={setNewAwardEndDate} required />
+                      </div>
+                    </div>
+                    <button type="submit" disabled={isCreatingAward} className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer shadow-md">
+                      {isCreatingAward ? 'Creating...' : 'Create Badge'}
+                    </button>
+                  </form>
+                ) : (
+                  <form onSubmit={handleBulkGenerateAwards} className="space-y-4 animate-in fade-in duration-200 font-medium">
+                    <div className="space-y-1.5">
+                      <label className="text-[9px] font-black uppercase text-[#A09E9A] tracking-wider">Select Month</label>
+                      <select
+                        value={bulkMonth}
+                        onChange={(e) => setBulkMonth(e.target.value)}
+                        className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-indigo-500/50 cursor-pointer"
+                      >
+                        <option value="01">January</option>
+                        <option value="02">February</option>
+                        <option value="03">March</option>
+                        <option value="04">April</option>
+                        <option value="05">May</option>
+                        <option value="06">June</option>
+                        <option value="07">July</option>
+                        <option value="08">August</option>
+                        <option value="09">September</option>
+                        <option value="10">October</option>
+                        <option value="11">November</option>
+                        <option value="12">December</option>
+                      </select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[9px] font-black uppercase text-[#A09E9A] tracking-wider">Select Year</label>
+                      <select
+                        value={bulkYear}
+                        onChange={(e) => setBulkYear(e.target.value)}
+                        className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-indigo-500/50 cursor-pointer"
+                      >
+                        <option value="2024">2024</option>
+                        <option value="2025">2025</option>
+                        <option value="2026">2026</option>
+                        <option value="2027">2027</option>
+                        <option value="2028">2028</option>
+                        <option value="2029">2029</option>
+                        <option value="2030">2030</option>
+                      </select>
+                    </div>
+                    <button
+                      type="submit"
+                      disabled={isCreatingAward}
+                      className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer shadow-md"
+                    >
+                      {isCreatingAward ? 'Generating...' : 'Bulk Generate Top 9 Badges'}
+                    </button>
+                  </form>
+                )}
+              </div>
+
+              {/* Assign Badge Form */}
+              <div className="bg-[#11111A]/40 border border-white/5 p-5 rounded-2xl space-y-4 shadow-md">
+                <h6 className="text-[10px] font-black uppercase tracking-wider text-[#F0EFE8] pb-2 border-b border-white/5">Assign Badge to Member</h6>
+                <form onSubmit={handleAssignAward} className="space-y-4">
+                  <div className="space-y-1.5">
+                    <label className="text-[9px] font-black uppercase text-[#A09E9A] tracking-wider">Select Created Badge</label>
+                    <select value={assignAwardId} onChange={e => setAssignAwardId(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-indigo-500/50 cursor-pointer" required>
+                      <option value="">-- Select Badge --</option>
+                      {opsAwards.map(a => <option key={a.id} value={a.id}>{a.name} ({a.color})</option>)}
+                    </select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[9px] font-black uppercase text-[#A09E9A] tracking-wider">Filter by Role</label>
+                    <select value={assignRoleFilter} onChange={e => setAssignRoleFilter(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-indigo-500/50 cursor-pointer">
+                      <option value="All">All Roles (Excl. Director)</option>
+                      <option value="Host">Host / Talent</option>
+                      <option value="Manager">Manager</option>
+                      <option value="Agent">Agent</option>
+                      <option value="Admin">Admin</option>
+                      <option value="Head Admin">Head Admin</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[9px] font-black uppercase text-[#A09E9A] tracking-wider">Select Member</label>
+                    <select value={assignHostId} onChange={e => setAssignHostId(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-indigo-500/50 cursor-pointer" required>
+                      <option value="">-- Choose Member --</option>
+                      {filteredAssignHosts.map(h => <option key={h.id} value={h.id}>{h.nickname || h.name} - {h.id} ({String(h.role || 'Host').toUpperCase()})</option>)}
+                    </select>
+                  </div>
+                  {assignAwardId && (
+                    <div className="space-y-1.5">
+                      <label className="text-[9px] font-black uppercase text-[#A09E9A] tracking-wider">Effectivity Period</label>
+                      <div className="grid grid-cols-2 gap-3 bg-black/20 p-3 rounded-lg border border-white/5 text-xs text-[#F0EFE8] font-mono">
+                        <div>
+                          <span className="text-[8px] text-[#A09E9A] block uppercase mb-0.5">Start Date</span>
+                          {awardStartDate || 'N/A'}
+                        </div>
+                        <div>
+                          <span className="text-[8px] text-[#A09E9A] block uppercase mb-0.5">End Date</span>
+                          {awardEndDate || 'N/A'}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  <button type="submit" disabled={isAssigningAward} className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer shadow-md">
+                    {isAssigningAward ? 'Assigning...' : 'Assign Badge'}
+                  </button>
+                </form>
+              </div>
+
+              {/* Available Badges & Active Assignments stacked */}
+              <div className="space-y-4">
+                <div className="bg-[#11111A]/40 border border-white/5 p-5 rounded-2xl shadow-md space-y-3">
+                  <div className="flex items-center justify-between border-b border-[#D4AF37]/20 pb-2">
+                    <span className="text-[10px] font-black uppercase tracking-wider text-[#F0EFE8]">Available Badges</span>
+                    <span className="text-[9px] text-[#A09E9A]/60 font-mono">{opsAwards.length} created</span>
+                  </div>
+                  <div className="overflow-y-auto max-h-[200px] custom-scrollbar space-y-2.5 pr-1.5">
+                    {opsAwards.length === 0 ? (
+                      <p className="text-xs text-[#A09E9A]/30 italic py-4 text-center">No badges created yet.</p>
+                    ) : (
+                      opsAwards.map(a => {
+                        let labelStyle = 'bg-amber-500/10 text-amber-400 border-amber-500/20';
+                        if (a.color === 'Purple') labelStyle = 'bg-purple-500/10 text-purple-400 border-purple-500/20';
+                        else if (a.color === 'Emerald') labelStyle = 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
+                        else if (a.color === 'Blue') labelStyle = 'bg-blue-500/10 text-blue-400 border-blue-500/20';
+                        else if (a.color === 'Red') labelStyle = 'bg-red-500/10 text-red-400 border-red-500/20';
+                        else if (a.color === 'Orange') labelStyle = 'bg-orange-500/10 text-orange-400 border-orange-500/20';
+
+                        return (
+                          <div key={a.id} className="bg-black/30 border border-white/5 rounded-xl p-3 flex items-center justify-between transition-all hover:bg-black/40">
+                            <div className="space-y-1 min-w-0">
+                              <span className={cn("text-[9px] font-black uppercase px-2 py-0.5 rounded-full border tracking-wider", labelStyle)}>
+                                {a.name}
+                              </span>
+                              <div className="text-[9px] text-[#A09E9A] font-mono mt-1">
+                                {a.startDate || 'N/A'} to {a.endDate || 'N/A'}
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setAssignAwardId(a.id);
+                              }}
+                              className="text-[9px] font-black uppercase text-[#D4AF37] hover:bg-[#D4AF37]/10 px-2.5 py-1 border border-[#D4AF37]/35 rounded-lg transition-all cursor-pointer"
+                            >
+                              Assign
+                            </button>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+
+                <div className="bg-[#11111A]/40 border border-white/5 p-5 rounded-2xl shadow-md space-y-3">
+                  <div className="flex items-center justify-between border-b border-[#D4AF37]/20 pb-2">
+                    <span className="text-[10px] font-black uppercase tracking-wider text-[#F0EFE8]">Active Badge Assignments</span>
+                    <span className="text-[9px] text-[#A09E9A]/60 font-mono">{opsAwardAssignments.length} assigned</span>
+                  </div>
+                  <div className="overflow-y-auto max-h-[200px] custom-scrollbar space-y-2.5 pr-1.5">
+                    {opsAwardAssignments.length === 0 ? (
+                      <p className="text-xs text-[#A09E9A]/30 italic py-4 text-center">No badges assigned.</p>
+                    ) : (
+                      opsAwardAssignments.map(a => {
+                        let labelStyle = 'bg-amber-500/10 text-amber-400 border-amber-500/20';
+                        if (a.awardColor === 'Purple') labelStyle = 'bg-purple-500/10 text-purple-400 border-purple-500/20';
+                        else if (a.awardColor === 'Emerald') labelStyle = 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
+                        else if (a.awardColor === 'Blue') labelStyle = 'bg-blue-500/10 text-blue-400 border-blue-500/20';
+                        else if (a.awardColor === 'Red') labelStyle = 'bg-red-500/10 text-red-400 border-red-500/20';
+                        else if (a.awardColor === 'Orange') labelStyle = 'bg-orange-500/10 text-orange-400 border-orange-500/20';
+
+                        return (
+                          <div key={a.id} className="bg-black/30 border border-white/5 rounded-xl p-3 flex items-center justify-between transition-all hover:bg-black/40">
+                            <div className="space-y-1 min-w-0">
+                              <p className="text-xs font-bold text-[#F0EFE8] truncate">{a.hostNickname}</p>
+                              <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                                <span className={cn("text-[8px] font-black uppercase px-1.5 py-0.5 rounded border tracking-wider", labelStyle)}>
+                                  {a.awardName}
+                                </span>
+                                <span className="text-[9px] text-white/30 font-mono">
+                                  {a.startDate} to {a.endDate}
+                                </span>
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleRevokeAssignment(a.id)}
+                              className="text-[9px] font-black uppercase text-red-400 hover:bg-red-500/10 px-2 py-1 border border-red-500/35 rounded-lg transition-all cursor-pointer"
+                            >
+                              Revoke
+                            </button>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* RIGHT COLUMN: Task (former Task Board) */}
+            <div className="space-y-6">
+              <div className="flex items-center gap-2 border-b border-white/5 pb-2">
+                <ListTodo size={18} className="text-indigo-400" />
+                <h5 className="font-black text-xs uppercase tracking-wider text-[#F0EFE8]">Task</h5>
+              </div>
+
+              {/* Delegate Task Form */}
+              <div className="bg-[#11111A]/40 border border-white/5 p-5 rounded-2xl space-y-4 shadow-md">
+                <h6 className="text-[10px] font-black uppercase tracking-wider text-[#F0EFE8] pb-2 border-b border-white/5">Delegate New Task</h6>
+                <form onSubmit={handleCreateTask} className="space-y-4">
+                  <div className="space-y-1.5">
+                    <label className="text-[9px] font-black uppercase text-[#A09E9A] tracking-wider">Task Title</label>
+                    <input type="text" value={taskTitle} onChange={e => setTaskTitle(e.target.value)} placeholder="e.g. Boost solo live hours" className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-indigo-500/50" required />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[9px] font-black uppercase text-[#A09E9A] tracking-wider">Guidelines</label>
+                    <textarea value={taskDescription} onChange={e => setTaskDescription(e.target.value)} placeholder="Provide steps..." className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-indigo-500/50 h-24 resize-none" required />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[9px] font-black uppercase text-[#A09E9A] tracking-wider">Due Date</label>
+                    <SingleDatePicker id="due-date" name="dueDate" value={taskDueDateVal} onChange={setTaskDueDateVal} required />
+                  </div>
+                  <button type="submit" disabled={isSubmittingTask} className="w-full py-2.5 bg-[#D4AF37] hover:bg-[#D4AF37]/80 text-[#0D0D14] rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer shadow-md font-bold">
+                    {isSubmittingTask ? 'Assigning...' : 'Delegate Task'}
+                  </button>
+                </form>
+              </div>
+
+              {/* Active Agency Tasks table */}
+              <div className="bg-[#11111A]/40 border border-white/5 p-5 rounded-2xl shadow-md space-y-3">
+                <h6 className="text-[10px] font-black uppercase tracking-wider text-[#F0EFE8] pb-2 border-b border-white/5">Active Agency Tasks</h6>
+                <div className="overflow-x-auto custom-scrollbar">
+                  <table className="w-full text-left text-xs">
+                    <thead>
+                      <tr className="border-b border-white/5 text-[8px] font-black text-[#A09E9A]/40 uppercase">
+                        <th className="px-3 py-2.5">Assignee</th>
+                        <th className="px-3 py-2.5">Details</th>
+                        <th className="px-3 py-2.5">Due Date</th>
+                        <th className="px-3 py-2.5">Status</th>
+                        <th className="px-3 py-2.5 text-right">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/5">
+                      {opsTasks.length === 0 ? (
+                        <tr><td colSpan={5} className="py-6 text-center text-[#A09E9A]/20 font-medium">No active delegated tasks.</td></tr>
+                      ) : (
+                        opsTasks.map(t => (
+                          <tr key={t.taskId}>
+                            <td className="px-3 py-2.5 font-mono text-indigo-400 font-bold truncate max-w-[80px]">{t.assigneeId || t.assignedToUserId}</td>
+                            <td className="px-3 py-2.5"><div className="font-bold text-[#F0EFE8]">{t.title}</div><div className="text-[9px] text-[#A09E9A]/50">{t.taskType}</div></td>
+                            <td className="px-3 py-2.5 font-mono text-[#A09E9A]/85 whitespace-nowrap">{t.dueDate}</td>
+                            <td className="px-3 py-2.5"><span className="text-[8px] font-black uppercase px-1.5 py-0.5 rounded border bg-amber-500/10 text-amber-400 border-amber-500/20">{t.status}</span></td>
+                            <td className="px-3 py-2.5 text-right">
+                              <button type="button" onClick={() => handleDirectorDeleteTask(t.taskId)} className="text-red-400 hover:text-red-300 p-1 cursor-pointer"><Trash2 size={13}/></button>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const handleFanbaseReportSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setFanErrors([]);
+    setFanSuccessMsg('');
+
+    if (!selectedHostUser) {
+      setFanErrors(['Please select a target host.']);
+      return;
+    }
+    const hostId = selectedHostUser.poppo_id || selectedHostUser.poppoId || selectedHostUser.id;
+    if (!hostId) {
+      setFanErrors(['Selected host does not have a valid ID.']);
+      return;
+    }
+
+    if (!fanRangeStart || !fanRangeEnd) {
+      setFanErrors(['Please select the date range.']);
+      return;
+    }
+
+    const followersNum = Number(currentFollowers);
+    const gcMembersNum = Number(fanclubGcMembers);
+    const subsNum = Number(fanclubSubscribers);
+    const updatesFansNum = Number(gcUpdatesFans);
+    const updatesHostNum = Number(gcUpdatesHost);
+
+    if (isNaN(followersNum) || followersNum < 0 ||
+        isNaN(gcMembersNum) || gcMembersNum < 0 ||
+        isNaN(subsNum) || subsNum < 0 ||
+        isNaN(updatesFansNum) || updatesFansNum < 0 ||
+        isNaN(updatesHostNum) || updatesHostNum < 0) {
+      setFanErrors(['All metric counts must be positive numbers.']);
+      return;
+    }
+
+    setIsFanProcessing(true);
+
+    try {
+      const hostNickname = selectedHostUser.nickname || selectedHostUser.name || 'Unknown Host';
+      const fromTimestamp = Timestamp.fromDate(new Date(fanRangeStart));
+      const toTimestamp = Timestamp.fromDate(new Date(fanRangeEnd));
+
+      const reportData = {
+        // camelCase schema for standard writes
+        fromDate: fromTimestamp,
+        toDate: toTimestamp,
+        poppoId: hostId,
+        nickname: hostNickname,
+        currentFollowers: followersNum,
+        fanclubSubscribers: subsNum,
+        fanclubGcMembers: gcMembersNum,
+        gcUpdatesHost: updatesHostNum,
+        gcUpdatesFans: updatesFansNum,
+        reporterId: rootAuth.poppo_id || rootAuth.poppoId || 'SystemAdmin',
+        reporterName: rootAuth.nickname || rootAuth.name || 'Admin',
+        reporterRole: rootAuth.role || 'Admin',
+        submittedAt: Timestamp.now(),
+
+        // snake_case schema for subcollection compatibility
+        from_date: new Date(fanRangeStart).toISOString(),
+        to_date: new Date(fanRangeEnd).toISOString(),
+        poppo_id: hostId,
+        total_followers: followersNum,
+        fanclub_subscribers: subsNum,
+        fanclub_gc_members: gcMembersNum,
+        gc_activity_count_host: updatesHostNum,
+        gc_activity_count_fans: updatesFansNum,
+        reporter_id: rootAuth.poppo_id || rootAuth.poppoId || 'SystemAdmin',
+        reporter_name: rootAuth.nickname || rootAuth.name || 'Admin',
+        reporter_role: rootAuth.role || 'Admin',
+        timestamp: new Date().toISOString()
+      };
+
+      // Direct write to fanbase_reports collection
+      await addDoc(collection(db, 'fanbase_reports'), reportData);
+
+      await FirebaseService.logSystemActivity(
+        `Submitted fanbase report for Host: ${hostNickname} (Poppo ID: ${hostId}) - Period: ${fanRangeStart} to ${fanRangeEnd} - Followers: ${followersNum}, Subscribers: ${subsNum}, GC Members: ${gcMembersNum}, GC Activity Host/Fans: ${updatesHostNum}/${updatesFansNum}`,
+        'Info'
+      );
+
+      Storage.addLog('Fanbase', `Submitted admin fanbase report for ${hostNickname}`, rootAuth.nickname || rootAuth.name);
+      
+      setFanSuccessMsg(`Successfully submitted fanbase report for ${hostNickname}!`);
+      showToast('success', `Submitted fanbase report for ${hostNickname}`);
+
+      // Reset form
+      setFanReportHostId('');
+      setCurrentFollowers('');
+      setFanclubGcMembers('');
+      setFanclubSubscribers('');
+      setGcUpdatesFans('');
+      setGcUpdatesHost('');
+      setFanRangeStart('');
+      setFanRangeEnd('');
+      setHostSearchQuery('');
+      setSelectedHostUser(null);
+    } catch (err: any) {
+      console.error('[HostProfileView] Fanbase Submit Error:', err);
+      setFanErrors([err.message || 'Failed to save fanbase report to database']);
+      showToast('error', err.message || 'Failed to submit fanbase report');
+    } finally {
+      setIsFanProcessing(false);
+    }
+  };
+
+  const renderAdminFanbaseReportSection = () => {
+    return (
+      <div className="bg-white/5 backdrop-blur-xl border border-white/10 p-5 rounded-3xl transition-all duration-300 hover:border-[#D4AF37]/30 group space-y-6 shadow-lg">
+        <div className="flex items-center gap-4 pb-4 border-b border-white/5">
+          <div className="p-3 rounded-2xl bg-[#D4AF37]/10 text-[#D4AF37] border border-[#D4AF37]/20">
+            <Users size={24} />
+          </div>
+          <div>
+            <h3 className="text-sm font-black text-[#F0EFE8] uppercase tracking-wide">Submit Host Fanbase Report</h3>
+            <p className="text-[10px] text-[#A09E9A] uppercase font-black tracking-widest mt-0.5">Admin version — full host lookup & edit access</p>
+          </div>
+        </div>
+
+        {fanErrors.length > 0 && (
+          <div className="bg-rose-950/50 border border-rose-500/30 rounded-xl p-3.5 space-y-1">
+            {fanErrors.map((err, idx) => (
+              <p key={idx} className="text-xs text-rose-300 font-bold">⚠️ {err}</p>
+            ))}
+          </div>
+        )}
+
+        {fanSuccessMsg && (
+          <div className="bg-emerald-950/50 border border-emerald-500/30 rounded-xl p-3.5">
+            <p className="text-xs text-emerald-300 font-bold">✅ {fanSuccessMsg}</p>
+          </div>
+        )}
+
+        <form onSubmit={handleFanbaseReportSubmit} className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Select Host via dynamic search box */}
+            <div className="space-y-1.5 host-search-container relative">
+              <label htmlFor="fanbase-host-search" className="text-[10px] font-black text-[#A09E9A] uppercase tracking-widest ml-1">
+                Select Target Niner Host
+              </label>
+              <input
+                id="fanbase-host-search"
+                type="text"
+                placeholder="Search host by Name, Nickname or Poppo ID..."
+                value={hostSearchQuery}
+                onChange={(e) => {
+                  setHostSearchQuery(e.target.value);
+                  setIsHostDropdownOpen(true);
+                  if (selectedHostUser) {
+                    setSelectedHostUser(null);
+                  }
+                }}
+                onFocus={() => setIsHostDropdownOpen(true)}
+                className="w-full bg-[#0D0D14] border border-white/10 rounded-xl px-4 py-3 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37]/30 transition-all font-bold placeholder:text-white/20"
+                required={!selectedHostUser}
+              />
+              {isHostDropdownOpen && filteredHostUsersForSearch.length > 0 && (
+                <div className="absolute left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-[#11111A]/95 border border-white/10 backdrop-blur-md rounded-xl shadow-2xl z-55 custom-scrollbar p-1">
+                  {filteredHostUsersForSearch.map((user) => (
+                    <button
+                      key={user.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedHostUser(user);
+                        setHostSearchQuery(user.nickname || user.name || user.id);
+                        setIsHostDropdownOpen(false);
+                      }}
+                      className="w-full text-left px-3 py-2 text-xs text-slate-300 hover:text-white hover:bg-white/5 rounded-lg transition-colors flex justify-between items-center cursor-pointer"
+                    >
+                      <span className="font-bold">{user.nickname || user.name}</span>
+                      <span className="text-[10px] text-slate-500 font-mono">ID: {user.poppo_id || user.id} ({user.role})</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Date Range */}
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black text-[#A09E9A] uppercase tracking-widest ml-1">Reporting Date Range</label>
+              <DateRangePicker
+                startDate={fanRangeStart}
+                endDate={fanRangeEnd}
+                onChange={(start, end) => { setFanRangeStart(start); setFanRangeEnd(end); }}
+                required
+              />
+            </div>
+          </div>
+
+          {/* Metrics */}
+          <div className="bg-[#0D0D14]/50 p-6 rounded-2xl border border-white/5 space-y-6">
+            <span className="text-[10px] font-black text-[#A09E9A] uppercase tracking-widest block border-b border-white/5 pb-2">Fanbase Health Indicators</span>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+              {/* Followers */}
+              <div className="space-y-1.5">
+                <label htmlFor="followers" className="text-[10px] font-bold text-[#A09E9A]">Current Followers count</label>
+                <input
+                  id="followers"
+                  type="number"
+                  value={currentFollowers}
+                  onChange={(e) => setCurrentFollowers(e.target.value)}
+                  placeholder="e.g. 15000"
+                  required
+                  min="0"
+                  className="w-full bg-[#0D0D14] border border-white/10 rounded-xl px-4 py-3 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
+                />
+              </div>
+
+              {/* FC Subscribers */}
+              <div className="space-y-1.5">
+                <label htmlFor="subscribers" className="text-[10px] font-bold text-[#A09E9A]">Fanclub Subscribers</label>
+                <input
+                  id="subscribers"
+                  type="number"
+                  value={fanclubSubscribers}
+                  onChange={(e) => setFanclubSubscribers(e.target.value)}
+                  placeholder="e.g. 120"
+                  required
+                  min="0"
+                  className="w-full bg-[#0D0D14] border border-white/10 rounded-xl px-4 py-3 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
+                />
+              </div>
+
+              {/* FC GC Members */}
+              <div className="space-y-1.5">
+                <label htmlFor="members" className="text-[10px] font-bold text-[#A09E9A]">Fanclub GC Members</label>
+                <input
+                  id="members"
+                  type="number"
+                  value={fanclubGcMembers}
+                  onChange={(e) => setFanclubGcMembers(e.target.value)}
+                  placeholder="e.g. 450"
+                  required
+                  min="0"
+                  className="w-full bg-[#0D0D14] border border-white/10 rounded-xl px-4 py-3 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 pt-2">
+              {/* GC Updates Host */}
+              <div className="space-y-1.5">
+                <label htmlFor="gc-updates-host" className="text-[10px] font-bold text-[#A09E9A]">GC Updates (By Host)</label>
+                <input
+                  id="gc-updates-host"
+                  type="number"
+                  value={gcUpdatesHost}
+                  onChange={(e) => setGcUpdatesHost(e.target.value)}
+                  placeholder="Updates count"
+                  required
+                  min="0"
+                  className="w-full bg-[#0D0D14] border border-white/10 rounded-xl px-4 py-3 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
+                />
+              </div>
+
+              {/* GC Updates Fans */}
+              <div className="space-y-1.5">
+                <label htmlFor="gc-updates-fans" className="text-[10px] font-bold text-[#A09E9A]">GC Updates (By Fans)</label>
+                <input
+                  id="gc-updates-fans"
+                  type="number"
+                  value={gcUpdatesFans}
+                  onChange={(e) => setGcUpdatesFans(e.target.value)}
+                  placeholder="Updates count"
+                  required
+                  min="0"
+                  className="w-full bg-[#0D0D14] border border-white/10 rounded-xl px-4 py-3 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Submitter & Host Metadata */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-[10px] font-bold text-[#A09E9A] uppercase tracking-wider bg-black/20 p-4 rounded-xl border border-white/5">
+            <div className="space-y-1">
+              <span className="block">SubmittedBy: <span className="text-[#F0EFE8]">{rootAuth.nickname || rootAuth.name} (Role: {rootAuth.role})</span></span>
+              <span className="block font-mono">ReporterID: {rootAuth.poppo_id || rootAuth.poppoId || 'SystemAdmin'}</span>
+            </div>
+            <div className="space-y-1 border-t sm:border-t-0 sm:border-l border-white/5 pt-2 sm:pt-0 sm:pl-4">
+              {selectedHostUser ? (
+                <>
+                  <span className="block">TargetHost: <span className="text-[#D4AF37]">{selectedHostUser.nickname || selectedHostUser.name || 'Unknown'}</span></span>
+                  <span className="block font-mono">PoppoID: {selectedHostUser.poppo_id || selectedHostUser.id}</span>
+                </>
+              ) : (
+                <span className="text-white/20 italic">No target host selected</span>
+              )}
+            </div>
+          </div>
+
+          {/* Submit */}
+          <div className="flex justify-end pt-4">
+            <button
+              type="submit"
+              disabled={isFanProcessing}
+              className="w-full sm:w-auto px-8 py-3 bg-[#D4AF37] hover:bg-[#C5A028] text-black rounded-xl text-xs font-black uppercase tracking-widest flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50 cursor-pointer shadow-lg shadow-[#D4AF37]/10 transition-all font-black"
+            >
+              <Send size={14} className="text-[#0D0D14]" />
+              {isFanProcessing ? 'Processing...' : 'Submit fanbase report'}
+            </button>
+          </div>
+        </form>
+      </div>
+    );
+  };
+
+  const combinedAdminLogs = useMemo(() => {
+    const combined = [...rawFanbase, ...rawAttendance, ...rawCalendar];
+    // sort chronologically descending (newest first)
+    combined.sort((a, b) => b.sortDate.getTime() - a.sortDate.getTime());
+    return combined;
+  }, [rawFanbase, rawAttendance, rawCalendar]);
+
+  const filteredEditUsers = useMemo(() => {
+    return allUsers.filter(u => {
+      const userRole = String(u.role || '').toLowerCase();
+      if (userRole === 'director') return false;
+
+      if (editRoleFilter !== 'All Roles') {
+        if (editRoleFilter === 'hosts' && userRole !== 'host' && userRole !== 'talent') return false;
+        if (editRoleFilter === 'managers' && userRole !== 'manager') return false;
+        if (editRoleFilter === 'agents' && userRole !== 'agent') return false;
+        if (editRoleFilter === 'admins' && userRole !== 'admin' && userRole !== 'head admin') return false;
+      }
+
+      const searchStr = editSearch.toLowerCase().trim();
+      if (searchStr) {
+        const nickname = String(u.nickname || u.name || '').toLowerCase();
+        const poppoId = String(u.poppo_id || u.poppoId || u.id || '').toLowerCase();
+        return nickname.includes(searchStr) || poppoId.includes(searchStr);
+      }
+
+      return true;
+    });
+  }, [allUsers, editSearch, editRoleFilter]);
+
+  const filteredEditCalUsers = useMemo(() => {
+    return allUsers.filter(u => {
+      const userRole = String(u.role || '').toLowerCase();
+      if (userRole === 'director') return false;
+
+      if (editCalRoleFilter !== 'All Roles') {
+        if (editCalRoleFilter === 'hosts' && userRole !== 'host' && userRole !== 'talent') return false;
+        if (editCalRoleFilter === 'managers' && userRole !== 'manager') return false;
+        if (editCalRoleFilter === 'agents' && userRole !== 'agent') return false;
+        if (editCalRoleFilter === 'admins' && userRole !== 'admin' && userRole !== 'head admin') return false;
+      }
+
+      const searchStr = editCalSearch.toLowerCase().trim();
+      if (searchStr) {
+        const nickname = String(u.nickname || u.name || '').toLowerCase();
+        const poppoId = String(u.poppo_id || u.poppoId || u.id || '').toLowerCase();
+        return nickname.includes(searchStr) || poppoId.includes(searchStr);
+      }
+
+      return true;
+    });
+  }, [allUsers, editCalSearch, editCalRoleFilter]);
+
+  const isOriginalAuthor = (item: any) => {
+    const poppoId = rootAuth?.poppo_id || rootAuth?.poppoId || rootAuth?.id;
+    if (!poppoId) return false;
+    if (item.logType === 'calendar') {
+      return String(item.created_by_id) === String(poppoId);
+    } else {
+      return String(item.reporterId || item.reporter_id) === String(poppoId);
+    }
+  };
+
+  const handleDeleteLogItem = async (item: any) => {
+    if (!window.confirm(`Are you sure you want to delete this ${item.logType === 'calendar' ? 'calendar event' : item.logType === 'fanbase' ? 'fanbase report' : 'attendance log'}?`)) {
+      return;
+    }
+
+    try {
+      const idToken = await auth.currentUser?.getIdToken();
+      if (!idToken) throw new Error("Authentication token not found.");
+
+      let url = '';
+      let payload: any = {};
+      if (item.logType === 'calendar') {
+        url = '/api/admin/delete-event';
+        payload = { eventId: item.id };
+      } else if (item.logType === 'fanbase') {
+        url = '/api/admin/delete-fanbase-report';
+        payload = { reportId: item.id };
+      } else {
+        url = '/api/admin/delete-attendance-log';
+        payload = { attendanceId: item.id };
+      }
+
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${idToken}`
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!res.ok) {
+        const errText = await res.text();
+        throw new Error(errText || `Failed to delete ${item.logType}`);
+      }
+
+      showToast('success', `Successfully deleted ${item.logType === 'calendar' ? 'event' : 'report'}`);
+      await FirebaseService.logSystemActivity(
+        `${rootAuth.nickname || rootAuth.name} deleted their own ${item.logType} log/event (ID: ${item.id})`,
+        'Info'
+      );
+    } catch (err: any) {
+      console.error("Failed to delete log item:", err);
+      showToast('error', err.message || "Deletion failed.");
+    }
+  };
+
+  const handleEditLogItemSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editTargetLogItem) return;
+
+    setIsLogProcessing(true);
+    setLogErrors([]);
+    setLogSuccessMsg('');
+
+    try {
+      const idToken = await auth.currentUser?.getIdToken();
+      if (!idToken) throw new Error("Authentication token not found.");
+
+      let url = '';
+      let payload: any = {};
+
+      if (editTargetLogItem.logType === 'fanbase') {
+        const followersNum = Number(editFollowers);
+        const subsNum = Number(editSubscribers);
+        const gcMembersNum = Number(editGcMembers);
+        const updatesHostNum = Number(editGcUpdatesHost);
+        const updatesFansNum = Number(editGcUpdatesFans);
+
+        if (isNaN(followersNum) || followersNum < 0 ||
+            isNaN(subsNum) || subsNum < 0 ||
+            isNaN(gcMembersNum) || gcMembersNum < 0 ||
+            isNaN(updatesHostNum) || updatesHostNum < 0 ||
+            isNaN(updatesFansNum) || updatesFansNum < 0) {
+          throw new Error('All metrics must be positive numbers.');
+        }
+
+        url = '/api/admin/update-fanbase-report';
+        payload = {
+          reportId: editTargetLogItem.id,
+          updatedFields: {
+            fromDate: editRangeStart,
+            toDate: editRangeEnd,
+            currentFollowers: followersNum,
+            fanclubSubscribers: subsNum,
+            fanclubGcMembers: gcMembersNum,
+            gcUpdatesHost: updatesHostNum,
+            gcUpdatesFans: updatesFansNum,
+            from_date: new Date(editRangeStart).toISOString(),
+            to_date: new Date(editRangeEnd).toISOString(),
+            total_followers: followersNum,
+            fanclub_subscribers: subsNum,
+            fanclub_gc_members: gcMembersNum,
+            gc_activity_count_host: updatesHostNum,
+            gc_activity_count_fans: updatesFansNum,
+          }
+        };
+      } else if (editTargetLogItem.logType === 'attendance') {
+        if (editAttendees.length === 0) {
+          throw new Error('Please add at least one attendee.');
+        }
+
+        url = '/api/admin/update-attendance-log';
+        payload = {
+          attendanceId: editTargetLogItem.id,
+          updatedFields: {
+            eventId: editEventId,
+            eventTitle: editEventTitle,
+            eventDate: editEventDate,
+            timeslot: editTimeslot,
+            attendees: editAttendees.map(a => ({
+              poppoId: a.poppoId || a.poppo_id || a.id,
+              nickname: a.nickname || a.name,
+              role: a.role
+            })),
+            attendeeIds: editAttendees.map(a => a.poppoId || a.poppo_id || a.id),
+            eventFeedback: editFeedback.trim()
+          }
+        };
+      } else if (editTargetLogItem.logType === 'calendar') {
+        if (!editCalTitle.trim()) {
+          throw new Error('Event Title is required.');
+        }
+
+        url = '/api/admin/update-event';
+        payload = {
+          eventId: editTargetLogItem.id,
+          updatedFields: {
+            title: editCalTitle.trim(),
+            description: editCalDescription.trim(),
+            date: editCalDate,
+            time: editCalTime,
+            type: editCalType,
+            location: editCalLocation.trim(),
+            participants: editCalParticipants.map(p => ({
+              poppoId: p.poppoId || p.poppo_id || p.id,
+              nickname: p.nickname || p.name,
+              role: p.role
+            })),
+            participantIds: editCalParticipants.map(p => p.poppoId || p.poppo_id || p.id)
+          }
+        };
+      }
+
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${idToken}`
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!res.ok) {
+        const errText = await res.text();
+        throw new Error(errText || `Failed to update ${editTargetLogItem.logType}`);
+      }
+
+      setLogSuccessMsg(`Successfully updated the ${editTargetLogItem.logType === 'calendar' ? 'event' : 'report'}!`);
+      showToast('success', `Updated ${editTargetLogItem.logType === 'calendar' ? 'event' : 'report'}`);
+      
+      setTimeout(() => {
+        setEditTargetLogItem(null);
+      }, 800);
+    } catch (err: any) {
+      console.error("Failed to edit log item:", err);
+      setLogErrors([err.message || "Update failed."]);
+      showToast('error', err.message || "Update failed.");
+    } finally {
+      setIsLogProcessing(false);
+    }
+  };
+
+  const handleOpenLogEditModal = (item: any) => {
+    setEditTargetLogItem(item);
+    setLogErrors([]);
+    setLogSuccessMsg('');
+    setIsLogProcessing(false);
+
+    if (item.logType === 'fanbase') {
+      setEditFollowers(String(item.currentFollowers ?? item.total_followers ?? ''));
+      setEditSubscribers(String(item.fanclubSubscribers ?? item.fanclub_subscribers ?? ''));
+      setEditGcMembers(String(item.fanclubGcMembers ?? item.fanclub_gc_members ?? ''));
+      setEditGcUpdatesHost(String(item.gcUpdatesHost ?? item.gc_activity_count_host ?? ''));
+      setEditGcUpdatesFans(String(item.gcUpdatesFans ?? item.gc_activity_count_fans ?? ''));
+
+      const getIsoDate = (d: any) => {
+        if (!d) return '';
+        if (d.toDate) return d.toDate().toISOString().substring(0, 10);
+        try {
+          return new Date(d).toISOString().substring(0, 10);
+        } catch (e) {
+          return '';
+        }
+      };
+      setEditRangeStart(getIsoDate(item.fromDate || item.from_date));
+      setEditRangeEnd(getIsoDate(item.toDate || item.to_date));
+    } else if (item.logType === 'attendance') {
+      setEditEventId(item.eventId || '');
+      setEditEventTitle(item.eventTitle || '');
+      setEditEventDate(item.eventDate || '');
+      setEditTimeslot(item.timeslot || '');
+      setEditAttendees(item.attendees || []);
+      setEditFeedback(item.eventFeedback || '');
+      setEditSearch('');
+      setEditRoleFilter('All Roles');
+    } else if (item.logType === 'calendar') {
+      setEditCalTitle(item.title || '');
+      setEditCalDescription(item.description || '');
+      setEditCalDate(item.date || '');
+      setEditCalTime(item.time || '');
+      setEditCalType(item.type || 'solo livehouse');
+      setEditCalLocation(item.location || '');
+      setEditCalParticipants(item.participants || []);
+      setEditCalSearch('');
+      setEditCalRoleFilter('All Roles');
+    }
+  };
+
+  const renderAdminsLogSection = () => {
+    return (
+      <div className="bg-white/5 backdrop-blur-xl border border-white/10 p-5 rounded-3xl transition-all duration-300 hover:border-[#D4AF37]/30 group space-y-6 shadow-lg text-left">
+        <div className="flex items-center justify-between pb-4 border-b border-white/5">
+          <div className="flex items-center gap-4">
+            <div className="p-3 rounded-2xl bg-[#D4AF37]/10 text-[#D4AF37] border border-[#D4AF37]/20">
+              <ClipboardList size={24} />
+            </div>
+            <div>
+              <h3 className="text-sm font-black text-[#F0EFE8] uppercase tracking-wide">Admins Log & Submissions</h3>
+              <p className="text-[10px] text-[#A09E9A] uppercase font-black tracking-widest mt-0.5">Your aggregated report & event history</p>
+            </div>
+          </div>
+          <div className="text-[10px] bg-black/40 border border-white/5 px-3 py-1 rounded-full font-bold text-[#A09E9A] uppercase">
+            Total entries: {combinedAdminLogs.length}
+          </div>
+        </div>
+
+        {combinedAdminLogs.length > 0 ? (
+          <div className="overflow-x-auto no-scrollbar rounded-2xl border border-white/5">
+            <table className="w-full text-left text-xs divide-y divide-white/5">
+              <thead className="bg-black/30 text-[#A09E9A] text-[9px] font-black uppercase tracking-wider">
+                <tr>
+                  <th className="px-4 py-3">Type</th>
+                  <th className="px-4 py-3">Subject / Target</th>
+                  <th className="px-4 py-3 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5 bg-black/10 font-medium">
+                {combinedAdminLogs.map((item) => {
+                  let badgeColor = '';
+                  let typeLabel = '';
+                  let titleStr = '';
+                  let subtitleStr = '';
+                  let dateAndTimeStr = '';
+
+                  if (item.logType === 'fanbase') {
+                    badgeColor = 'bg-[#D4AF37]/10 text-[#D4AF37] border-[#D4AF37]/20';
+                    typeLabel = 'Fanbase';
+                    titleStr = item.nickname || 'Unknown Host';
+                    subtitleStr = `Poppo: ${item.poppoId || item.poppo_id}`;
+                    
+                    const start = formatLogDateAndTime(item.fromDate || item.from_date, '');
+                    const end = formatLogDateAndTime(item.toDate || item.to_date, '');
+                    dateAndTimeStr = `${start} - ${end}`;
+                  } else if (item.logType === 'attendance') {
+                    badgeColor = 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20';
+                    typeLabel = 'Attendance';
+                    titleStr = item.eventTitle || 'Unknown Event';
+                    subtitleStr = `Poppo IDs: ${(item.attendeeIds || []).length} logged`;
+                    dateAndTimeStr = formatLogDateAndTime(item.eventDate, item.timeslot || '');
+                  } else if (item.logType === 'calendar') {
+                    badgeColor = 'bg-pink-500/10 text-pink-400 border-pink-500/20';
+                    typeLabel = 'Event';
+                    titleStr = item.title || 'Untitled Event';
+                    subtitleStr = `Type: ${item.type || 'solo'}`;
+                    dateAndTimeStr = formatLogDateAndTime(item.date, item.time || '');
+                  }
+
+                  const isAuthor = isOriginalAuthor(item);
+
+                  return (
+                    <tr key={item.id} className="hover:bg-white/[0.01] transition-colors">
+                      <td className="px-4 py-3.5 whitespace-nowrap">
+                        <span className={cn("px-2 py-0.5 rounded border text-[9px] font-black uppercase tracking-wider", badgeColor)}>
+                          {typeLabel}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3.5">
+                        <div className="font-bold text-[#F0EFE8]">{titleStr}</div>
+                        <div className="text-[10px] text-[#D4AF37] font-mono mt-0.5">{dateAndTimeStr}</div>
+                        <div className="text-[9px] font-mono text-[#A09E9A] mt-0.5">{subtitleStr}</div>
+                      </td>
+                      <td className="px-4 py-3.5 text-right whitespace-nowrap">
+                        {isAuthor ? (
+                          <div className="flex items-center gap-1.5 justify-end">
+                            <button
+                              type="button"
+                              onClick={() => handleOpenLogEditModal(item)}
+                              className="px-2 py-1 bg-white/5 hover:bg-white/10 text-[#F0EFE8] border border-white/10 rounded-lg text-[9px] font-black uppercase tracking-wider flex items-center gap-1 cursor-pointer transition-all"
+                            >
+                              <Edit2 size={9} /> Edit
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteLogItem(item)}
+                              className="px-2 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 rounded-lg text-[9px] font-black uppercase tracking-wider flex items-center gap-1 cursor-pointer transition-all"
+                            >
+                              <Trash2 size={9} /> Delete
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="text-[9px] text-slate-500 italic select-none">ReadOnly</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="p-12 text-center text-[#A09E9A]/30 italic text-xs bg-black/20 rounded-2xl border border-white/5">
+            No submissions recorded by you yet.
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderAdminLogEditModal = () => {
+    if (!editTargetLogItem) return null;
+
+    return (
+      <div className="fixed inset-0 z-55 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
+        <div className="w-full max-w-lg bg-[#13131E] border border-white/10 rounded-3xl p-6 shadow-2xl relative my-8 text-left">
+          <button
+            type="button"
+            title="Close"
+            onClick={() => setEditTargetLogItem(null)}
+            className="absolute top-4 right-4 text-[#A09E9A] hover:text-[#F0EFE8] cursor-pointer"
+          >
+            <X size={16} />
+          </button>
+          
+          <h3 className="text-sm font-black text-[#F0EFE8] uppercase tracking-wider mb-4 flex items-center gap-2">
+            <Edit2 size={16} className="text-[#D4AF37]" />
+            Edit {editTargetLogItem.logType === 'fanbase' ? 'Fanbase Report' : editTargetLogItem.logType === 'attendance' ? 'Attendance Log' : 'Calendar Event'}
+          </h3>
+
+          {logErrors.length > 0 && (
+            <div className="bg-rose-950/50 border border-rose-500/30 rounded-xl p-3 mb-4 space-y-1 text-left">
+              {logErrors.map((err, idx) => (
+                <p key={idx} className="text-xs text-rose-300 font-bold">⚠️ {err}</p>
+              ))}
+            </div>
+          )}
+
+          {logSuccessMsg && (
+            <div className="bg-emerald-950/50 border border-emerald-500/30 rounded-xl p-3 mb-4 text-left">
+              <p className="text-xs text-emerald-300 font-bold">✅ {logSuccessMsg}</p>
+            </div>
+          )}
+
+          <form onSubmit={handleEditLogItemSubmit} className="space-y-4">
+            {editTargetLogItem.logType === 'fanbase' && (
+              <div className="space-y-4">
+                <div className="p-3 bg-black/20 rounded-xl border border-white/5 text-[10px] text-[#A09E9A] font-bold uppercase space-y-1">
+                  <div>Target Host: <span className="text-[#D4AF37]">{editTargetLogItem.nickname || 'Unknown'}</span></div>
+                  <div>Poppo ID: <span className="text-[#F0EFE8] font-mono">{editTargetLogItem.poppoId || editTargetLogItem.poppo_id}</span></div>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label htmlFor="edit-start" className="text-[9px] font-bold text-[#A09E9A] uppercase tracking-widest">Start Date</label>
+                    <input
+                      id="edit-start"
+                      type="date"
+                      value={editRangeStart}
+                      onChange={(e) => setEditRangeStart(e.target.value)}
+                      required
+                      className="w-full bg-[#0D0D14] border border-white/10 rounded-xl px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label htmlFor="edit-end" className="text-[9px] font-bold text-[#A09E9A] uppercase tracking-widest">End Date</label>
+                    <input
+                      id="edit-end"
+                      type="date"
+                      value={editRangeEnd}
+                      onChange={(e) => setEditRangeEnd(e.target.value)}
+                      required
+                      className="w-full bg-[#0D0D14] border border-white/10 rounded-xl px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="space-y-1">
+                    <label htmlFor="edit-followers" className="text-[9px] font-bold text-[#A09E9A] uppercase tracking-widest">Followers</label>
+                    <input
+                      id="edit-followers"
+                      type="number"
+                      min="0"
+                      value={editFollowers}
+                      onChange={(e) => setEditFollowers(e.target.value)}
+                      required
+                      className="w-full bg-[#0D0D14] border border-white/10 rounded-xl px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label htmlFor="edit-subscribers" className="text-[9px] font-bold text-[#A09E9A] uppercase tracking-widest">Subscribers</label>
+                    <input
+                      id="edit-subscribers"
+                      type="number"
+                      min="0"
+                      value={editSubscribers}
+                      onChange={(e) => setEditSubscribers(e.target.value)}
+                      required
+                      className="w-full bg-[#0D0D14] border border-white/10 rounded-xl px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label htmlFor="edit-gc-members" className="text-[9px] font-bold text-[#A09E9A] uppercase tracking-widest">GC Members</label>
+                    <input
+                      id="edit-gc-members"
+                      type="number"
+                      min="0"
+                      value={editGcMembers}
+                      onChange={(e) => setEditGcMembers(e.target.value)}
+                      required
+                      className="w-full bg-[#0D0D14] border border-white/10 rounded-xl px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label htmlFor="edit-updates-host" className="text-[9px] font-bold text-[#A09E9A] uppercase tracking-widest">GC Updates (Host)</label>
+                    <input
+                      id="edit-updates-host"
+                      type="number"
+                      min="0"
+                      value={editGcUpdatesHost}
+                      onChange={(e) => setEditGcUpdatesHost(e.target.value)}
+                      required
+                      className="w-full bg-[#0D0D14] border border-white/10 rounded-xl px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label htmlFor="edit-updates-fans" className="text-[9px] font-bold text-[#A09E9A] uppercase tracking-widest">GC Updates (Fans)</label>
+                    <input
+                      id="edit-updates-fans"
+                      type="number"
+                      min="0"
+                      value={editGcUpdatesFans}
+                      onChange={(e) => setEditGcUpdatesFans(e.target.value)}
+                      required
+                      className="w-full bg-[#0D0D14] border border-white/10 rounded-xl px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {editTargetLogItem.logType === 'attendance' && (
+              <div className="space-y-4">
+                <div className="space-y-1">
+                  <label htmlFor="edit-attendance-title" className="text-[9px] font-black text-[#A09E9A] uppercase tracking-widest ml-1">Event Title</label>
+                  <input
+                    id="edit-attendance-title"
+                    type="text"
+                    value={editEventTitle}
+                    disabled
+                    className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-xs text-[#A09E9A] outline-none font-bold"
+                  />
+                </div>
+
+                {/* Attendees Selection */}
+                <div className="border border-white/5 rounded-xl bg-black/40 p-4 space-y-3">
+                  <span className="text-[9px] font-black text-[#A09E9A] uppercase tracking-widest block text-left">Edit Attendees ({editAttendees.length})</span>
+                  
+                  <div className="flex flex-wrap gap-1.5 min-h-[40px] p-2 bg-[#0D0D14]/80 rounded-lg border border-white/5">
+                    {editAttendees.map((att, idx) => (
+                      <span key={idx} className="px-2 py-0.5 rounded bg-[#D4AF37]/10 border border-[#D4AF37]/20 text-[10px] text-[#D4AF37] font-bold flex items-center gap-1">
+                        {att.nickname || att.name}
+                        <button
+                          type="button"
+                          onClick={() => setEditAttendees(editAttendees.filter(a => (a.poppoId || a.id || a.poppo_id) !== (att.poppoId || att.id || att.poppo_id)))}
+                          className="text-red-400 hover:text-red-300 font-bold ml-0.5 cursor-pointer text-xs"
+                        >
+                          ×
+                        </button>
+                      </span>
+                    ))}
+                    {editAttendees.length === 0 && (
+                      <span className="text-white/20 italic text-[10px] self-center">No attendees selected yet</span>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={editSearch}
+                        onChange={(e) => setEditSearch(e.target.value)}
+                        placeholder="Search users..."
+                        className="flex-1 bg-[#0A0B0E] border border-white/10 rounded-lg px-3 py-1.5 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
+                      />
+                      <select
+                        value={editRoleFilter}
+                        onChange={(e) => setEditRoleFilter(e.target.value)}
+                        title="Role Filter"
+                        className="bg-[#0A0B0E] border border-white/10 rounded-lg px-2 text-xs text-[#F0EFE8] outline-none cursor-pointer font-bold"
+                      >
+                        <option value="All Roles">All Roles</option>
+                        <option value="hosts">Hosts</option>
+                        <option value="managers">Managers</option>
+                        <option value="agents">Agents</option>
+                        <option value="admins">Admins</option>
+                      </select>
+                    </div>
+
+                    <div className="max-h-[120px] overflow-y-auto border border-white/5 rounded-lg bg-black/20 divide-y divide-white/5 custom-scrollbar">
+                      {filteredEditUsers.map(user => {
+                        const userPoppo = user.poppo_id || user.id;
+                        const isAdded = editAttendees.some(a => (a.poppoId || a.id || a.poppo_id) === userPoppo);
+                        return (
+                          <div key={user.id} className="flex items-center justify-between p-2 text-xs hover:bg-white/[0.01]">
+                            <div>
+                              <span className="font-bold text-[#F0EFE8]">{user.nickname || user.name}</span>
+                              <span className="text-[9px] text-[#A09E9A] ml-2">({user.role})</span>
+                            </div>
+                            <button
+                              type="button"
+                              disabled={isAdded}
+                              onClick={() => {
+                                if (!isAdded) {
+                                  setEditAttendees([...editAttendees, {
+                                    poppoId: userPoppo,
+                                    nickname: user.nickname || user.name,
+                                    role: user.role
+                                  }]);
+                                }
+                              }}
+                              className={cn(
+                                "px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider transition-colors",
+                                isAdded
+                                  ? "bg-white/5 text-slate-500 cursor-not-allowed"
+                                  : "bg-[#D4AF37]/20 hover:bg-[#D4AF37]/30 text-[#D4AF37] cursor-pointer"
+                              )}
+                            >
+                              {isAdded ? 'Added' : 'Add'}
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label htmlFor="edit-attendance-feedback" className="text-[9px] font-bold text-[#A09E9A] uppercase tracking-widest">Feedback / Comments</label>
+                  <textarea
+                    id="edit-attendance-feedback"
+                    rows={3}
+                    value={editFeedback}
+                    onChange={(e) => setEditFeedback(e.target.value)}
+                    placeholder="Attendance records notes or comments..."
+                    className="w-full bg-[#0D0D14] border border-white/10 rounded-xl px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37] resize-none"
+                  />
+                </div>
+              </div>
+            )}
+
+            {editTargetLogItem.logType === 'calendar' && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label htmlFor="edit-cal-title" className="text-[9px] font-bold text-[#A09E9A] uppercase tracking-widest">Event Title</label>
+                    <input
+                      id="edit-cal-title"
+                      type="text"
+                      value={editCalTitle}
+                      disabled
+                      className="w-full bg-[#0D0D14]/50 border border-white/10 rounded-xl px-3 py-2 text-xs text-slate-500 cursor-not-allowed outline-none"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label htmlFor="edit-cal-type" className="text-[9px] font-bold text-[#A09E9A] uppercase tracking-widest">Event Type</label>
+                    <select
+                      id="edit-cal-type"
+                      value={editCalType}
+                      disabled
+                      className="w-full bg-[#0D0D14]/50 border border-white/10 rounded-xl px-3 py-2 text-xs text-slate-500 cursor-not-allowed outline-none"
+                    >
+                      <option value="solo livehouse">Solo Livehouse</option>
+                      <option value="party livehouse">Party Livehouse</option>
+                      <option value="pk event">PK Event</option>
+                      <option value="agency meeting">Agency Meeting</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label htmlFor="edit-cal-date" className="text-[9px] font-bold text-[#A09E9A] uppercase tracking-widest">Date</label>
+                    <input
+                      id="edit-cal-date"
+                      type="date"
+                      value={editCalDate}
+                      disabled
+                      className="w-full bg-[#0D0D14]/50 border border-white/10 rounded-xl px-3 py-2 text-xs text-slate-500 cursor-not-allowed outline-none"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label htmlFor="edit-cal-time" className="text-[9px] font-bold text-[#A09E9A] uppercase tracking-widest">Time Slot</label>
+                    <input
+                      id="edit-cal-time"
+                      type="text"
+                      value={editCalTime}
+                      disabled
+                      className="w-full bg-[#0D0D14]/50 border border-white/10 rounded-xl px-3 py-2 text-xs text-slate-500 cursor-not-allowed outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label htmlFor="edit-cal-loc" className="text-[9px] font-bold text-[#A09E9A] uppercase tracking-widest">Location / Room Link</label>
+                  <input
+                    id="edit-cal-loc"
+                    type="text"
+                    value={editCalLocation}
+                    disabled
+                    className="w-full bg-[#0D0D14]/50 border border-white/10 rounded-xl px-3 py-2 text-xs text-slate-500 cursor-not-allowed outline-none"
+                  />
+                </div>
+
+                {/* Calendar Participants */}
+                <div className="border border-white/5 rounded-xl bg-black/40 p-4 space-y-3">
+                  <span className="text-[9px] font-black text-[#A09E9A] uppercase tracking-widest block text-left">Edit Participants ({editCalParticipants.length})</span>
+                  
+                  <div className="flex flex-wrap gap-1.5 min-h-[40px] p-2 bg-[#0D0D14]/80 rounded-lg border border-white/5">
+                    {editCalParticipants.map((part, idx) => (
+                      <span key={idx} className="px-2 py-0.5 rounded bg-[#D4AF37]/10 border border-[#D4AF37]/20 text-[10px] text-[#D4AF37] font-bold flex items-center gap-1">
+                        {part.nickname || part.name}
+                        <button
+                          type="button"
+                          onClick={() => setEditCalParticipants(editCalParticipants.filter(p => (p.poppoId || p.id || p.poppo_id) !== (part.poppoId || part.id || part.poppo_id)))}
+                          className="text-red-400 hover:text-red-300 font-bold ml-0.5 cursor-pointer text-xs"
+                        >
+                          ×
+                        </button>
+                      </span>
+                    ))}
+                    {editCalParticipants.length === 0 && (
+                      <span className="text-white/20 italic text-[10px] self-center">No participants selected yet</span>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={editCalSearch}
+                        onChange={(e) => setEditCalSearch(e.target.value)}
+                        placeholder="Search users..."
+                        className="flex-1 bg-[#0A0B0E] border border-white/10 rounded-lg px-3 py-1.5 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
+                      />
+                      <select
+                        value={editCalRoleFilter}
+                        onChange={(e) => setEditCalRoleFilter(e.target.value)}
+                        title="Role Filter"
+                        className="bg-[#0A0B0E] border border-white/10 rounded-lg px-2 text-xs text-[#F0EFE8] outline-none cursor-pointer font-bold"
+                      >
+                        <option value="All Roles">All Roles</option>
+                        <option value="hosts">Hosts</option>
+                        <option value="managers">Managers</option>
+                        <option value="agents">Agents</option>
+                        <option value="admins">Admins</option>
+                      </select>
+                    </div>
+
+                    <div className="max-h-[120px] overflow-y-auto border border-white/5 rounded-lg bg-black/20 divide-y divide-white/5 custom-scrollbar">
+                      {filteredEditCalUsers.map(user => {
+                        const userPoppo = user.poppo_id || user.id;
+                        const isAdded = editCalParticipants.some(p => (p.poppoId || p.id || p.poppo_id) === userPoppo);
+                        return (
+                          <div key={user.id} className="flex items-center justify-between p-2 text-xs hover:bg-white/[0.01]">
+                            <div>
+                              <span className="font-bold text-[#F0EFE8]">{user.nickname || user.name}</span>
+                              <span className="text-[9px] text-[#A09E9A] ml-2">({user.role})</span>
+                            </div>
+                            <button
+                              type="button"
+                              disabled={isAdded}
+                              onClick={() => {
+                                if (!isAdded) {
+                                  setEditCalParticipants([...editCalParticipants, {
+                                    poppoId: userPoppo,
+                                    nickname: user.nickname || user.name,
+                                    role: user.role
+                                  }]);
+                                }
+                              }}
+                              className={cn(
+                                "px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider transition-colors",
+                                isAdded
+                                  ? "bg-white/5 text-slate-500 cursor-not-allowed"
+                                  : "bg-[#D4AF37]/20 hover:bg-[#D4AF37]/30 text-[#D4AF37] cursor-pointer"
+                              )}
+                            >
+                              {isAdded ? 'Added' : 'Add'}
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label htmlFor="edit-cal-desc" className="text-[9px] font-bold text-[#A09E9A] uppercase tracking-widest">Description</label>
+                  <textarea
+                    id="edit-cal-desc"
+                    rows={2}
+                    value={editCalDescription}
+                    disabled
+                    className="w-full bg-[#0D0D14]/50 border border-white/10 rounded-xl px-3 py-2 text-xs text-slate-500 cursor-not-allowed outline-none resize-none"
+                  />
+                </div>
+              </div>
+            )}
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-white/5">
+              <button
+                type="button"
+                onClick={() => setEditTargetLogItem(null)}
+                className="px-4 py-2 bg-white/5 hover:bg-white/10 text-xs font-bold uppercase rounded-lg text-[#F0EFE8] cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={isLogProcessing}
+                className="px-4 py-2 bg-[#D4AF37] text-black hover:bg-[#C5A028] text-xs font-black uppercase rounded-lg flex items-center gap-1.5 cursor-pointer disabled:opacity-50 transition-all font-bold"
+              >
+                {isLogProcessing ? 'Saving...' : 'Save Changes'}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    );
+  };
+
   const [performanceReports, setPerformanceReports] = useState<any[]>([]);
   const [participatedEvents, setParticipatedEvents] = useState<any[]>([]);
   const [pkData, setPkData] = useState<{ win_percentage: number; pk_score: number; sessions: number }>({
@@ -181,7 +2927,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
   const [isLoading, setIsLoading] = useState(true);
   const [sortAscending, setSortAscending] = useState(true);
 
-  // Dynamic styles based on base_salary_category
+  // Dynamic styles based on tier_pay
   const styles = useMemo(() => {
     const getCategoryStyles = (category: string) => {
       const norm = String(category || '').trim().toLowerCase();
@@ -235,22 +2981,34 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
         gradientBg: 'bg-gradient-to-br from-white/10 via-white/5 to-[#1A1A28]/80',
       };
     };
-    return getCategoryStyles(host.base_salary_category || '');
-  }, [host.base_salary_category]);
+    return getCategoryStyles(host.tier_pay || '');
+  }, [host.tier_pay]);
 
   // Profile Edit States
   const [editNickname, setEditNickname] = useState(host.nickname || host.name || '');
   const [editPhotoUrl, setEditPhotoUrl] = useState(host.photoUrl || '');
   const [editDescription, setEditDescription] = useState(host.description || '');
   const [editRole, setEditRole] = useState<string>(host.role || 'Host');
-  const [editTeam, setEditTeam] = useState<string>(host.team || 'Unassigned');
+  const [editTeam, setEditTeam] = useState<string>(host.teamAnchor || host.team || 'Unassigned');
   const [editManager, setEditManager] = useState<string>(host.manager || 'Nine Management');
-  const [editBaseSalaryCategory, setEditBaseSalaryCategory] = useState<string>(host.base_salary_category || 'N/A');
+  const [editBaseSalaryCategory, setEditBaseSalaryCategory] = useState<string>(host.tier_pay || 'N/A');
   const [editStatus, setEditStatus] = useState<string>(host.status || 'Active');
 
   const [editLevel, setEditLevel] = useState<number>(host.level || 1);
   const [isProcessingPhoto, setIsProcessingPhoto] = useState(false);
-  const [managersList, setManagersList] = useState<{ id: string; name: string }[]>([]);
+  const [managersList, setManagersList] = useState<{ id: string; name: string; photoUrl?: string }[]>([]);
+
+  const assignedManager = useMemo(() => {
+    const managerId = host.assignedManagerId || host.assigned_manager_poppo_id;
+    if (managerId) {
+      return managersList.find(m => String(m.id).trim() === String(managerId).trim());
+    }
+    const managerName = host.manager;
+    if (managerName) {
+      return managersList.find(m => String(m.name).trim().toLowerCase() === String(managerName).trim().toLowerCase());
+    }
+    return null;
+  }, [host.assignedManagerId, host.assigned_manager_poppo_id, host.manager, managersList]);
 
   // Host self-edit panel (bio, social, streaming hours)
   const [isSelfEditing, setIsSelfEditing] = useState(false);
@@ -320,6 +3078,8 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
   // New States for dropdown selections, RPK metadata, event form data, and AI reports triggers
   const [analyticsYear, setAnalyticsYear] = useState<string>('all');
   const [analyticsMonth, setAnalyticsMonth] = useState<string>('all');
+  const [perfActiveTab, setPerfActiveTab] = useState<'metrics' | 'diversity'>('metrics');
+  const [assignedAwards, setAssignedAwards] = useState<any[]>([]);
   const [eventFormData, setEventFormData] = useState({
     eventType: 'SOLO LIVEHOUSE',
     eventDate: '',
@@ -328,8 +3088,8 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
   });
   const [isAddEventFormOpen, setIsAddEventFormOpen] = useState(false);
   const [isSubmittingEvent, setIsSubmittingEvent] = useState(false);
-  const [eventActiveTab, setEventActiveTab] = useState<'exposure' | 'attendance'>('exposure');
-  const [rpkMetadata, setRpkMetadata] = useState<{ lastUpdated: string; updatedBy: string } | null>(null);
+  const [eventActiveTab, setEventActiveTab] = useState<'exposure' | 'attendance' | 'recognitions'>('exposure');
+  const [rpkMetadata, setRpkMetadata] = useState<any>(null);
   
   // AI report states
   const [postedAiReport, setPostedAiReport] = useState<any>(null);
@@ -343,12 +3103,20 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
     setEditPhotoUrl(host.photoUrl || '');
     setEditDescription(host.description || '');
     setEditRole(host.role || 'Host');
-    setEditTeam(host.team || 'Unassigned');
+    setEditTeam(host.teamAnchor || host.team || 'Unassigned');
     setEditManager(host.manager || 'Nine Management');
-    setEditBaseSalaryCategory(host.base_salary_category || 'N/A');
+    setEditBaseSalaryCategory(host.tier_pay || 'N/A');
     setEditStatus(host.status || 'Active');
 
     setEditLevel(host.level || 1);
+
+    // Sync self-edit states for other fields
+    setSelfBio(host.bio || host.description || '');
+    setSelfSocialIg(host.social_links?.ig || '');
+    setSelfSocialTk(host.social_links?.tiktok || '');
+    setSelfSocialFb(host.social_links?.fb || '');
+    setSelfSocialWa(host.social_links?.whatsapp || '');
+    setSelfStreamSlots(host.streaming_hours?.length ? host.streaming_hours : [{ from: '', to: '' }]);
     
     const loadProfileData = async () => {
       setIsLoading(true);
@@ -629,16 +3397,20 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
         try {
           const assignSnap = await getDocs(query(collection(db, 'award_assignments'), where('hostId', '==', host.id)));
           const assignList: any[] = [];
+          const activeList: any[] = [];
           const nowStr = new Date().toISOString().slice(0, 10);
           assignSnap.forEach(d => {
             const data = d.data();
+            const item = { id: d.id, ...data };
+            assignList.push(item);
             if (data.startDate && data.endDate && nowStr >= data.startDate && nowStr <= data.endDate) {
-              assignList.push({ id: d.id, ...data });
+              activeList.push(item);
             }
           });
-          setActiveAwards(assignList);
+          setAssignedAwards(assignList);
+          setActiveAwards(activeList);
         } catch (e) {
-          console.warn('Could not load active award assignments:', e);
+          console.warn('Could not load award assignments:', e);
         }
 
         // Load agent notes
@@ -722,7 +3494,11 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
         const allHosts = await FirebaseService.getAllHosts();
         const mgrs = allHosts
           .filter(h => (h.role || '').toLowerCase() === 'manager' || (h.role || '').toLowerCase() === 'agent')
-          .map(h => ({ id: h.id || (h as any).poppoId || (h as any).poppo_id, name: h.nickname || h.name || h.id }));
+          .map(h => ({ 
+            id: h.id || (h as any).poppoId || (h as any).poppo_id, 
+            name: h.nickname || h.name || h.id,
+            photoUrl: h.photoUrl
+          }));
         setManagersList(mgrs);
       } catch (err) {
         console.error("Failed to load managers list:", err);
@@ -753,27 +3529,26 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
           const img = new Image();
           img.onload = () => {
             const canvas = document.createElement('canvas');
-            let width = img.width;
-            let height = img.height;
-            const MAX_SIZE = 400;
-
-            if (width > height) {
-              if (width > MAX_SIZE) {
-                height *= MAX_SIZE / width;
-                width = MAX_SIZE;
-              }
-            } else {
-              if (height > MAX_SIZE) {
-                width *= MAX_SIZE / height;
-                width = MAX_SIZE;
-              }
-            }
-
-            canvas.width = width;
-            canvas.height = height;
+            canvas.width = 1080;
+            canvas.height = 1080;
             const ctx = canvas.getContext('2d');
-            ctx?.drawImage(img, 0, 0, width, height);
-            resolve(canvas.toDataURL('image/jpeg', 0.7));
+            if (ctx) {
+              // Fill background with theme color #0D0D14
+              ctx.fillStyle = '#0D0D14';
+              ctx.fillRect(0, 0, 1080, 1080);
+              
+              // Calculate scale to fit original image entirely inside the 1080x1080 square box
+              const scale = Math.min(1080 / img.width, 1080 / img.height);
+              const drawWidth = img.width * scale;
+              const drawHeight = img.height * scale;
+              const x = (1080 - drawWidth) / 2;
+              const y = (1080 - drawHeight) / 2;
+
+              ctx.imageSmoothingEnabled = true;
+              ctx.imageSmoothingQuality = 'high';
+              ctx.drawImage(img, 0, 0, img.width, img.height, x, y, drawWidth, drawHeight);
+            }
+            resolve(canvas.toDataURL('image/jpeg', 0.8));
           };
           img.onerror = reject;
           img.src = reader.result as string;
@@ -972,7 +3747,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
     const userRoleLower = String(currentAuth?.role || '').toLowerCase();
     const isDirectorOrHeadAdmin = ['director', 'head admin', 'head_admin'].includes(userRoleLower);
 
-    if (!(isOwnProfile && !isSpotlight) && !isDirectorOrHeadAdmin) {
+    if (!isOwnProfile && !isDirectorOrHeadAdmin) {
       alert("Unauthorized: Only the host themselves through their profile page, director, or head admin can edit profile info.");
       return;
     }
@@ -982,46 +3757,89 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
       const truncatedBio = selfBio.slice(0, 100);
       let updatedHost: Host;
 
+      const updatedFields: Record<string, any> = {};
+
       if (isDirectorOrHeadAdmin) {
-        // Director/Head Admin can edit both administrative fields and public profile info
         const selectedMgr = managersList.find(m => m.name === editManager);
         const assignedManagerId = selectedMgr ? selectedMgr.id : null;
+        updatedFields.nickname = editNickname.trim();
+        updatedFields.role = editRole;
+        updatedFields.manager = editManager;
+        updatedFields.assignedManagerId = assignedManagerId;
+        updatedFields.status = editStatus;
+        updatedFields.teamAnchor = editTeam;
+      }
 
-        updatedHost = {
-          ...host,
-          nickname: editNickname.trim(),
-          name: editNickname.trim() || host.name,
-          photoUrl: editPhotoUrl,
-          description: truncatedBio,
-          bio: truncatedBio,
-          role: editRole as any,
-          team: editTeam,
-          manager: editManager,
-          assignedManagerId: assignedManagerId,
-          base_salary_category: editBaseSalaryCategory as any,
-          status: editStatus as any,
+      if (isOwnProfile || isDirectorOrHeadAdmin) {
+        updatedFields.photoUrl = editPhotoUrl;
+        updatedFields.tier_pay = editBaseSalaryCategory;
+        updatedFields.bio = truncatedBio;
+        updatedFields.description = truncatedBio;
+        updatedFields.social_links = { ig: selfSocialIg, tiktok: selfSocialTk, fb: selfSocialFb, whatsapp: selfSocialWa };
+        updatedFields.streaming_hours = selfStreamSlots.filter(s => s.from && s.to);
+      }
 
-          level: Number(editLevel) || 1,
-          social_links: { ig: selfSocialIg, tiktok: selfSocialTk, fb: selfSocialFb, whatsapp: selfSocialWa },
-          streaming_hours: selfStreamSlots.filter(s => s.from && s.to),
-          updated_at: new Date().toISOString()
-        };
+      const idToken = await auth.currentUser?.getIdToken();
+      if (!idToken) {
+        throw new Error("Unable to retrieve authentication token. Please re-login.");
+      }
 
-        await FirebaseService.updateHost(updatedHost, host.role);
-        await FirebaseService.logSystemActivity(`Admin edited profile metadata and public info for Host: ${host.nickname || host.name} (Poppo ID: ${host.id}) - New Nickname: ${editNickname.trim()}, Role: ${editRole}, Team: ${editTeam}, Manager: ${editManager}, Base Salary Category: ${editBaseSalaryCategory}, Status: ${editStatus}, Level: ${editLevel}, Bio: "${truncatedBio}"`, 'Warning');
+      const res = await fetch('/api/admin/update-host-profile', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${idToken}`
+        },
+        body: JSON.stringify({
+          hostId: host.id,
+          updatedFields
+        })
+      });
+      if (!res.ok) {
+        let errMsg = "Failed to update profile.";
+        try {
+          const resData = await res.clone().json();
+          errMsg = resData.error || errMsg;
+        } catch (parseErr) {
+          try {
+            const text = await res.clone().text();
+            if (text) errMsg = text;
+          } catch (e) {}
+        }
+        showToast('error', errMsg);
+        console.error(`[UpdateProfile Error] HTTP ${res.status}: ${errMsg}`);
+        throw new Error(errMsg);
+      }
+      try {
+        const resData = await res.clone().json();
+        console.log("[UpdateProfile Success] Response data:", resData);
+      } catch (e) {}
+
+      updatedHost = {
+        ...host,
+        ...updatedFields,
+        nickname: updatedFields.nickname !== undefined ? updatedFields.nickname : host.nickname,
+        name: updatedFields.nickname !== undefined ? updatedFields.nickname : host.name,
+        photoUrl: updatedFields.photoUrl !== undefined ? updatedFields.photoUrl : host.photoUrl,
+        bio: updatedFields.bio !== undefined ? updatedFields.bio : host.bio,
+        description: updatedFields.description !== undefined ? updatedFields.description : host.description,
+        role: updatedFields.role !== undefined ? updatedFields.role as any : host.role,
+        teamAnchor: updatedFields.teamAnchor !== undefined ? updatedFields.teamAnchor : host.teamAnchor,
+        manager: updatedFields.manager !== undefined ? updatedFields.manager : host.manager,
+        assignedManagerId: updatedFields.assignedManagerId !== undefined ? updatedFields.assignedManagerId : host.assignedManagerId,
+        tier_pay: updatedFields.tier_pay !== undefined ? updatedFields.tier_pay as any : host.tier_pay,
+        status: updatedFields.status !== undefined ? updatedFields.status as any : host.status,
+        social_links: updatedFields.social_links !== undefined ? updatedFields.social_links : host.social_links,
+        streaming_hours: updatedFields.streaming_hours !== undefined ? updatedFields.streaming_hours : host.streaming_hours,
+        updated_at: new Date().toISOString()
+      };
+
+      showToast('success', "Profile updated successfully!");
+
+      if (isDirectorOrHeadAdmin) {
+        await FirebaseService.logSystemActivity(`Admin/Director edited profile metadata/info for Host: ${host.nickname || host.name} (Poppo ID: ${host.id}) - Fields: ${JSON.stringify(updatedFields)}`, 'Warning');
       } else {
-        // Normal host self-edit
-        updatedHost = {
-          ...host,
-          bio: truncatedBio,
-          description: truncatedBio,
-          social_links: { ig: selfSocialIg, tiktok: selfSocialTk, fb: selfSocialFb, whatsapp: selfSocialWa },
-          streaming_hours: selfStreamSlots.filter(s => s.from && s.to),
-          updated_at: new Date().toISOString()
-        };
-
-        await FirebaseService.updateHost(updatedHost, host.role);
-        await FirebaseService.logSystemActivity(`Host edited self profile public info (Poppo ID: ${host.id}) - Bio: "${truncatedBio}", Socials: ${JSON.stringify(updatedHost.social_links)}, Streaming Slots: ${JSON.stringify(updatedHost.streaming_hours)}`, 'Info');
+        await FirebaseService.logSystemActivity(`Host edited self profile public info (Poppo ID: ${host.id}) - Fields: ${JSON.stringify(updatedFields)}`, 'Info');
       }
 
       // Update auth state if editing own profile
@@ -1031,7 +3849,8 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
           name: updatedHost.nickname || updatedHost.name,
           nickname: updatedHost.nickname || updatedHost.name,
           profile_photo: updatedHost.photoUrl,
-          bio: updatedHost.bio
+          bio: updatedHost.bio,
+          anchor_team: updatedHost.teamAnchor || updatedHost.team || ''
         };
         Storage.setAuthState(newAuth);
       }
@@ -1257,7 +4076,7 @@ Return EXACTLY three sections with these exact labels on their own lines:
 
 Host: ${host.nickname || host.name} (Poppo ID: ${host.id})
 Status: ${host.status || 'Unknown'} | Level: ${host.level || 1}
-Role: ${host.role || 'Host'} | Manager: ${host.manager || 'N/A'} | Team: ${host.team || 'N/A'}
+Role: ${host.role || 'Host'} | Manager: ${host.manager || 'N/A'} | Team Anchor: ${host.teamAnchor || host.team || 'N/A'}
 Total Live Earnings: ${perfTotals.liveEarnings.toLocaleString()} | Party Earnings: ${perfTotals.partyEarnings.toLocaleString()}
 Total Points Earned (all time): ${perfTotals.points.toLocaleString()}
 Live Hours (all time): ${perfTotals.liveHrs}h
@@ -1507,65 +4326,148 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
     },
   ];
 
-  const renderEarningsBreakdown = () => {
+  const renderPerformanceMetricsAndDiversity = () => {
     if (performanceReports.length === 0) return null;
     return (
       <div className={cn("space-y-4 bg-white/5 backdrop-blur-xl border border-white/10 p-5 rounded-3xl transition-all duration-300 hover:border-amber-500/30 group", styles.shadow)}>
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-2">
-          <div className="flex items-center gap-2">
-             <div className="w-8 h-8 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-400 text-sm shadow-inner">📈</div>
-             <h4 className="text-xs font-black uppercase tracking-widest text-[#F0EFE8]">PERFORMANCE ANALYTICS</h4>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-2 pb-2 border-b border-white/5">
+          {/* Tab Switcher on the left */}
+          <div className="flex items-center gap-1 bg-black/40 p-1 rounded-xl border border-white/5 self-start">
+            <button
+              type="button"
+              onClick={() => setPerfActiveTab('metrics')}
+              className={cn(
+                "px-3.5 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer",
+                perfActiveTab === 'metrics'
+                  ? "bg-amber-500/20 text-amber-400 border border-amber-500/30 shadow-[0_0_12px_rgba(245,158,11,0.2)]"
+                  : "text-white/40 hover:text-white/70 border border-transparent"
+              )}
+            >
+              PERFORMANCE METRICS
+            </button>
+            <button
+              type="button"
+              onClick={() => setPerfActiveTab('diversity')}
+              className={cn(
+                "px-3.5 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer",
+                perfActiveTab === 'diversity'
+                  ? "bg-amber-500/20 text-amber-400 border border-amber-500/30 shadow-[0_0_12px_rgba(245,158,11,0.2)]"
+                  : "text-white/40 hover:text-white/70 border border-transparent"
+              )}
+            >
+              EARNINGS DIVERSITY
+            </button>
           </div>
-          <div className="flex items-center gap-2 relative z-10">
-            <select
-              title="Filter by Year"
-              value={analyticsYear}
-              onChange={e => setAnalyticsYear(e.target.value)}
-              className="bg-[#0D0D14] border border-[#D4AF37]/20 rounded-lg px-3 py-1.5 text-xs font-bold text-[#F0EFE8] outline-none focus:border-[#D4AF37] cursor-pointer shadow-inner"
-            >
-              <option value="all">All Years</option>
-              {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
-            </select>
-            <select
-              title="Filter by Month"
-              value={analyticsMonth}
-              onChange={e => setAnalyticsMonth(e.target.value)}
-              className="bg-[#0D0D14] border border-[#D4AF37]/20 rounded-lg px-3 py-1.5 text-xs font-bold text-[#F0EFE8] outline-none focus:border-[#D4AF37] cursor-pointer shadow-inner"
-            >
-              <option value="all">All Months</option>
-              {MONTH_ORDER.map(m => <option key={m} value={m}>{m}</option>)}
-            </select>
+
+          {/* Right side controls depending on active tab */}
+          <div className="flex items-center gap-2 relative z-10 self-end sm:self-center">
+            {perfActiveTab === 'metrics' ? (
+              <>
+                <select
+                  title="Filter by Year"
+                  value={analyticsYear}
+                  onChange={e => setAnalyticsYear(e.target.value)}
+                  className="bg-[#0D0D14] border border-[#D4AF37]/20 rounded-lg px-3 py-1.5 text-xs font-bold text-[#F0EFE8] outline-none focus:border-[#D4AF37] cursor-pointer shadow-inner transition-all hover:border-[#D4AF37]/50"
+                >
+                  <option value="all">All Years</option>
+                  {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
+                </select>
+                <select
+                  title="Filter by Month"
+                  value={analyticsMonth}
+                  onChange={e => setAnalyticsMonth(e.target.value)}
+                  className="bg-[#0D0D14] border border-[#D4AF37]/20 rounded-lg px-3 py-1.5 text-xs font-bold text-[#F0EFE8] outline-none focus:border-[#D4AF37] cursor-pointer shadow-inner transition-all hover:border-[#D4AF37]/50"
+                >
+                  <option value="all">All Months</option>
+                  {MONTH_ORDER.map(m => <option key={m} value={m}>{m}</option>)}
+                </select>
+              </>
+            ) : (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setSortAscending(prev => !prev)}
+                  className="p-1.5 bg-[#0D0D14] hover:bg-white/5 border border-amber-500/20 hover:border-amber-500/40 rounded-lg text-[#A09E9A] hover:text-amber-400 transition-all cursor-pointer shadow-sm flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider"
+                  title="Toggle Chronological Sort"
+                >
+                  <ArrowUpDown size={12} className="text-amber-400" />
+                  Sort
+                </button>
+              </div>
+            )}
           </div>
         </div>
-        <div className="grid grid-cols-3 gap-3 pt-1">
-          {earningTiles.map((tile, i) => {
-            const valStr = tile.fmt(tile.value);
-            const textClass = valStr.length > 10
-              ? "text-xs sm:text-sm md:text-base"
-              : valStr.length > 7
-                ? "text-sm sm:text-base md:text-lg"
-                : "text-base sm:text-lg md:text-xl";
-            return (
-              <div 
-                key={i} 
-                style={{ background: tile.bgGradient }}
-                className={cn(
-                  "border border-white/5 p-3 sm:p-4.5 rounded-2xl flex flex-col items-center justify-center text-center min-h-[90px] transition-all duration-300 transform group-hover:translate-y-[-2px] shadow-lg gap-1.5",
-                  tile.hoverBorder
-                )}
-              >
-                <span className="text-[8px] sm:text-[9px] md:text-[10px] font-black text-white/50 uppercase tracking-widest leading-tight">
-                  {tile.label}
-                </span>
-                <span 
-                  style={{ color: tile.accentColor }}
-                  className={cn("font-black tracking-tight drop-shadow-md", textClass)}
-                >
-                  {valStr}
-                </span>
-              </div>
-            );
-          })}
+
+        {/* Content Panel */}
+        <div className="transition-all duration-300">
+          {perfActiveTab === 'metrics' ? (
+            <div className="grid grid-cols-3 gap-3 pt-1">
+              {earningTiles.map((tile, i) => {
+                const valStr = tile.fmt(tile.value);
+                const textClass = valStr.length > 10
+                  ? "text-xs sm:text-sm md:text-base"
+                  : valStr.length > 7
+                    ? "text-sm sm:text-base md:text-lg"
+                    : "text-base sm:text-lg md:text-xl";
+                return (
+                  <div 
+                    key={i} 
+                    style={{ background: tile.bgGradient }}
+                    className={cn(
+                      "border border-white/5 p-3 sm:p-4.5 rounded-2xl flex flex-col items-center justify-center text-center min-h-[90px] transition-all duration-300 transform group-hover:translate-y-[-2px] shadow-lg gap-1.5",
+                      tile.hoverBorder
+                    )}
+                  >
+                    <span className="text-[8px] sm:text-[9px] md:text-[10px] font-black text-white/50 uppercase tracking-widest leading-tight">
+                      {tile.label}
+                    </span>
+                    <span 
+                      style={{ color: tile.accentColor }}
+                      className={cn("font-black tracking-tight drop-shadow-md", textClass)}
+                    >
+                      {valStr}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="overflow-x-auto pt-1 custom-scrollbar">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr className="border-b border-amber-500/20 text-amber-400/90 font-black uppercase tracking-wider text-[8.5px]">
+                    <th className="py-2.5 px-2">Period</th>
+                    <th className="py-2.5 px-2 text-right">Live Earnings</th>
+                    <th className="py-2.5 px-2 text-right">Party Earnings</th>
+                    <th className="py-2.5 px-2 text-right">Platform Reward</th>
+                    <th className="py-2.5 px-2 text-right">Tips</th>
+                    <th className="py-2.5 px-2 text-right">Other</th>
+                    <th className="py-2.5 px-2 text-right">Super Rank</th>
+                    <th className="py-2.5 px-2 text-right">Super Salary</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5 text-[#F0EFE8]">
+                  {sortedReportsForRender.length > 0 ? (
+                    sortedReportsForRender.map((r, i) => (
+                      <tr key={i} className="hover:bg-amber-500/5 hover:text-amber-200 transition-colors text-[10.5px]">
+                        <td className="py-3 px-2 font-bold capitalize whitespace-nowrap">{formatPeriodShort(r.monthName || r.month, r.year)}</td>
+                        <td className="py-3 px-2 text-right font-mono text-[#FFB800]">{pf(r, 'liveEarnings', 'live_earnings').toLocaleString()}</td>
+                        <td className="py-3 px-2 text-right font-mono text-[#FF7B00]">{pf(r, 'partyEarnings', 'party_earnings').toLocaleString()}</td>
+                        <td className="py-3 px-2 text-right font-mono text-[#FF3B5C]">{pf(r, 'platformReward', 'platform_reward').toLocaleString()}</td>
+                        <td className="py-3 px-2 text-right font-mono text-[#FFB800]">{pf(r, 'tips').toLocaleString()}</td>
+                        <td className="py-3 px-2 text-right font-mono text-[#A09E9A]">{pf(r, 'otherEarnings', 'other_earnings').toLocaleString()}</td>
+                        <td className="py-3 px-2 text-right font-mono text-[#FF7B00]">{pf(r, 'superRank', 'super_rank').toLocaleString()}</td>
+                        <td className="py-3 px-2 text-right font-mono text-[#FFB800]">{pf(r, 'superSalary', 'super_salary').toLocaleString()}</td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={8} className="py-8 text-center text-amber-400/30 italic font-medium">No historical performance records found in database.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -1739,12 +4641,13 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
   const renderSelfEditModal = () => {
     if (!isSelfEditing) return null;
     const currentAuth = Storage.getAuthState();
+    const isOwnProfile = currentAuth.poppo_id === host.id;
     const userRoleLower = String(currentAuth?.role || '').toLowerCase();
     const isDirectorOrHeadAdmin = ['director', 'head admin', 'head_admin'].includes(userRoleLower);
 
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-        <div className={cn("bg-[#13131E] border border-white/10 rounded-2xl w-full p-5 shadow-2xl relative max-h-[90vh] overflow-y-auto transition-all duration-300", isDirectorOrHeadAdmin ? "max-w-lg" : "max-w-md")}>
+        <div className="bg-[#13131E] border border-white/10 rounded-2xl w-full p-5 shadow-2xl relative max-h-[90vh] overflow-y-auto transition-all duration-300 max-w-lg">
           <button
             title="Close"
             onClick={() => setIsSelfEditing(false)}
@@ -1754,130 +4657,151 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
           </button>
 
           <h3 className="text-sm font-black uppercase tracking-wider text-[#F0EFE8] mb-0.5">
-            {isDirectorOrHeadAdmin ? 'Edit Host Profile' : 'Edit Your Profile'}
+            Edit Host Profile
           </h3>
           <p className="text-[10px] text-[#A09E9A] mb-4">
-            {isDirectorOrHeadAdmin 
-              ? "Update host's administrative details, bio, social media links, and streaming schedule." 
-              : "Update bio, social media links and streaming schedule."}
+            Update administrative fields (Director/Head Admin only) or public profile settings (Profile owner only).
           </p>
 
           <div className="space-y-4">
-            {isDirectorOrHeadAdmin && (
-              <div className="bg-[#1A1A28] border border-white/5 p-4 rounded-xl space-y-3">
-                <div className="border-b border-white/5 pb-1">
-                  <span className="text-[9px] font-black text-[#D4AF37] uppercase tracking-wider">Administrative Fields</span>
-                </div>
-                
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <label className="text-[8px] font-black text-[#A09E9A] uppercase tracking-widest block">Nickname</label>
-                    <input 
-                      type="text"
-                      title="Nickname"
-                      placeholder="Nickname"
-                      value={editNickname}
-                      onChange={(e) => setEditNickname(e.target.value)}
-                      className="w-full bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-1.5 text-xs font-bold text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
-                      required
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[8px] font-black text-[#A09E9A] uppercase tracking-widest block">Role</label>
-                    <select
-                      title="Role"
-                      value={editRole}
-                      onChange={(e) => setEditRole(e.target.value)}
-                      className="w-full bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-1.5 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37] font-bold"
-                    >
-                      {['Host', 'Manager', 'Admin', 'Head Admin', 'Agent']
-                        .concat(host.role === 'Director' ? ['Director'] : [])
-                        .map(r => (
-                          <option key={r} value={r} className="bg-[#1A1A28] text-[#F0EFE8]">{r}</option>
-                        ))
-                      }
-                    </select>
-                  </div>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-[8px] font-black text-[#A09E9A] uppercase tracking-widest block">Photo Upload & URL</label>
-                  <div className="flex gap-2 items-center">
-                    <label className="px-3 py-2 bg-[#222235] border border-white/10 hover:bg-[#2A2A3F] rounded-lg text-[9px] font-black uppercase tracking-wider cursor-pointer text-[#F0EFE8] whitespace-nowrap">
-                      {isProcessingPhoto ? 'Uploading...' : 'Choose File'}
-                      <input type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
-                    </label>
-                    <input 
-                      type="text" 
-                      placeholder="Or paste photo URL..." 
-                      value={editPhotoUrl}
-                      onChange={(e) => setEditPhotoUrl(e.target.value)}
-                      className="w-full bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-1.5 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <label className="text-[8px] font-black text-[#A09E9A] uppercase tracking-widest block">Base Salary Category</label>
-                    <select
-                      title="Base Salary Category"
-                      value={editBaseSalaryCategory}
-                      onChange={(e) => setEditBaseSalaryCategory(e.target.value)}
-                      className="w-full bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-1.5 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37] font-bold"
-                    >
-                      {BASE_SALARY_POLICIES.map(policy => (
-                        <option key={policy} value={policy} className="bg-[#1A1A28] text-[#F0EFE8]">{policy}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[8px] font-black text-[#A09E9A] uppercase tracking-widest block">Assigned Manager</label>
-                    <select
-                      title="Assigned Manager"
-                      value={editManager}
-                      onChange={(e) => setEditManager(e.target.value)}
-                      className="w-full bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-1.5 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37] font-bold"
-                    >
-                      {!managersList.some(m => m.name === editManager) && editManager && (
-                        <option value={editManager} className="bg-[#1A1A28] text-[#F0EFE8]">{editManager}</option>
-                      )}
-                      {managersList.map(mgr => (
-                        <option key={mgr.id} value={mgr.name} className="bg-[#1A1A28] text-[#F0EFE8]">{mgr.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <label className="text-[8px] font-black text-[#A09E9A] uppercase tracking-widest block">Team / Anchor Group</label>
-                    <input
-                      type="text"
-                      title="Team / Anchor Group"
-                      placeholder="Team / Anchor Group"
-                      value={editTeam}
-                      onChange={(e) => setEditTeam(e.target.value)}
-                      className="w-full bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-1.5 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[8px] font-black text-[#A09E9A] uppercase tracking-widest block">Status</label>
-                    <select
-                      title="Status"
-                      value={editStatus}
-                      onChange={(e) => setEditStatus(e.target.value)}
-                      className="w-full bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-1.5 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37] font-bold"
-                    >
-                      {['Active', 'Inconsistent', 'Released', 'Inactive'].map(s => (
-                        <option key={s} value={s} className="bg-[#1A1A28] text-[#F0EFE8]">{s}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
+            {/* 1. Administrative Fields Section */}
+            <div className="bg-[#1A1A28] border border-white/5 p-4 rounded-xl space-y-3">
+              <div className="border-b border-white/5 pb-1 flex justify-between items-center">
+                <span className="text-[9px] font-black text-[#D4AF37] uppercase tracking-wider">Administrative Fields</span>
+                {!isDirectorOrHeadAdmin && (
+                  <span className="text-[7.5px] font-black text-[#A09E9A]/50 uppercase tracking-widest border border-white/10 px-1.5 py-0.5 rounded bg-white/5">Read-Only</span>
+                )}
               </div>
-            )}
+              
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-[8px] font-black text-[#A09E9A] uppercase tracking-widest block">Nickname</label>
+                  <input 
+                    type="text"
+                    title="Nickname"
+                    placeholder="Nickname"
+                    value={editNickname}
+                    onChange={(e) => setEditNickname(e.target.value)}
+                    className="w-full bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-1.5 text-xs font-bold text-[#F0EFE8] outline-none focus:border-[#D4AF37] disabled:opacity-50 disabled:cursor-not-allowed"
+                    required
+                    disabled={!isDirectorOrHeadAdmin}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[8px] font-black text-[#A09E9A] uppercase tracking-widest block">Role</label>
+                  <select
+                    title="Role"
+                    value={editRole}
+                    onChange={(e) => setEditRole(e.target.value)}
+                    className="w-full bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-1.5 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37] font-bold disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled={!isDirectorOrHeadAdmin}
+                  >
+                    {['Host', 'Manager', 'Admin', 'Head Admin', 'Agent']
+                      .concat(host.role === 'Director' ? ['Director'] : [])
+                      .map(r => (
+                        <option key={r} value={r} className="bg-[#1A1A28] text-[#F0EFE8]">{r}</option>
+                      ))
+                    }
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-[8px] font-black text-[#A09E9A] uppercase tracking-widest block">Assigned Manager</label>
+                  <select
+                    title="Assigned Manager"
+                    value={editManager}
+                    onChange={(e) => setEditManager(e.target.value)}
+                    className="w-full bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-1.5 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37] font-bold disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled={!isDirectorOrHeadAdmin}
+                  >
+                    {!managersList.some(m => m.name === editManager) && editManager && (
+                      <option value={editManager} className="bg-[#1A1A28] text-[#F0EFE8]">{editManager}</option>
+                    )}
+                    {managersList.map(mgr => (
+                      <option key={mgr.id} value={mgr.name} className="bg-[#1A1A28] text-[#F0EFE8]">{mgr.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[8px] font-black text-[#A09E9A] uppercase tracking-widest block">Team Anchor</label>
+                  <input
+                    type="text"
+                    title="Team Anchor"
+                    placeholder="Team Anchor"
+                    value={editTeam}
+                    onChange={(e) => setEditTeam(e.target.value)}
+                    className="w-full bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-1.5 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37] disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled={!isDirectorOrHeadAdmin}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1 col-span-2">
+                  <label className="text-[8px] font-black text-[#A09E9A] uppercase tracking-widest block">Status</label>
+                  <select
+                    title="Status"
+                    value={editStatus}
+                    onChange={(e) => setEditStatus(e.target.value)}
+                    className={cn(
+                      "w-full bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-1.5 text-xs outline-none focus:border-[#D4AF37] font-bold disabled:opacity-50 disabled:cursor-not-allowed",
+                      editStatus === 'Active' ? "text-emerald-400" : "text-[#F0EFE8]"
+                    )}
+                    disabled={!isDirectorOrHeadAdmin}
+                  >
+                    {['Active', 'Intermittent', 'Released', 'Inactive'].map(s => (
+                      <option key={s} value={s} className="bg-[#1A1A28] text-[#F0EFE8]">{s}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* 2. Profile Details & Pay Tier (Owner or Admin) */}
+            <div className="bg-[#1A1A28]/50 border border-white/5 p-4 rounded-xl space-y-3">
+              <div className="border-b border-white/5 pb-1 flex justify-between items-center">
+                <span className="text-[9px] font-black text-[#D4AF37] uppercase tracking-wider">Profile Info &amp; Pay Tier</span>
+                {!isOwnProfile && !isDirectorOrHeadAdmin && (
+                  <span className="text-[7.5px] font-black text-[#A09E9A]/50 uppercase tracking-widest border border-white/10 px-1.5 py-0.5 rounded bg-white/5">Read-Only</span>
+                )}
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[8px] font-black text-[#A09E9A] uppercase tracking-widest block">Photo Upload &amp; URL</label>
+                <div className="flex gap-2 items-center">
+                  <label className={cn("px-3 py-2 bg-[#222235] border border-white/10 rounded-lg text-[9px] font-black uppercase tracking-wider text-[#F0EFE8] whitespace-nowrap", !isOwnProfile && !isDirectorOrHeadAdmin ? "opacity-50 cursor-not-allowed pointer-events-none" : "hover:bg-[#2A2A3F] cursor-pointer")}>
+                    {isProcessingPhoto ? 'Uploading...' : 'Choose File'}
+                    <input type="file" accept="image/*" onChange={handleFileChange} className="hidden" disabled={!isOwnProfile && !isDirectorOrHeadAdmin} />
+                  </label>
+                  <input 
+                    type="text" 
+                    placeholder="Or paste photo URL..." 
+                    value={editPhotoUrl}
+                    onChange={(e) => setEditPhotoUrl(e.target.value)}
+                    className="w-full bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-1.5 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37] disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled={!isOwnProfile && !isDirectorOrHeadAdmin}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[8px] font-black text-[#A09E9A] uppercase tracking-widest block">Tier Pay</label>
+                <select
+                  title="Tier Pay"
+                  value={editBaseSalaryCategory}
+                  onChange={(e) => setEditBaseSalaryCategory(e.target.value)}
+                  className="w-full bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-1.5 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37] font-bold disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={!isOwnProfile && !isDirectorOrHeadAdmin}
+                >
+                  {BASE_SALARY_POLICIES.map(policy => (
+                    <option key={policy} value={policy} className="bg-[#1A1A28] text-[#F0EFE8]">{policy}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
             {/* Host Public Message */}
             <div className="space-y-1">
               <div className="flex justify-between items-center">
@@ -1890,7 +4814,8 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                 value={selfBio}
                 onChange={e => setSelfBio(e.target.value.slice(0, 100))}
                 placeholder="Enter your public message (max 100 characters)..."
-                className="w-full bg-[#0D0D14] border border-white/10 rounded-xl px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37] resize-none"
+                className="w-full bg-[#0D0D14] border border-white/10 rounded-xl px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37] resize-none disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={!isOwnProfile && !isDirectorOrHeadAdmin}
               />
             </div>
 
@@ -1912,7 +4837,8 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                       value={value}
                       onChange={e => setter(e.target.value)}
                       placeholder={placeholder}
-                      className="w-full bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-1.5 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
+                      className="w-full bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-1.5 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37] disabled:opacity-50 disabled:cursor-not-allowed"
+                      disabled={!isOwnProfile && !isDirectorOrHeadAdmin}
                     />
                   </div>
                 </div>
@@ -1926,7 +4852,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                   <label className="text-[9px] font-black uppercase tracking-wider text-[#A09E9A]">Streaming Schedule (Max 2)</label>
                   <span className="text-[7.5px] text-[#A09E9A]/50 font-bold">Use AM/PM format (e.g. 08:00 AM - 10:00 PM)</span>
                 </div>
-                {selfStreamSlots.length < 2 && (
+                {(isOwnProfile || isDirectorOrHeadAdmin) && selfStreamSlots.length < 2 && (
                   <button
                     type="button"
                     onClick={() => setSelfStreamSlots([...selfStreamSlots, { from: '', to: '' }])}
@@ -1942,16 +4868,18 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                     type="text" value={slot.from}
                     onChange={e => { const s = [...selfStreamSlots]; s[idx] = { ...s[idx], from: e.target.value }; setSelfStreamSlots(s); }}
                     placeholder="From (e.g. 08:00 AM)"
-                    className="flex-1 bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-1.5 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
+                    className="flex-1 bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-1.5 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37] disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled={!isOwnProfile && !isDirectorOrHeadAdmin}
                   />
                   <span className="text-[#A09E9A]/40 text-xs">→</span>
                   <input
                     type="text" value={slot.to}
                     onChange={e => { const s = [...selfStreamSlots]; s[idx] = { ...s[idx], to: e.target.value }; setSelfStreamSlots(s); }}
                     placeholder="To (e.g. 10:00 PM)"
-                    className="flex-1 bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-1.5 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
+                    className="flex-1 bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-1.5 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37] disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled={!isOwnProfile && !isDirectorOrHeadAdmin}
                   />
-                  {selfStreamSlots.length > 1 && (
+                  {(isOwnProfile || isDirectorOrHeadAdmin) && selfStreamSlots.length > 1 && (
                     <button type="button" title="Remove Slot" onClick={() => setSelfStreamSlots(selfStreamSlots.filter((_, i) => i !== idx))} className="text-red-400 hover:text-red-300 cursor-pointer">
                       <X size={12} />
                     </button>
@@ -2039,6 +4967,12 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
     const userRoleLower = String(currentAuth?.role || '').toLowerCase();
     const isDirectorOrHeadAdmin = ['director', 'head admin', 'head_admin'].includes(userRoleLower);
 
+    const now = new Date();
+    const lastMonthYear = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear();
+    const lastMonthVal = now.getMonth() === 0 ? 12 : now.getMonth();
+    const lastMonthStr = `${lastMonthYear}-${String(lastMonthVal).padStart(2, '0')}`;
+    const lastMonthAwards = assignedAwards.filter(a => a.startDate && a.startDate.startsWith(lastMonthStr));
+
     return (
       <div className={cn("backdrop-blur-xl border-2 rounded-3xl overflow-hidden flex flex-col relative group/card transition-all duration-300", styles.gradientBg, styles.borderColor, styles.shadow, styles.topTrim)}>
         
@@ -2057,41 +4991,77 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
             </div>
           )}
           
+          {/* Top Overlay (17% total height, top 12% is solid black, remaining 5% fades) */}
+          <div className="absolute top-0 inset-x-0 h-[17%] pointer-events-none" style={{ background: 'linear-gradient(to bottom, #000000 0%, #000000 70.6%, transparent 100%)', zIndex: 10 }} />
+          
+          {/* Bottom Overlay (30% total height, bottom 20% is solid black, remaining 10% fades) */}
+          <div className="absolute bottom-0 inset-x-0 h-[30%] pointer-events-none" style={{ background: 'linear-gradient(to top, #000000 0%, #000000 66.7%, transparent 100%)', zIndex: 10 }} />
+
           {/* Faded gradient overlay at the bottom 25% to merge with profile block */}
           <div className="absolute bottom-0 inset-x-0 h-1/3 bg-gradient-to-t from-[#1A1A28] via-[#1A1A28]/60 to-transparent z-10" />
           
-          {/* Absolute positioned badges overlaying the image */}
-          <div className="absolute top-4 right-4 z-20 flex flex-col items-end gap-2">
+          {/* Absolute positioned last month's awards overlaying the image top-left */}
+          {lastMonthAwards.length > 0 && (
+            <div className="absolute top-4 left-4 z-20 flex flex-col gap-1.5 max-w-[60%] pointer-events-auto">
+              {lastMonthAwards.map((a: any) => {
+                let badgeColorStyle = 'bg-amber-500/20 text-amber-400 border-amber-500/30';
+                if (a.awardColor === 'Purple') badgeColorStyle = 'bg-purple-500/20 text-purple-400 border-purple-500/30';
+                else if (a.awardColor === 'Emerald') badgeColorStyle = 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30';
+                else if (a.awardColor === 'Blue') badgeColorStyle = 'bg-blue-500/20 text-blue-400 border-blue-500/30';
+                else if (a.awardColor === 'Red') badgeColorStyle = 'bg-red-500/20 text-red-400 border-red-500/30';
+                else if (a.awardColor === 'Orange') badgeColorStyle = 'bg-orange-500/20 text-orange-400 border-orange-500/30';
+
+                return (
+                  <span 
+                    key={a.id} 
+                    className={cn(
+                      "text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg border backdrop-blur-md shadow-lg truncate block max-w-full",
+                      badgeColorStyle
+                    )}
+                    title={`Last Month's Award: ${a.awardName}`}
+                  >
+                    {abbreviateMonths(a.awardName)}
+                  </span>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Absolute positioned status badge overlaying the image top-right */}
+          <div className="absolute top-4 right-4 z-20">
              <span className={cn("text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full border backdrop-blur-md shadow-lg", 
                 host.status === 'Active' ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30" : "bg-amber-500/20 text-amber-400 border-amber-500/30")}>
                 {host.status || 'Active'}
              </span>
-             {/* Base Salary Category glowing badge */}
-             <span className={cn("text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full border backdrop-blur-md shadow-[0_0_15px_rgba(212,175,55,0.3)]", styles.badgeText, styles.borderColor, "bg-black/40")}>
-                {host.base_salary_category || 'Regular Host'}
-             </span>
           </div>
 
-          {/* Edit / Save Options overlaying the image bottom right */}
-          {((!isReadOnly && isDirectorOrHeadAdmin) || (isOwnProfile && !isSpotlight)) && (
-            <div className="absolute bottom-4 right-4 z-20 flex gap-2">
-              <button
-                onClick={() => setIsSelfEditing(true)}
-                className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-md border border-white/20 flex items-center justify-center text-white transition-all shadow-xl cursor-pointer"
-                title="Edit Profile"
-              >
-                <Edit2 size={16} />
-              </button>
-            </div>
-          )}
         </div>
 
         {/* Identity Details Block (merged below the photo) */}
-        <div className="px-6 pb-6 -mt-8 relative z-20 flex-1 flex flex-col space-y-5">
-          <div>
-            <h2 className="text-3xl md:text-4xl font-black text-[#F0EFE8] tracking-tight drop-shadow-md">{host.nickname || host.name}</h2>
-            <div className="flex items-center flex-wrap gap-2 mt-1.5">
-              <span className="text-xs font-mono font-bold text-[#A09E9A]">ID: {host.id}</span>
+        <div className="px-6 pb-6 -mt-8 relative z-20 flex-1 flex flex-col space-y-2">
+          {/* Top Row: Nickname and Edit pencil icon */}
+          <div className="flex justify-between items-center gap-4">
+            <h2 className="text-3xl md:text-4xl font-black text-[#F0EFE8] tracking-tight drop-shadow-md truncate">
+              {host.nickname || host.name}
+            </h2>
+            {(isDirectorOrHeadAdmin || (isOwnProfile && !isSpotlight)) && (
+              <div className="shrink-0">
+                <button
+                  onClick={() => setIsSelfEditing(true)}
+                  className="w-10 h-10 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 flex items-center justify-center text-[#A09E9A] hover:text-[#F0EFE8] transition-all shadow-xl cursor-pointer"
+                  title="Edit Profile"
+                >
+                  <Edit2 size={16} />
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Bottom Row: ID/Awards (left) and Tier Pay badge (right, aligned with Team Anchor column) */}
+          <div className="grid grid-cols-2 gap-x-4 items-center">
+            {/* Left Column: ID and Awards */}
+            <div className="flex items-center flex-wrap gap-2">
+              <span className={cn("text-xs font-mono font-bold", styles.badgeText)}>ID: {host.id}</span>
               {activeAwards.map(a => {
                 let badgeStyle = 'bg-amber-500/10 text-amber-400 border-amber-500/20';
                 if (a.awardColor === 'Purple') badgeStyle = 'bg-purple-500/10 text-purple-400 border-purple-500/20';
@@ -2106,39 +5076,127 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                     className={cn("text-[8px] font-black uppercase px-2 py-0.5 rounded-full border shrink-0 backdrop-blur-sm", badgeStyle)}
                     title={`Active Award: ${a.awardName} (${a.startDate} to ${a.endDate})`}
                   >
-                    {a.awardName}
+                    {abbreviateMonths(a.awardName)}
                   </span>
                 );
               })}
             </div>
+
+            {/* Right Column: Tier Pay Badge */}
+            <div>
+              <span className={cn("text-[9px] font-black uppercase tracking-widest px-2.5 py-0.5 rounded-full border backdrop-blur-md shadow-[0_0_12px_rgba(212,175,55,0.25)] inline-block", styles.badgeText, styles.borderColor, "bg-black/40")}>
+                {host.tier_pay || 'Regular Host'}
+              </span>
+            </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-y-4 gap-x-4 pt-4 border-t border-white/5 text-xs text-[#A09E9A]">
+          <div className="grid grid-cols-2 gap-y-2 gap-x-4 pt-1.5 border-t border-white/5 text-xs text-[#A09E9A]">
+            {String(host.role || '').toLowerCase() === 'host' || String(host.role || '').toLowerCase() === 'talent' ? (
+              <div className="flex flex-col">
+                <span className="text-[9px] font-black uppercase tracking-widest mb-1 text-white/40">Assigned Manager</span>
+                <div className="flex items-center gap-2 mt-0.5">
+                  {assignedManager?.photoUrl ? (
+                    <img 
+                      src={assignedManager.photoUrl} 
+                      alt={assignedManager.name || host.manager} 
+                      className="w-12 h-12 rounded-full object-cover border border-white/10 shrink-0 shadow-inner"
+                      referrerPolicy="no-referrer"
+                    />
+                  ) : (
+                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#1A1A28] to-[#0D0D14] border border-white/10 flex items-center justify-center text-base font-black text-indigo-400 shrink-0 shadow-inner">
+                      {(assignedManager?.name || host.manager || 'M')[0].toUpperCase()}
+                    </div>
+                  )}
+                  <span className={cn("font-bold truncate", styles.badgeText)}>{assignedManager?.name || host.manager}</span>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col">
+                <span className="text-[9px] font-black uppercase tracking-widest mb-1 text-white/40">Role</span>
+                <span className="text-[#D4AF37] font-black">{host.role}</span>
+              </div>
+            )}
             <div className="flex flex-col">
-              <span className="text-[9px] font-black uppercase tracking-widest mb-1 text-white/40">Role</span>
-              <span className="text-[#D4AF37] font-black">{host.role === 'Host' || host.role === 'Talent' ? 'Star Host' : host.role}</span>
-            </div>
-            <div className="flex flex-col">
-              <span className="text-[9px] font-black uppercase tracking-widest mb-1 text-white/40">Base Salary Category</span>
-              <span className={cn("font-black drop-shadow-sm text-sm", styles.badgeText)}>{host.base_salary_category || 'Regular Host'}</span>
-            </div>
-            <div className="flex flex-col">
-              <span className="text-[9px] font-black uppercase tracking-widest mb-1 text-white/40">Assigned Manager</span>
-              <span className="text-[#F0EFE8] font-bold">{host.manager}</span>
-            </div>
-            <div className="flex flex-col">
-              <span className="text-[9px] font-black uppercase tracking-widest mb-1 text-white/40">Team Group</span>
-              <span className="text-indigo-400 font-bold">{host.team}</span>
+              <span className="text-[9px] font-black uppercase tracking-widest mb-1 text-white/40">Team Anchor</span>
+              <span className="text-indigo-400 font-bold">{host.teamAnchor || host.team}</span>
+              {(() => {
+                const igLink = getSocialLink('instagram', host.social_links?.ig);
+                const tiktokLink = getSocialLink('tiktok', host.social_links?.tiktok);
+                const fbLink = getSocialLink('facebook', host.social_links?.fb);
+                const waLink = getSocialLink('whatsapp', host.social_links?.whatsapp);
+                
+                const hasAnySocial = igLink || tiktokLink || fbLink || waLink;
+                if (!hasAnySocial) return null;
+                
+                return (
+                  <div className="flex items-center gap-2 mt-2">
+                    {igLink && (
+                      <a 
+                        href={igLink} 
+                        target="_blank" 
+                        rel="noopener noreferrer" 
+                        className="w-6 h-6 rounded-full bg-pink-500/10 hover:bg-pink-500/20 border border-pink-500/20 hover:border-pink-500/40 flex items-center justify-center text-pink-400 transition-all shadow-inner"
+                        title="Instagram"
+                      >
+                        <Instagram size={12} />
+                      </a>
+                    )}
+                    {tiktokLink && (
+                      <a 
+                        href={tiktokLink} 
+                        target="_blank" 
+                        rel="noopener noreferrer" 
+                        className="w-6 h-6 rounded-full bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/20 hover:border-cyan-500/40 flex items-center justify-center text-cyan-400 transition-all shadow-inner"
+                        title="TikTok"
+                      >
+                        <svg className="w-3 h-3 fill-current" viewBox="0 0 24 24">
+                          <path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.17-2.86-.74-3.95-1.72-.1.08-.21.17-.31.25-.02 3.78-.01 7.56-.02 11.34-.1 2.39-1.39 4.71-3.64 5.63-2.18.97-4.88.75-6.85-.56-2.03-1.32-3.08-3.83-2.67-6.21.36-2.28 2.14-4.22 4.41-4.72.16-.03.32-.06.49-.09V12.3c-.15.02-.29.04-.44.07-3.23.51-5.74 3.49-5.69 6.78.07 3.32 2.7 6.18 6.01 6.3 3.25.17 6.18-2.19 6.57-5.41.09-.76.08-1.53.08-2.3V5.19c-.87.59-1.89.97-2.95 1.07-1.12.11-2.27-.1-3.27-.63-.97-.53-1.73-1.39-2.13-2.42C12.98 2.2 12.87 1.09 12.525.02z" />
+                        </svg>
+                      </a>
+                    )}
+                    {fbLink && (
+                      <a 
+                        href={fbLink} 
+                        target="_blank" 
+                        rel="noopener noreferrer" 
+                        className="w-6 h-6 rounded-full bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 hover:border-blue-500/40 flex items-center justify-center text-blue-400 transition-all shadow-inner"
+                        title="Facebook"
+                      >
+                        <Facebook size={12} className="text-blue-450" />
+                      </a>
+                    )}
+                    {waLink && (
+                      <a 
+                        href={waLink} 
+                        target="_blank" 
+                        rel="noopener noreferrer" 
+                        className="w-6 h-6 rounded-full bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 hover:border-emerald-500/40 flex items-center justify-center text-emerald-400 transition-all shadow-inner"
+                        title="WhatsApp"
+                      >
+                        <svg className="w-3 h-3 fill-current text-emerald-400" viewBox="0 0 24 24">
+                          <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.514 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.73-1.45L0 24zm6.59-4.846c1.6.95 3.188 1.449 4.825 1.451 5.436 0 9.86-4.42 9.864-9.864.002-2.637-1.019-5.117-2.875-6.973-1.857-1.857-4.339-2.875-6.98-2.875-5.437 0-9.86 4.42-9.863 9.865-.001 1.716.463 3.39 1.342 4.877l-.994 3.634 3.716-.975zm12.167-7.79c-.273-.137-1.62-.8-1.871-.892-.253-.09-.437-.137-.621.137-.184.272-.713.89-.873 1.073-.16.184-.321.206-.594.07-1.12-.56-1.92-.937-2.678-2.23-.2-.345.2-.32.57-.962.082-.136.04-.256-.02-.393-.06-.137-.506-1.22-.693-1.67-.182-.44-.367-.38-.506-.388-.13-.004-.28-.006-.43-.006-.15 0-.395.056-.6.28-.206.223-.787.77-.787 1.877 0 1.107.805 2.176.918 2.33.113.15 1.583 2.417 3.834 3.388.536.23 1.012.38 1.357.49.538.172 1.028.148 1.416.09.431-.064 1.332-.546 1.518-1.072.186-.527.186-.978.13-1.07-.056-.09-.206-.137-.478-.273z" />
+                        </svg>
+                      </a>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
           </div>
 
           {host.streaming_hours && host.streaming_hours.length > 0 && (
             <div className="pt-2 border-t border-white/5 space-y-2">
               <span className="text-[9px] font-black text-white/40 uppercase tracking-widest block">Streaming Schedule</span>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 gap-3">
                 {host.streaming_hours.slice(0, 2).map((slot, idx) => (
-                  <div key={idx} className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl px-3 py-2 text-center shadow-inner">
-                    <span className="text-[10px] font-bold text-white/90">{slot.from} - {slot.to}</span>
+                  <div 
+                    key={idx} 
+                    className={cn(
+                      "bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl px-3 py-2 text-center shadow-inner min-w-0",
+                      host.streaming_hours.length === 1 && "col-span-2"
+                    )}
+                  >
+                    <span className="text-[10px] font-bold text-white/90 truncate block">{slot.from} - {slot.to}</span>
                   </div>
                 ))}
               </div>
@@ -2158,64 +5216,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
     );
   };
 
-  const renderPerformanceHistory = () => {
-    return (
-      <div className={cn("space-y-4 bg-white/5 backdrop-blur-xl border border-white/10 p-5 rounded-3xl transition-all duration-300 hover:border-[#D4AF37]/30 group", styles.shadow)}>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-             <div className="w-8 h-8 rounded-full bg-[#D4AF37]/20 flex items-center justify-center text-[#D4AF37] text-sm shadow-inner">💰</div>
-             <h4 className="text-xs font-black uppercase tracking-widest text-[#F0EFE8]">Earning Diversity</h4>
-             <button
-              onClick={() => setSortAscending(prev => !prev)}
-              className="p-1.5 ml-1 bg-white/5 hover:bg-white/10 rounded-lg text-[#A09E9A] hover:text-[#D4AF37] transition-all cursor-pointer shadow-sm"
-              title="Toggle Chronological Sort"
-             >
-               <ArrowUpDown size={12} />
-             </button>
-          </div>
-          <span className="px-3 py-1 text-[9px] font-black text-[#D4AF37] border border-[#D4AF37]/30 bg-[#D4AF37]/10 rounded-full uppercase tracking-widest shadow-[0_0_10px_rgba(212,175,55,0.2)]">
-            Performance Records
-          </span>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse text-xs mt-2">
-            <thead>
-              <tr className="border-b border-white/5 text-[#A09E9A] font-bold uppercase tracking-wider text-[8.5px]">
-                <th className="py-2 px-1">Period</th>
-                <th className="py-2 px-1 text-right">Live Earnings</th>
-                <th className="py-2 px-1 text-right">Party Earnings</th>
-                <th className="py-2 px-1 text-right">Platform Reward</th>
-                <th className="py-2 px-1 text-right">Tips</th>
-                <th className="py-2 px-1 text-right">Other</th>
-                <th className="py-2 px-1 text-right">Super Rank</th>
-                <th className="py-2 px-1 text-right">Super Salary</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-white/5 text-slate-300">
-              {sortedReportsForRender.length > 0 ? (
-                sortedReportsForRender.map((r, i) => (
-                  <tr key={i} className="hover:bg-white/2 transition-colors text-[10.5px]">
-                    <td className="py-2.5 px-1 capitalize whitespace-nowrap">{formatPeriodShort(r.monthName || r.month, r.year)}</td>
-                    <td className="py-2.5 px-1 text-right font-mono text-cyan-400">{pf(r, 'liveEarnings', 'live_earnings').toLocaleString()}</td>
-                    <td className="py-2.5 px-1 text-right font-mono text-indigo-400">{pf(r, 'partyEarnings', 'party_earnings').toLocaleString()}</td>
-                    <td className="py-2.5 px-1 text-right font-mono text-emerald-400">{pf(r, 'platformReward', 'platform_reward').toLocaleString()}</td>
-                    <td className="py-2.5 px-1 text-right font-mono text-amber-400">{pf(r, 'tips').toLocaleString()}</td>
-                    <td className="py-2.5 px-1 text-right font-mono text-slate-400">{pf(r, 'otherEarnings', 'other_earnings').toLocaleString()}</td>
-                    <td className="py-2.5 px-1 text-right font-mono text-orange-400">{pf(r, 'superRank', 'super_rank').toLocaleString()}</td>
-                    <td className="py-2.5 px-1 text-right font-mono text-yellow-400">{pf(r, 'superSalary', 'super_salary').toLocaleString()}</td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={8} className="py-8 text-center text-[#A09E9A]/40 italic">No historical performance records found in database.</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    );
-  };
+  // renderPerformanceHistory is merged into renderPerformanceMetricsAndDiversity
 
   const renderRandomPK = () => {
     const currentAuth = Storage.getAuthState();
@@ -2291,12 +5292,10 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
           ))}
         </div>
 
-        {rpkMetadata && (
-          <div className="flex items-center justify-between mt-4 pt-4 border-t border-white/5">
-            <p className="text-[9px] text-[#A09E9A]/60 italic font-medium">
-              Updated: {formatUpdateMetaDate(rpkMetadata.lastUpdated)}
-            </p>
-          </div>
+        {rpkMetadata && renderCardFooter(
+          rpkMetadata.lastUpdated,
+          rpkMetadata.reporterRole,
+          rpkMetadata.reporterName
         )}
       </div>
     );
@@ -2305,6 +5304,8 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
   const renderExposuresAndAttendance = () => {
     const currentAuth = Storage.getAuthState();
     const isOwnProfile = currentAuth.poppo_id === host.id;
+    const userRoleLower = String(currentAuth?.role || '').toLowerCase();
+    const canAddEvent = isOwnProfile || userRoleLower !== 'host';
     
     const attendedCount = attendedEvents.length;
     const totalCount = totalAgencyEventsCount || 0;
@@ -2313,71 +5314,86 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
 
     return (
       <div className={cn("space-y-4 flex-1 bg-white/5 backdrop-blur-xl border border-white/10 p-5 rounded-3xl transition-all duration-300 hover:border-amber-500/30 group", styles.shadow)}>
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-             <div className="w-8 h-8 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-400 text-sm shadow-inner">📅</div>
-             <h4 className="text-xs font-black uppercase tracking-widest text-[#F0EFE8]">EVENTS</h4>
-          </div>
-          <div className="flex items-center gap-2">
-            {isOwnProfile && eventActiveTab === 'exposure' && (
-              <button
-                onClick={() => setIsAddEventFormOpen(true)}
-                className="px-3 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-400 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all cursor-pointer shadow-md"
-              >
-                + Add Event
-              </button>
-            )}
-            <div className="flex items-center gap-1 bg-black/40 p-1 rounded-xl border border-white/5">
-              <button
-                type="button"
-                onClick={() => setEventActiveTab('exposure')}
-                className={cn(
-                  "px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer",
-                  eventActiveTab === 'exposure'
-                    ? "bg-amber-500/20 text-amber-400 border border-amber-500/30"
-                    : "text-white/40 hover:text-white/70 border border-transparent"
-                )}
-              >
-                Exposures
-              </button>
-              <button
-                type="button"
-                onClick={() => setEventActiveTab('attendance')}
-                className={cn(
-                  "px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer",
-                  eventActiveTab === 'attendance'
-                    ? "bg-amber-500/20 text-amber-400 border border-amber-500/30"
-                    : "text-white/40 hover:text-white/70 border border-transparent"
-                )}
-              >
-                Attendance
-              </button>
-            </div>
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex-1 bg-black/40 p-1 rounded-xl border border-white/5 flex">
+            <button
+              type="button"
+              onClick={() => setEventActiveTab('exposure')}
+              className={cn(
+                "flex-1 py-2 rounded-lg text-xs font-black uppercase tracking-wider transition-all cursor-pointer text-center",
+                eventActiveTab === 'exposure'
+                  ? "bg-amber-500/20 text-amber-400 border border-amber-500/30"
+                  : "text-white/40 hover:text-white/70 border border-transparent"
+              )}
+            >
+              EVENTS
+            </button>
+            <button
+              type="button"
+              onClick={() => setEventActiveTab('attendance')}
+              className={cn(
+                "flex-1 py-2 rounded-lg text-xs font-black uppercase tracking-wider transition-all cursor-pointer text-center",
+                eventActiveTab === 'attendance'
+                  ? "bg-amber-500/20 text-amber-400 border border-amber-500/30"
+                  : "text-white/40 hover:text-white/70 border border-transparent"
+              )}
+            >
+              ATTENDANCE
+            </button>
+            <button
+              type="button"
+              onClick={() => setEventActiveTab('recognitions')}
+              className={cn(
+                "flex-1 py-2 rounded-lg text-xs font-black uppercase tracking-wider transition-all cursor-pointer text-center",
+                eventActiveTab === 'recognitions'
+                  ? "bg-amber-500/20 text-amber-400 border border-amber-500/30"
+                  : "text-white/40 hover:text-white/70 border border-transparent"
+              )}
+            >
+              RECOGNITIONS
+            </button>
           </div>
         </div>
 
-        {eventActiveTab === 'exposure' ? (
+        {eventActiveTab === 'exposure' && (
           <>
             <div className="space-y-3 mt-4 max-h-48 overflow-y-auto custom-scrollbar pr-1">
               {participatedEvents.length > 0 ? (
                 participatedEvents.map((e, idx) => {
-                  const eventDate = formatDateYYYYMMDD(e.eventDate || e.date);
-                  const eventTitle = e.eventType || e.description || e.eventTitle || e.title || 'Event';
+                  const eventDate = formatDateMMDDYYYY(e.eventDate || e.date);
+                  const eventTitle = e.eventType || e.eventTitle || e.title || 'Event';
                   const hostName = host.nickname || host.name;
-                  const displayTitle = `${hostName} - ${eventTitle}`;
+                  const cleanHostName = hostName.trim().toLowerCase();
+                  const cleanEventTitle = eventTitle.trim();
+                  
+                  let displayTitle = '';
+                  if (cleanEventTitle.toLowerCase().startsWith(cleanHostName)) {
+                    displayTitle = cleanEventTitle;
+                  } else {
+                    displayTitle = `${hostName} - ${cleanEventTitle}`;
+                  }
+
+                  const localTimeObj = convertManilaToLocal(e.eventDate || e.date, e.timeslot || e.time);
+                  const localTooltip = localTimeObj 
+                    ? formatToLocalTimezone(localTimeObj)
+                    : undefined;
 
                   return (
-                    <div key={idx} className="bg-white/5 border border-white/10 p-3 rounded-xl hover:border-amber-500/30 transition-all duration-300 shadow-sm flex flex-col gap-1.5 group/item">
-                      <h4 className="font-bold text-[#F0EFE8] text-sm group-hover/item:text-amber-400 transition-colors truncate">
-                        {displayTitle}
-                      </h4>
-                      <div className="text-xs text-[#A09E9A]">
-                        {eventDate} . {formatTimeslot(e.timeslot)}
-                      </div>
-                      <div className="pt-0.5">
-                        <span className="text-[10px] font-mono text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded border border-amber-400/20 inline-block uppercase tracking-wider">
+                    <div 
+                      key={idx} 
+                      className="bg-white/5 border border-white/10 p-3 rounded-xl hover:border-amber-500/30 transition-all duration-300 shadow-sm flex flex-col gap-1.5 group/item cursor-help"
+                      title={localTooltip}
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <h4 className="font-bold text-[#F0EFE8] text-sm group-hover/item:text-amber-400 transition-colors truncate">
+                          {displayTitle}
+                        </h4>
+                        <span className="text-[9px] font-mono text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded border border-amber-400/20 inline-block uppercase tracking-wider shrink-0">
                           {e.status || 'Scheduled'}
                         </span>
+                      </div>
+                      <div className="text-xs text-[#A09E9A]">
+                        {eventDate} • <span className="text-amber-400 font-medium">{formatTimeslot(e.timeslot || e.time)}</span>
                       </div>
                     </div>
                   );
@@ -2386,13 +5402,20 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                 <p className="text-xs text-white/30 italic text-center py-6 font-medium">No historical event participations found.</p>
               )}
             </div>
-            {participatedEvents.length > 0 && (
-              <p className="text-[9px] text-[#A09E9A]/60 italic font-medium mt-4 pt-4 border-t border-white/5">
-                Updated by: {participatedEvents[0].created_by_name || 'Unknown'}
-              </p>
+            {canAddEvent && (
+              <div className="flex justify-end mt-4">
+                <button
+                  onClick={() => setIsAddEventFormOpen(true)}
+                  className="px-3.5 py-2 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-400 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all cursor-pointer shadow-md"
+                >
+                  + Add Event
+                </button>
+              </div>
             )}
           </>
-        ) : (
+        )}
+
+        {eventActiveTab === 'attendance' && (
           <>
             <div className="grid grid-cols-2 gap-2.5 pt-2">
               {[
@@ -2438,7 +5461,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
             </div>
 
             {/* Progress Bar */}
-            <div className="px-1 py-1">
+            <div className="px-1 py-1 mt-2.5">
               <div className="w-full bg-black/40 rounded-full h-1.5 border border-white/5 overflow-hidden">
                 <div 
                   className="bg-gradient-to-r from-amber-600 via-orange-500 to-yellow-400 h-1.5 rounded-full transition-all duration-500" 
@@ -2478,6 +5501,82 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
             </div>
           </>
         )}
+
+        {eventActiveTab === 'recognitions' && (() => {
+          const activeCount = assignedAwards.filter(a => a.startDate && a.endDate && getIsLastMonth(a.startDate, a.endDate)).length;
+
+          return (
+            <>
+              {/* Header stats inside tab */}
+              <div className="flex items-center justify-between bg-black/20 border border-white/5 p-3 rounded-2xl">
+                <span className="text-[10px] font-black uppercase text-[#A09E9A] tracking-wider">Agency Badges & Recognitions</span>
+                <span className="px-2.5 py-0.5 text-[9px] font-black text-amber-400 border border-amber-500/20 bg-amber-500/10 rounded-full uppercase tracking-widest shadow-inner">
+                  {activeCount} active / {assignedAwards.length} total
+                </span>
+              </div>
+
+              {/* Badges list */}
+              <div className="space-y-3 mt-4 max-h-48 overflow-y-auto custom-scrollbar pr-1">
+                {assignedAwards.length > 0 ? (
+                  <div className="grid grid-cols-2 gap-2.5 pt-1">
+                    {assignedAwards.map((a: any) => {
+                      const isActive = getIsLastMonth(a.startDate, a.endDate);
+
+                      let glowStyle = '';
+                      if (isActive) {
+                        if (a.awardColor === 'Purple') glowStyle = 'border-purple-500 text-purple-200 bg-purple-500/20 shadow-[0_0_12px_rgba(168,85,247,0.4)] opacity-100';
+                        else if (a.awardColor === 'Emerald') glowStyle = 'border-emerald-500 text-emerald-200 bg-emerald-500/20 shadow-[0_0_12px_rgba(16,185,129,0.4)] opacity-100';
+                        else if (a.awardColor === 'Blue') glowStyle = 'border-blue-500 text-blue-200 bg-blue-500/20 shadow-[0_0_12px_rgba(59,130,246,0.4)] opacity-100';
+                        else if (a.awardColor === 'Red') glowStyle = 'border-red-500 text-red-200 bg-red-500/20 shadow-[0_0_12px_rgba(239,68,68,0.4)] opacity-100';
+                        else if (a.awardColor === 'Orange') glowStyle = 'border-orange-500 text-orange-200 bg-orange-500/20 shadow-[0_0_12px_rgba(249,115,22,0.4)] opacity-100';
+                        else glowStyle = 'border-amber-500 text-amber-200 bg-amber-500/20 shadow-[0_0_12px_rgba(245,158,11,0.4)] opacity-100';
+                      } else {
+                        if (a.awardColor === 'Purple') glowStyle = 'bg-purple-500/5 text-purple-400/50 border-purple-500/10 opacity-40 hover:opacity-80';
+                        else if (a.awardColor === 'Emerald') glowStyle = 'bg-emerald-500/5 text-emerald-400/50 border-emerald-500/10 opacity-40 hover:opacity-80';
+                        else if (a.awardColor === 'Blue') glowStyle = 'bg-blue-500/5 text-blue-400/50 border-blue-500/10 opacity-40 hover:opacity-80';
+                        else if (a.awardColor === 'Red') glowStyle = 'bg-red-500/5 text-red-400/50 border-red-500/10 opacity-40 hover:opacity-80';
+                        else if (a.awardColor === 'Orange') glowStyle = 'bg-orange-500/5 text-orange-400/50 border-orange-500/10 opacity-40 hover:opacity-80';
+                        else glowStyle = 'bg-amber-500/5 text-amber-400/50 border-amber-500/10 opacity-40 hover:opacity-80';
+                      }
+
+                      return (
+                        <div 
+                          key={a.id} 
+                          className={cn(
+                            "flex flex-col justify-center items-center border rounded-xl px-3 py-1.5 transition-all duration-300 hover:scale-[1.02] hover:border-amber-500/50 shadow-md cursor-help relative group/badge w-full min-w-0 text-center", 
+                            glowStyle
+                          )}
+                          title={`Award: ${a.awardName}\nDuration: ${a.startDate} to ${a.endDate}\nStatus: ${isActive ? 'Active Badge' : 'Past Award'}`}
+                        >
+                          <div className="flex flex-col min-w-0 items-center justify-center">
+                            <span className={cn("text-[9px] font-black uppercase tracking-wider leading-tight truncate w-full", isActive ? "text-white" : "text-[#F0EFE8]/70")}>
+                              {abbreviateMonths(a.awardName)}
+                            </span>
+                            {isActive && (
+                              <span className="text-[7px] font-bold uppercase tracking-wider mt-0.5 opacity-90 text-white animate-pulse">
+                                Active
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="text-xs text-[#A09E9A]/40 italic text-center py-6 font-medium">No agency badges or recognitions found for this host.</p>
+                )}
+              </div>
+            </>
+          );
+        })()}
+        {participatedEvents.length > 0 && (() => {
+          const latestEvent = participatedEvents[0];
+          return renderCardFooter(
+            latestEvent.eventDate || latestEvent.date,
+            latestEvent.attendanceSubmittedBy?.role || latestEvent.created_by_role || 'Host',
+            latestEvent.attendanceSubmittedBy?.name || latestEvent.created_by_name || latestEvent.createdBy
+          );
+        })()}
       </div>
     );
   };
@@ -2499,11 +5598,6 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
              <h4 className="text-xs font-black uppercase tracking-widest text-[#F0EFE8]">Fanbase Health</h4>
           </div>
           <div className="flex items-center gap-2">
-            {fanbaseLatest?.timestamp && (
-              <span className="text-[9px] font-bold text-pink-400 border border-pink-500/20 bg-pink-500/10 px-3 py-1 rounded-full uppercase tracking-widest shadow-[0_0_10px_rgba(244,114,182,0.2)]">
-                {formatDateStandard(fanbaseLatest.timestamp)}
-              </span>
-            )}
             {canSubmitFanbase && (
               <button 
                 onClick={() => setIsFanbaseFormOpen(true)}
@@ -2569,12 +5663,10 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
           ))}
         </div>
 
-        {fanbaseLatest?.timestamp && (
-          <div className="flex items-center justify-between mt-4 pt-4 border-t border-white/5">
-            <p className="text-[9px] text-[#A09E9A]/60 italic font-medium">
-              Updated by: {fanbaseLatest.reporter_name || 'Unknown'}
-            </p>
-          </div>
+        {fanbaseLatest && renderCardFooter(
+          fanbaseLatest.timestamp || fanbaseLatest.from_date || fanbaseLatest.to_date,
+          fanbaseLatest.reporter_role || fanbaseLatest.reporterRole,
+          fanbaseLatest.reporter_name || fanbaseLatest.reporterName
         )}
       </div>
     );
@@ -2689,6 +5781,14 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
             )}
           </div>
         )}
+        {(() => {
+          const activeReportSource = myRecentAiReport || postedAiReport;
+          return activeReportSource && renderCardFooter(
+            activeReportSource.timestamp,
+            activeReportSource.generatedRole,
+            activeReportSource.generatedByName
+          );
+        })()}
       </div>
     );
   };
@@ -3174,44 +6274,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
 
 
 
-  const renderAwardsBlock = () => {
-    if (activeAwards.length === 0) return null;
-    return (
-      <div className={cn("space-y-4 bg-white/5 backdrop-blur-xl border border-white/10 p-5 rounded-3xl transition-all duration-300 hover:border-[#D4AF37]/30 group", styles.shadow)}>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-             <div className="w-8 h-8 rounded-full bg-[#D4AF37]/20 flex items-center justify-center text-[#D4AF37] text-sm shadow-inner">🏆</div>
-             <h4 className="text-xs font-black uppercase tracking-widest text-[#F0EFE8]">Agency Awards</h4>
-          </div>
-          <span className="px-3 py-1 text-[9px] font-black text-[#D4AF37] border border-[#D4AF37]/30 bg-[#D4AF37]/10 rounded-full uppercase tracking-widest shadow-[0_0_10px_rgba(212,175,55,0.2)]">
-            {activeAwards.length} active
-          </span>
-        </div>
-        <div className="flex flex-wrap gap-2.5">
-          {activeAwards.map((a: any) => {
-            let badgeColorStyle = 'bg-amber-500/10 text-amber-400 border-amber-500/20 hover:border-amber-500/40';
-            if (a.awardColor === 'Purple') badgeColorStyle = 'bg-purple-500/10 text-purple-400 border-purple-500/20 hover:border-purple-500/40';
-            else if (a.awardColor === 'Emerald') badgeColorStyle = 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 hover:border-emerald-500/40';
-            else if (a.awardColor === 'Blue') badgeColorStyle = 'bg-blue-500/10 text-blue-400 border-blue-500/20 hover:border-blue-500/40';
-            else if (a.awardColor === 'Red') badgeColorStyle = 'bg-red-500/10 text-red-400 border-red-500/20 hover:border-red-500/40';
-            else if (a.awardColor === 'Orange') badgeColorStyle = 'bg-orange-500/10 text-orange-400 border-orange-500/20 hover:border-orange-500/40';
 
-            return (
-              <div 
-                key={a.id} 
-                className={cn("flex flex-col items-center justify-center gap-1.5 bg-[#0D0D14] border rounded-xl p-3 w-[100px] text-center transition-all duration-300 hover:scale-105 shadow-md", badgeColorStyle)}
-                title={`Active Period: ${a.startDate} to ${a.endDate}`}
-              >
-                <span className="text-xl">🏆</span>
-                <p className="text-[10px] font-black uppercase tracking-wider leading-tight text-[#F0EFE8] mt-1">{a.awardName}</p>
-                <p className="text-[8px] opacity-40 font-mono mt-0.5">{a.startDate} to {a.endDate}</p>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    );
-  };
 
   const renderWeeklyLiveStats = () => {
     if (weeklyLiveData.length === 0) return null;
@@ -3250,6 +6313,11 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
             </tbody>
           </table>
         </div>
+        {weeklyLiveData.length > 0 && renderCardFooter(
+          weeklyLiveData[0].timestamp || weeklyLiveData[0].to_date || weeklyLiveData[0].from_date,
+          undefined,
+          weeklyLiveData[0].submitted_by
+        )}
       </div>
     );
   };
@@ -3283,15 +6351,942 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
             </div>
           ))}
         </div>
+        {agentNotes.length > 0 && renderCardFooter(
+          agentNotes[0].timestamp || agentNotes[0].createdAt,
+          agentNotes[0].managerRole || agentNotes[0].authorRole || agentNotes[0].role,
+          agentNotes[0].managerName || agentNotes[0].authorName || agentNotes[0].createdBy
+        )}
       </div>
     );
   };
+
+  const renderAssignedHostsSection = () => {
+    const userRoleLower = String(rootAuth?.role || '').toLowerCase();
+    if (userRoleLower !== 'agent' && userRoleLower !== 'manager') return null;
+
+    return (
+      <div className="space-y-4 bg-white/5 backdrop-blur-xl border border-white/10 p-5 rounded-3xl transition-all duration-300 hover:border-indigo-500/30 group shadow-lg">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-full bg-indigo-500/20 flex items-center justify-center text-indigo-400 text-sm shadow-inner">👤</div>
+            <h4 className="text-xs font-black uppercase tracking-widest text-[#F0EFE8]">Assigned Hosts</h4>
+          </div>
+          <span className="px-3 py-1 text-[9px] font-black text-indigo-400 border border-indigo-500/30 bg-indigo-500/10 rounded-full uppercase tracking-widest">
+            {assignedHostsList.length} assigned
+          </span>
+        </div>
+
+        {isLoadingAssignedHosts ? (
+          <div className="flex flex-col items-center justify-center py-6 gap-2">
+            <div className="w-5 h-5 border-2 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin" />
+            <p className="text-[9px] font-black uppercase tracking-widest text-indigo-400/60">Loading assigned hosts...</p>
+          </div>
+        ) : assignedHostsList.length === 0 ? (
+          <p className="text-xs text-[#A09E9A]/40 italic text-center py-6 font-medium">No assigned hosts found.</p>
+        ) : (
+          <div className="grid grid-cols-4 gap-3">
+            {assignedHostsList.map((h, idx) => {
+              const nickname = h.nickname || h.name || 'Unnamed';
+              return (
+                <div key={h.id || idx} className="flex flex-col gap-2">
+                  {/* Photo Container */}
+                  <div 
+                    onClick={() => setSpotlightHost(h)}
+                    className="relative overflow-hidden flex items-center justify-center rounded-xl border border-white/10 bg-gradient-to-br from-[#1E2838] to-[#0E131C] w-full h-[76px] transition-all duration-300 hover:-translate-y-0.5 hover:border-white/20 cursor-pointer select-none"
+                  >
+                    {h.photoUrl ? (
+                      <img src={h.photoUrl} alt={nickname} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-xl text-[#A09E9A] font-black">
+                        {nickname[0]?.toUpperCase() || 'H'}
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Text Elements */}
+                  <div className="flex flex-col">
+                    <span className="text-sm font-normal text-[#F0EFE8] truncate">
+                      {nickname}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderIntakeSection = () => {
+    const userRole = rootAuth?.role || '';
+    if (userRole !== 'Agent' && userRole !== 'agent') return null;
+
+    return (
+      <div className="bg-white/5 backdrop-blur-xl border border-white/10 p-5 rounded-3xl transition-all duration-300 hover:border-indigo-500/30 group shadow-lg">
+        <div className="flex items-center gap-2 mb-4 border-b border-white/5 pb-3">
+          <div className="w-8 h-8 rounded-full bg-indigo-500/20 flex items-center justify-center text-indigo-400 text-sm shadow-inner">📥</div>
+          <div>
+            <h4 className="text-xs font-black uppercase tracking-widest text-[#F0EFE8]">Request Host Intake</h4>
+            <p className="text-[9px] text-[#A09E9A] uppercase tracking-wider mt-0.5 font-bold">Submit a new host to the Director for onboarding</p>
+          </div>
+        </div>
+
+        <form onSubmit={handleIntakeSubmit} className="space-y-3.5 max-w-md">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <label className="text-[9px] font-black uppercase text-[#A09E9A] tracking-wider">Poppo ID</label>
+              <input
+                type="text"
+                value={intakePoppoId}
+                onChange={(e) => setIntakePoppoId(e.target.value)}
+                placeholder="e.g. 1234567"
+                className="w-full bg-[#0D0D14] border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white placeholder-white/20 focus:outline-none focus:border-indigo-500/50"
+                required
+                title="Poppo ID"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-[9px] font-black uppercase text-[#A09E9A] tracking-wider">Nickname</label>
+              <input
+                type="text"
+                value={intakeNickname}
+                onChange={(e) => setIntakeNickname(e.target.value)}
+                placeholder="e.g. SweetHost"
+                className="w-full bg-[#0D0D14] border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white placeholder-white/20 focus:outline-none focus:border-indigo-500/50"
+                required
+                title="Nickname"
+              />
+            </div>
+          </div>
+
+          <button
+            type="submit"
+            disabled={isSubmittingIntake}
+            className="w-full py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-md"
+          >
+            {isSubmittingIntake && <Loader2 className="h-3 w-3 animate-spin" />}
+            <span>{isSubmittingIntake ? 'Submitting...' : 'Submit Request'}</span>
+          </button>
+
+          {intakeSuccess && (
+            <div className="p-2 bg-emerald-950/40 border border-emerald-500/20 text-emerald-400 rounded-lg text-[9px] font-bold flex items-center gap-1.5">
+              <span>✅</span>
+              <span>{intakeSuccess}</span>
+            </div>
+          )}
+
+          {intakeError && (
+            <div className="p-2 bg-rose-950/40 border border-rose-500/20 text-rose-400 rounded-lg text-[9px] font-bold flex items-center gap-1.5">
+              <span>❌</span>
+              <span>{intakeError}</span>
+            </div>
+          )}
+        </form>
+      </div>
+    );
+  };
+
+  const renderProgressNotes = () => {
+    const userRole = String(rootAuth?.role || '').toLowerCase();
+    const isManagerOrAgent = userRole === 'manager' || userRole === 'agent';
+    if (!isManagerOrAgent) return null;
+
+    // Calculate recommendations dynamic justifications
+    const getDynamicWhy = (templateId: string, hostId: string) => {
+      if (!hostId) return "Select a host to see dynamic task justification.";
+      const selectedHost = assignedHostsList.find(h => String(h.poppo_id || h.poppoId || h.id || '') === hostId);
+      if (!selectedHost) return "Select a host to see dynamic task justification.";
+
+      const nickname = selectedHost.nickname || selectedHost.name || 'Unnamed';
+
+      const hostEvents = rosterEvents.filter(evt => {
+        const pIds = evt.participantIds || evt.participants_id || [];
+        const participants = evt.participants || [];
+        return (Array.isArray(pIds) && pIds.includes(hostId)) ||
+               (Array.isArray(participants) && participants.includes(hostId)) ||
+               String(evt.poppo_id || evt.event_host_id || '') === hostId;
+      });
+
+      const getEventDateStringLocal = (evt: any): string => {
+        if (evt.date) return evt.date;
+        if (evt.event_date) return evt.event_date;
+        if (evt.eventDate) {
+          if (typeof evt.eventDate === 'string') return evt.eventDate.split('T')[0];
+          if (evt.eventDate.toDate) return evt.eventDate.toDate().toISOString().split('T')[0];
+          if (evt.eventDate.seconds) return new Date(evt.eventDate.seconds * 1000).toISOString().split('T')[0];
+          return new Date(evt.eventDate).toISOString().split('T')[0];
+        }
+        return '';
+      };
+
+      const todayDate = new Date();
+      const yyyyVal = todayDate.getFullYear();
+      const mmVal = String(todayDate.getMonth() + 1).padStart(2, '0');
+      const ddVal = String(todayDate.getDate()).padStart(2, '0');
+      const todayStrLocal = `${yyyyVal}-${mmVal}-${ddVal}`;
+
+      const hostUpcomingEvents = hostEvents.filter(evt => {
+        const dateStr = getEventDateStringLocal(evt).replace(/\//g, '-');
+        return dateStr >= todayStrLocal;
+      });
+
+      const hostPastEvents = hostEvents.filter(evt => {
+        const dateStr = getEventDateStringLocal(evt).replace(/\//g, '-');
+        return dateStr < todayStrLocal;
+      });
+
+      let hostPastEventParticipations = 0;
+      let hostAttendedEventParticipations = 0;
+      let hostMissedEventsCount = 0;
+
+      hostPastEvents.forEach(evt => {
+        hostPastEventParticipations++;
+        const att = rosterAttendance.find(a => a.eventId === evt.event_id || a.eventId === evt.id);
+        if (att) {
+          const isPresent = (Array.isArray(att.attendeeIds) && att.attendeeIds.includes(hostId)) ||
+                            (Array.isArray(att.attendees) && att.attendees.some((a: any) => String(a.poppoId || a.id || '').trim() === hostId));
+          if (isPresent) {
+            hostAttendedEventParticipations++;
+          } else {
+            hostMissedEventsCount++;
+          }
+        } else {
+          hostMissedEventsCount++;
+        }
+      });
+
+      const hostAttendanceRate = hostPastEventParticipations > 0 ? (hostAttendedEventParticipations / hostPastEventParticipations) : 1.0;
+
+      switch (templateId) {
+        case 'livehouse':
+          return hostUpcomingEvents.length <= 1
+            ? `⚠️ ${nickname} has only ${hostUpcomingEvents.length} upcoming event(s). Scheduling a Livehouse is urgent to prevent room visibility decay.`
+            : `✅ ${nickname} currently has ${hostUpcomingEvents.length} upcoming events. Suggest scheduling another to maintain exposure.`;
+        case 'talent_auction':
+          return `✨ Register ${nickname} on the Monthly Talent Auction to boost exposure and attract new supporters/spenders.`;
+        case 'attendance':
+          return hostMissedEventsCount > 0
+            ? `⚠️ ${nickname} missed ${hostMissedEventsCount} event(s) recently. Remind them of upcoming events to stop attendance slippage.`
+            : `✅ ${nickname} has kept a strong attendance sheet (${Math.round(hostAttendanceRate * 100)}%). Keep encouraging them!`;
+        case 'pk':
+          return `⚔️ Completing 1 hour of random PK battles helps ${nickname} build room dynamics, match experience, and supporter support.`;
+        case 'voice_seat':
+          return `🎙️ Bringing viewers to voice seats increases live interaction, room retention, and chat gift-giving rates for ${nickname}.`;
+        case 'song_requests':
+          return `🎵 Suggesting ${nickname} perform 9 song requests per stream drives chat engagement and lengthens session duration.`;
+        case 'gc_members':
+          return `💬 Growing ${nickname}'s Group Chat (GC) members ensures instant reach and notifications whenever they go live.`;
+        case 'pre_stream':
+          return `📢 Reminding ${nickname} to post feed/social updates 15 minutes before going live drives launch-traffic directly.`;
+        default:
+          return '';
+      }
+    };
+
+    const recommendationTemplates = [
+      { id: 'livehouse', category: 'Exposure & Scheduling', title: 'Schedule a Livehouse Event', priority: 'High' },
+      { id: 'talent_auction', category: 'Exposure & Scheduling', title: 'Register on the Talent Auction', priority: 'High' },
+      { id: 'attendance', category: 'Coaching & Retention', title: 'Encourage to Show Up to Next Event', priority: 'High' },
+      { id: 'pk', category: 'Coaching & Retention', title: 'Complete 1 Hour of Random PK', priority: 'Normal' },
+      { id: 'voice_seat', category: 'Live & Engagement', title: 'Suggest to Bring Audience to Voice Seat', priority: 'Normal' },
+      { id: 'song_requests', category: 'Live & Engagement', title: 'Complete 9 Song Requests per Stream', priority: 'Normal' },
+      { id: 'gc_members', category: 'Fanbase & Communication', title: 'Grow Fanclub GC Members', priority: 'Normal' },
+      { id: 'pre_stream', category: 'Fanbase & Communication', title: 'Post Pre-Stream Update Message', priority: 'Normal' }
+    ];
+
+    const categories = ['Exposure & Scheduling', 'Coaching & Retention', 'Live & Engagement', 'Fanbase & Communication'];
+
+    return (
+      <div className="bg-white/5 backdrop-blur-xl border border-white/10 p-5 rounded-3xl transition-all duration-300 hover:border-indigo-500/30 group shadow-lg space-y-4">
+        {/* Header and Tabs */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/5 pb-3">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-full bg-indigo-500/20 flex items-center justify-center text-indigo-400 text-sm shadow-inner">📝</div>
+            <div>
+              <h4 className="text-xs font-black uppercase tracking-widest text-[#F0EFE8]">Progress Notes</h4>
+              <p className="text-[9px] text-[#A09E9A] uppercase tracking-wider mt-0.5 font-bold">Record and review host coaching logs</p>
+            </div>
+          </div>
+          
+          <div className="flex bg-black/20 p-1 rounded-xl border border-white/5 self-end sm:self-center">
+            <button
+              type="button"
+              onClick={() => setActiveTab('todo')}
+              className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer ${
+                activeTab === 'todo'
+                  ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
+                  : 'text-[#A09E9A] hover:text-white'
+              }`}
+            >
+              To-Do List
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('add')}
+              className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer ${
+                activeTab === 'add'
+                  ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
+                  : 'text-[#A09E9A] hover:text-white'
+              }`}
+            >
+              Add Notes
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('history')}
+              className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer ${
+                activeTab === 'history'
+                  ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
+                  : 'text-[#A09E9A] hover:text-white'
+              }`}
+            >
+              Notes History
+            </button>
+          </div>
+        </div>
+
+        {/* Tab Content */}
+        {activeTab === 'todo' && (
+          <div className="space-y-5">
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (!newTodoTitle.trim()) return;
+                handleAddTodo(newTodoTitle, newTodoHostId);
+                setNewTodoTitle('');
+                setNewTodoHostId('');
+              }}
+              className="bg-[#0D0D14]/80 border border-white/5 p-4 rounded-2xl space-y-3"
+            >
+              <div className="text-[10px] font-black uppercase tracking-widest text-[#A09E9A] border-b border-white/5 pb-1">
+                Create New Task
+              </div>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <div className="flex-1 space-y-1">
+                  <input
+                    type="text"
+                    value={newTodoTitle}
+                    onChange={(e) => setNewTodoTitle(e.target.value)}
+                    placeholder="E.g., Host exposure check, attendance sync..."
+                    className="w-full bg-black/30 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder-white/20 focus:outline-none focus:border-indigo-500/50"
+                    required
+                    title="Task Title"
+                  />
+                </div>
+                <div className="sm:w-48 space-y-1">
+                  <select
+                    value={newTodoHostId}
+                    onChange={(e) => setNewTodoHostId(e.target.value)}
+                    className="w-full bg-black/30 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500/50 cursor-pointer"
+                    title="Assign Host"
+                  >
+                    <option value="">-- General Roster --</option>
+                    {assignedHostsList.map((h) => (
+                      <option key={h.poppo_id || h.poppoId || h.id} value={h.poppo_id || h.poppoId || h.id}>
+                        {h.nickname || h.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <button
+                  type="submit"
+                  className="bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl px-4 py-2 text-xs font-black uppercase tracking-widest transition-all cursor-pointer shadow-md self-stretch flex items-center justify-center"
+                >
+                  Add
+                </button>
+              </div>
+            </form>
+
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <div className="text-[10px] font-black uppercase tracking-widest text-[#A09E9A] flex items-center gap-1.5">
+                  <span>📌</span> Active Tasks ({todoList.filter(t => !t.completed).length})
+                </div>
+                {todoList.filter(t => !t.completed).length === 0 ? (
+                  <p className="text-[11px] text-[#A09E9A]/40 italic py-4 text-center bg-[#0D0D14]/30 border border-dashed border-white/5 rounded-2xl">
+                    No active tasks.
+                  </p>
+                ) : (
+                  <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1 custom-scrollbar">
+                    {todoList.filter(t => !t.completed).map(todo => (
+                      <div key={todo.id || todo.todoId} className="flex items-center justify-between gap-3 bg-white/[0.02] hover:bg-white/[0.04] border border-white/5 hover:border-white/10 p-3 rounded-xl transition-all">
+                        <div className="flex items-center gap-3">
+                          <input
+                            type="checkbox"
+                            checked={false}
+                            onChange={() => handleToggleTodo(todo)}
+                            className="w-4 h-4 rounded border-white/10 bg-black/40 text-indigo-600 focus:ring-0 cursor-pointer"
+                            title="Complete Task"
+                          />
+                          <div className="flex flex-col">
+                            <span className="text-xs text-[#F0EFE8] font-medium leading-normal">{todo.title}</span>
+                            {todo.hostNickname && todo.hostId !== 'roster' && (
+                              <span className="text-[9px] font-black text-indigo-400 uppercase mt-0.5 tracking-wider bg-indigo-500/5 px-1.5 py-0.5 rounded border border-indigo-500/10 self-start">
+                                {todo.hostNickname}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteTodo(todo.id || todo.todoId)}
+                          className="p-1.5 rounded-lg hover:bg-rose-500/15 text-[#A09E9A] hover:text-rose-400 transition-all cursor-pointer"
+                          title="Delete Task"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Smart Recommendations Section */}
+            <div className="space-y-4 pt-4 border-t border-white/5">
+              <div className="text-[10px] font-black uppercase tracking-widest text-[#A09E9A] flex items-center gap-1.5 flex-wrap">
+                <span>✨</span> Coaching Recommendations
+              </div>
+              
+              <div className="space-y-5 max-h-[380px] overflow-y-auto pr-1 custom-scrollbar">
+                {categories.map(cat => {
+                  const catTemplates = recommendationTemplates.filter(t => t.category === cat);
+                  return (
+                    <div key={cat} className="space-y-2.5">
+                      <div className="text-[9px] font-black uppercase tracking-widest text-indigo-400 bg-indigo-500/5 px-2 py-1 rounded border border-indigo-500/10 self-start inline-block">
+                        {cat}
+                      </div>
+                      
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {catTemplates.map(template => {
+                          const selectedHostId = recSelectedHosts[template.id] || '';
+                          const selectedHost = assignedHostsList.find(h => String(h.poppo_id || h.poppoId || h.id || '') === selectedHostId);
+                          const whyText = selectedHostId ? getDynamicWhy(template.id, selectedHostId) : '';
+
+                          const alreadyAdded = selectedHostId
+                            ? todoList.some(todo => String(todo.hostId) === String(selectedHostId) && todo.title === template.title && !todo.completed)
+                            : false;
+
+                          return (
+                            <div key={template.id} className="bg-white/[0.02] border border-white/5 p-3 rounded-2xl flex flex-col justify-between gap-3 hover:border-indigo-500/20 transition-all">
+                              <div className="space-y-2.5">
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="text-[10px] font-black text-[#F0EFE8] leading-tight">
+                                    {template.title}
+                                  </span>
+                                  <span className={cn(
+                                    "text-[7px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded shrink-0",
+                                    template.priority === 'High' ? "bg-amber-500/10 text-amber-400" : "bg-emerald-500/10 text-emerald-400"
+                                  )}>
+                                    {template.priority}
+                                  </span>
+                                </div>
+
+                                <div className="space-y-1">
+                                  <label className="text-[8px] font-black uppercase text-[#A09E9A] tracking-wider">Select Host</label>
+                                  <select
+                                    value={selectedHostId}
+                                    onChange={(e) => setRecSelectedHosts(prev => ({ ...prev, [template.id]: e.target.value }))}
+                                    className="w-full bg-black/40 border border-white/10 rounded-xl px-2.5 py-1.5 text-[11px] text-white focus:outline-none focus:border-indigo-500/50 cursor-pointer"
+                                    title="Recommend Host"
+                                  >
+                                    <option value="">-- Choose Host --</option>
+                                    {assignedHostsList.map(h => (
+                                      <option key={h.poppo_id || h.poppoId || h.id} value={h.poppo_id || h.poppoId || h.id}>
+                                        {h.nickname || h.name}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
+
+                                {selectedHostId ? (
+                                  <div className="text-[10px] text-[#F0EFE8]/90 font-medium leading-relaxed bg-indigo-500/5 p-2 rounded-xl border border-indigo-500/10">
+                                    {whyText}
+                                  </div>
+                                ) : (
+                                  <div className="text-[9px] text-[#A09E9A]/40 italic">
+                                    Select a host to see dynamic task justification.
+                                  </div>
+                                )}
+                              </div>
+
+                              <button
+                                type="button"
+                                disabled={!selectedHostId || alreadyAdded}
+                                onClick={() => handleAddTodo(template.title, selectedHostId)}
+                                className={cn(
+                                  "w-full py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all cursor-pointer text-center border",
+                                  !selectedHostId
+                                    ? "bg-black/20 border-white/5 text-[#A09E9A]/40 cursor-not-allowed"
+                                    : alreadyAdded
+                                      ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400 cursor-not-allowed"
+                                      : "bg-indigo-600/10 hover:bg-indigo-600 border-indigo-500/20 hover:border-indigo-500 text-indigo-400 hover:text-white"
+                                )}
+                              >
+                                {!selectedHostId
+                                  ? 'Select Host First'
+                                  : alreadyAdded
+                                    ? 'Added to To-Do'
+                                    : 'Add to To-Do List'}
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'add' && (
+          <form onSubmit={handleNoteSubmit} className="space-y-4 max-w-md">
+            <div className="space-y-1.5">
+              <label className="text-[9px] font-black uppercase text-[#A09E9A] tracking-wider">Select Host</label>
+              <select
+                value={noteHostId}
+                onChange={(e) => setNoteHostId(e.target.value)}
+                className="w-full bg-[#0D0D14] border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500/50 appearance-none cursor-pointer"
+                required
+                title="Host Selection"
+              >
+                <option value="">-- Choose Host --</option>
+                {assignedHostsList.map((h) => {
+                  const name = h.nickname || h.name || 'Unnamed';
+                  const poppoId = h.poppo_id || h.poppoId || h.id;
+                  return (
+                    <option key={poppoId} value={poppoId}>
+                      {name} - {poppoId}
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-[9px] font-black uppercase text-[#A09E9A] tracking-wider">Feedback Content</label>
+              <textarea
+                value={noteContent}
+                onChange={(e) => setNoteContent(e.target.value)}
+                placeholder="Write notes, coaching feedback, or action steps..."
+                className="w-full bg-[#0D0D14] border border-white/10 rounded-xl px-3 py-2 text-xs text-white h-24 resize-none focus:outline-none focus:border-indigo-500/50"
+                required
+                title="Note Content"
+              />
+            </div>
+
+            <button
+              type="submit"
+              className="w-full py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-md"
+            >
+              Save Feedback Note
+            </button>
+
+            {noteSuccess && (
+              <div className="p-2 bg-emerald-950/40 border border-emerald-500/20 text-emerald-400 rounded-lg text-[9px] font-bold flex items-center gap-1.5">
+                <span>✅</span>
+                <span>{noteSuccess}</span>
+              </div>
+            )}
+
+            {noteError && (
+              <div className="p-2 bg-rose-950/40 border border-rose-500/20 text-rose-400 rounded-lg text-[9px] font-bold flex items-center gap-1.5">
+                <span>❌</span>
+                <span>{noteError}</span>
+              </div>
+            )}
+          </form>
+        )}
+
+        {activeTab === 'history' && (
+          <div className="space-y-4">
+            <div className="space-y-1.5 max-w-md">
+              <label className="text-[9px] font-black uppercase text-[#A09E9A] tracking-wider">Select Host</label>
+              <select
+                value={noteHostId}
+                onChange={(e) => setNoteHostId(e.target.value)}
+                className="w-full bg-[#0D0D14] border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500/50 appearance-none cursor-pointer"
+                title="Host Selection"
+              >
+                <option value="">-- Choose Host --</option>
+                {assignedHostsList.map((h) => {
+                  const name = h.nickname || h.name || 'Unnamed';
+                  const poppoId = h.poppo_id || h.poppoId || h.id;
+                  return (
+                    <option key={poppoId} value={poppoId}>
+                      {name} - {poppoId}
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
+
+            {/* History List */}
+            {!noteHostId ? (
+              <div className="bg-[#0D0D14] border border-white/5 rounded-xl py-6 text-center text-xs text-[#A09E9A]/40 italic font-medium">
+                Please select a host to view their progress feedback logs.
+              </div>
+            ) : isLoadingNotes ? (
+              <div className="bg-[#0D0D14] border border-white/5 rounded-xl py-6 flex flex-col items-center justify-center gap-1.5">
+                <Loader2 className="h-4 w-4 text-indigo-400 animate-spin" />
+                <span className="text-[8px] text-[#A09E9A] uppercase tracking-wider">Loading history...</span>
+              </div>
+            ) : notesHistory.length === 0 ? (
+              <div className="bg-[#0D0D14] border border-white/5 rounded-xl py-6 text-center text-xs text-[#A09E9A]/40 italic font-medium">
+                No notes recorded for this host yet.
+              </div>
+            ) : (
+              <div className="space-y-2.5 max-h-[200px] overflow-y-auto custom-scrollbar bg-[#0D0D14] border border-white/5 rounded-xl p-2.5">
+                {notesHistory.map((note) => (
+                  <div key={note.id} className="bg-white/[0.02] border border-white/5 p-3 rounded-lg space-y-1.5">
+                    <div className="flex items-center justify-between text-[9px] font-mono text-[#A09E9A]/60">
+                      <span className="font-bold text-indigo-400">{note.managerName || 'Manager'}</span>
+                      <span>{new Date(note.timestamp).toLocaleString()}</span>
+                    </div>
+                    <p className="text-white text-xs leading-relaxed whitespace-pre-wrap">{note.content}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderRosterEventsAndAttendance = () => {
+    const userRole = String(rootAuth?.role || '').toLowerCase();
+    const isManagerOrAgent = userRole === 'manager' || userRole === 'agent';
+    if (!isManagerOrAgent) return null;
+
+    // Helper to extract date string in YYYY-MM-DD
+    const getEventDateString = (evt: any): string => {
+      if (evt.date) return evt.date;
+      if (evt.event_date) return evt.event_date;
+      if (evt.eventDate) {
+        if (typeof evt.eventDate === 'string') return evt.eventDate.split('T')[0];
+        if (evt.eventDate.toDate) return evt.eventDate.toDate().toISOString().split('T')[0];
+        if (evt.eventDate.seconds) return new Date(evt.eventDate.seconds * 1000).toISOString().split('T')[0];
+        return new Date(evt.eventDate).toISOString().split('T')[0];
+      }
+      return '';
+    };
+
+    // Calculate today's date in local time YYYY-MM-DD
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, '0');
+    const dd = String(today.getDate()).padStart(2, '0');
+    const todayStr = `${yyyy}-${mm}-${dd}`;
+
+    const hostIds = assignedHostsList.map(h => String(h.poppo_id || h.poppoId || h.id || ''));
+
+    // Filter events for assigned hosts
+    const filteredEvents = rosterEvents.filter(evt => {
+      const pIds = evt.participantIds || evt.participants_id || [];
+      const participants = evt.participants || [];
+      const isPart = (Array.isArray(pIds) && pIds.some((id: any) => hostIds.includes(String(id)))) ||
+                     (Array.isArray(participants) && participants.some((id: any) => hostIds.includes(String(id)))) ||
+                     hostIds.includes(String(evt.poppo_id || evt.event_host_id || ''));
+      return isPart;
+    });
+
+    // Separate upcoming and past
+    const upcomingEvents = filteredEvents.filter(evt => {
+      const dateStr = getEventDateString(evt).replace(/\//g, '-');
+      return dateStr >= todayStr;
+    });
+
+    const pastEvents = filteredEvents.filter(evt => {
+      const dateStr = getEventDateString(evt).replace(/\//g, '-');
+      return dateStr < todayStr;
+    });
+
+    // Sort upcoming events: date ascending (soonest first)
+    upcomingEvents.sort((a, b) => {
+      const dateA = getEventDateString(a).replace(/\//g, '-');
+      const dateB = getEventDateString(b).replace(/\//g, '-');
+      return dateA.localeCompare(dateB);
+    });
+
+    // Filter attendance for assigned hosts
+    const filteredAttendance = rosterAttendance.filter(att => {
+      const attendeeIds = att.attendeeIds || [];
+      const attendees = att.attendees || [];
+      const participantIds = att.participantIds || [];
+      const participants = att.participants || [];
+      const isAtt = (Array.isArray(attendeeIds) && attendeeIds.some((id: any) => hostIds.includes(String(id)))) ||
+                    (Array.isArray(participantIds) && participantIds.some((id: any) => hostIds.includes(String(id)))) ||
+                    (Array.isArray(participants) && participants.some((id: any) => hostIds.includes(String(id)))) ||
+                    (Array.isArray(attendees) && attendees.some((a: any) => hostIds.includes(String(a.poppoId || a.id || '')))) ||
+                    hostIds.includes(String(att.poppo_id || att.poppoId || att.hostId || ''));
+      return isAtt;
+    });
+
+    // Helper to get attendance Date for sorting
+    const getAttendanceDate = (att: any): Date => {
+      if (att.eventDate) {
+        if (att.eventDate.toDate) return att.eventDate.toDate();
+        if (att.eventDate.seconds) return new Date(att.eventDate.seconds * 1000);
+        return new Date(att.eventDate);
+      }
+      if (att.submittedAt) {
+        if (att.submittedAt.toDate) return att.submittedAt.toDate();
+        if (att.submittedAt.seconds) return new Date(att.submittedAt.seconds * 1000);
+        return new Date(att.submittedAt);
+      }
+      if (att.timestamp) return new Date(att.timestamp);
+      return new Date(0);
+    };
+
+    // Sort attendance logs: date descending
+    filteredAttendance.sort((a, b) => getAttendanceDate(b).getTime() - getAttendanceDate(a).getTime());
+
+    // Calculate Insights Condition
+    let totalPastEventParticipations = 0;
+    let totalAttendedEventParticipations = 0;
+    let hasMissedEvent = false;
+
+    pastEvents.forEach(evt => {
+      const eventHosts = assignedHostsList.filter(h => {
+        const hostId = String(h.poppo_id || h.poppoId || h.id || '');
+        const pIds = evt.participantIds || evt.participants_id || [];
+        const participants = evt.participants || [];
+        return (Array.isArray(pIds) && pIds.includes(hostId)) ||
+               (Array.isArray(participants) && participants.includes(hostId)) ||
+               String(evt.poppo_id || evt.event_host_id || '') === hostId;
+      });
+
+      eventHosts.forEach(h => {
+        const hostId = String(h.poppo_id || h.poppoId || h.id || '');
+        totalPastEventParticipations++;
+
+        // Find attendance record for this event
+        const att = rosterAttendance.find(a => a.eventId === evt.event_id || a.eventId === evt.id);
+        if (att) {
+          const isPresent = (Array.isArray(att.attendeeIds) && att.attendeeIds.includes(hostId)) ||
+                            (Array.isArray(att.attendees) && att.attendees.some((a: any) => String(a.poppoId || a.id || '').trim() === hostId));
+          if (isPresent) {
+            totalAttendedEventParticipations++;
+          } else {
+            hasMissedEvent = true;
+          }
+        } else {
+          hasMissedEvent = true;
+        }
+      });
+    });
+
+    const attendanceRate = totalPastEventParticipations > 0 ? (totalAttendedEventParticipations / totalPastEventParticipations) : 1.0;
+    const isAttendanceLow = attendanceRate < 0.8 || hasMissedEvent;
+
+    let insightType: 'warning' | 'success' = 'success';
+    let insightMessage = '';
+
+    if (upcomingEvents.length <= 1) {
+      insightType = 'warning';
+      insightMessage = "Action Needed: Your roster has very few upcoming events. Encourage your hosts to schedule a Solo Livehouse or participate in external events like the Monthly Talent Auction to boost their exposure!";
+    } else if (isAttendanceLow) {
+      insightType = 'warning';
+      insightMessage = "Action Needed: Roster attendance is slipping. Push your hosts to be present at upcoming calendar events and drop supportive comments during the stream to show team solidarity.";
+    } else {
+      insightType = 'success';
+      insightMessage = "Great job! Your roster is highly engaged with a healthy event schedule and strong attendance.";
+    }
+
+    return (
+      <div className="bg-white/5 backdrop-blur-xl border border-white/10 p-5 rounded-3xl transition-all duration-300 hover:border-indigo-500/30 group shadow-lg space-y-5">
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-white/5 pb-3">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-full bg-[#1A1A28] border border-white/10 flex items-center justify-center text-indigo-400 text-sm shadow-inner">
+              <Calendar size={16} />
+            </div>
+            <div>
+              <h4 className="text-xs font-black uppercase tracking-widest text-[#F0EFE8]">Roster Events &amp; Attendance</h4>
+              <p className="text-[9px] text-[#A09E9A] uppercase tracking-wider mt-0.5 font-bold">Roster scheduling and check-in logs</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Actionable Insights callout box */}
+        <div className={cn(
+          "p-4 rounded-2xl border text-xs leading-relaxed flex items-start gap-3 shadow-md transition-all duration-300",
+          insightType === 'warning'
+            ? "bg-amber-500/10 border-amber-500/20 text-amber-400"
+            : "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
+        )}>
+          <span className="text-base leading-none select-none shrink-0 mt-0.5">
+            {insightType === 'warning' ? '⚠️' : '✅'}
+          </span>
+          <div className="space-y-1">
+            <h5 className="font-black uppercase tracking-wider text-[10px]">
+              {insightType === 'warning' ? 'Actionable Insights' : 'Recommendations'}
+            </h5>
+            <p className="font-medium text-[#F0EFE8]/90">{insightMessage}</p>
+          </div>
+        </div>
+
+        {/* Content Layout */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Upcoming Events Column */}
+          <div className="space-y-3">
+            <h5 className="text-[10px] font-black uppercase tracking-widest text-[#A09E9A] flex items-center gap-1.5 border-b border-white/5 pb-1.5">
+              <span>📅</span> Upcoming Events ({upcomingEvents.length})
+            </h5>
+            {isLoadingRosterData ? (
+              <div className="py-8 flex flex-col items-center justify-center gap-2">
+                <Loader2 className="h-5 w-5 text-indigo-400 animate-spin" />
+                <span className="text-[8px] text-[#A09E9A] uppercase tracking-wider">Syncing Events...</span>
+              </div>
+            ) : upcomingEvents.length === 0 ? (
+              <p className="text-xs text-[#A09E9A]/40 italic py-6 text-center bg-[#0D0D14] border border-white/5 rounded-2xl">
+                No upcoming events scheduled.
+              </p>
+            ) : (
+              <div className="space-y-2.5 max-h-[300px] overflow-y-auto pr-1 custom-scrollbar">
+                {upcomingEvents.map(evt => {
+                  const eventHosts = assignedHostsList.filter(h => {
+                    const hostId = String(h.poppo_id || h.poppoId || h.id || '');
+                    const pIds = evt.participantIds || evt.participants_id || [];
+                    const participants = evt.participants || [];
+                    return (Array.isArray(pIds) && pIds.includes(hostId)) ||
+                           (Array.isArray(participants) && participants.includes(hostId)) ||
+                           String(evt.poppo_id || evt.event_host_id || '') === hostId;
+                  });
+
+                  return (
+                    <div key={evt.id || evt.event_id} className="bg-white/[0.02] hover:bg-white/[0.04] border border-white/5 hover:border-white/10 p-3 rounded-2xl transition-all space-y-2">
+                      <div className="flex items-start justify-between gap-2">
+                        <span className="text-xs font-black text-[#F0EFE8] leading-tight line-clamp-1">{evt.title}</span>
+                        <span className="px-2 py-0.5 bg-indigo-500/10 border border-indigo-500/20 rounded-md text-[8px] font-black uppercase text-indigo-400 tracking-wider shrink-0">
+                          {evt.type || evt.type_of_event || 'Event'}
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-[#A09E9A] font-medium leading-relaxed line-clamp-2">{evt.description}</p>
+                      
+                      <div className="flex flex-col gap-1 pt-1.5 border-t border-white/[0.03] text-[9px] font-mono text-[#A09E9A]/60">
+                        <div className="flex items-center gap-1">
+                          <span className="text-[#A09E9A]/40">Date:</span>
+                          <span className="text-[#F0EFE8]/80 font-bold">{getEventDateString(evt)}</span>
+                          {evt.time && (
+                            <>
+                              <span className="text-[#A09E9A]/30">|</span>
+                              <span className="text-[#F0EFE8]/80">{evt.time}</span>
+                            </>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1 flex-wrap">
+                          <span className="text-[#A09E9A]/40">Host(s):</span>
+                          {eventHosts.map(h => (
+                            <span key={h.id || h.poppo_id} className="text-indigo-400 font-bold bg-indigo-500/5 px-1.5 py-0.5 rounded border border-indigo-500/10 mr-1 my-0.5">
+                              {h.nickname || h.name || 'Unnamed'} ({h.poppo_id || h.poppoId || h.id})
+                            </span>
+                          ))}
+                          {eventHosts.length === 0 && (
+                            <span className="text-[#A09E9A]/40 italic">None assigned</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Recent Attendance Logs Column */}
+          <div className="space-y-3">
+            <h5 className="text-[10px] font-black uppercase tracking-widest text-[#A09E9A] flex items-center gap-1.5 border-b border-white/5 pb-1.5">
+              <span>📋</span> Recent Attendance Logs ({filteredAttendance.length})
+            </h5>
+            {isLoadingRosterData ? (
+              <div className="py-8 flex flex-col items-center justify-center gap-2">
+                <Loader2 className="h-5 w-5 text-indigo-400 animate-spin" />
+                <span className="text-[8px] text-[#A09E9A] uppercase tracking-wider">Syncing Attendance...</span>
+              </div>
+            ) : filteredAttendance.length === 0 ? (
+              <p className="text-xs text-[#A09E9A]/40 italic py-6 text-center bg-[#0D0D14] border border-white/5 rounded-2xl">
+                No recent attendance records.
+              </p>
+            ) : (
+              <div className="space-y-2.5 max-h-[300px] overflow-y-auto pr-1 custom-scrollbar">
+                {filteredAttendance.slice(0, 10).map(att => {
+                  const presentHosts = assignedHostsList.filter(h => {
+                    const hostId = String(h.poppo_id || h.poppoId || h.id || '');
+                    const attendeeIds = att.attendeeIds || [];
+                    const attendees = att.attendees || [];
+                    const participantIds = att.participantIds || [];
+                    const participants = att.participants || [];
+                    return (Array.isArray(attendeeIds) && attendeeIds.includes(hostId)) ||
+                           (Array.isArray(participantIds) && participantIds.includes(hostId)) ||
+                           (Array.isArray(participants) && participants.includes(hostId)) ||
+                           (Array.isArray(attendees) && attendees.some((a: any) => String(a.poppoId || a.id || '').trim() === hostId)) ||
+                           String(att.poppo_id || att.poppoId || att.hostId || '') === hostId;
+                  });
+
+                  const formattedDate = att.eventDate || (att.timestamp ? att.timestamp.split('T')[0] : '');
+
+                  return (
+                    <div key={att.id || att.attendanceId} className="bg-white/[0.02] hover:bg-white/[0.04] border border-white/5 hover:border-white/10 p-3 rounded-2xl transition-all space-y-2">
+                      <div className="flex items-start justify-between gap-2">
+                        <span className="text-xs font-black text-[#F0EFE8] leading-tight line-clamp-1">{att.eventTitle || 'Event Attendance'}</span>
+                        <span className="px-2 py-0.5 bg-emerald-500/10 border border-emerald-500/20 rounded-md text-[8px] font-black uppercase text-emerald-400 tracking-wider shrink-0">
+                          Checked-In
+                        </span>
+                      </div>
+                      {att.eventFeedback && (
+                        <p className="text-[10px] text-[#A09E9A] font-medium leading-relaxed bg-black/15 p-2 rounded-xl border border-white/5 italic">
+                          "{att.eventFeedback}"
+                        </p>
+                      )}
+                      
+                      <div className="flex flex-col gap-1 pt-1.5 border-t border-white/[0.03] text-[9px] font-mono text-[#A09E9A]/60">
+                        <div className="flex items-center gap-1">
+                          <span className="text-[#A09E9A]/40">Date:</span>
+                          <span className="text-[#F0EFE8]/80 font-bold">{formattedDate}</span>
+                          {att.timeslot && (
+                            <>
+                              <span className="text-[#A09E9A]/30">|</span>
+                              <span className="text-[#F0EFE8]/80">{att.timeslot}</span>
+                            </>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1 flex-wrap">
+                          <span className="text-[#A09E9A]/40">Present:</span>
+                          {presentHosts.map(h => (
+                            <span key={h.id || h.poppo_id} className="text-emerald-400 font-bold bg-emerald-500/5 px-1.5 py-0.5 rounded border border-emerald-500/10 mr-1 my-0.5">
+                              {h.nickname || h.name || 'Unnamed'} ({h.poppo_id || h.poppoId || h.id})
+                            </span>
+                          ))}
+                          {presentHosts.length === 0 && (
+                            <span className="text-[#A09E9A]/40 italic">None assigned</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const profileOwnerRole = String(host.role || '').toLowerCase();
+  const isNonHostRole = ['admin', 'manager', 'agent', 'head admin', 'head_admin', 'director'].includes(profileOwnerRole);
 
   return (
     <div className={cn(
       "w-full text-[#F0EFE8] flex flex-col",
       isSpotlight 
-        ? "bg-[#13131E] p-5 space-y-5 relative max-w-md mx-auto border border-white/5 rounded-[24px] shadow-2xl overflow-hidden" 
+        ? cn("bg-[#13131E] p-5 space-y-5 relative mx-auto border border-white/5 rounded-[24px] shadow-2xl max-h-[calc(100dvh-2rem)] overflow-y-auto custom-scrollbar", hidePerformanceStats ? "max-w-4xl" : "max-w-md") 
         : "space-y-6 max-w-4xl mx-auto pb-12 pt-2"
     )}>
       
@@ -3340,24 +7335,40 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
           <div className="w-8 h-8 border-2 border-[#D4AF37]/20 border-t-[#D4AF37] rounded-full animate-spin" />
           <p className="text-[10px] font-black uppercase tracking-widest text-[#D4AF37]/45">Syncing Profile Metrics...</p>
         </div>
+      ) : profileOwnerRole === 'director' ? (
+        <div className={cn("mx-auto w-full pt-2 space-y-6", (!onClose && (loggedInUserRole === 'director' || loggedInUserRole === 'head admin' || loggedInUserRole === 'head_admin')) ? "max-w-4xl" : "max-w-xl")}>
+          {renderIdentityCard()}
+          {!isSpotlight && String(rootAuth?.role || '').toLowerCase() === 'director' && renderImpersonationBlock()}
+          {!onClose && (loggedInUserRole === 'director' || loggedInUserRole === 'head admin' || loggedInUserRole === 'head_admin') && renderBadgeAndTaskAssignment()}
+        </div>
+      ) : isNonHostRole ? (
+        <div className={cn("mx-auto w-full pt-2 space-y-6", (String(rootAuth?.role || '').toLowerCase() === 'admin' || (!onClose && (loggedInUserRole === 'director' || loggedInUserRole === 'head admin' || loggedInUserRole === 'head_admin'))) ? "max-w-4xl" : "max-w-xl")}>
+          {renderIdentityCard()}
+          {renderAssignedHostsSection()}
+          {renderIntakeSection()}
+          {renderProgressNotes()}
+          {['agent', 'manager'].includes(String(rootAuth?.role || '').toLowerCase()) && renderRosterEventsAndAttendance()}
+          {!isSpotlight && String(rootAuth?.role || '').toLowerCase() === 'director' && renderImpersonationBlock()}
+          {String(rootAuth?.role || '').toLowerCase() === 'admin' && renderAdminFanbaseReportSection()}
+          {String(rootAuth?.role || '').toLowerCase() === 'admin' && renderAdminsLogSection()}
+          {!onClose && (loggedInUserRole === 'director' || loggedInUserRole === 'head admin' || loggedInUserRole === 'head_admin') && renderBadgeAndTaskAssignment()}
+        </div>
       ) : (
         <div className={cn(
-          isSpotlight 
+          (isSpotlight && !hidePerformanceStats)
             ? "space-y-5 overflow-y-auto pr-0.5 py-1 custom-scrollbar max-h-[72vh]" 
             : "grid grid-cols-1 lg:grid-cols-3 gap-6 pt-2"
         )}>
-          {isSpotlight ? (
+          {(isSpotlight && !hidePerformanceStats) ? (
             <>
               {renderIdentityCard()}
-              {renderEarningsBreakdown()}
-              {renderMonthlyTrend()}
-              {renderPerformanceHistory()}
+              {renderFanbaseBlock()}
               <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
                 {renderRandomPK()}
                 {renderExposuresAndAttendance()}
               </div>
-              {renderFanbaseBlock()}
-              {renderAwardsBlock()}
+              {renderMonthlyTrend()}
+              {renderPerformanceMetricsAndDiversity()}
               {renderTrendBadge()}
               {renderWeeklyLiveStats()}
               {renderAgentNotes()}
@@ -3365,7 +7376,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
               {onClose && (
                 <button
                   onClick={onClose}
-                  className="w-full mt-4 py-3 bg-[#222235] hover:bg-[#2A2A3F] border border-white/10 hover:border-[#D4AF37]/40 text-[#F0EFE8] hover:text-[#D4AF37] rounded-xl text-xs font-black uppercase tracking-widest transition-all cursor-pointer text-center"
+                  className="w-full mt-4 py-3 bg-[#222235] hover:bg-[#2A2A3F] border border-white/10 hover:border-[#D4AF37]/45 hover:text-[#D4AF37] rounded-xl text-xs font-black uppercase tracking-widest transition-all cursor-pointer text-center"
                 >
                   Close Profile Spotlight
                 </button>
@@ -3380,19 +7391,30 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
               
               {/* Right Column (Performance Stats) */}
               <div className="space-y-6 lg:col-span-2">
-                {renderEarningsBreakdown()}
-                {renderMonthlyTrend()}
-                {renderPerformanceHistory()}
+                {!isSpotlight && String(rootAuth?.role || '').toLowerCase() === 'director' && renderImpersonationBlock()}
+                {renderFanbaseBlock()}
                 <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
                   {renderRandomPK()}
                   {renderExposuresAndAttendance()}
                 </div>
-                {renderFanbaseBlock()}
-                {renderAwardsBlock()}
-                {renderTrendBadge()}
-                {renderWeeklyLiveStats()}
-                {renderAgentNotes()}
-                {renderAIAnalysis()}
+                {!hidePerformanceStats && (
+                  <>
+                    {renderMonthlyTrend()}
+                    {renderPerformanceMetricsAndDiversity()}
+                    {renderTrendBadge()}
+                    {renderWeeklyLiveStats()}
+                    {renderAgentNotes()}
+                    {renderAIAnalysis()}
+                  </>
+                )}
+                {isSpotlight && onClose && (
+                  <button
+                    onClick={onClose}
+                    className="w-full mt-4 py-3 bg-[#222235] hover:bg-[#2A2A3F] border border-white/10 hover:border-[#D4AF37]/45 hover:text-[#D4AF37] rounded-xl text-xs font-black uppercase tracking-widest transition-all cursor-pointer text-center"
+                  >
+                    Close Profile Spotlight
+                  </button>
+                )}
               </div>
             </>
           )}
@@ -3403,7 +7425,39 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
       {renderFanbaseModal()}
       {renderSelfEditModal()}
       {renderAddEventModal()}
+      {renderAdminLogEditModal()}
       {/* renderMonthlyDataModal() */}
+
+      {spotlightHost && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm overflow-y-auto">
+          <HostProfileView 
+            host={spotlightHost} 
+            isReadOnly={true} 
+            onClose={() => setSpotlightHost(null)} 
+          />
+        </div>
+      )}
+
+
+      {/* Floating Toast Notification Container */}
+      <div className="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none">
+        {toasts.map(toast => (
+          <div
+            key={toast.id}
+            className={cn(
+              "flex items-center gap-3 px-4 py-3 rounded-xl shadow-2xl border backdrop-blur-xl transition-all duration-300 pointer-events-auto transform translate-y-0 opacity-100",
+              toast.type === 'success' 
+                ? "bg-emerald-950/90 border-emerald-500/30 text-emerald-300 shadow-[0_0_15px_rgba(16,185,129,0.15)]"
+                : "bg-rose-950/90 border-rose-500/30 text-rose-300 shadow-[0_0_15px_rgba(244,63,94,0.15)]"
+            )}
+          >
+            <span className="text-sm">
+              {toast.type === 'success' ? '✅' : '❌'}
+            </span>
+            <span className="text-xs font-bold tracking-wide">{toast.message}</span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 };

@@ -24,5 +24,11 @@ check_col.js
 check_syntax.js
 fix_cors.ts
 run_tsc.js
-test_babel.js
+
+
+
+
+# Temporary scratch folder
+scratch/
+.antigravity/
 

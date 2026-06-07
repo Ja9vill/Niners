@@ -1,6 +1,6 @@
 export type Role = 'Talent' | 'Host' | 'Manager' | 'Admin' | 'Head Admin' | 'Director' | 'Agent';
 export type BaseSalaryTier = 'N/A' | 'Rocket Host' | 'Star Host' | 'S idol' | 'ESport Host' | 'Regular Host';
-export type HostStatus = 'Active' | 'Inconsistent' | 'Released' | 'Inactive' | 'Releasing';
+export type HostStatus = 'Active' | 'Inconsistent' | 'Intermittent' | 'Released' | 'Inactive' | 'Releasing';
 export type AnchorType = 'Nine Agency' | 'Sub Agency' | 'External';
 export type EventType = 'Official PK' | 'Solo Livehouse' | 'Party Livehouse' | 'Agency Event' | 'Poppo Event' | 'External Event';
 export type Trend = 'Growing' | 'Declining' | 'Stable' | 'At Risk' | 'New' | 'Explosive';
@@ -66,7 +66,7 @@ export interface Host {
 
   // Profile data
   status: HostStatus;
-  tier_pay: BaseSalaryTier;
+  tier_pay?: string;
   photoUrl?: string;
   bio?: string;
   social_links?: {
@@ -82,6 +82,7 @@ export interface Host {
   reset_requested?: boolean;
   
   // Role specific
+  teamAnchor?: string;
   team_anchor?: string;
   assigned_manager_poppo_id?: string;
   manager?: string; // Legacy alias for assigned_manager_poppo_id

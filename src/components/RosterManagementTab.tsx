@@ -197,7 +197,7 @@ export const RosterManagementTab: React.FC<RosterManagementTabProps> = ({ hosts,
       
       const nickname = getVal('nickname') || getVal('name');
       const status = getVal('status');
-      const team_anchor = getVal('team_anchor') || getVal('anchor_type');
+      const team_anchor = getVal('teamAnchor') || getVal('team_anchor') || getVal('team') || getVal('anchor_type');
       const tier_pay = getVal('tier_pay') || getVal('tierPay');
       const manager = getVal('assigned_manager_poppo_id') || getVal('manager');
       const photoUrl = getVal('photoUrl');
@@ -249,6 +249,32 @@ export const RosterManagementTab: React.FC<RosterManagementTabProps> = ({ hosts,
         ...(prev[hostId] || {}),
         assigned_manager_poppo_id: managerId,
         assigned_manager_nickname: selectedManager ? selectedManager.name : ''
+      }
+    }));
+  };
+
+  const getSocialDisplayValue = (host: any, platform: string) => {
+    const id = host.poppo_id || host.poppoId || host.id;
+    if (editedHosts[id]?.social_links !== undefined) {
+      return editedHosts[id].social_links[platform] || '';
+    }
+    return host.social_links?.[platform] || '';
+  };
+
+  const handleSocialChange = (hostId: string, platform: string, value: string) => {
+    const original = users.find(h => (h.poppo_id || h.poppoId || h.id) === hostId);
+    const currentSocials = editedHosts[hostId]?.social_links !== undefined 
+      ? editedHosts[hostId].social_links 
+      : original?.social_links || {};
+    
+    setEditedHosts(prev => ({
+      ...prev,
+      [hostId]: {
+        ...(prev[hostId] || {}),
+        social_links: {
+          ...currentSocials,
+          [platform]: value
+        }
       }
     }));
   };
@@ -427,6 +453,11 @@ export const RosterManagementTab: React.FC<RosterManagementTabProps> = ({ hosts,
                 <th className="px-6 py-4">Status</th>
                 <th className="px-6 py-4">Team Anchor</th>
                 <th className="px-6 py-4">Tier / Pay</th>
+                <th className="px-6 py-4">Bio</th>
+                <th className="px-6 py-4">Facebook</th>
+                <th className="px-6 py-4">Instagram</th>
+                <th className="px-6 py-4">TikTok</th>
+                <th className="px-6 py-4">WhatsApp</th>
                 <th className="px-6 py-4">Assigned Manager (Name)</th>
                 <th className="px-6 py-4">Manager Poppo ID</th>
                 {onResetAccountAccess && <th className="px-6 py-4">Account Access</th>}
@@ -435,19 +466,19 @@ export const RosterManagementTab: React.FC<RosterManagementTabProps> = ({ hosts,
             <tbody className="divide-y divide-white/5">
               {fetchError ? (
                 <tr>
-                  <td colSpan={12} className="py-12 text-center text-red-400 italic text-xs font-bold">
+                  <td colSpan={16} className="py-12 text-center text-red-400 italic text-xs font-bold">
                     System Error: {fetchError}
                   </td>
                 </tr>
               ) : users.length === 0 ? (
                 <tr>
-                  <td colSpan={12} className="py-12 text-center text-[#A09E9A]/30 italic text-xs">
+                  <td colSpan={16} className="py-12 text-center text-[#A09E9A]/30 italic text-xs">
                     Roster is empty. Ensure data is loaded properly.
                   </td>
                 </tr>
               ) : filteredHosts.length === 0 ? (
                 <tr>
-                  <td colSpan={12} className="py-12 text-center text-[#A09E9A]/30 italic text-xs">
+                  <td colSpan={16} className="py-12 text-center text-[#A09E9A]/30 italic text-xs">
                     No users found matching the criteria.
                   </td>
                 </tr>
@@ -484,14 +515,27 @@ export const RosterManagementTab: React.FC<RosterManagementTabProps> = ({ hosts,
                               <Camera size={14} className="text-white" />
                             </div>
                           </button>
-                          <span className="font-bold text-[#F0EFE8] truncate">{host.nickname || host.name}</span>
+                          <input
+                            type="text"
+                            value={getDisplayValue(host, 'nickname') as string || getDisplayValue(host, 'name') as string || ''}
+                            onChange={(e) => handleFieldChange(host.id, 'nickname', e.target.value)}
+                            className="bg-transparent border border-transparent hover:border-white/10 focus:border-indigo-500 rounded px-2 py-1 outline-none text-[#F0EFE8] font-bold w-28 text-xs truncate"
+                            placeholder="Nickname"
+                          />
                         </div>
                       </td>
 
                       <td className="px-6 py-3">
-                        <div className="px-3 py-1 inline-flex rounded-full bg-white/5 border border-white/10 text-[10px] font-black text-[#A09E9A] uppercase tracking-wider">
-                          {getDisplayValue(host, 'role') as string || 'Host'}
-                        </div>
+                        <select
+                          title="Select Role"
+                          value={getDisplayValue(host, 'role') as string || 'Host'}
+                          onChange={(e) => handleFieldChange(host.id, 'role', e.target.value)}
+                          className="bg-transparent border border-transparent hover:border-white/10 focus:border-indigo-500 rounded px-2 py-1 outline-none text-[#F0EFE8] w-28 font-bold"
+                        >
+                          {['Host', 'Manager', 'Agent', 'Head Admin', 'Admin', 'Director', 'Talent'].map(r => (
+                            <option key={r} value={r} className="bg-[#1A1A28]">{r}</option>
+                          ))}
+                        </select>
                       </td>
 
                       <td className="px-6 py-3">
@@ -502,12 +546,12 @@ export const RosterManagementTab: React.FC<RosterManagementTabProps> = ({ hosts,
                           className={cn(
                             "bg-transparent border border-transparent hover:border-white/10 focus:border-indigo-500 rounded px-2 py-1 outline-none font-bold",
                             getDisplayValue(host, 'status') === 'Active' ? 'text-emerald-400' :
-                            getDisplayValue(host, 'status') === 'Inconsistent' ? 'text-amber-400' :
+                            (getDisplayValue(host, 'status') === 'Inconsistent' || getDisplayValue(host, 'status') === 'Intermittent') ? 'text-amber-400' :
                             getDisplayValue(host, 'status') === 'Releasing' ? 'text-orange-400' :
                             'text-red-400'
                           )}
                         >
-                          {['Active', 'Inconsistent', 'Inactive', 'Releasing', 'Released'].map(s => (
+                          {['Active', 'Intermittent', 'Inactive', 'Releasing', 'Released'].map(s => (
                             <option key={s} value={s} className="bg-[#1A1A28]">{s}</option>
                           ))}
                         </select>
@@ -516,10 +560,10 @@ export const RosterManagementTab: React.FC<RosterManagementTabProps> = ({ hosts,
                       <td className="px-6 py-3">
                         <input
                           type="text"
-                          value={getDisplayValue(host, 'team_anchor') as string || ''}
-                          onChange={(e) => handleFieldChange(host.id, 'team_anchor', e.target.value)}
+                          value={getDisplayValue(host, 'teamAnchor') as string || getDisplayValue(host, 'team_anchor') as string || ''}
+                          onChange={(e) => handleFieldChange(host.id, 'teamAnchor', e.target.value)}
                           className="bg-transparent border border-transparent hover:border-white/10 focus:border-indigo-500 rounded px-2 py-1 outline-none text-[#F0EFE8] w-32"
-                          placeholder="Team / Anchor"
+                          placeholder="Team Anchor"
                         />
                       </td>
 
@@ -535,6 +579,56 @@ export const RosterManagementTab: React.FC<RosterManagementTabProps> = ({ hosts,
                             <option key={t} value={t} className="bg-[#1A1A28]">{t}</option>
                           ))}
                         </select>
+                      </td>
+
+                      <td className="px-6 py-3">
+                        <input
+                          type="text"
+                          value={getDisplayValue(host, 'bio') as string || ''}
+                          onChange={(e) => handleFieldChange(host.id, 'bio', e.target.value)}
+                          className="bg-transparent border border-transparent hover:border-white/10 focus:border-indigo-500 rounded px-2 py-1 outline-none text-[#F0EFE8] w-48 text-xs"
+                          placeholder="Bio / Public Message"
+                        />
+                      </td>
+
+                      <td className="px-6 py-3">
+                        <input
+                          type="text"
+                          value={getSocialDisplayValue(host, 'fb')}
+                          onChange={(e) => handleSocialChange(host.id, 'fb', e.target.value)}
+                          className="bg-transparent border border-transparent hover:border-white/10 focus:border-indigo-500 rounded px-2 py-1 outline-none text-[#F0EFE8] w-24 text-xs font-mono"
+                          placeholder="Facebook"
+                        />
+                      </td>
+
+                      <td className="px-6 py-3">
+                        <input
+                          type="text"
+                          value={getSocialDisplayValue(host, 'ig')}
+                          onChange={(e) => handleSocialChange(host.id, 'ig', e.target.value)}
+                          className="bg-transparent border border-transparent hover:border-white/10 focus:border-indigo-500 rounded px-2 py-1 outline-none text-[#F0EFE8] w-24 text-xs font-mono"
+                          placeholder="Instagram"
+                        />
+                      </td>
+
+                      <td className="px-6 py-3">
+                        <input
+                          type="text"
+                          value={getSocialDisplayValue(host, 'tiktok')}
+                          onChange={(e) => handleSocialChange(host.id, 'tiktok', e.target.value)}
+                          className="bg-transparent border border-transparent hover:border-white/10 focus:border-indigo-500 rounded px-2 py-1 outline-none text-[#F0EFE8] w-24 text-xs font-mono"
+                          placeholder="TikTok"
+                        />
+                      </td>
+
+                      <td className="px-6 py-3">
+                        <input
+                          type="text"
+                          value={getSocialDisplayValue(host, 'whatsapp')}
+                          onChange={(e) => handleSocialChange(host.id, 'whatsapp', e.target.value)}
+                          className="bg-transparent border border-transparent hover:border-white/10 focus:border-indigo-500 rounded px-2 py-1 outline-none text-[#F0EFE8] w-24 text-xs font-mono"
+                          placeholder="WhatsApp"
+                        />
                       </td>
 
                       <td className="px-6 py-3">

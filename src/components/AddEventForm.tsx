@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Calendar, Plus, Trash2, Send, Info, AlertCircle } from 'lucide-react';
+import { Calendar, Plus, Send, Info, AlertCircle, Search, UserMinus, CheckCircle2 } from 'lucide-react';
 import { doc, setDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { Storage } from '../lib/storage';
@@ -13,7 +13,7 @@ interface AddEventFormProps {
 }
 
 export const AddEventForm: React.FC<AddEventFormProps> = ({ onSuccess, onCancel }) => {
-  const [hosts, setHosts] = useState<any[]>([]);
+  const [allUsers, setAllUsers] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errors, setErrors] = useState<string[]>([]);
   const [successMsg, setSuccessMsg] = useState('');
@@ -21,26 +21,22 @@ export const AddEventForm: React.FC<AddEventFormProps> = ({ onSuccess, onCancel 
 
   const auth = Storage.getAuthState();
 
-  // Load database hosts on mount
+  // Load database metadata on mount
   useEffect(() => {
-    const loadHosts = async () => {
+    const loadMetadata = async () => {
       setIsLoading(true);
       setErrors([]);
       try {
         const usersList = await FirebaseService.getAllRoleMetadata();
-        const filteredHosts = usersList.filter(u => {
-          const r = String(u.role || '').toLowerCase();
-          return r === 'host' || r === 'talent';
-        });
-        setHosts(filteredHosts);
+        setAllUsers(usersList);
       } catch (err: any) {
-        console.error('[AddEventForm] Error loading hosts:', err);
+        console.error('[AddEventForm] Error loading metadata:', err);
         setErrors([err.message || 'Failed to sync registry details from Database']);
       } finally {
         setIsLoading(false);
       }
     };
-    loadHosts();
+    loadMetadata();
   }, []);
 
   // Form State
@@ -52,34 +48,10 @@ export const AddEventForm: React.FC<AddEventFormProps> = ({ onSuccess, onCancel 
   const [eventTitle, setEventTitle] = useState('');
   const [eventDescription, setEventDescription] = useState('');
   
-  // SOLO LIVEHOUSE states
-  const [soloPoppoId, setSoloPoppoId] = useState('');
-  const [soloNickname, setSoloNickname] = useState('');
-
-  // Other types states
-  interface ParticipantSlot {
-    type: 'agency' | 'manual';
-    poppoId: string;
-    name: string;
-  }
-  const [participantsList, setParticipantsList] = useState<ParticipantSlot[]>([{ type: 'agency', poppoId: '', name: '' }]);
-
-  // SOLO LIVEHOUSE cross-autofill logic
-  const handleSoloPoppoIdChange = (val: string) => {
-    setSoloPoppoId(val);
-    const match = hosts.find(h => String(h.id) === val.trim());
-    if (match) {
-      setSoloNickname(match.nickname || match.name || '');
-    }
-  };
-
-  const handleSoloNicknameChange = (val: string) => {
-    setSoloNickname(val);
-    const match = hosts.find(h => String(h.nickname || h.name).toLowerCase() === val.trim().toLowerCase());
-    if (match) {
-      setSoloPoppoId(String(match.id));
-    }
-  };
+  // Participant Selection States
+  const [participantSearch, setParticipantSearch] = useState('');
+  const [participantRoleFilter, setParticipantRoleFilter] = useState('All Roles');
+  const [selectedParticipants, setSelectedParticipants] = useState<any[]>([]);
 
   const computedTimeStr = `${eventTimeHour}:${eventTimeMinute} ${eventTimeAmpm} Manila Time`;
 
@@ -95,37 +67,40 @@ export const AddEventForm: React.FC<AddEventFormProps> = ({ onSuccess, onCancel 
     return `${cleanDate}_${cleanTime}_${cleanType}_${timestamp}_${hhmmss}`;
   }, [eventDate, computedTimeStr, eventType]);
 
-  const handleAddParticipantSlot = () => {
-    if (participantsList.length < 9) {
-      setParticipantsList([...participantsList, { type: 'agency', poppoId: '', name: '' }]);
-    }
+  // Filter users based on search query and role filter (excluding director role)
+  const filteredUsers = useMemo(() => {
+    return allUsers.filter(u => {
+      const userRole = String(u.role || '').toLowerCase();
+      // Exclude director role
+      if (userRole === 'director') return false;
+
+      // Filter by role selection
+      if (participantRoleFilter !== 'All Roles') {
+        if (participantRoleFilter === 'hosts' && userRole !== 'host' && userRole !== 'talent') return false;
+        if (participantRoleFilter === 'managers' && userRole !== 'manager') return false;
+        if (participantRoleFilter === 'agents' && userRole !== 'agent') return false;
+        if (participantRoleFilter === 'admins' && userRole !== 'admin' && userRole !== 'head admin') return false;
+      }
+
+      // Search matching poppoId or nickname
+      const searchStr = participantSearch.toLowerCase().trim();
+      if (searchStr) {
+        const nickname = String(u.nickname || u.name || '').toLowerCase();
+        const poppoId = String(u.poppo_id || u.poppoId || u.id || '').toLowerCase();
+        return nickname.includes(searchStr) || poppoId.includes(searchStr);
+      }
+
+      return true;
+    });
+  }, [allUsers, participantSearch, participantRoleFilter]);
+
+  const handleAddParticipant = (user: any) => {
+    if (selectedParticipants.some(a => a.id === user.id)) return;
+    setSelectedParticipants([...selectedParticipants, user]);
   };
 
-  const handleRemoveParticipantSlot = (index: number) => {
-    if (participantsList.length > 1) {
-      setParticipantsList(participantsList.filter((_, idx) => idx !== index));
-    } else {
-      setParticipantsList([{ type: 'agency', poppoId: '', name: '' }]);
-    }
-  };
-
-  const handleParticipantChange = (index: number, field: keyof ParticipantSlot, val: string) => {
-    const updated = [...participantsList];
-    updated[index] = { ...updated[index], [field]: val };
-    
-    // Auto-fill name if changing agency poppoId
-    if (field === 'poppoId' && updated[index].type === 'agency') {
-      const match = hosts.find(h => String(h.id) === val);
-      updated[index].name = match ? (match.nickname || match.name || '') : '';
-    }
-    
-    setParticipantsList(updated);
-  };
-
-  const handleParticipantTypeToggle = (index: number, type: 'agency' | 'manual') => {
-    const updated = [...participantsList];
-    updated[index] = { type, poppoId: '', name: '' };
-    setParticipantsList(updated);
+  const handleRemoveParticipant = (userId: string) => {
+    setSelectedParticipants(selectedParticipants.filter(a => a.id !== userId));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -138,36 +113,20 @@ export const AddEventForm: React.FC<AddEventFormProps> = ({ onSuccess, onCancel 
       return;
     }
 
-    let validParticipants: string[] = [];
-    let firstParticipantNickname = '';
-
-    if (eventType === 'SOLO LIVEHOUSE') {
-      if (!soloPoppoId.trim()) {
-        setErrors(['Poppo ID is required for SOLO LIVEHOUSE.']);
-        return;
-      }
-      validParticipants = [soloPoppoId.trim()];
-      const match = hosts.find(h => String(h.id) === soloPoppoId.trim());
-      firstParticipantNickname = match ? (match.nickname || match.name || '') : soloNickname.trim() || 'Solo Host';
-    } else {
-      // Filter valid participants (non-empty poppoId)
-      const nonHex = participantsList.filter(p => p.poppoId.trim() !== '');
-      if (nonHex.length === 0) {
-        setErrors(['At least one host participant is required.']);
-        return;
-      }
-      validParticipants = nonHex.map(p => p.poppoId.trim());
-
-      // Check for duplicate participants
-      const uniqueParticipants = Array.from(new Set(validParticipants));
-      if (uniqueParticipants.length !== validParticipants.length) {
-        setErrors(['Duplicate participants are not allowed.']);
-        return;
-      }
-      const first = nonHex[0];
-      const match = hosts.find(h => String(h.id) === first.poppoId.trim());
-      firstParticipantNickname = match ? (match.nickname || match.name || '') : first.name.trim() || 'Host';
+    if (selectedParticipants.length === 0) {
+      setErrors(['At least one host participant is required.']);
+      return;
     }
+    const validParticipants = selectedParticipants.map(p => String(p.poppo_id || p.id).trim());
+
+    // Check for duplicate participants
+    const uniqueParticipants = Array.from(new Set(validParticipants));
+    if (uniqueParticipants.length !== validParticipants.length) {
+      setErrors(['Duplicate participants are not allowed.']);
+      return;
+    }
+    const first = selectedParticipants[0];
+    const firstParticipantNickname = first.nickname || first.name || 'Host';
 
     setIsProcessing(true);
 
@@ -175,13 +134,7 @@ export const AddEventForm: React.FC<AddEventFormProps> = ({ onSuccess, onCancel 
       const defaultTitle = `${firstParticipantNickname} - ${eventType}`;
       const finalTitle = eventTitle.trim() || defaultTitle;
 
-      let finalDescription = eventDescription.trim() || 'No description provided.';
-      if (eventType !== 'SOLO LIVEHOUSE') {
-        const externalList = participantsList.filter(p => p.type === 'manual' && p.poppoId && p.name);
-        if (externalList.length > 0) {
-          finalDescription += `\n\nExternal Participants:\n` + externalList.map(p => `• ${p.name} (#${p.poppoId})`).join('\n');
-        }
-      }
+      const finalDescription = eventDescription.trim() || 'No description provided.';
 
       const newCalendarEvent = {
         event_id: computedEventId,
@@ -217,9 +170,7 @@ export const AddEventForm: React.FC<AddEventFormProps> = ({ onSuccess, onCancel 
       setEventDate('');
       setEventTitle('');
       setEventDescription('');
-      setSoloPoppoId('');
-      setSoloNickname('');
-      setParticipantsList([{ type: 'agency', poppoId: '', name: '' }]);
+      setSelectedParticipants([]);
       
       if (onSuccess) {
         onSuccess();
@@ -232,11 +183,11 @@ export const AddEventForm: React.FC<AddEventFormProps> = ({ onSuccess, onCancel 
     }
   };
 
-  if (isLoading && hosts.length === 0) {
+  if (isLoading && allUsers.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-8 gap-3">
         <div className="relative w-8 h-8 animate-spin rounded-full border-2 border-[#D4AF37]/20 border-t-[#D4AF37]" />
-        <p className="text-[10px] uppercase tracking-wider text-[#A09E9A]">Syncing Hosts list...</p>
+        <p className="text-[10px] uppercase tracking-wider text-[#A09E9A]">Syncing Members list...</p>
       </div>
     );
   }
@@ -357,140 +308,140 @@ export const AddEventForm: React.FC<AddEventFormProps> = ({ onSuccess, onCancel 
       </div>
 
       {/* Participants */}
-      {eventType === 'SOLO LIVEHOUSE' ? (
-        <div className="space-y-4 bg-[#0D0D14]/50 p-6 rounded-2xl border border-white/5">
-          <div className="border-b border-white/5 pb-2">
-            <span className="text-[10px] font-black text-[#A09E9A] uppercase tracking-widest">Solo Livehouse Host Details (Cross-Autofills)</span>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <label htmlFor="solo-poppo-id" className="text-[10px] font-black text-[#A09E9A] uppercase tracking-widest ml-1">Poppo ID</label>
-              <input
-                id="solo-poppo-id"
-                type="text"
-                value={soloPoppoId}
-                onChange={(e) => handleSoloPoppoIdChange(e.target.value)}
-                placeholder="Enter Poppo ID..."
-                className="w-full bg-[#0D0D14] border border-white/10 rounded-xl px-4 py-3 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37]/30 transition-all font-mono"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <label htmlFor="solo-nickname" className="text-[10px] font-black text-[#A09E9A] uppercase tracking-widest ml-1">Nickname</label>
-              <input
-                id="solo-nickname"
-                type="text"
-                value={soloNickname}
-                onChange={(e) => handleSoloNicknameChange(e.target.value)}
-                placeholder="Enter Nickname..."
-                className="w-full bg-[#0D0D14] border border-white/10 rounded-xl px-4 py-3 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37]/30 transition-all"
-              />
-            </div>
-          </div>
-        </div>
-      ) : (
-        <div className="space-y-4 bg-[#0D0D14]/50 p-6 rounded-2xl border border-white/5">
-          <div className="flex justify-between items-center border-b border-white/5 pb-2">
-            <span className="text-[10px] font-black text-[#A09E9A] uppercase tracking-widest">Niners Hosts Participants (Up to 9)</span>
-            <button
-              type="button"
-              onClick={handleAddParticipantSlot}
-              disabled={participantsList.length >= 9}
-              className="px-3 py-1.5 bg-[#D4AF37]/10 hover:bg-[#D4AF37]/20 border border-[#D4AF37]/30 text-[#D4AF37] rounded-lg text-[10px] font-black uppercase tracking-wider flex items-center gap-1 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              <Plus size={12} /> Add Participant
-            </button>
+      <div className="space-y-4 bg-[#0D0D14]/50 p-6 rounded-2xl border border-white/5">
+        <span className="text-[10px] font-black text-[#A09E9A] uppercase tracking-widest block border-b border-white/5 pb-2">ADD PARTICIPANTS</span>
+        
+        {/* Search & Filter Row */}
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30" size={14} />
+            <input
+              type="text"
+              value={participantSearch}
+              onChange={(e) => setParticipantSearch(e.target.value)}
+              placeholder="Search nickname or poppoId..."
+              className="w-full bg-[#0A0B0E] border border-white/10 rounded-xl pl-9 pr-4 py-2.5 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
+            />
           </div>
 
-          <div className="space-y-4">
-            {participantsList.map((slot, index) => (
-              <div key={index} className="bg-[#07070B] border border-white/5 p-4 rounded-xl space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-[9px] font-mono text-white/40 uppercase">Participant #{index + 1}</span>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => handleParticipantTypeToggle(index, 'agency')}
-                      className={cn(
-                        "px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest border transition-all cursor-pointer",
-                        slot.type === 'agency'
-                          ? "bg-[#D4AF37]/10 border-[#D4AF37]/30 text-[#D4AF37]"
-                          : "bg-transparent border-white/10 text-white/45 hover:text-white/70"
-                      )}
-                    >
-                      Agency Host
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleParticipantTypeToggle(index, 'manual')}
-                      className={cn(
-                        "px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest border transition-all cursor-pointer",
-                        slot.type === 'manual'
-                          ? "bg-[#ec4899]/10 border-[#ec4899]/30 text-[#ec4899]"
-                          : "bg-transparent border-white/10 text-white/45 hover:text-white/70"
-                      )}
-                    >
-                      Manual/External
-                    </button>
-                    {participantsList.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveParticipantSlot(index)}
-                        className="p-1 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 rounded-md transition-all cursor-pointer shrink-0 ml-2"
-                        title="Remove participant slot"
-                      >
-                        <Trash2 size={12} />
-                      </button>
+          <select
+            value={participantRoleFilter}
+            onChange={(e) => setParticipantRoleFilter(e.target.value)}
+            title="Role Filter"
+            className="bg-[#0A0B0E] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-[#F0EFE8] outline-none font-bold cursor-pointer"
+          >
+            <option value="All Roles">All Roles</option>
+            <option value="hosts">Hosts</option>
+            <option value="managers">Managers</option>
+            <option value="agents">Agents</option>
+            <option value="admins">Admins</option>
+          </select>
+        </div>
+
+        {/* Member Grid/List */}
+        <div className="max-h-[220px] overflow-y-auto border border-white/5 rounded-xl bg-black/40 custom-scrollbar divide-y divide-white/5">
+          {filteredUsers.length > 0 ? (
+            filteredUsers.map(user => {
+              const isAdded = selectedParticipants.some(a => a.id === user.id);
+              return (
+                <div key={user.id} className="flex items-center justify-between p-3 text-xs hover:bg-white/[0.02] transition-colors">
+                  <div className="flex items-center gap-3">
+                    {user.photoUrl || user.photo_url ? (
+                      <img
+                        src={user.photoUrl || user.photo_url}
+                        alt={user.nickname || user.name}
+                        className="w-8 h-8 rounded-full object-cover border border-[#D4AF37]/20 shrink-0"
+                      />
+                    ) : (
+                      <div className="w-8 h-8 rounded-full bg-[#D4AF37]/10 text-[#D4AF37] border border-[#D4AF37]/25 flex items-center justify-center shrink-0 font-bold text-xs uppercase">
+                        {(user.nickname || user.name || 'N')[0].toUpperCase()}
+                      </div>
                     )}
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {slot.type === 'agency' ? (
-                    <div className="sm:col-span-2">
-                      <select
-                        value={slot.poppoId}
-                        onChange={(e) => handleParticipantChange(index, 'poppoId', e.target.value)}
-                        title={`Select agency host ${index + 1}`}
-                        className="w-full bg-[#0D0D14] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37] font-bold cursor-pointer"
-                      >
-                        <option value="">-- Choose Host --</option>
-                        {hosts.map(h => (
-                          <option key={h.id} value={h.id}>{h.nickname || h.name} ({h.id})</option>
-                        ))}
-                      </select>
+                    <div>
+                      <div className="font-bold text-[#F0EFE8]">{user.nickname || user.name}</div>
+                      <div className="text-[10px] font-mono text-[#A09E9A] flex items-center gap-1.5 mt-0.5">
+                        <span>ID: {user.poppo_id || user.id}</span>
+                        <span>•</span>
+                        <span className="text-indigo-400 capitalize">{user.role || 'Host'}</span>
+                      </div>
                     </div>
-                  ) : (
-                    <>
-                      <div className="space-y-1">
-                        <label htmlFor={`manual-id-${index}`} className="text-[8px] font-black text-[#A09E9A] uppercase tracking-widest block">Poppo ID</label>
-                        <input
-                          id={`manual-id-${index}`}
-                          type="text"
-                          value={slot.poppoId}
-                          onChange={(e) => handleParticipantChange(index, 'poppoId', e.target.value)}
-                          placeholder="External Poppo ID..."
-                          className="w-full bg-[#0D0D14] border border-white/10 rounded-xl px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37] font-mono"
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <label htmlFor={`manual-name-${index}`} className="text-[8px] font-black text-[#A09E9A] uppercase tracking-widest block">Name/Nickname</label>
-                        <input
-                          id={`manual-name-${index}`}
-                          type="text"
-                          value={slot.name}
-                          onChange={(e) => handleParticipantChange(index, 'name', e.target.value)}
-                          placeholder="External Nickname..."
-                          className="w-full bg-[#0D0D14] border border-white/10 rounded-xl px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
-                        />
-                      </div>
-                    </>
-                  )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleAddParticipant(user)}
+                    disabled={isAdded}
+                    className={cn(
+                      "p-2 rounded-lg transition-all cursor-pointer flex items-center justify-center shrink-0 border",
+                      isAdded
+                        ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400 cursor-default"
+                        : "bg-[#D4AF37]/10 hover:bg-[#D4AF37]/20 border-[#D4AF37]/20 text-[#D4AF37]"
+                    )}
+                  >
+                    {isAdded ? <CheckCircle2 size={13} /> : <Plus size={13} />}
+                  </button>
                 </div>
+              );
+            })
+          ) : (
+            <div className="p-8 text-center text-[#A09E9A]/30 italic text-xs">No matching users found.</div>
+          )}
+        </div>
+
+        {/* Selection Summary */}
+        <div className="flex flex-col border border-white/5 rounded-xl bg-black/40 p-4 min-h-[150px] mt-4">
+          <div className="flex justify-between items-center border-b border-white/5 pb-2 mb-3">
+            <span className="text-[9px] font-black text-white/50 uppercase tracking-wider">SELECTED PARTICIPANTS ({selectedParticipants.length})</span>
+            {selectedParticipants.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setSelectedParticipants([])}
+                className="text-[9px] font-black text-red-400 hover:underline uppercase tracking-wider cursor-pointer"
+              >
+                Clear All
+              </button>
+            )}
+          </div>
+
+          <div className="overflow-y-auto max-h-[190px] pr-1 space-y-2 custom-scrollbar">
+            {selectedParticipants.length > 0 ? (
+              selectedParticipants.map(user => (
+                <div key={user.id} className="flex items-center justify-between bg-white/5 border border-white/10 px-3 py-2 rounded-xl text-xs hover:border-[#D4AF37]/20 transition-all">
+                  <div className="flex items-center gap-2.5">
+                    {user.photoUrl || user.photo_url ? (
+                      <img
+                        src={user.photoUrl || user.photo_url}
+                        alt={user.nickname || user.name}
+                        className="w-6 h-6 rounded-full object-cover border border-[#D4AF37]/10 shrink-0"
+                      />
+                    ) : (
+                      <div className="w-6 h-6 rounded-full bg-[#D4AF37]/10 text-[#D4AF37] border border-[#D4AF37]/25 flex items-center justify-center shrink-0 font-bold text-[9px] uppercase">
+                        {(user.nickname || user.name || 'N')[0].toUpperCase()}
+                      </div>
+                    )}
+                    <div>
+                      <span className="font-bold text-[#F0EFE8]">{user.nickname || user.name}</span>
+                      <span className="text-[9px] text-[#A09E9A] font-mono ml-2">(#{user.poppo_id || user.id})</span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveParticipant(user.id)}
+                    className="p-1 text-red-400 hover:bg-red-500/10 rounded-md transition-colors cursor-pointer"
+                    title="Remove Participant"
+                  >
+                    <UserMinus size={13} />
+                  </button>
+                </div>
+              ))
+            ) : (
+              <div className="flex flex-col items-center justify-center h-full text-center text-[#A09E9A]/35 italic text-xs py-8">
+                <span>No participants selected.</span>
+                <span className="text-[10px] mt-1">Search and click the add icon (+) above.</span>
               </div>
-            ))}
+            )}
           </div>
         </div>
-      )}
+      </div>
 
       {/* Generated ID Preview */}
       <div className="p-4 bg-indigo-500/5 border border-indigo-500/10 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between text-xs gap-2">

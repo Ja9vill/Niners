@@ -218,9 +218,9 @@ service cloud.firestore {
 
     // 10. Host Intake Requests
     match /host_requests/{requestId} {
-      allow read: if isDirector() || isHeadAdmin() || isLeadership() || isStaff();
-      allow create: if isStaff() || isDirector() || isHeadAdmin() || isLeadership();
-      allow update, delete: if isDirector() || isHeadAdmin() || isLeadership();
+      allow read: if isLeadership() || isAgent();
+      allow create: if isAgent();
+      allow update, delete: if isLeadership();
     }
 
     // Default Deny: block all other access by default

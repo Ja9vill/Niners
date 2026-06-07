@@ -61,7 +61,6 @@ import { PrivacyTab } from './components/PrivacyTab';
 import { TermsTab } from './components/TermsTab';
 import { AgencyPolicyTab } from './components/AgencyPolicyTab';
 import { AppUsersTab } from './components/AppUsersTab';
-import { ManagerDashboard } from './components/ManagerDashboard';
 import { NotificationPrompt } from './components/NotificationPrompt';
 
 import { HomeTab } from './components/HomeTab';
@@ -146,7 +145,8 @@ export default function App() {
         }
 
         // Automatically upgrade local storage session if Firebase reports verified admin
-        if (user.email === 'jwavpr@gmail.com') {
+        const emailLower = (user.email || '').toLowerCase();
+        if (emailLower === 'jwavpr@gmail.com' || emailLower === 'jwavp@gmail.com' || emailLower === 'missjapugh@gmail.com') {
           const currentAuth = Storage.getAuthState();
           if (currentAuth.role?.toLowerCase() !== 'director' || currentAuth.level < 5) {
             const newState = { 
@@ -383,14 +383,6 @@ export default function App() {
       case 'roster': 
         return <ProfilesTab isReadOnly={authState.level === 0} />;
       case 'profiles': 
-        const userRoleForProfiles = (authState.role || '').toLowerCase();
-        if (userRoleForProfiles === 'manager' || userRoleForProfiles === 'agent') {
-          return wrapProtected(
-            <AuthGate onAuthChange={refreshState}>
-              <ManagerDashboard />
-            </AuthGate>
-          );
-        }
         return wrapProtected(
           <AuthGate onAuthChange={refreshState}>
             <ProfilesTab isReadOnly={false} />
@@ -420,14 +412,15 @@ export default function App() {
           </AuthGate>
         );
       case 'dashboard':
-        if (authState.role?.toLowerCase() !== 'director') {
+        const userRoleLower = (authState.role || '').toLowerCase();
+        if (userRoleLower !== 'director' && userRoleLower !== 'founder' && userRoleLower !== 'head admin' && userRoleLower !== 'head_admin') {
           return (
             <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4 select-none">
               <div className="w-16 h-16 rounded-2xl bg-red-950/30 flex items-center justify-center border border-red-900/50 shadow-lg shadow-red-950/20">
                 <span className="text-2xl">🔒</span>
               </div>
               <p className="text-[#A09E9A] font-semibold text-sm">Access Denied</p>
-              <p className="text-[#A09E9A]/60 text-xs">This panel is restricted to Directors only.</p>
+              <p className="text-[#A09E9A]/60 text-xs">This panel is restricted to Directors and Head Admins only.</p>
             </div>
           );
         }
@@ -460,6 +453,7 @@ export default function App() {
             position: authState.role || 'director',
             role: authState.role || 'director',
             team: authState.anchor_team || 'Director Only',
+            teamAnchor: authState.anchor_team || 'Director Only',
             manager: authState.manager_assigned || 'Self',
             anchor_type: 'Nine Agency',
             tier_pay: 'N/A',
@@ -864,7 +858,7 @@ export default function App() {
                       {(authState.role?.toLowerCase() === 'director' || authState.role?.toLowerCase() === 'founder' || authState.level >= 2 || authState.role?.toLowerCase() !== 'host') && (
                         <div className="nav-section-label pt-3">[Management]</div>
                       )}
-                      {(authState.role?.toLowerCase() === 'director' || authState.role?.toLowerCase() === 'founder') && (
+                      {(authState.role?.toLowerCase() === 'director' || authState.role?.toLowerCase() === 'founder' || authState.role?.toLowerCase() === 'head admin' || authState.role?.toLowerCase() === 'head_admin') && (
                         <button 
                           onClick={() => { if (!migrationRequired) { setActiveTab('dashboard'); setIsSidebarOpen(false); } }} 
                           className={cn('nav-item', activeTab === 'dashboard' && 'active', migrationRequired && 'opacity-50 cursor-not-allowed')}
@@ -1363,7 +1357,7 @@ export const OverviewTab = ({ commissions, hosts }: { commissions: CommissionEnt
                      </div>
                      <div className="text-right">
                        <p className="text-sm font-bold text-emerald-400 font-mono">{formatNumber(host.totalPoints)} pts</p>
-                        <p className="text-[10px] font-medium text-[#A09E9A]/60 uppercase">{host.tier_pay}</p>
+                       <p className="text-[10px] font-medium text-[#A09E9A]/60 uppercase">{host.tier_pay}</p>
                      </div>
                    </div>
                    <div className="pt-2 border-t border-white/5 flex justify-between items-center text-[10px]">

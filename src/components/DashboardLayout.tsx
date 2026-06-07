@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Outlet, useNavigate, useLocation, Link } from 'react-router-dom';
 import { 
   Menu, X, LogOut, LayoutDashboard, Users, User, Shield, Calendar, DollarSign, Activity, FileText,
-  Bell, Trash2, Plus, Clock, ChevronDown, Monitor, Smartphone
+  Bell, Trash2, Plus, Clock, ChevronDown, Monitor, Smartphone, TrendingUp
 } from 'lucide-react';
 import { useViewMode } from '../hooks/useViewMode';
 import { Storage } from '../lib/storage';
@@ -587,7 +587,6 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
         icon: LayoutDashboard,
         subLinks: [
           { path: '/director-operations', label: 'Operations', icon: Activity },
-          { path: '/financial-data', label: 'Reporting', icon: DollarSign },
           { path: '/system-logs', label: 'System Logs', icon: FileText }
         ]
       });
@@ -596,13 +595,11 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
         links.push({ isDivider: true, id: 'div-2' });
         links.push({ isTitle: true, label: "Directors Access", id: 'title-access' });
         links.push({ path: '/provision-user', label: 'Provision User', icon: Plus });
+        links.push({ path: '/financial-data', label: 'Reporting', icon: DollarSign });
       }
-    } else if (role === 'admin') {
-      links.push({ isDivider: true, id: 'div-admin' });
-      links.push({ path: '/admin-hub', label: 'Admin Hub', icon: Shield });
     } else if (role === 'manager' || role === 'agent') {
       links.push({ isDivider: true, id: 'div-manager' });
-      links.push({ path: '/hub', label: 'Operations', icon: Activity });
+      links.push({ path: '/analytics', label: 'Team Analytics', icon: TrendingUp });
     }
 
     return links;
@@ -625,17 +622,24 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
       {authState.mockRole && (
         <div className="w-full bg-indigo-600 text-white text-xs font-bold py-2 flex items-center justify-center gap-4 z-[9999] shrink-0 sticky top-0 shadow-lg px-4 text-center">
           <span>
-            Viewing as: <span className="uppercase text-amber-300 font-extrabold">{authState.nickname || authState.name}</span> 
-            <span className="text-white/70"> ({authState.role} • ID: {authState.poppo_id})</span>
+            Currently viewing as <span className="uppercase text-amber-300 font-extrabold">{authState.nickname || authState.name}</span>
           </span>
           <button 
-            onClick={() => {
+            onClick={async () => {
+              try {
+                await FirebaseService.logSystemActivity(
+                  `Director session restored. Ended impersonation of "${authState.nickname || authState.name}" (Poppo ID: ${authState.poppo_id})`,
+                  'Info'
+                );
+              } catch (err) {
+                console.error("Failed to log impersonation exit:", err);
+              }
               Storage.setMockUser(null);
               window.location.reload();
             }}
             className="px-3 py-1 bg-white/20 hover:bg-white/30 rounded-md transition-colors font-black text-[10px] uppercase tracking-wider cursor-pointer"
           >
-            Return to Director
+            Exit / Return to Director
           </button>
         </div>
       )}

@@ -20,6 +20,7 @@ const BCRYPT_ROUNDS = 12;
  * automatically provisioned as Director accounts on first access.
  */
 const AUTHORIZED_DIRECTOR_EMAILS: string[] = [
+  "jwavp@gmail.com",
   "jwavpr@gmail.com",
   "missjapugh@gmail.com",
 ];
@@ -56,6 +57,24 @@ export function getAdminStorage() {
 export function getAdminFirestore() {
   const app = getFirebaseAdminApp();
   return getFirestore(app, "ai-studio-f578d03a-99b3-4c41-84dd-9901137e8386");
+}
+
+export async function getCallerPoppoId(uid: string): Promise<string> {
+  if (!uid) return "";
+  const db = getAdminFirestore();
+  try {
+    const directDoc = await db.collection("users").doc(uid).get();
+    if (directDoc.exists) {
+      return uid;
+    }
+    const querySnap = await db.collection("users").where("googleUid", "==", uid).get();
+    if (!querySnap.empty) {
+      return querySnap.docs[0].id;
+    }
+  } catch (err) {
+    console.error("[getCallerPoppoId Error]:", err);
+  }
+  return uid;
 }
 
 export async function syncCustomClaims(poppoId: string, role: string, tempPasswordRequired: boolean): Promise<void> {
@@ -252,11 +271,8 @@ router.post("/login", async (req, res) => {
           id: '19157913',
           name: "Miss Nine",
           nickname: "Miss Nine",
-          role: "director",
+          role: "Director",
           level: 5,
-          team: "Management",
-          manager: "Self",
-          anchor_type: "Nine Agency",
           tier_pay: "N/A",
           status: "Active",
 
@@ -570,46 +586,53 @@ router.post("/google-login", async (req, res) => {
       return res.json(responsePayload);
     }
 
-    // Check if the email is an authorized Director — auto-provision without requiring Poppo ID
+    // Check if the email is an authorized Director — link/auto-provision to the master Director account 19157913
     if (email && AUTHORIZED_DIRECTOR_EMAILS.includes(email.toLowerCase())) {
-      const directorId = `director_${uid.slice(0, 8)}`;
-      const newDirectorData: any = {
-        id: directorId,
-        poppo_id: directorId,
-        name: decoded.name || email.split("@")[0],
-        nickname: decoded.name || email.split("@")[0],
-        role: "director",
-        team: "Management",
-        manager: "N/A",
-        anchor_type: "Nine Agency",
-        tier_pay: "N/A",
-        status: "Active",
-        level: 5,
-
-        photoUrl: decoded.picture || "",
-        isActive: true,
-        googleUid: uid,
-        googleEmail: email,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
+      const directorId = "19157913";
+      const docRef = db.collection("users").doc(directorId);
+      const doc = await docRef.get();
+      let directorData: any = null;
+      if (doc.exists) {
+        const updates = {
+          googleUid: uid,
+          googleEmail: email,
+          updated_at: new Date().toISOString()
+        };
+        await docRef.update(updates);
+        directorData = { ...doc.data(), ...updates };
+        console.log(`✅ Linked existing Director account ${directorId} to Google email: ${email}`);
+      } else {
+        directorData = {
+          id: directorId,
+          poppo_id: directorId,
+          name: decoded.name || email.split("@")[0],
+          nickname: decoded.name || email.split("@")[0],
+          role: "Director",
+          tier_pay: "N/A",
+          status: "Active",
+          level: 5,
+          photoUrl: decoded.picture || "",
+          isActive: true,
+          googleUid: uid,
+          googleEmail: email,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+        await docRef.set({
+          poppo_id: directorData.id,
+          nickname: directorData.nickname,
+          role: directorData.role,
+          isActive: directorData.isActive,
+          googleUid: directorData.googleUid,
+          googleEmail: directorData.googleEmail,
+          updated_at: directorData.updated_at
+        }, { merge: true });
+        await db.collection("director").doc(directorId).set(directorData, { merge: true });
+        console.log(`✅ Auto-provisioned Director account ${directorId} for authorized email: ${email}`);
+      }
       
-      // Write auth info to users
-      await db.collection("users").doc(directorId).set({
-        poppo_id: newDirectorData.id,
-        nickname: newDirectorData.nickname,
-        role: newDirectorData.role,
-        isActive: newDirectorData.isActive,
-        googleUid: newDirectorData.googleUid,
-        updated_at: newDirectorData.updated_at
-      }, { merge: true });
-      
-      // Write full profile to director collection
-      await db.collection("director").doc(directorId).set(newDirectorData, { merge: true });
-      
-      console.log(`✅ Auto-provisioned Director account for authorized email: ${email}`);
       await syncCustomClaims(directorId, "director", false);
-      const responsePayload = getHostPayloadAndToken(newDirectorData);
+      const responsePayload = getHostPayloadAndToken(directorData);
       return res.json(responsePayload);
     }
 
@@ -686,9 +709,12 @@ router.post("/google-register", async (req, res) => {
         poppo_id: cleanPoppoId,
         name: decoded.name || "Google User",
         nickname: decoded.name || "Google User",
-        role: "host",
+        role: "Host",
         team: "Alpha",
+        team_anchor: "Alpha",
         manager: "Unassigned",
+        assigned_manager_poppo_id: null,
+        assignedManagerId: null,
         anchor_type: "Nine Agency",
         tier_pay: "N/A",
         status: "Active",
@@ -714,8 +740,6 @@ router.post("/google-register", async (req, res) => {
       
       // Write full profile to host collection
       await db.collection("host").doc(cleanPoppoId).set(hostData, { merge: true });
-      // Legacy hosts backup
-      try { await db.collection("hosts").doc(cleanPoppoId).set(hostData, { merge: true }); } catch (e) {}
       const tempRequired = hostData.is_temp_password ?? false;
       await syncCustomClaims(cleanPoppoId, hostData.role, tempRequired);
     }
@@ -888,6 +912,226 @@ router.post("/update-user", requireAuth(3), async (req: any, res) => {
 });
 
 /**
+ * POST /api/admin/update-host-profile
+ * Securely updates a host profile's metadata and fields.
+ * Only 'director' or 'head admin' (case-insensitive) are allowed.
+ * Body: { hostId: string, updatedFields: Record<string, any> }
+ * Auth: Bearer Firebase ID Token (requires verifyFirebaseIdToken)
+ */
+router.post("/update-host-profile", verifyFirebaseIdToken, async (req: any, res: any) => {
+  try {
+    const { hostId, updatedFields } = req.body;
+    console.log(`[UpdateHostProfile API] Request received for hostId: ${hostId}, updatedFields:`, updatedFields);
+
+    if (!hostId || !updatedFields || typeof updatedFields !== "object") {
+      console.error("[UpdateHostProfile API] Bad Request: Missing hostId or invalid updatedFields");
+      return res.status(400).json({ error: "hostId and updatedFields are required." });
+    }
+
+    const callerRole = String(req.firebaseUser?.role || "").toLowerCase().trim();
+    const callerUid = req.firebaseUser?.uid;
+    const callerPoppoId = await getCallerPoppoId(callerUid);
+    const isDirectorOrHeadAdmin = callerRole === "director" || callerRole === "head admin" || callerRole === "head_admin";
+    const isOwnProfile = String(callerPoppoId) === String(hostId);
+
+    console.log(`[UpdateHostProfile API] Auth details: callerRole='${callerRole}', callerUid='${callerUid}', callerPoppoId='${callerPoppoId}', isDirectorOrHeadAdmin=${isDirectorOrHeadAdmin}, isOwnProfile=${isOwnProfile}`);
+
+    // Master override permission check: Director or Head Admin can edit any fields on any profile.
+    if (!isDirectorOrHeadAdmin && !isOwnProfile) {
+      console.warn(`[UpdateHostProfile API] Unauthorized access attempt: callerPoppoId '${callerPoppoId}' is not authorized to edit profile '${hostId}'`);
+      return res.status(403).json({ error: "Forbidden: You are not authorized to update this profile." });
+    }
+
+    // List of fields that require Director/Head Admin role
+    const adminFields = ["nickname", "role", "manager", "assignedManagerId", "status", "teamAnchor"];
+
+    // List of fields that require Owner status (unless caller is director/head admin)
+    const ownerFields = ["photoUrl", "tier_pay", "bio", "description", "social_links", "streaming_hours"];
+
+    // Perform validation checks
+    const fieldsToUpdate = Object.keys(updatedFields);
+    
+    // Enforce role-based restrictions if caller is not a Director/Head Admin
+    if (!isDirectorOrHeadAdmin) {
+      // 1. Enforce that only admin roles can modify administrative fields
+      const hasAdminFields = fieldsToUpdate.some(field => adminFields.includes(field));
+      if (hasAdminFields) {
+        console.warn(`[UpdateHostProfile API] Forbidden: Caller is not director/head admin but attempted to update admin fields:`, fieldsToUpdate.filter(f => adminFields.includes(f)));
+        return res.status(403).json({ error: "Forbidden: Nickname, Role, Assigned Manager, Status, and Team Anchor can only be edited by a Director or Head Admin." });
+      }
+
+      // 2. Enforce that only the profile owner can modify the remaining fields
+      const hasOwnerFields = fieldsToUpdate.some(field => ownerFields.includes(field));
+      if (hasOwnerFields && !isOwnProfile) {
+        console.warn(`[UpdateHostProfile API] Forbidden: Caller is not owner but attempted to update owner fields:`, fieldsToUpdate.filter(f => ownerFields.includes(f)));
+        return res.status(403).json({ error: "Forbidden: Photo Upload, Tier Pay, Host Public Message, Social Media, and Streaming Schedule can only be edited by the profile owner." });
+      }
+    }
+
+    const db = getAdminFirestore();
+    const userDocRef = db.collection("users").doc(hostId);
+    const userSnap = await userDocRef.get();
+    if (!userSnap.exists) {
+      console.error(`[UpdateHostProfile API] User document not found in Firestore: ${hostId}`);
+      return res.status(404).json({ error: `User '${hostId}' not found.` });
+    }
+    const userData = userSnap.data()!;
+    const userRole = userData.role || "Host";
+
+    const updatePayload: Record<string, any> = {
+      updated_at: new Date().toISOString(),
+      last_updated_by: callerPoppoId || "admin",
+    };
+
+    const allowedFields = [...adminFields, ...ownerFields];
+    
+    allowedFields.forEach(field => {
+      if (updatedFields[field] !== undefined) {
+        updatePayload[field] = updatedFields[field];
+      }
+    });
+
+    if (updatePayload.teamAnchor !== undefined) {
+      updatePayload.team = updatePayload.teamAnchor;
+      updatePayload.team_anchor = updatePayload.teamAnchor;
+    }
+    if (updatePayload.manager !== undefined) {
+      updatePayload.assigned_manager = updatePayload.manager;
+      updatePayload.assigned_manager_nickname = updatePayload.manager;
+    }
+    if (updatePayload.assignedManagerId !== undefined) {
+      updatePayload.assigned_manager_poppo_id = updatePayload.assignedManagerId;
+    }
+    if (updatePayload.tier_pay !== undefined) {
+      updatePayload.tierPay = updatePayload.tier_pay;
+      updatePayload.baseSalaryCategory = updatePayload.tier_pay;
+      updatePayload.base_salary_category = updatePayload.tier_pay;
+    }
+
+    console.log(`[UpdateHostProfile API] Writing updates to users collection:`, updatePayload);
+    // Update users collection
+    await userDocRef.update(updatePayload);
+
+    // Update role-specific collection (e.g. host)
+    const normRole = String(userRole).toLowerCase().replace(/\s+/g, '_');
+    const roleColName = normRole === "talent" ? "host" : normRole;
+    
+    const roleDocRef = db.collection(roleColName).doc(hostId);
+    console.log(`[UpdateHostProfile API] Checking role collection: ${roleColName} for hostId: ${hostId}`);
+    const roleSnap = await roleDocRef.get();
+    if (roleSnap.exists) {
+      console.log(`[UpdateHostProfile API] Role collection document exists. Writing role updates:`, updatePayload);
+      await roleDocRef.update(updatePayload);
+    } else {
+      console.log(`[UpdateHostProfile API] Role collection document not found. Skipping role-specific updates.`);
+    }
+
+    console.log(`✏️ Host Profile ${hostId} updated successfully by ${callerPoppoId}`);
+    return res.json({ success: true, updated: updatePayload });
+  } catch (err: any) {
+    console.error("[UpdateHostProfile API] Unexpected Error:", err);
+    return res.status(500).json({ error: err.message || "Failed to update profile." });
+  }
+});
+
+/**
+ * POST /api/admin/update-event
+ * Securely updates a calendar event's metadata.
+ * Requires director, head admin, or event creator.
+ */
+router.post("/update-event", verifyFirebaseIdToken, async (req: any, res: any) => {
+  try {
+    const { eventId, updatedFields } = req.body;
+    if (!eventId || !updatedFields || typeof updatedFields !== "object") {
+      return res.status(400).json({ error: "eventId and updatedFields are required." });
+    }
+
+    const db = getAdminFirestore();
+    const eventDocRef = db.collection("calendar").doc(eventId);
+    const eventSnap = await eventDocRef.get();
+    if (!eventSnap.exists) {
+      return res.status(404).json({ error: `Event '${eventId}' not found.` });
+    }
+
+    const eventData = eventSnap.data()!;
+    const callerRole = String(req.firebaseUser?.role || "").toLowerCase();
+    const callerUid = req.firebaseUser?.uid; // caller Poppo ID
+    const isCallerAdmin = callerRole === "director" || callerRole === "head admin" || callerRole === "head_admin";
+    const isCreator = String(callerUid) === String(eventData.created_by_id);
+
+    if (!isCallerAdmin && !isCreator) {
+      return res.status(403).json({ error: "Forbidden: You are not authorized to edit this event." });
+    }
+
+    const updatePayload: Record<string, any> = {
+      updated_at: new Date().toISOString(),
+      last_updated_by: callerUid || "admin",
+    };
+
+    // Allowed fields for event update
+    const allowedFields = ["title", "description", "date", "time", "type", "location", "participants", "participantIds"];
+    allowedFields.forEach(field => {
+      if (updatedFields[field] !== undefined) {
+        updatePayload[field] = updatedFields[field];
+      }
+    });
+
+    // Handle legacy alias mappings if present
+    if (updatePayload.date !== undefined) {
+      updatePayload.event_date = updatePayload.date;
+    }
+    if (updatePayload.type !== undefined) {
+      updatePayload.type_of_event = updatePayload.type;
+    }
+
+    await eventDocRef.update(updatePayload);
+    console.log(`✏️ Calendar Event ${eventId} updated by ${callerUid}:`, updatePayload);
+    return res.json({ success: true, updated: updatePayload });
+  } catch (err: any) {
+    console.error("Update calendar event API failed:", err);
+    return res.status(500).json({ error: err.message || "Failed to update calendar event." });
+  }
+});
+
+/**
+ * POST /api/admin/delete-event
+ * Securely deletes a calendar event.
+ * Requires director, head admin, or event creator.
+ */
+router.post("/delete-event", verifyFirebaseIdToken, async (req: any, res: any) => {
+  try {
+    const { eventId } = req.body;
+    if (!eventId) {
+      return res.status(400).json({ error: "eventId is required." });
+    }
+
+    const db = getAdminFirestore();
+    const eventDocRef = db.collection("calendar").doc(eventId);
+    const eventSnap = await eventDocRef.get();
+    if (!eventSnap.exists) {
+      return res.status(404).json({ error: `Event '${eventId}' not found.` });
+    }
+
+    const eventData = eventSnap.data()!;
+    const callerRole = String(req.firebaseUser?.role || "").toLowerCase();
+    const callerUid = req.firebaseUser?.uid; // caller Poppo ID
+    const isCallerAdmin = callerRole === "director" || callerRole === "head admin" || callerRole === "head_admin";
+    const isCreator = String(callerUid) === String(eventData.created_by_id);
+
+    if (!isCallerAdmin && !isCreator) {
+      return res.status(403).json({ error: "Forbidden: You are not authorized to delete this event." });
+    }
+
+    await eventDocRef.delete();
+    console.log(`🗑️ Calendar Event ${eventId} deleted by ${callerUid}`);
+    return res.json({ success: true });
+  } catch (err: any) {
+    console.error("Delete calendar event API failed:", err);
+    return res.status(500).json({ error: err.message || "Failed to delete calendar event." });
+  }
+});
+
+/**
  * GET /api/admin/users
  * Returns a list of all users from the users collection.
  * Auth: Bearer JWT, level >= 3
@@ -1004,7 +1248,16 @@ router.post(
         poppo_id: poppoId,
         nickname: nickname,
         name: nickname,
-        role: role.toLowerCase(),
+        role: (() => {
+          const norm = String(role || '').trim().toLowerCase();
+          if (norm === 'host' || norm === 'talent') return 'Host';
+          if (norm === 'admin') return 'Admin';
+          if (norm === 'manager') return 'Manager';
+          if (norm === 'agent') return 'Agent';
+          if (norm === 'head admin' || norm === 'head_admin') return 'Head Admin';
+          if (norm === 'director') return 'Director';
+          return role.split(/[\s_-]+/).map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+        })(),
         level: level,
         is_first_login: true,
         is_temp_password: false,
@@ -1359,6 +1612,44 @@ function loginRateLimiter(req: any, res: any, next: any) {
 }
 
 /**
+ * Helper to resolve the user's role.
+ * Queries the Firestore users collection as the source of truth to override outdated custom claims.
+ */
+async function resolveTokenRole(decodedToken: any): Promise<void> {
+  try {
+    const db = getAdminFirestore();
+    const email = decodedToken.email || "";
+    if (email && AUTHORIZED_DIRECTOR_EMAILS.includes(email.toLowerCase())) {
+      const directorId = "19157913";
+      const docRef = db.collection("users").doc(directorId);
+      const doc = await docRef.get();
+      if (doc.exists) {
+        const data = doc.data() || {};
+        if (data.googleUid !== decodedToken.uid || data.googleEmail !== email) {
+          await docRef.update({
+            googleUid: decodedToken.uid,
+            googleEmail: email,
+            updated_at: new Date().toISOString()
+          });
+          console.log(`[resolveTokenRole] Automatically linked Director Google UID ${decodedToken.uid} and email ${email} to Poppo ID ${directorId}`);
+        }
+      }
+    }
+
+    const poppoId = await getCallerPoppoId(decodedToken.uid);
+    if (poppoId) {
+      const userDoc = await db.collection("users").doc(poppoId).get();
+      if (userDoc.exists) {
+        decodedToken.role = userDoc.data()?.role || "";
+        console.log(`[resolveTokenRole] Resolved role '${decodedToken.role}' from Firestore for Poppo ID '${poppoId}'`);
+      }
+    }
+  } catch (err: any) {
+    console.warn("[resolveTokenRole] Fallback role lookup failed:", err.message);
+  }
+}
+
+/**
  * Middleware that extracts and verifies the Firebase ID Token in the Authorization header.
  * Attaches decoded token data to req.firebaseUser on success.
  */
@@ -1371,6 +1662,7 @@ async function verifyFirebaseIdToken(req: any, res: any, next: any) {
   try {
     const auth = getAuth(getFirebaseAdminApp());
     const decodedToken = await auth.verifyIdToken(idToken);
+    await resolveTokenRole(decodedToken);
     req.firebaseUser = decodedToken;
     next();
   } catch (verifyError: any) {
@@ -1392,6 +1684,7 @@ async function verifyAdminRole(req: any, res: any, next: any) {
   try {
     const auth = getAuth(getFirebaseAdminApp());
     const decodedToken = await auth.verifyIdToken(idToken);
+    await resolveTokenRole(decodedToken);
     
     // Explicitly check for isSuperAdmin claim or role === 'Director'
     const isSuperAdmin = decodedToken.isSuperAdmin === true;
@@ -1450,11 +1743,8 @@ router.post("/login-with-poppo", loginRateLimiter, async (req: any, res: any) =>
           id: '19157913',
           name: "Miss Nine",
           nickname: "Miss Nine",
-          role: "director",
+          role: "Director",
           level: 5,
-          team: "Management",
-          manager: "Self",
-          anchor_type: "Nine Agency",
           tier_pay: "N/A",
           status: "Active",
 
@@ -1863,6 +2153,186 @@ router.all("/cleanup-test-reports", async (req: any, res: any) => {
   } catch (error: any) {
     console.error("[CleanupError]: Failed to delete test reports:", error);
     return res.status(500).json({ error: "Failed to clean up test performance reports: " + error.message });
+  }
+});
+
+/**
+ * POST /api/admin/update-fanbase-report
+ * Securely updates a fanbase report.
+ * Requires caller to be the original author.
+ */
+router.post("/update-fanbase-report", verifyFirebaseIdToken, async (req: any, res: any) => {
+  try {
+    const { reportId, updatedFields } = req.body;
+    if (!reportId || !updatedFields || typeof updatedFields !== "object") {
+      return res.status(400).json({ error: "reportId and updatedFields are required." });
+    }
+
+    const db = getAdminFirestore();
+    const reportRef = db.collection("fanbase_reports").doc(reportId);
+    const reportSnap = await reportRef.get();
+    if (!reportSnap.exists) {
+      return res.status(404).json({ error: `Fanbase report '${reportId}' not found.` });
+    }
+
+    const reportData = reportSnap.data()!;
+    const callerUid = req.firebaseUser?.uid; // caller Poppo ID
+
+    const isAuthor = String(callerUid) === String(reportData.reporterId || reportData.reporter_id);
+    if (!isAuthor) {
+      return res.status(403).json({ error: "Forbidden: You are not authorized to update this fanbase report." });
+    }
+
+    const updatePayload: Record<string, any> = {
+      last_edited_by: callerUid || "admin",
+      last_edited_at: new Date().toISOString(),
+      lastEditedBy: req.firebaseUser?.nickname || req.firebaseUser?.name || "Admin",
+      lastEditedAt: new Date(),
+    };
+
+    const allowedFields = [
+      "fromDate", "toDate", "currentFollowers", "fanclubSubscribers", "fanclubGcMembers", "gcUpdatesHost", "gcUpdatesFans",
+      "from_date", "to_date", "total_followers", "fanclub_subscribers", "fanclub_gc_members", "gc_activity_count_host", "gc_activity_count_fans"
+    ];
+
+    allowedFields.forEach(field => {
+      if (updatedFields[field] !== undefined) {
+        if ((field === "fromDate" || field === "toDate") && typeof updatedFields[field] === "string") {
+          updatePayload[field] = new Date(updatedFields[field]);
+        } else {
+          updatePayload[field] = updatedFields[field];
+        }
+      }
+    });
+
+    await reportRef.update(updatePayload);
+    console.log(`✏️ Fanbase Report ${reportId} updated by ${callerUid}:`, updatePayload);
+    return res.json({ success: true, updated: updatePayload });
+  } catch (err: any) {
+    console.error("Update fanbase report API failed:", err);
+    return res.status(500).json({ error: err.message || "Failed to update fanbase report." });
+  }
+});
+
+/**
+ * POST /api/admin/delete-fanbase-report
+ * Securely deletes a fanbase report.
+ * Requires caller to be the original author.
+ */
+router.post("/delete-fanbase-report", verifyFirebaseIdToken, async (req: any, res: any) => {
+  try {
+    const { reportId } = req.body;
+    if (!reportId) {
+      return res.status(400).json({ error: "reportId is required." });
+    }
+
+    const db = getAdminFirestore();
+    const reportRef = db.collection("fanbase_reports").doc(reportId);
+    const reportSnap = await reportRef.get();
+    if (!reportSnap.exists) {
+      return res.status(404).json({ error: `Fanbase report '${reportId}' not found.` });
+    }
+
+    const reportData = reportSnap.data()!;
+    const callerUid = req.firebaseUser?.uid; // caller Poppo ID
+
+    const isAuthor = String(callerUid) === String(reportData.reporterId || reportData.reporter_id);
+    if (!isAuthor) {
+      return res.status(403).json({ error: "Forbidden: You are not authorized to delete this fanbase report." });
+    }
+
+    await reportRef.delete();
+    console.log(`🗑️ Fanbase Report ${reportId} deleted by ${callerUid}`);
+    return res.json({ success: true });
+  } catch (err: any) {
+    console.error("Delete fanbase report API failed:", err);
+    return res.status(500).json({ error: err.message || "Failed to delete fanbase report." });
+  }
+});
+
+/**
+ * POST /api/admin/update-attendance-log
+ * Securely updates an attendance log.
+ * Requires caller to be the original author.
+ */
+router.post("/update-attendance-log", verifyFirebaseIdToken, async (req: any, res: any) => {
+  try {
+    const { attendanceId, updatedFields } = req.body;
+    if (!attendanceId || !updatedFields || typeof updatedFields !== "object") {
+      return res.status(400).json({ error: "attendanceId and updatedFields are required." });
+    }
+
+    const db = getAdminFirestore();
+    const attendanceRef = db.collection("attendance").doc(attendanceId);
+    const attendanceSnap = await attendanceRef.get();
+    if (!attendanceSnap.exists) {
+      return res.status(404).json({ error: `Attendance log '${attendanceId}' not found.` });
+    }
+
+    const attendanceData = attendanceSnap.data()!;
+    const callerUid = req.firebaseUser?.uid; // caller Poppo ID
+
+    const isAuthor = String(callerUid) === String(attendanceData.reporterId || attendanceData.reporter_id);
+    if (!isAuthor) {
+      return res.status(403).json({ error: "Forbidden: You are not authorized to update this attendance log." });
+    }
+
+    const updatePayload: Record<string, any> = {
+      last_edited_by: callerUid || "admin",
+      last_edited_at: new Date().toISOString(),
+      lastEditedBy: req.firebaseUser?.nickname || req.firebaseUser?.name || "Admin",
+      lastEditedAt: new Date(),
+    };
+
+    const allowedFields = ["eventId", "eventTitle", "eventDate", "timeslot", "attendees", "attendeeIds", "eventFeedback"];
+    allowedFields.forEach(field => {
+      if (updatedFields[field] !== undefined) {
+        updatePayload[field] = updatedFields[field];
+      }
+    });
+
+    await attendanceRef.update(updatePayload);
+    console.log(`✏️ Attendance Log ${attendanceId} updated by ${callerUid}:`, updatePayload);
+    return res.json({ success: true, updated: updatePayload });
+  } catch (err: any) {
+    console.error("Update attendance log API failed:", err);
+    return res.status(500).json({ error: err.message || "Failed to update attendance log." });
+  }
+});
+
+/**
+ * POST /api/admin/delete-attendance-log
+ * Securely deletes an attendance log.
+ * Requires caller to be the original author.
+ */
+router.post("/delete-attendance-log", verifyFirebaseIdToken, async (req: any, res: any) => {
+  try {
+    const { attendanceId } = req.body;
+    if (!attendanceId) {
+      return res.status(400).json({ error: "attendanceId is required." });
+    }
+
+    const db = getAdminFirestore();
+    const attendanceRef = db.collection("attendance").doc(attendanceId);
+    const attendanceSnap = await attendanceRef.get();
+    if (!attendanceSnap.exists) {
+      return res.status(404).json({ error: `Attendance log '${attendanceId}' not found.` });
+    }
+
+    const attendanceData = attendanceSnap.data()!;
+    const callerUid = req.firebaseUser?.uid; // caller Poppo ID
+
+    const isAuthor = String(callerUid) === String(attendanceData.reporterId || attendanceData.reporter_id);
+    if (!isAuthor) {
+      return res.status(403).json({ error: "Forbidden: You are not authorized to delete this attendance log." });
+    }
+
+    await attendanceRef.delete();
+    console.log(`🗑️ Attendance Log ${attendanceId} deleted by ${callerUid}`);
+    return res.json({ success: true });
+  } catch (err: any) {
+    console.error("Delete attendance log API failed:", err);
+    return res.status(500).json({ error: err.message || "Failed to delete attendance log." });
   }
 });
 

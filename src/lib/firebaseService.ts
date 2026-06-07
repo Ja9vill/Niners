@@ -67,6 +67,122 @@ function handleFirestoreError(error: unknown, operationType: OperationType, path
   throw new Error(JSON.stringify(errInfo));
 }
 
+export const normalizeRoleTypography = (r: string): string => {
+  const norm = String(r || '').trim().toLowerCase();
+  if (norm === 'host' || norm === 'talent') return 'Host';
+  if (norm === 'admin') return 'Admin';
+  if (norm === 'manager') return 'Manager';
+  if (norm === 'agent') return 'Agent';
+  if (norm === 'head admin' || norm === 'head_admin') return 'Head Admin';
+  if (norm === 'director') return 'Director';
+  return r.split(/[\s_-]+/).map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+};
+
+export const getSafeRoleCollection = (r: string): string => {
+  const norm = String(r || '').trim().toLowerCase();
+  if (norm === 'host' || norm === 'talent') return 'host';
+  if (norm === 'admin') return 'admin';
+  if (norm === 'manager') return 'manager';
+  if (norm === 'agent') return 'agent';
+  if (norm === 'head admin' || norm === 'head_admin') return 'head_admin';
+  if (norm === 'director') return 'director';
+  return 'host';
+};
+
+export const sanitizeDocumentByRole = (docData: any, role: string): any => {
+  const cleanData = { ...docData };
+  const normRole = normalizeRoleTypography(role);
+
+  // Enforce normalized role field inside the document
+  cleanData.role = normRole;
+
+  // Rule 1: The field 'tier' (and base_salary_category, tierPay) is merged into tier_pay and permanently deleted
+  const rawTier = cleanData.tier_pay ?? cleanData.tierPay ?? cleanData.base_salary_category ?? cleanData.baseSalaryCategory ?? cleanData.tier;
+  if (rawTier !== undefined) {
+    cleanData.tier_pay = rawTier;
+  }
+  delete cleanData.tier;
+  delete cleanData.tierPay;
+  delete cleanData.base_salary_category;
+  delete cleanData.baseSalaryCategory;
+  delete cleanData.salaryCategory;
+
+  // Rule 2: Merge team, team_anchor, teamAnchor, teamGroup, team_group, group, etc. into teamAnchor and delete others
+  const rawTeamAnchor = cleanData.teamAnchor ?? cleanData.team_anchor ?? cleanData.team ?? cleanData.teamGroup ?? cleanData.team_group ?? cleanData.group;
+  if (rawTeamAnchor !== undefined) {
+    cleanData.teamAnchor = rawTeamAnchor;
+  }
+  delete cleanData.team;
+  delete cleanData.team_anchor;
+  delete cleanData.teamGroup;
+  delete cleanData.team_group;
+  delete cleanData.group;
+
+
+
+  // Rule 3: Only role 'host' has assigned_manager_poppo_id
+  if (normRole !== 'Host') {
+    delete cleanData.assigned_manager_poppo_id;
+    delete cleanData.assignedManagerId;
+    delete cleanData.manager;
+    delete cleanData.assigned_manager;
+    delete cleanData.assigned_manager_nickname;
+  }
+
+  // Rule 4: Only roles 'manager' and 'agent' have assignedHosts
+  if (normRole !== 'Manager' && normRole !== 'Agent') {
+    delete cleanData.assignedHosts;
+    Object.keys(cleanData).forEach(key => {
+      if (key.match(/^assigned\s*host/i)) {
+        delete cleanData[key];
+      }
+    });
+  }
+
+  return cleanData;
+};
+
+export const sanitizeUserAuthDoc = (docData: any, id: string): any => {
+  const userAuthData: any = {};
+  const poppoId = docData.poppo_id || docData.id || id;
+  if (poppoId) {
+    userAuthData.poppo_id = poppoId;
+    userAuthData.id = poppoId;
+  }
+  if (docData.role) {
+    userAuthData.role = normalizeRoleTypography(docData.role);
+  }
+  const nickname = docData.nickname || docData.name || '';
+  if (nickname) {
+    userAuthData.nickname = nickname;
+  }
+  const authKeys = [
+    'password',
+    'googleUid',
+    'is_temp_password',
+    'last_login',
+    'isActive',
+    'updated_at',
+    'email',
+    'teamAnchor',
+    'team',
+    'team_anchor',
+    'manager',
+    'assignedManagerId',
+    'assigned_manager',
+    'assigned_manager_nickname',
+    'assigned_manager_poppo_id',
+    'status',
+    'level'
+  ];
+  authKeys.forEach(k => {
+    if (docData[k] !== undefined) {
+      userAuthData[k] = docData[k];
+    }
+  });
+  return userAuthData;
+};
+
 export const FirebaseService = {
   // Users management
   async getAllUsers(): Promise<any[]> {
@@ -84,7 +200,8 @@ export const FirebaseService = {
     const path = `users/${poppoId}`;
     try {
       const docRef = doc(db, 'users', poppoId);
-      await setDoc(docRef, { ...data, updated_at: new Date().toISOString() }, { merge: true });
+      const sanitized = sanitizeUserAuthDoc({ ...data, id: poppoId }, poppoId);
+      await setDoc(docRef, { ...sanitized, updated_at: new Date().toISOString() }, { merge: true });
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, path);
     }
@@ -93,7 +210,9 @@ export const FirebaseService = {
   async updateRoleMetadata(role: string, id: string, data: any): Promise<void> {
     try {
       if (!id) throw new Error("ID is required for role metadata updates.");
-      const safeRole = (role || 'host').toLowerCase().replace(/\s+/g, '_');
+      
+      const normRole = normalizeRoleTypography(role || data.role || 'Host');
+      const safeRole = getSafeRoleCollection(normRole);
       
       let managerIdToSync: string | null = undefined;
       if (data.assignedManagerId !== undefined) {
@@ -107,8 +226,7 @@ export const FirebaseService = {
       const normalizedData = { ...data };
       const managerName = data.manager || data.assigned_manager_nickname || data.assigned_manager || '';
       const managerId = data.assignedManagerId || data.assigned_manager_poppo_id || '';
-      const teamName = data.team || data.team_anchor || '';
-      const salaryCategory = data.tier_pay || '';
+      const teamAnchorVal = data.teamAnchor || data.team || data.team_anchor || data.teamGroup || data.team_group || data.group || '';
 
       if (managerName) {
         normalizedData.manager = managerName;
@@ -119,43 +237,37 @@ export const FirebaseService = {
         normalizedData.assignedManagerId = managerId;
         normalizedData.assigned_manager_poppo_id = managerId;
       }
-      if (teamName) {
-        normalizedData.team = teamName;
-        normalizedData.team_anchor = teamName;
-      }
-      if (salaryCategory) {
-        normalizedData.tier_pay = salaryCategory;
+      if (teamAnchorVal) {
+        normalizedData.teamAnchor = teamAnchorVal;
+        normalizedData.team = teamAnchorVal;
+        normalizedData.team_anchor = teamAnchorVal;
       }
 
       const roleRef = doc(db, safeRole, id);
       const userRef = doc(db, 'users', id);
       
-      const finalData = { ...normalizedData, updated_at: new Date().toISOString() };
+      const baseData = { ...normalizedData, updated_at: new Date().toISOString() };
       
-      // Extract only UserAuth fields for the users collection
-      const userAuthData: any = {};
-      if (finalData.poppo_id !== undefined) userAuthData.poppo_id = finalData.poppo_id;
-      if (finalData.nickname !== undefined) userAuthData.nickname = finalData.nickname;
-      if (finalData.name !== undefined && finalData.nickname === undefined) userAuthData.nickname = finalData.name;
-      if (finalData.role !== undefined) userAuthData.role = finalData.role;
-      if (finalData.is_temp_password !== undefined) userAuthData.is_temp_password = finalData.is_temp_password;
-      if (finalData.password !== undefined) userAuthData.password = finalData.password;
-      if (finalData.googleUid !== undefined) userAuthData.googleUid = finalData.googleUid;
-      if (finalData.last_login !== undefined) userAuthData.last_login = finalData.last_login;
-      
+      // Sanitize for Role collection
+      const finalRoleData = sanitizeDocumentByRole(baseData, normRole);
+
+      // Sanitize for Users collection
+      const finalUserData = sanitizeUserAuthDoc(baseData, id);
+
       // Attempt to update the users collection first as the source of truth
       try {
-        if (Object.keys(userAuthData).length > 0) {
-          await setDoc(userRef, userAuthData, { merge: true });
+        if (Object.keys(finalUserData).length > 0) {
+          await setDoc(userRef, finalUserData, { merge: true });
         }
       } catch (e: any) {
          console.warn(`[UPDATE] Could not update 'users' collection for ID: ${id}: ${e.message}`);
       }
 
-      await setDoc(roleRef, finalData, { merge: true });
+      // Update role collection
+      await setDoc(roleRef, finalRoleData, { merge: true });
       console.log(`[UPDATE] Role metadata updated for ${id} in ${safeRole}`);
 
-      if (managerIdToSync !== undefined) {
+      if (managerIdToSync !== undefined && normRole === 'Host') {
         await this.syncHostManagerRelationship(id, managerIdToSync);
       }
     } catch (error: any) {
@@ -252,21 +364,30 @@ export const FirebaseService = {
       const fileName = `${cleanName}-${id}.jpg`; // Always save as jpg after compression
 
       // Compress image using canvas before uploading (reduces payload from ~5MB to ~100KB)
+      // Embed and fit the image inside a 1080x1080px square box (maintaining original aspect ratio)
       const compressedBase64 = await new Promise<string>((resolve, reject) => {
         const img = new Image();
         const objectUrl = URL.createObjectURL(file);
         img.onload = () => {
-          const MAX = 800;
-          let { width, height } = img;
-          if (width > MAX || height > MAX) {
-            if (width > height) { height = Math.round((height * MAX) / width); width = MAX; }
-            else { width = Math.round((width * MAX) / height); height = MAX; }
-          }
           const canvas = document.createElement('canvas');
-          canvas.width = width;
-          canvas.height = height;
+          canvas.width = 1080;
+          canvas.height = 1080;
           const ctx = canvas.getContext('2d')!;
-          ctx.drawImage(img, 0, 0, width, height);
+          
+          // Fill background with theme color #0D0D14
+          ctx.fillStyle = '#0D0D14';
+          ctx.fillRect(0, 0, 1080, 1080);
+          
+          // Calculate scale to fit original image entirely inside the 1080x1080 square box
+          const scale = Math.min(1080 / img.width, 1080 / img.height);
+          const drawWidth = img.width * scale;
+          const drawHeight = img.height * scale;
+          const x = (1080 - drawWidth) / 2;
+          const y = (1080 - drawHeight) / 2;
+
+          ctx.imageSmoothingEnabled = true;
+          ctx.imageSmoothingQuality = 'high';
+          ctx.drawImage(img, 0, 0, img.width, img.height, x, y, drawWidth, drawHeight);
           URL.revokeObjectURL(objectUrl);
           resolve(canvas.toDataURL('image/jpeg', 0.8));
         };
@@ -312,20 +433,50 @@ export const FirebaseService = {
   },
 
   async getAllRoleMetadata(): Promise<any[]> {
-    const collections = ['users', 'host', 'manager', 'admin', 'head_admin', 'agent', 'director'];
     let metadataMap: Record<string, any> = {};
     let errors: string[] = [];
-    for (const col of collections) {
+
+    // 1. Fetch from 'users' (auth data)
+    try {
+      const usersSnap = await getDocs(collection(db, 'users'));
+      usersSnap.docs.forEach(d => {
+        const id = d.id;
+        const data = d.data();
+        const normRole = normalizeRoleTypography(data.role || 'Host');
+        metadataMap[id] = {
+          id,
+          poppo_id: id,
+          ...data,
+          role: normRole
+        };
+      });
+    } catch (error: any) {
+      console.warn("Could not fetch users collection:", error);
+      errors.push(`users: ${error.message}`);
+    }
+
+    // 2. Fetch from specific role collections and merge
+    const roleCols = ['host', 'manager', 'admin', 'head_admin', 'agent', 'director'];
+    for (const col of roleCols) {
       try {
         const snapshot = await getDocs(collection(db, col));
         snapshot.docs.forEach(d => {
           const id = d.id;
           const data = d.data();
-          const collectionRole = col === 'users' ? 'host' : col;
-          metadataMap[id] = { role: collectionRole, ...metadataMap[id], poppo_id: id, ...data };
+          
+          // Merge data, keeping the auth fields from users if already present
+          metadataMap[id] = {
+            ...data,
+            ...metadataMap[id],
+            id,
+            poppo_id: id
+          };
+
+          const normRole = normalizeRoleTypography(metadataMap[id].role || col);
+          metadataMap[id] = sanitizeDocumentByRole(metadataMap[id], normRole);
         });
       } catch (error: any) {
-        console.warn(`Could not fetch metadata for collection: ${col}`, error);
+        console.warn(`Could not fetch metadata for role collection: ${col}`, error);
         errors.push(`${col}: ${error.message}`);
       }
     }
@@ -334,8 +485,8 @@ export const FirebaseService = {
       const data = item as any;
       const managerName = data.manager || data.assigned_manager_nickname || data.assigned_manager || 'Nine Management';
       const managerId = data.assignedManagerId || data.assigned_manager_poppo_id || null;
-      const teamName = data.team || data.team_anchor || 'Unassigned';
-      const salaryCategory = data.tier_pay || 'Regular Host';
+      const teamName = data.teamAnchor || data.team || data.team_anchor || data.teamGroup || data.team_group || data.group || 'Unassigned';
+      const tierPayVal = data.tier_pay || data.tierPay || data.base_salary_category || 'Regular Host';
       return {
         ...data,
         id: data.id || data.poppo_id,
@@ -347,7 +498,8 @@ export const FirebaseService = {
         assigned_manager_nickname: managerName,
         assigned_manager_poppo_id: managerId,
         team_anchor: teamName,
-        tier_pay: salaryCategory
+        teamAnchor: teamName,
+        tier_pay: tierPayVal
       };
     });
     
@@ -391,30 +543,15 @@ export const FirebaseService = {
     try {
       const batch = writeBatch(db);
       hosts.forEach(h => {
-        const fullData = { ...h, updated_at: new Date().toISOString() };
-        
-        // Extract only UserAuth fields for users collection
-        const userAuthData: any = {};
-        if (fullData.poppo_id !== undefined) userAuthData.poppo_id = fullData.poppo_id;
-        else if (fullData.id !== undefined) userAuthData.poppo_id = fullData.id;
-        if (fullData.nickname !== undefined) userAuthData.nickname = fullData.nickname;
-        else if (fullData.name !== undefined) userAuthData.nickname = fullData.name;
-        if (fullData.role !== undefined) userAuthData.role = fullData.role;
-        if (fullData.is_temp_password !== undefined) userAuthData.is_temp_password = fullData.is_temp_password;
-        if (fullData.password !== undefined) userAuthData.password = fullData.password;
-        if (fullData.googleUid !== undefined) userAuthData.googleUid = fullData.googleUid;
-        if (fullData.last_login !== undefined) userAuthData.last_login = fullData.last_login;
-        if (fullData.isActive !== undefined) userAuthData.isActive = fullData.isActive;
-        userAuthData.updated_at = fullData.updated_at;
+        const baseData = { ...h, updated_at: new Date().toISOString() };
+        const normRole = normalizeRoleTypography(h.role || 'Host');
+        const roleCol = getSafeRoleCollection(normRole);
 
-        // Determine correct role collection
-        const getSafeRoleCollection = (r: string) => {
-          const norm = String(r || 'host').toLowerCase();
-          if (norm === 'talent' || norm === 'host') return 'host';
-          if (norm === 'head admin' || norm === 'head_admin') return 'head_admin';
-          return norm;
-        };
-        const roleCol = getSafeRoleCollection(fullData.role || 'host');
+        // Extract only UserAuth fields for users collection
+        const userAuthData = sanitizeUserAuthDoc(baseData, h.id);
+
+        // Sanitize for Role collection
+        const finalRoleData = sanitizeDocumentByRole(baseData, normRole);
 
         // Write auth info to users
         if (Object.keys(userAuthData).length > 0) {
@@ -424,13 +561,7 @@ export const FirebaseService = {
 
         // Write full profile info to role collection
         const roleRef = doc(db, roleCol, h.id);
-        batch.set(roleRef, fullData, { merge: true });
-        
-        // Also keep legacy 'hosts' sync for now if it's a host
-        if (roleCol === 'host') {
-          const hostsRef = doc(db, 'hosts', h.id);
-          batch.set(hostsRef, fullData, { merge: true });
-        }
+        batch.set(roleRef, finalRoleData, { merge: true });
       });
       await batch.commit();
     } catch (error) {
@@ -439,12 +570,29 @@ export const FirebaseService = {
   },
 
   async updateManagerHostFields(managerId: string, hostIdToAdd: string | null, hostIdToRemove: string | null, forceHosts?: string[]): Promise<void> {
-    const managerUserRef = doc(db, 'users', managerId);
-    const managerSnap = await getDoc(managerUserRef);
-    if (!managerSnap.exists()) return;
+    // Get current manager data from role collection first, since it contains the profile fields
+    const normRoleCol = 'manager';
+    let managerRef = doc(db, 'manager', managerId);
+    let managerSnap = await getDoc(managerRef);
+    let currentRole = 'manager';
+    if (!managerSnap.exists()) {
+      // Try agent collection
+      managerRef = doc(db, 'agent', managerId);
+      managerSnap = await getDoc(managerRef);
+      currentRole = 'agent';
+      if (!managerSnap.exists()) {
+        // Fallback to check users collection
+        const userRef = doc(db, 'users', managerId);
+        const userSnap = await getDoc(userRef);
+        if (!userSnap.exists()) return;
+        const uRole = String(userSnap.data()?.role || '').toLowerCase();
+        currentRole = uRole === 'agent' ? 'agent' : 'manager';
+        managerRef = doc(db, currentRole, managerId);
+        managerSnap = await getDoc(managerRef);
+      }
+    }
 
-    const mgrData = managerSnap.data();
-    const mgrRole = String(mgrData?.role || '').toLowerCase();
+    const mgrData = managerSnap.exists() ? managerSnap.data() : {};
     
     let assignedHosts: string[] = forceHosts !== undefined 
       ? forceHosts 
@@ -466,50 +614,37 @@ export const FirebaseService = {
     };
 
     // Find any existing "Assigned Host X" keys to delete them
-    Object.keys(mgrData).forEach(key => {
-      if (key.startsWith('Assigned Host') || key.startsWith('Assigned host')) {
-        updateData[key] = deleteField();
-      }
-    });
+    if (mgrData) {
+      Object.keys(mgrData).forEach(key => {
+        if (key.startsWith('Assigned Host') || key.startsWith('Assigned host')) {
+          updateData[key] = deleteField();
+        }
+      });
+    }
 
     // Generate new "Assigned Host X" fields
     assignedHosts.forEach((hId, index) => {
       updateData[`Assigned Host ${index + 1}`] = hId;
     });
 
-    // Update both collections (users and manager/agent)
+    // Update only the specific role collection (users collection only keeps credentials, not assignments)
     const batchUpdate = writeBatch(db);
-    batchUpdate.set(managerUserRef, updateData, { merge: true });
-
-    const col = mgrRole === 'agent' ? 'agent' : 'manager';
-    const roleRef = doc(db, col, managerId);
+    batchUpdate.set(managerRef, updateData, { merge: true });
     
-    // For the role collections, also delete old fields
-    try {
-      const roleSnap = await getDoc(roleRef);
-      if (roleSnap.exists()) {
-        const roleData = roleSnap.data();
-        Object.keys(roleData).forEach(key => {
-          if (key.startsWith('Assigned Host') || key.startsWith('Assigned host')) {
-            if (!(key in updateData)) {
-              updateData[key] = deleteField();
-            }
-          }
-        });
-      }
-    } catch (e) {}
+    // Make sure we also update updated_at in users
+    const userUserRef = doc(db, 'users', managerId);
+    batchUpdate.set(userUserRef, { updated_at: new Date().toISOString() }, { merge: true });
 
-    batchUpdate.set(roleRef, updateData, { merge: true });
     await batchUpdate.commit();
   },
 
   async syncHostManagerRelationship(hostId: string, newManagerId: string | null): Promise<void> {
     const hostUserRef = doc(db, 'users', hostId);
     
-    // 1. Fetch current host document to find old manager
+    // 1. Fetch current host document from 'host' collection to find old manager
     let oldManagerId: string | null = null;
     try {
-      const hostSnap = await getDoc(hostUserRef);
+      const hostSnap = await getDoc(doc(db, 'host', hostId));
       if (hostSnap.exists()) {
         const hostData = hostSnap.data();
         oldManagerId = hostData?.assignedManagerId || hostData?.assigned_manager_poppo_id || null;
@@ -533,7 +668,7 @@ export const FirebaseService = {
       }
     }
 
-    // 3. Update host documents across users, host, and hosts collections
+    // 3. Update host documents across users and host collections (omit legacy hosts)
     const hostFieldsToUpdate = {
       manager: newManagerName || null,
       assigned_manager: newManagerName || null,
@@ -544,13 +679,14 @@ export const FirebaseService = {
     };
 
     const hostBatch = writeBatch(db);
-    hostBatch.set(hostUserRef, hostFieldsToUpdate, { merge: true });
-    for (const col of ['host', 'hosts']) {
-      try {
-        const ref = doc(db, col, hostId);
-        hostBatch.set(ref, hostFieldsToUpdate, { merge: true });
-      } catch (e) {}
-    }
+    
+    // Users collection only gets updated_at (it is auth only, no manager fields)
+    hostBatch.set(hostUserRef, { updated_at: hostFieldsToUpdate.updated_at }, { merge: true });
+    
+    // Host collection gets full manager sync fields
+    const hostRoleRef = doc(db, 'host', hostId);
+    hostBatch.set(hostRoleRef, hostFieldsToUpdate, { merge: true });
+
     await hostBatch.commit();
 
     // 4. Update the new manager's assignedHosts and "Assigned Host X" fields
@@ -570,10 +706,9 @@ export const FirebaseService = {
     try {
       const managerName = host.manager || (host as any).assigned_manager_nickname || (host as any).assigned_manager || '';
       const managerId = (host as any).assignedManagerId || host.assigned_manager_poppo_id || '';
-      const teamName = host.team || host.team_anchor || '';
-      const salaryCategory = host.tier_pay || '';
+      const teamName = host.teamAnchor || host.team || host.team_anchor || '';
 
-      const updateData = {
+      const baseData = {
         ...host,
         poppo_id: poppoId,
         nickname: host.nickname || host.name,
@@ -584,22 +719,17 @@ export const FirebaseService = {
         assignedManagerId: managerId || null,
         team: teamName,
         team_anchor: teamName,
-        tier_pay: salaryCategory,
+        teamAnchor: teamName,
         updated_at: new Date().toISOString()
       };
 
-      const getSafeRoleCollection = (r: string) => {
-        const norm = String(r || 'host').toLowerCase();
-        if (norm === 'talent' || norm === 'host') return 'host';
-        if (norm === 'head admin' || norm === 'head_admin') return 'head_admin';
-        return norm; // 'manager', 'admin', 'agent', 'director'
-      };
-
-      const newRoleCol = getSafeRoleCollection(host.role);
+      const normRole = normalizeRoleTypography(host.role);
+      const newRoleCol = getSafeRoleCollection(normRole);
       
       // If oldRole is provided and has changed, delete the old role document
       if (oldRole) {
-        const oldRoleCol = getSafeRoleCollection(oldRole);
+        const oldNormRole = normalizeRoleTypography(oldRole);
+        const oldRoleCol = getSafeRoleCollection(oldNormRole);
         if (oldRoleCol !== newRoleCol) {
           try {
             await deleteDoc(doc(db, oldRoleCol, poppoId));
@@ -609,30 +739,17 @@ export const FirebaseService = {
         }
       }
 
+      // Sanitize for Role collection
+      const finalRoleData = sanitizeDocumentByRole(baseData, normRole);
+
       // Write to new/current role collection
       const roleDocRef = doc(db, newRoleCol, poppoId);
-      await setDoc(roleDocRef, updateData, { merge: true });
+      await setDoc(roleDocRef, finalRoleData, { merge: true });
 
-      // If host, also write to legacy 'hosts' collection
-      if (newRoleCol === 'host') {
-        try {
-          const hostsDocRef = doc(db, 'hosts', poppoId);
-          await setDoc(hostsDocRef, updateData, { merge: true });
-        } catch (e) {}
-      }
+      // Sanitize for Users collection
+      const userAuthData = sanitizeUserAuthDoc(baseData, poppoId);
 
       // Write to users collection
-      const userAuthData: any = {};
-      if (updateData.poppo_id !== undefined) userAuthData.poppo_id = updateData.poppo_id;
-      if (updateData.nickname !== undefined) userAuthData.nickname = updateData.nickname;
-      if (updateData.role !== undefined) userAuthData.role = updateData.role;
-      if (updateData.is_temp_password !== undefined) userAuthData.is_temp_password = updateData.is_temp_password;
-      if (updateData.password !== undefined) userAuthData.password = updateData.password;
-      if (updateData.googleUid !== undefined) userAuthData.googleUid = updateData.googleUid;
-      if (updateData.last_login !== undefined) userAuthData.last_login = updateData.last_login;
-      if (updateData.isActive !== undefined) userAuthData.isActive = updateData.isActive;
-      userAuthData.updated_at = updateData.updated_at;
-
       const userDocRef = doc(db, 'users', poppoId);
       if (Object.keys(userAuthData).length > 0) {
         await setDoc(userDocRef, userAuthData, { merge: true });
@@ -657,41 +774,10 @@ export const FirebaseService = {
   },
 
   async getAllHosts(): Promise<Host[]> {
-    const collections = ['host', 'manager', 'admin', 'head_admin', 'agent', 'director'];
-    let allHosts: any[] = [];
-    for (const col of collections) {
-      try {
-        const snapshot = await getDocs(collection(db, col));
-        const docs = snapshot.docs.map(d => {
-          const data = d.data();
-          const managerName = data.manager || data.assigned_manager_nickname || data.assigned_manager || 'Nine Management';
-          const managerId = data.assignedManagerId || data.assigned_manager_poppo_id || null;
-          const teamName = data.team || data.team_anchor || 'Unassigned';
-          const salaryCategory = data.tier_pay || 'Regular Host';
-          return { 
-            ...data, 
-            id: d.id, 
-            poppo_id: d.id,
-            name: data.nickname || data.name || 'Unknown',
-            nickname: data.nickname || data.name || 'Unknown',
-            manager: managerName,
-            team: teamName,
-            assignedManagerId: managerId,
-            assigned_manager_nickname: managerName,
-            assigned_manager_poppo_id: managerId,
-            team_anchor: teamName,
-            tier_pay: salaryCategory,
-          } as Host;
-        });
-        allHosts = allHosts.concat(docs);
-      } catch (error) {
-        console.warn(`Could not fetch hosts for collection: ${col}`, error);
-      }
-    }
-    return allHosts;
+    return this.getAllRoleMetadata();
   },
   async getHosts(): Promise<Host[]> {
-    return this.getAllHosts();
+    return this.getAllRoleMetadata();
   },
   
   // *** User credentials retrieval ***

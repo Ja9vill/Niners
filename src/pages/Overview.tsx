@@ -757,8 +757,7 @@ export const Overview = () => {
         <div className="flex items-center justify-between flex-wrap gap-4 border-b border-[#D4AF37]/10 pb-4">
           <div className="flex items-center gap-2">
             <Award size={16} className="text-[#D4AF37]" />
-            <h3 className="font-bold text-[#F0EFE8] text-sm uppercase tracking-widest">Host Leaderboard & Contribution</h3>
-            <span className="text-[10px] text-[#A09E9A] font-mono">({topPerformers.length} hosts)</span>
+            <h3 className="font-bold text-[#F0EFE8] text-sm uppercase tracking-widest whitespace-nowrap">Host Leaderboard & Contribution</h3>
           </div>
           <div className="flex items-center gap-2 relative z-10">
             <select
@@ -777,6 +776,9 @@ export const Overview = () => {
               <option value="all">All Months</option>
               {MONTH_ORDER.map(m => <option key={m} value={m}>{m}</option>)}
             </select>
+            <span className="text-[10px] text-[#A09E9A] font-mono whitespace-nowrap ml-1">
+              ({topPerformers.length} hosts)
+            </span>
           </div>
         </div>
 
@@ -790,29 +792,19 @@ export const Overview = () => {
           
           const sharePct = lbTotalPeriodCommission > 0 ? (userComm / lbTotalPeriodCommission) * 100 : 0;
           const hasContribution = userComm > 0;
-          const label = (lbYear === 'all' && lbMonth === 'all') ? 'All-Time' : `${lbMonth !== 'all' ? lbMonth : ''} ${lbYear !== 'all' ? lbYear : ''}`.trim();
-
+          
           return (
-            <div className="bg-[#0D0D14] border border-[#D4AF37]/15 rounded-xl p-4 flex flex-col gap-2.5 transition-all">
-              <div className="flex items-center justify-between flex-wrap gap-3">
-                <div>
-                  <p className="text-[10px] font-black text-[#A09E9A] uppercase tracking-wider">Spotlight: {label}</p>
-                  <p className="text-base font-black text-[#D4AF37] mt-0.5">{lbTotalPeriodCommission.toLocaleString()} Pts <span className="text-[10px] text-[#A09E9A] font-normal uppercase tracking-widest">(Agency Comm)</span></p>
-                </div>
-                <div className="text-right">
-                  <p className="text-[10px] font-bold text-[#A09E9A]/60 uppercase tracking-widest">YOUR SHARE CONTRIBUTION</p>
-                  <p className="text-base font-black text-white mt-0.5">
-                    {hasContribution ? sharePct.toFixed(2) : "0.00"}% <span className="text-xs text-[#A09E9A]/50 font-normal">({hasContribution ? userComm.toLocaleString() : "0"} comm)</span>
-                  </p>
-                </div>
+            <div className="bg-[#0D0D14] border border-[#D4AF37]/15 rounded-xl p-4 flex flex-row justify-between items-center gap-4 transition-all">
+              <div className="flex flex-col">
+                <p className="text-base font-black text-[#D4AF37]">{lbTotalPeriodCommission.toLocaleString()} Pts</p>
+                <p className="text-[10px] font-bold text-[#A09E9A]/60 uppercase tracking-widest mt-0.5">Agency Commission</p>
               </div>
-              {!hasContribution && (
-                <div className="pt-2 border-t border-[#D4AF37]/10 mt-1">
-                  <p className="text-[10px] text-[#A09E9A]/70 leading-relaxed italic">
-                    If you have not contributed to this period, for sure you have contributed with your hard work and dedication to representing the management with high standards.
-                  </p>
-                </div>
-              )}
+              <div className="flex flex-col text-right items-end">
+                <p className="text-[10px] font-bold text-[#A09E9A]/60 uppercase tracking-widest">Your Share Contribution</p>
+                <p className="text-base font-black text-white mt-0.5">
+                  {hasContribution ? sharePct.toFixed(2) : "0.00"}%
+                </p>
+              </div>
             </div>
           );
         })()}
@@ -888,7 +880,7 @@ export const Overview = () => {
                   </div>
 
                   <div className="text-right w-12 sm:w-20 shrink-0">
-                    <p className="text-xs font-black text-cyan-400">{fmtH(h.liveHrs)}</p>
+                    <p className="text-xs font-black text-purple-400">{fmtH(h.liveHrs)}</p>
                     <p className="text-[9px] text-[#A09E9A]/40 uppercase tracking-wider hidden sm:block">Live</p>
                   </div>
 
@@ -898,7 +890,7 @@ export const Overview = () => {
                   </div>
 
                   <div className="text-right w-14 sm:w-20 shrink-0">
-                    <p className="text-xs font-black text-purple-400">
+                    <p className="text-xs font-black text-cyan-400">
                       {(() => {
                         const sharePct = lbTotalPeriodCommission > 0 ? (h.commission / lbTotalPeriodCommission) * 100 : 0;
                         return `${sharePct.toFixed(2)}%`;

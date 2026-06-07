@@ -710,7 +710,7 @@ export const CreateMemberForm = () => {
                     <span>•</span>
                     <span className="uppercase text-[#D4AF37]">{host.role || 'Host'}</span>
                     <span>•</span>
-                    <span>{host.status}</span>
+                    <span className={host.status === 'Active' ? "text-emerald-400 font-bold" : ""}>{host.status}</span>
                   </div>
                 </div>
 
