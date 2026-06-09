@@ -19,7 +19,6 @@ import { PublicLayout } from './components/PublicLayout';
 import { PublicRoster } from './pages/PublicRoster';
 import { PublicCalendar } from './pages/PublicCalendar';
 import { PoppoLivePage } from './pages/PoppoLivePage';
-import { AdminHub } from './components/AdminHub';
 import { ProvisionUser } from './pages/ProvisionUser';
 import { FinancialData } from './pages/FinancialData';
 import { PublicLanding } from './pages/PublicLanding';
@@ -145,15 +144,6 @@ export default function App() {
             }
           />
 
-          {/* Admin Hub page */}
-          <Route
-            path="admin-hub"
-            element={
-              <RoleGuard roles={['admin']}>
-                <AdminHub />
-              </RoleGuard>
-            }
-          />
 
           {/* Error pages */}
           <Route

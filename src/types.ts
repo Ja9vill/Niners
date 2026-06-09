@@ -1,3 +1,5 @@
+import { AuthState } from "./lib/storage";
+
 export type Role = 'Talent' | 'Host' | 'Manager' | 'Admin' | 'Head Admin' | 'Director' | 'Agent';
 export type BaseSalaryTier = 'N/A' | 'Rocket Host' | 'Star Host' | 'S idol' | 'ESport Host' | 'Regular Host';
 export type HostStatus = 'Active' | 'Inconsistent' | 'Intermittent' | 'Released' | 'Inactive' | 'Releasing';
@@ -80,7 +82,7 @@ export interface Host {
   updated_at: string;
   isActive: boolean;
   reset_requested?: boolean;
-  
+
   // Role specific
   teamAnchor?: string;
   team_anchor?: string;
@@ -127,7 +129,7 @@ export interface PerformanceReportEntry {
   super_rank: number;
   agentweb_commission_rate: number;
   _isUnknownHost?: boolean;
-  
+
   // legacy fallbacks
   total_points?: number;
   agentweb_commission_earning?: number;
@@ -215,7 +217,7 @@ export interface CalendarEvent {
   created_by_name: string;
   created_by_role: string;
   timestamp: string;
-  
+
   // Legacy alias fields mapped to frontend
   event_id?: string;
   event_host_id?: string;
@@ -376,3 +378,15 @@ export interface ManagerNote {
   content: string;
   timestamp: string;
 }
+export const emptyAuthState: AuthState = {
+  level: 0,
+  role: "",
+  name: "",
+  poppo_id: "",
+  nickname: "",
+  status: "",
+  manager_assigned: "",
+  anchor_team: "",
+  profile_photo: "",
+  token: "",
+};

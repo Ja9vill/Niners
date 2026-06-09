@@ -49,7 +49,7 @@ import { SystemLogsViewer } from './SystemLogsViewer';
 import { CreateMemberForm } from './CreateMemberForm';
 import { RosterManagementTab } from './RosterManagementTab';
 import { db } from '../lib/firebase';
-import { collection, query, where, getDocs, addDoc, deleteDoc, doc, setDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, addDoc, deleteDoc, doc, setDoc, writeBatch } from 'firebase/firestore';
 
 // --- Types for AI Recommendations ---
 interface AIInsight {
@@ -1202,8 +1202,8 @@ export const DirectorTab = () => {
         if (a === 'Legacy Seeded Data') return 1;
         if (b === 'Legacy Seeded Data') return -1;
         try {
-          const da = new Date(groups[a][0].timestamp || '');
-          const db = new Date(groups[b][0].timestamp || '');
+          const da = new Date((groups[a][0] as any).timestamp || '');
+          const db = new Date((groups[b][0] as any).timestamp || '');
           return db.getTime() - da.getTime();
         } catch {
           return 0;
@@ -3756,7 +3756,7 @@ export const DirectorTab = () => {
     const original = { ...c };
     const updated: CommissionEntry = {
       ...c,
-      poppo_name: editPoppoName,
+      nickname: editPoppoName,
       total_points: editTotalPoints,
       total_earnings: editTotalPoints,
       my_commission: editMyCommission
@@ -3909,7 +3909,7 @@ export const DirectorTab = () => {
 
       parsedCommissions.push({
         poppo_id: poppoId,
-        poppo_name: nickname,
+        nickname: nickname,
         month: monthKey,
         live_duration: liveDuration,
         live_earnings: liveEarnings,
