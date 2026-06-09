@@ -212,7 +212,7 @@ export const FinancialData = () => {
             <button onClick={handleDeleteSelection} className="px-3.5 py-2 bg-red-550 hover:bg-red-650 text-white rounded-lg text-[10px] font-black uppercase transition-all">🗑️ Delete</button>
             <button onClick={handleSaveGrid} className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-[10px] font-black uppercase transition-all ml-4">💾 Save Changes</button>
           </div>
-          <div className="text-[10px] font-black text-[#A09E9A]">Rows: {(financialTab === 'monthly' ? monthlyLedger : weeklyLedger).length}</div>
+        <div className="text-[10px] font-black text-[#A09E9A]">Rows: {(financialTab === 'monthly' ? monthlyLedger : weeklyLedger).length}</div>
         </div>
 
         <div className="overflow-x-auto max-h-[500px] relative">
@@ -221,9 +221,32 @@ export const FinancialData = () => {
               <tr className="border-b border-white/5 text-[9px] font-black text-[#A09E9A] uppercase bg-[#1A1A28] sticky top-0 z-20">
                 <th className="px-3 py-3 w-12 text-center sticky left-0 z-30 bg-[#13131E] border-r border-white/5">Sel</th>
                 <th className="px-4 py-3 w-36 sticky left-[48px] bg-[#13131E] z-30 border-r border-white/5">Poppo ID</th>
-                {financialTab === 'monthly' ? <th className="px-3 py-3">Month</th> : <><th className="px-3 py-3">From</th><th className="px-3 py-3">To</th></>}
                 <th className="px-3 py-3">Nickname</th>
-                <th className="px-3 py-3">Total Points</th>
+                {financialTab === 'monthly' ? (
+                  <>
+                    <th className="px-3 py-3">Month</th>
+                  </>
+                ) : (
+                  <>
+                    <th className="px-3 py-3">From</th>
+                    <th className="px-3 py-3">To</th>
+                  </>
+                )}
+                <th className="px-3 py-3">Year</th>
+                <th className="px-3 py-3">Live duration</th>
+                <th className="px-3 py-3">Party host duration</th>
+                <th className="px-3 py-3">Total earnings of points</th>
+                <th className="px-3 py-3">Agent Commission</th>
+                <th className="px-3 py-3">Live earnings</th>
+                <th className="px-3 py-3">Party Earnings</th>
+                <th className="px-3 py-3">Private chat</th>
+                <th className="px-3 py-3">Tips</th>
+                <th className="px-3 py-3">Platform reward</th>
+                <th className="px-3 py-3">Other Earnings</th>
+                <th className="px-3 py-3">Platform hourly salary</th>
+                <th className="px-3 py-3">Super Salary</th>
+                <th className="px-3 py-3">Super Rank</th>
+                <th className="px-3 py-3">Level</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
@@ -237,6 +260,7 @@ export const FinancialData = () => {
                     <td className="px-4 py-2 sticky left-[48px] bg-[#13131E] border-r border-white/5 z-10">
                       <input type="text" value={row.poppo_id} onChange={e => handleCellChange(idx, 'poppo_id', e.target.value)} className="bg-transparent border-none w-full text-indigo-400 font-mono font-bold outline-none" />
                     </td>
+                    <td className="px-3 py-2"><input type="text" value={row.nickname || ''} onChange={e => handleCellChange(idx, 'nickname', e.target.value)} className="bg-transparent w-full text-white outline-none" /></td>
                     {financialTab === 'monthly' ? (
                       <td className="px-3 py-2"><input type="text" value={row.month || ''} onChange={e => handleCellChange(idx, 'month', e.target.value)} className="bg-transparent w-full text-white outline-none" /></td>
                     ) : (
@@ -245,14 +269,26 @@ export const FinancialData = () => {
                         <td className="px-3 py-2"><input type="text" value={row.to_date || ''} onChange={e => handleCellChange(idx, 'to_date', e.target.value)} className="bg-transparent w-full text-white outline-none" /></td>
                       </>
                     )}
-                    <td className="px-3 py-2"><input type="text" value={row.nickname || ''} onChange={e => handleCellChange(idx, 'nickname', e.target.value)} className="bg-transparent w-full text-white outline-none" /></td>
-                    <td className="px-3 py-2"><input type="number" value={row.total_points || 0} onChange={e => handleCellChange(idx, 'total_points', parseInt(e.target.value) || 0)} className="bg-transparent w-full text-white outline-none" /></td>
+                    <td className="px-3 py-2"><input type="number" value={new Date(row.timestamp).getFullYear() || ''} readOnly className="bg-transparent w-full text-white outline-none" /></td>
+                    <td className="px-3 py-2"><input type="number" value={row.live_duration || 0} onChange={e => handleCellChange(idx, 'live_duration', parseInt(e.target.value) || 0)} className="bg-transparent w-full text-white outline-none" /></td>
+                    <td className="px-3 py-2"><input type="number" value={row.party_host_duration || 0} onChange={e => handleCellChange(idx, 'party_host_duration', parseInt(e.target.value) || 0)} className="bg-transparent w-full text-white outline-none" /></td>
+                    <td className="px-3 py-2"><input type="number" value={row.total_earnings || 0} onChange={e => handleCellChange(idx, 'total_earnings', parseInt(e.target.value) || 0)} className="bg-transparent w-full text-white outline-none" /></td>
+                    <td className="px-3 py-2"><input type="number" value={row.agent_commission || 0} onChange={e => handleCellChange(idx, 'agent_commission', parseInt(e.target.value) || 0)} className="bg-transparent w-full text-white outline-none" /></td>
+                    <td className="px-3 py-2"><input type="number" value={row.live_earnings || 0} onChange={e => handleCellChange(idx, 'live_earnings', parseInt(e.target.value) || 0)} className="bg-transparent w-full text-white outline-none" /></td>
+                    <td className="px-3 py-2"><input type="number" value={row.party_earnings || 0} onChange={e => handleCellChange(idx, 'party_earnings', parseInt(e.target.value) || 0)} className="bg-transparent w-full text-white outline-none" /></td>
+                    <td className="px-3 py-2"><input type="number" value={row.private_chat || 0} onChange={e => handleCellChange(idx, 'private_chat', parseInt(e.target.value) || 0)} className="bg-transparent w-full text-white outline-none" /></td>
+                    <td className="px-3 py-2"><input type="number" value={row.tips || 0} onChange={e => handleCellChange(idx, 'tips', parseInt(e.target.value) || 0)} className="bg-transparent w-full text-white outline-none" /></td>
+                    <td className="px-3 py-2"><input type="number" value={row.platform_reward || 0} onChange={e => handleCellChange(idx, 'platform_reward', parseInt(e.target.value) || 0)} className="bg-transparent w-full text-white outline-none" /></td>
+                    <td className="px-3 py-2"><input type="number" value={row.other_earnings || 0} onChange={e => handleCellChange(idx, 'other_earnings', parseInt(e.target.value) || 0)} className="bg-transparent w-full text-white outline-none" /></td>
+                    <td className="px-3 py-2"><input type="number" value={row.platform_hourly_salary || 0} onChange={e => handleCellChange(idx, 'platform_hourly_salary', parseInt(e.target.value) || 0)} className="bg-transparent w-full text-white outline-none" /></td>
+                    <td className="px-3 py-2"><input type="number" value={row.super_salary || 0} onChange={e => handleCellChange(idx, 'super_salary', parseInt(e.target.value) || 0)} className="bg-transparent w-full text-white outline-none" /></td>
+                    <td className="px-3 py-2"><input type="number" value={row.super_rank || 0} onChange={e => handleCellChange(idx, 'super_rank', parseInt(e.target.value) || 0)} className="bg-transparent w-full text-white outline-none" /></td>
+                    <td className="px-3 py-2"><input type="number" value={row.level || 0} onChange={e => handleCellChange(idx, 'level', parseInt(e.target.value) || 0)} className="bg-transparent w-full text-white outline-none" /></td>
                   </tr>
                 );
               })}
             </tbody>
           </table>
-        </div>
       </div>
     </div>
   );
