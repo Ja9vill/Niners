@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Outlet, useNavigate, useLocation, Link } from 'react-router-dom';
-import { 
+import {
   Menu, X, LogOut, LayoutDashboard, Users, User, Shield, Calendar, DollarSign, Activity, FileText,
   Bell, Trash2, Plus, Clock, ChevronDown, Monitor, Smartphone, TrendingUp
 } from 'lucide-react';
@@ -56,7 +56,7 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
       setLivehouseRequests(list);
     });
 
-    let unsubLogs = () => {};
+    let unsubLogs = () => { };
     const roleLower = String(authState.role || '').toLowerCase();
     if (['director', 'head admin', 'head_admin'].includes(roleLower)) {
       const logsQuery = query(collection(db, 'system_logs'));
@@ -67,7 +67,7 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
       });
     }
 
-    let unsubEditReqs = () => {};
+    let unsubEditReqs = () => { };
     if (authState?.poppo_id) {
       const editReqsQuery = query(
         collection(db, 'edit_requests'),
@@ -222,8 +222,8 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
     } else if (isManagerOrAgent) {
       return livehouseRequests.filter(req => (req.status === 'Pending Approval' || req.status === 'Host Accepted Proposal') && req.managerId === authState.poppo_id);
     } else if (isHost) {
-      return livehouseRequests.filter(req => 
-        req.poppoId === authState.poppo_id && 
+      return livehouseRequests.filter(req =>
+        req.poppoId === authState.poppo_id &&
         !dismissedRequests.includes(req.id) &&
         (req.status === 'Approved' || req.status === 'Closed' || req.status === 'New Timeslot Proposed')
       );
@@ -241,7 +241,7 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
     if (!['director', 'head admin', 'head_admin'].includes(roleLower)) return 0;
     if (!lastReadTimestamp) return systemLogs.length;
     return systemLogs.filter(log => log.timestamp > lastReadTimestamp).length;
-  }, [systemLogs, lastReadTimestamp, authState.role]);  const totalUnreadCount = filteredRequests.length + unreadAnnouncementsCount + unreadLogsCount + pendingEditRequests.length;
+  }, [systemLogs, lastReadTimestamp, authState.role]); const totalUnreadCount = filteredRequests.length + unreadAnnouncementsCount + unreadLogsCount + pendingEditRequests.length;
   const toggleNotifications = () => {
     if (!isNotificationOpen) {
       const now = new Date().toISOString();
@@ -254,7 +254,7 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
   const renderNotificationCenter = () => {
     const roleLower = String(authState.role || '').toLowerCase();
     const canPostAnn = ['director', 'head admin', 'head_admin'].includes(roleLower);
-    
+
     return (
       <div className="relative">
         <button
@@ -277,15 +277,15 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
               <form onSubmit={handlePublishAnnouncement} className="space-y-4 text-left">
                 <div className="flex items-center justify-between border-b border-white/5 pb-2">
                   <span className="text-[10px] font-black uppercase tracking-widest text-[#D4AF37]">Publish Announcement</span>
-                  <button 
-                    type="button" 
+                  <button
+                    type="button"
                     onClick={() => setIsPostingAnnouncement(false)}
                     className="text-[9px] font-black uppercase text-[#A09E9A] hover:text-white cursor-pointer"
                   >
                     Cancel
                   </button>
                 </div>
-                
+
                 <div className="space-y-1.5">
                   <label className="text-[8px] font-black text-white/40 uppercase tracking-widest block">Announcement Title</label>
                   <input
@@ -327,7 +327,7 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
                       onClick={() => setIsPostingAnnouncement(true)}
                       className="px-2.5 py-1 bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 text-indigo-400 rounded-lg text-[8px] font-black uppercase tracking-wider transition-all cursor-pointer"
                     >
-                      + Post 
+                      + Post
                     </button>
                   )}
                 </div>
@@ -365,11 +365,10 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
                       {systemLogs.slice(0, 5).map((log) => (
                         <div key={log.id} className="bg-indigo-500/5 border-l-2 border-[#D4AF37] p-3 rounded-r-xl space-y-1 text-left">
                           <div className="flex items-center justify-between">
-                            <span className={`text-[7px] font-black uppercase px-1.5 py-0.5 rounded ${
-                              log.severity === 'Error' ? 'bg-red-500/10 text-red-400 border border-red-500/20' :
-                              log.severity === 'Warning' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
-                              'bg-indigo-500/10 text-[#D4AF37] border border-[#D4AF37]/20'
-                            }`}>
+                            <span className={`text-[7px] font-black uppercase px-1.5 py-0.5 rounded ${log.severity === 'Error' ? 'bg-red-500/10 text-red-400 border border-red-500/20' :
+                                log.severity === 'Warning' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
+                                  'bg-indigo-500/10 text-[#D4AF37] border border-[#D4AF37]/20'
+                              }`}>
                               {log.severity}
                             </span>
                             <span className="text-[7px] font-mono text-slate-500">{new Date(log.timestamp).toLocaleTimeString()}</span>
@@ -389,7 +388,7 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
                       <>
                         {filteredRequests.map((req) => {
                           const isOwnReq = req.poppoId === authState.poppo_id;
-                          
+
                           return (
                             <div key={req.id} className="bg-slate-900/60 border border-white/5 p-3 rounded-xl space-y-2 text-left">
                               <div>
@@ -474,23 +473,23 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
                               )}
 
                               {/* Admin/Director approval controls */}
-                              {(req.status === 'Pending Approval' || req.status === 'Host Accepted Proposal') && 
-                               ['director', 'head admin', 'head_admin'].includes(roleLower) && (
-                                <div className="flex items-center gap-2 pt-1">
-                                  <button
-                                    onClick={() => handleApprove(req)}
-                                    className="flex-1 py-1.5 bg-emerald-550 hover:bg-emerald-600 text-white text-[8px] font-black uppercase tracking-wider rounded-lg cursor-pointer transition-colors"
-                                  >
-                                    Approve
-                                  </button>
-                                  <button
-                                    onClick={() => handleDeny(req)}
-                                    className="flex-1 py-1.5 bg-slate-800 hover:bg-red-500/15 border border-white/10 hover:border-red-500/30 text-slate-400 hover:text-red-400 text-[8px] font-black uppercase tracking-wider rounded-lg cursor-pointer transition-colors"
-                                  >
-                                    Deny
-                                  </button>
-                                </div>
-                              )}
+                              {(req.status === 'Pending Approval' || req.status === 'Host Accepted Proposal') &&
+                                ['director', 'head admin', 'head_admin'].includes(roleLower) && (
+                                  <div className="flex items-center gap-2 pt-1">
+                                    <button
+                                      onClick={() => handleApprove(req)}
+                                      className="flex-1 py-1.5 bg-emerald-550 hover:bg-emerald-600 text-white text-[8px] font-black uppercase tracking-wider rounded-lg cursor-pointer transition-colors"
+                                    >
+                                      Approve
+                                    </button>
+                                    <button
+                                      onClick={() => handleDeny(req)}
+                                      className="flex-1 py-1.5 bg-slate-800 hover:bg-red-500/15 border border-white/10 hover:border-red-500/30 text-slate-400 hover:text-red-400 text-[8px] font-black uppercase tracking-wider rounded-lg cursor-pointer transition-colors"
+                                    >
+                                      Deny
+                                    </button>
+                                  </div>
+                                )}
                             </div>
                           );
                         })}
@@ -565,7 +564,7 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
 
   const getSideNavLinks = () => {
     const links: any[] = [];
-    
+
     // Base Menu for all logged-in users
     links.push({ path: '/dashboard', label: 'Overview', icon: LayoutDashboard });
     links.push({ path: '/roster', label: 'Roster', icon: Users });
@@ -573,14 +572,14 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
     links.push({ path: '/my-profile', label: 'My Profile', icon: User });
 
     const role = (authState.role || '').toLowerCase();
-    
+
     if (role === 'director' || role === 'head admin' || role === 'head_admin') {
       links.push({ isDivider: true, id: 'div-1' });
       links.push({ isTitle: true, label: "Director's Hub", id: 'title-director' });
-      
+
       links.push({ path: '/profiles', label: 'Roster Management', icon: Users });
-      
-      links.push({ 
+
+      links.push({
         id: 'dropdown-dashboard',
         isDropdown: true,
         label: 'Dashboard',
@@ -590,7 +589,7 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
           { path: '/system-logs', label: 'System Logs', icon: FileText }
         ]
       });
-      
+
       if (role === 'director') {
         links.push({ isDivider: true, id: 'div-2' });
         links.push({ isTitle: true, label: "Directors Access", id: 'title-access' });
@@ -624,7 +623,7 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
           <span>
             Currently viewing as <span className="uppercase text-amber-300 font-extrabold">{authState.nickname || authState.name}</span>
           </span>
-          <button 
+          <button
             onClick={async () => {
               try {
                 await FirebaseService.logSystemActivity(
@@ -685,8 +684,8 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
                   onClick={() => setViewMode('desktop')}
                   className={cn(
                     "p-1.5 rounded-full transition-all duration-300",
-                    currentViewMode === 'desktop' 
-                      ? "bg-[#D4AF37] text-black shadow-[0_0_10px_rgba(212,175,55,0.4)]" 
+                    currentViewMode === 'desktop'
+                      ? "bg-[#D4AF37] text-black shadow-[0_0_10px_rgba(212,175,55,0.4)]"
                       : "text-[#A09E9A] hover:text-white"
                   )}
                   title="Desktop View"
@@ -697,8 +696,8 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
                   onClick={() => setViewMode('mobile')}
                   className={cn(
                     "p-1.5 rounded-full transition-all duration-300",
-                    currentViewMode === 'mobile' 
-                      ? "bg-[#D4AF37] text-black shadow-[0_0_10px_rgba(212,175,55,0.4)]" 
+                    currentViewMode === 'mobile'
+                      ? "bg-[#D4AF37] text-black shadow-[0_0_10px_rgba(212,175,55,0.4)]"
                       : "text-[#A09E9A] hover:text-white"
                   )}
                   title="Mobile View"
@@ -732,7 +731,7 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
                       className={cn(
                         "w-full flex items-center justify-between px-3 py-3 rounded-xl transition-all font-bold text-sm",
                         isAnyChildActive || isOpen
-                          ? "bg-[#D4AF37]/10 text-[#D4AF37] shadow-[inset_0_0_12px_rgba(212,175,55,0.05)]" 
+                          ? "bg-[#D4AF37]/10 text-[#D4AF37] shadow-[inset_0_0_12px_rgba(212,175,55,0.05)]"
                           : "text-[#A09E9A] hover:bg-white/[0.02] hover:text-[#F0EFE8]"
                       )}
                     >
@@ -778,8 +777,8 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
                   onClick={() => setIsSidebarOpen(false)}
                   className={cn(
                     "flex items-center gap-3 px-3 py-3 rounded-xl transition-all font-bold text-sm",
-                    isActive 
-                      ? "bg-[#D4AF37]/10 text-[#D4AF37] shadow-[inset_0_0_12px_rgba(212,175,55,0.05)]" 
+                    isActive
+                      ? "bg-[#D4AF37]/10 text-[#D4AF37] shadow-[inset_0_0_12px_rgba(212,175,55,0.05)]"
                       : "text-[#A09E9A] hover:bg-white/[0.02] hover:text-[#F0EFE8]"
                   )}
                 >
@@ -791,7 +790,7 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
           </div>
 
           <div className="p-4 border-t border-white/5">
-            <button 
+            <button
               onClick={handleLogout}
               className="flex items-center gap-3 px-3 py-3 w-full text-left rounded-xl transition-all text-red-400 hover:bg-red-500/10 font-bold text-sm"
             >
@@ -808,7 +807,7 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
             <div className="flex items-center gap-2">
               <span className="text-[10px] font-black uppercase tracking-[0.2em] text-[#D4AF37]">Niners Portal Dashboard</span>
             </div>
-            
+
             <div className="flex items-center gap-4">
               {renderNotificationCenter()}
             </div>

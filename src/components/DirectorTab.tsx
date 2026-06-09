@@ -4,41 +4,41 @@
 /* eslint-disable i18next/no-literal-string */
 /* eslint-disable react/jsx-no-literals */
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { 
-  Shield, 
-  FileUp, 
-  Clipboard, 
-  CheckCircle2, 
-  History, 
-  Trash2, 
-  FolderPlus, 
-  ArrowRight, 
-  Zap, 
-  AlertCircle, 
-  FileText, 
-  Loader2, 
-  Activity, 
-  UserPlus, 
-  Edit2, 
-  X, 
-  LayoutDashboard, 
-  Database, 
-  Target, 
-  Briefcase, 
-  Users, 
-  Plus, 
+import {
+  Shield,
+  FileUp,
+  Clipboard,
+  CheckCircle2,
+  History,
+  Trash2,
+  FolderPlus,
+  ArrowRight,
+  Zap,
+  AlertCircle,
+  FileText,
+  Loader2,
+  Activity,
+  UserPlus,
+  Edit2,
+  X,
+  LayoutDashboard,
+  Database,
+  Target,
+  Briefcase,
+  Users,
+  Plus,
   Lock,
   Award,
   ListTodo
 } from 'lucide-react';
 import { Storage } from '../lib/storage';
-import { 
-  Host, 
-  CommissionEntry, 
-  Task, 
-  ActivityAuditLog, 
-  TopNinersEarningsSummary, 
-  EventsCalendarPublic 
+import {
+  Host,
+  CommissionEntry,
+  Task,
+  ActivityAuditLog,
+  TopNinersEarningsSummary,
+  EventsCalendarPublic
 } from '../types';
 import { cn, formatMonth, formatDate } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
@@ -80,14 +80,14 @@ export const DirectorTab = () => {
 
   // Sidebar views: roster_management, financials, system_logs, create_user
   const [activeView, setActiveView] = useState<string>('roster_management');
-  
+
   // Data State
   const [hosts, setHosts] = useState<Host[]>([]);
   const [commissions, setCommissions] = useState<CommissionEntry[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [auditLogs, setAuditLogs] = useState<ActivityAuditLog[]>([]);
   const [earningsSummaries, setEarningsSummaries] = useState<TopNinersEarningsSummary[]>([]);
-  
+
   // UI states
   const [selectedMonth, setSelectedMonth] = useState<string>(() => {
     const d = new Date();
@@ -104,7 +104,7 @@ export const DirectorTab = () => {
   const [proposingAltReq, setProposingAltReq] = useState<any | null>(null);
   const [altDate, setAltDate] = useState('');
   const [altTimeslot, setAltTimeslot] = useState('');
-  
+
   // Tasks desk states
   const [assigneeId, setAssigneeId] = useState('');
   const [taskTitle, setTaskTitle] = useState('');
@@ -313,7 +313,7 @@ export const DirectorTab = () => {
 
       const poppoId = r[0]?.trim() || '';
       const matchingHost = hosts.find(h => String(h.id).trim() === poppoId);
-      
+
       // Enforce nickname if host exists, otherwise keep original but it won't be saved
       const nickname = matchingHost ? (matchingHost.nickname || matchingHost.name) : (r[3]?.trim() || 'Pending Intake');
 
@@ -321,7 +321,7 @@ export const DirectorTab = () => {
       let parsedMonth = '';
       const r1 = r[1]?.trim() || '';
       const r2 = r[2]?.trim() || '';
-      
+
       // If r2 is just a 4-digit year (e.g. "2024"), it's the old monthly format
       if (/^20\d{2}$/.test(r2)) {
         parsedYear = parseInt(r2);
@@ -390,21 +390,21 @@ export const DirectorTab = () => {
     try {
       const type = financialTab;
       const data = type === 'monthly' ? monthlyLedger : weeklyLedger;
-      
+
       // Only save rows where the poppo_id is found in the users list (hosts)
       const validDataToSave = data.filter(row => hosts.some(h => String(h.id).trim() === String(row.poppo_id).trim()));
       const unknownCount = data.length - validDataToSave.length;
 
       // Save to the performance_report collection as requested
       await FirebaseService.savePerformanceReport(validDataToSave);
-      
+
       // We also save to the original endpoint for backward compatibility (optional)
       try {
         await FirebaseService.saveFinancials(type, validDataToSave);
       } catch (e) {
         console.warn("Legacy saveFinancials failed, but performance_reports succeeded", e);
       }
-      
+
       await auditLogAction('SAVE_FINANCIALS_STORAGE', null, { type, count: validDataToSave.length });
 
       if (type === 'monthly') {
@@ -530,7 +530,7 @@ export const DirectorTab = () => {
       };
       await setDoc(doc(db, 'calendar', eventId), newEvent);
       await FirebaseService.logSystemActivity(`Approved Livehouse request for host "${req.name}" (Poppo ID: ${req.poppoId}) on ${req.date} at ${req.timeslot}`, 'Info');
-      
+
       setLivehouseRequests(prev => prev.map(r => r.id === req.id ? { ...r, status: 'Approved' } : r));
       setSuccessMessage(`Successfully approved Livehouse request for ${req.name}!`);
     } catch (err: any) {
@@ -695,7 +695,7 @@ export const DirectorTab = () => {
       // Compute start and end dates
       const pad = (n: number) => String(n).padStart(2, '0');
       const startDateStr = `${yearNum}-${pad(bulkMonth)}-01`;
-      
+
       const lastDay = new Date(yearNum, monthIndex + 1, 0).getDate();
       const endDateStr = `${yearNum}-${pad(bulkMonth)}-${pad(lastDay)}`;
 
@@ -704,7 +704,7 @@ export const DirectorTab = () => {
 
       for (let rank = 1; rank <= 9; rank++) {
         const awardId = getUUID();
-        
+
         let color = 'Gold';
         if (rank >= 4 && rank <= 6) color = 'Orange';
         else if (rank >= 7) color = 'Red';
@@ -724,7 +724,7 @@ export const DirectorTab = () => {
 
       await batch.commit();
       await FirebaseService.logSystemActivity(`Director/Admin bulk generated Monthly Top Niners awards templates for ${monthName} ${bulkYear}`, 'Info');
-      
+
       setAwards(prev => [...prev, ...newAwardsList]);
       setSuccessMessage(`Successfully generated 9 Monthly Top Niner awards for ${monthName} ${bulkYear}!`);
     } catch (err: any) {
@@ -747,7 +747,7 @@ export const DirectorTab = () => {
 
     const matchedAward = awards.find(a => a.id === assignAwardId);
     const matchedHost = hosts.find(h => h.id === assignHostId);
-    
+
     if (!matchedAward || !matchedHost) {
       setErrorMessage('Award or Host not found.');
       setIsAssigningAward(false);
@@ -821,7 +821,7 @@ export const DirectorTab = () => {
       setHosts(hList.length > 0 ? hList : Storage.getHosts());
       setTasks(tList);
       setAllUsers(uList || []);
-      
+
       // Sort logs descending
       const sortedLogs = aList.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
       setAuditLogs(sortedLogs);
@@ -1001,7 +1001,7 @@ export const DirectorTab = () => {
       }
 
       showSuccess(`Account access successfully reset for Poppo ID: ${resetConfirmTarget}`);
-      
+
       // Log audit trail
       await auditLogAction('RESET_ACCOUNT_ACCESS', { poppoId: resetConfirmTarget }, { resetComplete: true });
 
@@ -1237,7 +1237,7 @@ export const DirectorTab = () => {
           </div>
           <div className="text-xs font-bold text-[#F0EFE8] truncate">{localAuth.name}</div>
           <div className="text-[9px] text-[#D4AF37] font-black mt-1 uppercase tracking-wider">Secure Session Active</div>
-          
+
           {isDirector && (
             <div className="mt-4 pt-4 border-t border-white/5 space-y-3">
               <div className="flex items-center justify-between">
@@ -1293,7 +1293,7 @@ export const DirectorTab = () => {
                     className="w-full bg-black/40 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-[#F0EFE8] focus:outline-none focus:border-indigo-500/50"
                     title="Search user to mock"
                   />
-                  
+
                   {/* Search Results Dropdown */}
                   {userSearchQuery.trim() !== '' && (
                     <div className="absolute left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-[#13131E] border border-white/10 rounded-lg shadow-2xl z-50 divide-y divide-white/5 custom-scrollbar">
@@ -1354,8 +1354,8 @@ export const DirectorTab = () => {
             onClick={() => { setActiveView(item.id as any); setErrorMessage(null); }}
             className={cn(
               "w-full flex items-center gap-4 p-4 rounded-2xl transition-all group relative cursor-pointer",
-              activeView === item.id 
-                ? "bg-[#1A1A28] text-[#F0EFE8] border border-white/5 shadow-xl" 
+              activeView === item.id
+                ? "bg-[#1A1A28] text-[#F0EFE8] border border-white/5 shadow-xl"
                 : "text-[#A09E9A] hover:bg-white/[0.02] hover:text-[#F0EFE8]"
             )}
             title={`Switch to ${item.label} view`}
@@ -1372,7 +1372,7 @@ export const DirectorTab = () => {
 
       {/* Main Control View Content Area */}
       <main className="flex-1 min-w-0 space-y-8 pb-20">
-        
+
         {/* Error/Alert Notification */}
         <AnimatePresence>
           {errorMessage && (
@@ -1405,11 +1405,11 @@ export const DirectorTab = () => {
 
         {!isLoading && (
           <AnimatePresence mode="wait">
-            
+
             {/* MODULE 1: OVERVIEW & AI RECOMMENDATIONS */}
             {activeView === 'overview' && (
               <motion.div key="overview" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
-                             {/* Dashboard Metrics */}
+                {/* Dashboard Metrics */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   <div className="p-6 rounded-3xl border border-white/5 bg-white/[0.01] tech-card">
                     <p className="text-[9px] font-black uppercase text-[#A09E9A]/60 tracking-[0.2em]">Active Hosts Roster</p>
@@ -1447,7 +1447,7 @@ export const DirectorTab = () => {
                       <Zap size={18} className="text-[#D4AF37]" />
                       System AI Recommendations Engine
                     </h3>
-                    <button 
+                    <button
                       onClick={() => runRecommendationsEngine(true)}
                       className="px-4 py-1.5 bg-[#D4AF37]/10 hover:bg-[#D4AF37] border border-[#D4AF37]/20 text-[#D4AF37] hover:text-[#0D0D14] rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
                       title="Recalculate recommendation metrics"
@@ -1464,12 +1464,12 @@ export const DirectorTab = () => {
                       </div>
                     ) : (
                       insights.map(item => (
-                        <div 
-                          key={item.id} 
+                        <div
+                          key={item.id}
                           className={cn(
                             "p-6 rounded-3xl border flex flex-col justify-between h-56 tech-card",
                             item.priority === 'High' ? 'border-red-500/20 bg-red-500/[0.02]' :
-                            item.priority === 'Medium' ? 'border-amber-500/20 bg-amber-500/[0.02]' : 'border-[#D4AF37]/20 bg-[#D4AF37]/[0.02]'
+                              item.priority === 'Medium' ? 'border-amber-500/20 bg-amber-500/[0.02]' : 'border-[#D4AF37]/20 bg-[#D4AF37]/[0.02]'
                           )}
                         >
                           <div>
@@ -1477,8 +1477,8 @@ export const DirectorTab = () => {
                               <span className={cn(
                                 "text-[8px] font-black uppercase px-2 py-0.5 rounded-full",
                                 item.priority === 'High' ? 'bg-red-500/10 text-red-400 border border-red-500/20' :
-                                item.priority === 'Medium' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
-                                'bg-[#D4AF37]/10 text-[#D4AF37] border border-[#D4AF37]/20'
+                                  item.priority === 'Medium' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
+                                    'bg-[#D4AF37]/10 text-[#D4AF37] border border-[#D4AF37]/20'
                               )}>
                                 {item.priority} Priority
                               </span>
@@ -1487,7 +1487,7 @@ export const DirectorTab = () => {
                             <h4 className="font-extrabold text-[#F0EFE8] text-sm line-clamp-1">{item.hostName}</h4>
                             <p className="text-[11px] text-[#A09E9A] leading-relaxed mt-2 line-clamp-3">{item.details}</p>
                           </div>
-                          
+
                           <button
                             onClick={() => handleConvertRecommendationToTask(item)}
                             className="w-full mt-4 py-2 btn-gold text-[9px] font-black uppercase tracking-widest rounded-xl transition-all shadow-md active:scale-95 cursor-pointer"
@@ -1534,8 +1534,8 @@ export const DirectorTab = () => {
                                 <span className={cn(
                                   "text-[8px] font-black uppercase px-2 py-0.5 rounded-full border",
                                   item.severity === 'High' ? 'bg-red-500/10 text-red-400 border-red-500/20' :
-                                  item.severity === 'Medium' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
-                                  'bg-slate-500/10 text-[#A09E9A] border-slate-500/20'
+                                    item.severity === 'Medium' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
+                                      'bg-slate-500/10 text-[#A09E9A] border-slate-500/20'
                                 )}>
                                   {item.severity}
                                 </span>
@@ -1602,12 +1602,12 @@ export const DirectorTab = () => {
                     </h3>
                     <p className="text-[10px] text-[#A09E9A]/40 uppercase tracking-widest font-black">Assign badges to top performing talent</p>
                   </div>
-                  
+
                   <div className="flex items-center gap-3 bg-[#1A1A28] p-2 px-4 rounded-xl border border-white/5">
                     <span className="text-[9px] font-black uppercase tracking-widest text-[#A09E9A]/50">Target Month:</span>
                     <div className="flex items-center gap-1">
-                      <select 
-                        value={selectedMonth.split('-')[0]} 
+                      <select
+                        value={selectedMonth.split('-')[0]}
                         onChange={(e) => setSelectedMonth(`${e.target.value}-${selectedMonth.split('-')[1]}`)}
                         className="bg-transparent text-indigo-400 font-bold text-xs outline-none cursor-pointer focus:ring-0"
                         title="Target Year selection"
@@ -1618,8 +1618,8 @@ export const DirectorTab = () => {
                         <option value="2027" className="bg-[#1A1A28] text-[#F0EFE8]">2027</option>
                       </select>
                       <span className="text-white/20 text-xs">-</span>
-                      <select 
-                        value={selectedMonth.split('-')[1]} 
+                      <select
+                        value={selectedMonth.split('-')[1]}
                         onChange={(e) => setSelectedMonth(`${selectedMonth.split('-')[0]}-${e.target.value}`)}
                         className="bg-transparent text-indigo-400 font-bold text-xs outline-none cursor-pointer focus:ring-0"
                         title="Target Month selection"
@@ -1647,7 +1647,7 @@ export const DirectorTab = () => {
                       {hosts.map(host => {
                         const summary = earningsSummaries.find(s => s.poppoId === host.id);
                         const currentBadge = summary?.profilePhotoUrl || 'None'; // profilePhotoUrl maps to local award badge here
-                        
+
                         return (
                           <tr key={host.id} className="hover:bg-white/[0.01] transition-colors">
                             <td className="px-6 py-4 font-mono font-bold text-indigo-400">{host.id}</td>
@@ -1666,7 +1666,7 @@ export const DirectorTab = () => {
                                 onChange={async (e) => {
                                   const val = e.target.value;
                                   if (!val) return;
-                                  
+
                                   const original = summary ? { ...summary } : null;
                                   const updatedSummary: TopNinersEarningsSummary = summary ? {
                                     ...summary,
@@ -1734,8 +1734,8 @@ export const DirectorTab = () => {
                   {/* Create Task Form */}
                   <div className="tech-card h-fit space-y-6">
                     <h4 className="text-[10px] font-black uppercase tracking-widest text-[#D4AF37] border-b border-white/5 pb-2">Delegate New Task</h4>
-                    
-                    <form 
+
+                    <form
                       onSubmit={async (e) => {
                         e.preventDefault();
                         const formData = new FormData(e.currentTarget);
@@ -1752,13 +1752,13 @@ export const DirectorTab = () => {
                         };
 
                         try {
-                           await FirebaseService.saveTasks([newTask]);
-                           await auditLogAction('CREATE_TASK', null, newTask);
-                           showSuccess('Task delegated down successfully.');
-                           e.currentTarget.reset();
-                           loadData();
+                          await FirebaseService.saveTasks([newTask]);
+                          await auditLogAction('CREATE_TASK', null, newTask);
+                          showSuccess('Task delegated down successfully.');
+                          e.currentTarget.reset();
+                          loadData();
                         } catch (err) {
-                           alert("Failed to create task.");
+                          alert("Failed to create task.");
                         }
                       }}
                       className="space-y-4"
@@ -1799,13 +1799,13 @@ export const DirectorTab = () => {
 
                       <div className="space-y-1.5">
                         <label htmlFor="task-due-date" className="text-[9px] font-black uppercase text-[#A09E9A]/40 tracking-wider">Due Date</label>
-                        <SingleDatePicker 
-                          id="task-due-date" 
-                          name="dueDate" 
-                          value={taskDueDate} 
-                          onChange={(val) => setTaskDueDate(val)} 
-                          required 
-                          title="Select task due date" 
+                        <SingleDatePicker
+                          id="task-due-date"
+                          name="dueDate"
+                          value={taskDueDate}
+                          onChange={(val) => setTaskDueDate(val)}
+                          required
+                          title="Select task due date"
                         />
                       </div>
 
@@ -1818,7 +1818,7 @@ export const DirectorTab = () => {
                   {/* Tasks List */}
                   <div className="lg:col-span-2 space-y-4">
                     <h4 className="text-[10px] font-black uppercase tracking-widest text-[#A09E9A]/40">Active Assignments</h4>
-                    
+
                     <div className="space-y-3">
                       {tasks.length === 0 ? (
                         <div className="text-center py-12 border border-dashed border-white/10 rounded-3xl text-[#A09E9A]/30 italic text-xs">
@@ -1897,15 +1897,15 @@ export const DirectorTab = () => {
             {/* MODULE 4: GLOBAL ROSTER ADMIN */}
             {activeView === 'roster_admin' && (
               <motion.div key="roster_admin" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
-                
+
                 {/* Manual Onboarding drawer/section */}
                 <section className="space-y-4">
                   <h3 className="font-bold text-lg flex items-center gap-2">
                     <UserPlus size={18} className="text-indigo-400" />
                     Manually Onboard Talent
                   </h3>
-                  
-                  <form 
+
+                  <form
                     onSubmit={async (e) => {
                       e.preventDefault();
                       const formData = new FormData(e.currentTarget);
@@ -2025,12 +2025,12 @@ export const DirectorTab = () => {
                         try {
                           const rawText = rosterPasteText.trim();
                           const rows = rawText.split('\n').filter(line => line.trim() !== '').map(line => line.split('\t'));
-                          
+
                           // Skip header row if pasted
                           const startIdx = (rows[0] && (
-                            rows[0][0]?.toLowerCase().includes('poppo') || 
-                            rows[0][1]?.toLowerCase().includes('nick') || 
-                            rows[0][2]?.toLowerCase().includes('pos') || 
+                            rows[0][0]?.toLowerCase().includes('poppo') ||
+                            rows[0][1]?.toLowerCase().includes('nick') ||
+                            rows[0][2]?.toLowerCase().includes('pos') ||
                             rows[0][3]?.toLowerCase().includes('role')
                           )) ? 1 : 0;
 
@@ -2102,14 +2102,14 @@ export const DirectorTab = () => {
                             const firstIncoming = duplicatesToMerge[0];
                             const firstExisting = hosts.find(ex => ex.id === firstIncoming.id);
                             setDuplicateQueue(duplicatesToMerge.slice(1));
-                            
+
                             if (firstExisting) {
                               setExistingHost(firstExisting);
                               setIncomingHost(firstIncoming);
                               setResolvedFields({ ...firstIncoming });
                               setShowMergeModal(true);
                             }
-                            
+
                             showSuccess(`Successfully added ${newHostsToSave.length} new talent records. ${duplicatesToMerge.length} duplicates flagged for merge-review.`);
                           } else {
                             showSuccess(`Successfully onboarded all ${newHostsToSave.length} talent records.`);
@@ -2263,7 +2263,7 @@ export const DirectorTab = () => {
                             <tr key={host.id} className="hover:bg-white/[0.01] transition-colors group">
                               <td className="px-6 py-4 font-mono font-bold text-indigo-400 sticky left-0 bg-[#13131E] group-hover:bg-[#1A1A28] transition-colors z-10 min-w-[100px] max-w-[100px] border-r border-white/5">{host.id}</td>
                               <td className="px-6 py-4 font-bold text-[#F0EFE8] sticky left-[100px] bg-[#13131E] group-hover:bg-[#1A1A28] transition-colors z-10 min-w-[150px] max-w-[150px] border-r border-white/5">
-                                <input 
+                                <input
                                   type="text"
                                   defaultValue={host.nickname || host.name}
                                   onBlur={async (e) => {
@@ -2287,7 +2287,7 @@ export const DirectorTab = () => {
                                 />
                               </td>
                               <td className="px-4 py-4 font-mono">
-                                <select 
+                                <select
                                   value={host.role || 'Talent'}
                                   onChange={async (e) => {
                                     const val = e.target.value as any;
@@ -2306,16 +2306,16 @@ export const DirectorTab = () => {
                                   title="Select role"
                                   aria-label="Select role"
                                 >
-                                  
-                                    {['Talent', 'Manager', 'Admin', 'Head Admin', 'Director', 'Agent'].map(r => (
-                                      <option key={r} value={r} className="bg-[#0A0A0B] text-[#F0EFE8]">{r}</option>
-                                    ))}
-                                  
+
+                                  {['Talent', 'Manager', 'Admin', 'Head Admin', 'Director', 'Agent'].map(r => (
+                                    <option key={r} value={r} className="bg-[#0A0A0B] text-[#F0EFE8]">{r}</option>
+                                  ))}
+
                                 </select>
                               </td>
 
                               <td className="px-6 py-4">
-                                <select 
+                                <select
                                   value={host.status}
                                   onChange={async (e) => {
                                     const val = e.target.value as any;
@@ -2340,7 +2340,7 @@ export const DirectorTab = () => {
                                 </select>
                               </td>
                               <td className="px-6 py-4">
-                                <select 
+                                <select
                                   value={host.tier_pay}
                                   onChange={async (e) => {
                                     const val = e.target.value as any;
@@ -2365,7 +2365,7 @@ export const DirectorTab = () => {
                                 </select>
                               </td>
                               <td className="px-6 py-4 text-right">
-                                <button 
+                                <button
                                   onClick={async () => {
                                     if (!confirm(`Are you sure you want to permanently HARD DELETE host: ${host.nickname || host.name}?`)) return;
                                     const original = { ...host };
@@ -2406,435 +2406,435 @@ export const DirectorTab = () => {
                 </div>
               ) : (
                 <motion.div key="financials" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
-                
-                {/* Header */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  <div className="space-y-1">
-                    <h3 className="font-bold text-xl flex items-center gap-2 text-[#F0EFE8]">
-                      <Database size={20} className="text-[#D4AF37]" />
-                      High-Volume Financial Ledger
-                    </h3>
-                    <p className="text-[10px] text-slate-400 uppercase tracking-widest font-black">
-                      Bypasses Firestore. Files saved directly as flat JSON in Firebase Storage.
-                    </p>
-                  </div>
-                  
-                  {/* Save Changes button with spinner state */}
-                  <button
-                    onClick={handleSaveChanges}
-                    disabled={isSavingFinancials}
-                    className="flex items-center gap-2 px-5 py-3 bg-[#D4AF37] hover:bg-[#c9a832] disabled:bg-slate-700 text-[#0D0D14] rounded-xl text-xs font-black uppercase tracking-widest transition-all cursor-pointer shadow-lg active:scale-95 shrink-0"
-                  >
-                    {isSavingFinancials ? (
-                      <span className="w-3.5 h-3.5 border-2 border-[#0D0D14]/20 border-t-[#0D0D14] rounded-full animate-spin" />
-                    ) : (
-                      <span>💾</span>
-                    )}
-                    {isSavingFinancials ? "Saving..." : "Save Changes"}
-                  </button>
-                </div>
 
-                {/* Sub Tabs Selection */}
-                <div className="flex border-b border-white/5 gap-6">
-                  <button
-                    onClick={() => { setFinancialTab('monthly'); setSelectedRows({}); }}
-                    className={cn(
-                      "pb-3 text-xs font-black uppercase tracking-widest border-b-2 transition-all cursor-pointer",
-                      financialTab === 'monthly' ? "border-[#D4AF37] text-[#F0EFE8]" : "border-transparent text-[#A09E9A] hover:text-[#F0EFE8]"
-                    )}
-                  >
-                    Monthly Financials
-                  </button>
-                  <button
-                    onClick={() => { setFinancialTab('weekly'); setSelectedRows({}); }}
-                    className={cn(
-                      "pb-3 text-xs font-black uppercase tracking-widest border-b-2 transition-all cursor-pointer",
-                      financialTab === 'weekly' ? "border-[#D4AF37] text-[#F0EFE8]" : "border-transparent text-[#A09E9A] hover:text-[#F0EFE8]"
-                    )}
-                  >
-                    Weekly Financials
-                  </button>
-                </div>
-
-                {/* Unified Ingestion Zone */}
-                <div className="tech-card bg-[#1A1A28] border border-white/5 p-6 rounded-2xl">
-                  <div className="flex flex-col space-y-4">
-                    <div className="flex items-center justify-between">
-                      <label htmlFor="bulk-ledger-paste" className="text-sm font-black uppercase tracking-widest text-[#F0EFE8] flex items-center gap-2">
-                        <span className="text-[#D4AF37]">📋</span> Paste Raw Ledger Data
-                      </label>
-                      <span className="text-[9px] text-[#A09E9A] uppercase tracking-wider font-bold">
-                        Supports direct paste from Excel/Sheets
-                      </span>
+                  {/* Header */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div className="space-y-1">
+                      <h3 className="font-bold text-xl flex items-center gap-2 text-[#F0EFE8]">
+                        <Database size={20} className="text-[#D4AF37]" />
+                        High-Volume Financial Ledger
+                      </h3>
+                      <p className="text-[10px] text-slate-400 uppercase tracking-widest font-black">
+                        Bypasses Firestore. Files saved directly as flat JSON in Firebase Storage.
+                      </p>
                     </div>
-                    <textarea
-                      id="bulk-ledger-paste"
-                      placeholder="Paste columns here (tab-separated)..."
-                      className="w-full h-32 glass-input font-mono text-[10px] resize-none focus:ring-1 focus:ring-[#D4AF37] text-[#F0EFE8] bg-[#0D0D14] border border-white/10 rounded-xl p-4 shadow-inner"
-                    />
+
+                    {/* Save Changes button with spinner state */}
                     <button
-                      onClick={() => {
-                        const textarea = document.getElementById('bulk-ledger-paste') as HTMLTextAreaElement;
-                        if (textarea && textarea.value.trim()) {
-                          handleBulkPaste(textarea.value);
-                          textarea.value = '';
-                        }
-                      }}
-                      className="w-full py-4 bg-[#D4AF37]/10 hover:bg-[#D4AF37] text-[#D4AF37] hover:text-[#0D0D14] transition-all font-black uppercase text-[11px] tracking-widest rounded-xl cursor-pointer shadow-lg active:scale-95"
+                      onClick={handleSaveChanges}
+                      disabled={isSavingFinancials}
+                      className="flex items-center gap-2 px-5 py-3 bg-[#D4AF37] hover:bg-[#c9a832] disabled:bg-slate-700 text-[#0D0D14] rounded-xl text-xs font-black uppercase tracking-widest transition-all cursor-pointer shadow-lg active:scale-95 shrink-0"
                     >
-                      Process & Load Data to Grid
+                      {isSavingFinancials ? (
+                        <span className="w-3.5 h-3.5 border-2 border-[#0D0D14]/20 border-t-[#0D0D14] rounded-full animate-spin" />
+                      ) : (
+                        <span>💾</span>
+                      )}
+                      {isSavingFinancials ? "Saving..." : "Save Changes"}
                     </button>
                   </div>
-                </div>
 
-                {/* Ledger Interactive Spreadsheet Table */}
-                <div className="tech-card !p-0 border border-white/5 overflow-hidden bg-[#13131E] shadow-xl">
-                  
-                  {/* Grid Action Bar */}
-                  <div className="flex items-center justify-between p-4 border-b border-white/5 bg-[#1A1A28]/40">
-                    <div className="flex items-center gap-3">
-                      <button
-                        onClick={handleAddRow}
-                        className="px-3.5 py-2 bg-emerald-550 hover:bg-emerald-600 text-white rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer shadow-sm shadow-emerald-500/10 active:scale-95"
-                      >
-                        + Add Row
-                      </button>
-                      <button
-                        onClick={handleDeleteSelection}
-                        disabled={!Object.keys(selectedRows).some(key => key.startsWith(`${financialTab}_`) && selectedRows[key])}
-                        className="px-3.5 py-2 bg-red-550 hover:bg-red-650 disabled:bg-[#222235] text-white disabled:text-[#A09E9A]/40 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer shadow-sm active:scale-95"
-                      >
-                        🗑️ Delete Selection
-                      </button>
-                    </div>
+                  {/* Sub Tabs Selection */}
+                  <div className="flex border-b border-white/5 gap-6">
+                    <button
+                      onClick={() => { setFinancialTab('monthly'); setSelectedRows({}); }}
+                      className={cn(
+                        "pb-3 text-xs font-black uppercase tracking-widest border-b-2 transition-all cursor-pointer",
+                        financialTab === 'monthly' ? "border-[#D4AF37] text-[#F0EFE8]" : "border-transparent text-[#A09E9A] hover:text-[#F0EFE8]"
+                      )}
+                    >
+                      Monthly Financials
+                    </button>
+                    <button
+                      onClick={() => { setFinancialTab('weekly'); setSelectedRows({}); }}
+                      className={cn(
+                        "pb-3 text-xs font-black uppercase tracking-widest border-b-2 transition-all cursor-pointer",
+                        financialTab === 'weekly' ? "border-[#D4AF37] text-[#F0EFE8]" : "border-transparent text-[#A09E9A] hover:text-[#F0EFE8]"
+                      )}
+                    >
+                      Weekly Financials
+                    </button>
+                  </div>
 
-                    <div className="text-[10px] font-black uppercase tracking-widest text-[#A09E9A]">
-                      {(financialTab === 'monthly' ? monthlyLedger : weeklyLedger).length} Total rows in workspace
+                  {/* Unified Ingestion Zone */}
+                  <div className="tech-card bg-[#1A1A28] border border-white/5 p-6 rounded-2xl">
+                    <div className="flex flex-col space-y-4">
+                      <div className="flex items-center justify-between">
+                        <label htmlFor="bulk-ledger-paste" className="text-sm font-black uppercase tracking-widest text-[#F0EFE8] flex items-center gap-2">
+                          <span className="text-[#D4AF37]">📋</span> Paste Raw Ledger Data
+                        </label>
+                        <span className="text-[9px] text-[#A09E9A] uppercase tracking-wider font-bold">
+                          Supports direct paste from Excel/Sheets
+                        </span>
+                      </div>
+                      <textarea
+                        id="bulk-ledger-paste"
+                        placeholder="Paste columns here (tab-separated)..."
+                        className="w-full h-32 glass-input font-mono text-[10px] resize-none focus:ring-1 focus:ring-[#D4AF37] text-[#F0EFE8] bg-[#0D0D14] border border-white/10 rounded-xl p-4 shadow-inner"
+                      />
+                      <button
+                        onClick={() => {
+                          const textarea = document.getElementById('bulk-ledger-paste') as HTMLTextAreaElement;
+                          if (textarea && textarea.value.trim()) {
+                            handleBulkPaste(textarea.value);
+                            textarea.value = '';
+                          }
+                        }}
+                        className="w-full py-4 bg-[#D4AF37]/10 hover:bg-[#D4AF37] text-[#D4AF37] hover:text-[#0D0D14] transition-all font-black uppercase text-[11px] tracking-widest rounded-xl cursor-pointer shadow-lg active:scale-95"
+                      >
+                        Process & Load Data to Grid
+                      </button>
                     </div>
                   </div>
 
-                  {/* Spreadsheet Grid Container */}
-                  <div className="overflow-x-auto overflow-y-auto max-h-[500px] relative custom-scrollbar">
-                    <table className="w-full text-left text-xs min-w-[1800px] border-collapse">
-                      <thead>
-                        <tr className="border-b border-white/5 text-[9px] font-black text-[#A09E9A] uppercase tracking-widest bg-[#1A1A28] sticky top-0 z-20">
-                          <th className="px-3 py-3 w-12 text-center bg-[#13131E] sticky left-0 z-30 border-r border-white/5">
-                            <input 
-                              type="checkbox"
-                              onChange={(e) => {
-                                const currentData = financialTab === 'monthly' ? monthlyLedger : weeklyLedger;
-                                const nextSelected = { ...selectedRows };
-                                currentData.forEach((_, idx) => {
-                                  nextSelected[`${financialTab}_${idx}`] = e.target.checked;
-                                });
-                                setSelectedRows(nextSelected);
-                              }}
-                              className="rounded border-white/10 text-[#D4AF37] focus:ring-[#D4AF37] cursor-pointer"
-                              title="Select all rows"
-                            />
-                          </th>
-                          {/* STICKY COLUMN FOR POPPO ID */}
-                          <th className="px-4 py-3 w-36 sticky left-[48px] bg-[#13131E] z-30 border-r border-white/5">Poppo ID</th>
-                          {financialTab === 'monthly' ? (
-                            <>
-                              <th className="px-3 py-3 w-28">Month</th>
-                              <th className="px-3 py-3 w-20">Year</th>
-                            </>
-                          ) : (
-                            <>
-                              <th className="px-3 py-3 w-32">From Date</th>
-                              <th className="px-3 py-3 w-32">To Date</th>
-                            </>
-                          )}
-                          <th className="px-3 py-3 w-40">Nickname</th>
-                          <th className="px-3 py-3 w-28">Live duration</th>
-                          <th className="px-3 py-3 w-32">Party host duration</th>
-                          <th className="px-3 py-3 w-36">Total earnings of points</th>
-                          <th className="px-3 py-3 w-32">Agent Commission</th>
-                          <th className="px-3 py-3 w-28">Live earnings</th>
-                          <th className="px-3 py-3 w-28">Party Earnings</th>
-                          <th className="px-3 py-3 w-28">Private chat</th>
-                          <th className="px-3 py-3 w-24">Tips</th>
-                          <th className="px-3 py-3 w-32">Platform reward</th>
-                          <th className="px-3 py-3 w-28">Other Earnings</th>
-                          <th className="px-3 py-3 w-36">Platform hourly salary</th>
-                          <th className="px-3 py-3 w-28">Super Salary</th>
-                          <th className="px-3 py-3 w-28">Super Rank</th>
-                          <th className="px-3 py-3 w-20">Level</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-white/5 bg-transparent">
-                        {(financialTab === 'monthly' ? monthlyLedger : weeklyLedger).length === 0 ? (
-                          <tr>
-                            <td colSpan={20} className="py-12 text-center text-[#A09E9A] italic">
-                              No ledger entries found. Click "+ Add Row" or paste data above.
-                            </td>
+                  {/* Ledger Interactive Spreadsheet Table */}
+                  <div className="tech-card !p-0 border border-white/5 overflow-hidden bg-[#13131E] shadow-xl">
+
+                    {/* Grid Action Bar */}
+                    <div className="flex items-center justify-between p-4 border-b border-white/5 bg-[#1A1A28]/40">
+                      <div className="flex items-center gap-3">
+                        <button
+                          onClick={handleAddRow}
+                          className="px-3.5 py-2 bg-emerald-550 hover:bg-emerald-600 text-white rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer shadow-sm shadow-emerald-500/10 active:scale-95"
+                        >
+                          + Add Row
+                        </button>
+                        <button
+                          onClick={handleDeleteSelection}
+                          disabled={!Object.keys(selectedRows).some(key => key.startsWith(`${financialTab}_`) && selectedRows[key])}
+                          className="px-3.5 py-2 bg-red-550 hover:bg-red-650 disabled:bg-[#222235] text-white disabled:text-[#A09E9A]/40 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer shadow-sm active:scale-95"
+                        >
+                          🗑️ Delete Selection
+                        </button>
+                      </div>
+
+                      <div className="text-[10px] font-black uppercase tracking-widest text-[#A09E9A]">
+                        {(financialTab === 'monthly' ? monthlyLedger : weeklyLedger).length} Total rows in workspace
+                      </div>
+                    </div>
+
+                    {/* Spreadsheet Grid Container */}
+                    <div className="overflow-x-auto overflow-y-auto max-h-[500px] relative custom-scrollbar">
+                      <table className="w-full text-left text-xs min-w-[1800px] border-collapse">
+                        <thead>
+                          <tr className="border-b border-white/5 text-[9px] font-black text-[#A09E9A] uppercase tracking-widest bg-[#1A1A28] sticky top-0 z-20">
+                            <th className="px-3 py-3 w-12 text-center bg-[#13131E] sticky left-0 z-30 border-r border-white/5">
+                              <input
+                                type="checkbox"
+                                onChange={(e) => {
+                                  const currentData = financialTab === 'monthly' ? monthlyLedger : weeklyLedger;
+                                  const nextSelected = { ...selectedRows };
+                                  currentData.forEach((_, idx) => {
+                                    nextSelected[`${financialTab}_${idx}`] = e.target.checked;
+                                  });
+                                  setSelectedRows(nextSelected);
+                                }}
+                                className="rounded border-white/10 text-[#D4AF37] focus:ring-[#D4AF37] cursor-pointer"
+                                title="Select all rows"
+                              />
+                            </th>
+                            {/* STICKY COLUMN FOR POPPO ID */}
+                            <th className="px-4 py-3 w-36 sticky left-[48px] bg-[#13131E] z-30 border-r border-white/5">Poppo ID</th>
+                            {financialTab === 'monthly' ? (
+                              <>
+                                <th className="px-3 py-3 w-28">Month</th>
+                                <th className="px-3 py-3 w-20">Year</th>
+                              </>
+                            ) : (
+                              <>
+                                <th className="px-3 py-3 w-32">From Date</th>
+                                <th className="px-3 py-3 w-32">To Date</th>
+                              </>
+                            )}
+                            <th className="px-3 py-3 w-40">Nickname</th>
+                            <th className="px-3 py-3 w-28">Live duration</th>
+                            <th className="px-3 py-3 w-32">Party host duration</th>
+                            <th className="px-3 py-3 w-36">Total earnings of points</th>
+                            <th className="px-3 py-3 w-32">Agent Commission</th>
+                            <th className="px-3 py-3 w-28">Live earnings</th>
+                            <th className="px-3 py-3 w-28">Party Earnings</th>
+                            <th className="px-3 py-3 w-28">Private chat</th>
+                            <th className="px-3 py-3 w-24">Tips</th>
+                            <th className="px-3 py-3 w-32">Platform reward</th>
+                            <th className="px-3 py-3 w-28">Other Earnings</th>
+                            <th className="px-3 py-3 w-36">Platform hourly salary</th>
+                            <th className="px-3 py-3 w-28">Super Salary</th>
+                            <th className="px-3 py-3 w-28">Super Rank</th>
+                            <th className="px-3 py-3 w-20">Level</th>
                           </tr>
-                        ) : (
-                          (financialTab === 'monthly' ? monthlyLedger : weeklyLedger).map((row, idx) => {
-                            const isChecked = !!selectedRows[`${financialTab}_${idx}`];
-                            return (
-                              <tr key={idx} className="hover:bg-white/[0.01] transition-colors group">
-                                <td className="px-3 py-2 text-center bg-[#13131E] group-hover:bg-[#1A1A28] sticky left-0 z-10 border-r border-white/5 transition-colors">
-                                  <input
-                                    type="checkbox"
-                                    checked={isChecked}
-                                    onChange={(e) => {
-                                      setSelectedRows(prev => ({
-                                        ...prev,
-                                        [`${financialTab}_${idx}`]: e.target.checked
-                                      }));
-                                    }}
-                                    className="rounded border-white/10 text-[#D4AF37] focus:ring-[#D4AF37] cursor-pointer"
-                                    title="Select row"
-                                  />
-                                </td>
-                                
-                                {/* STICKY POPPO ID COLUMN - MONO SPACED READ WRITE WITH COPY SELECT-ALL */}
-                                <td className="px-4 py-2 sticky left-[48px] bg-[#13131E] group-hover:bg-[#1A1A28] transition-colors border-r border-white/5 z-10 font-mono font-bold text-indigo-500 w-36">
-                                  <input
-                                    type="text"
-                                    value={row.poppo_id || ''}
-                                    onChange={(e) => handleCellChange(idx, 'poppo_id', e.target.value)}
-                                    className="bg-transparent border-none w-full text-xs font-mono font-bold text-[#D4AF37] select-all focus:ring-1 focus:ring-[#D4AF37]/50 rounded px-1.5 py-0.5 outline-none"
-                                    placeholder="Enter Poppo ID"
-                                  />
-                                </td>
+                        </thead>
+                        <tbody className="divide-y divide-white/5 bg-transparent">
+                          {(financialTab === 'monthly' ? monthlyLedger : weeklyLedger).length === 0 ? (
+                            <tr>
+                              <td colSpan={20} className="py-12 text-center text-[#A09E9A] italic">
+                                No ledger entries found. Click "+ Add Row" or paste data above.
+                              </td>
+                            </tr>
+                          ) : (
+                            (financialTab === 'monthly' ? monthlyLedger : weeklyLedger).map((row, idx) => {
+                              const isChecked = !!selectedRows[`${financialTab}_${idx}`];
+                              return (
+                                <tr key={idx} className="hover:bg-white/[0.01] transition-colors group">
+                                  <td className="px-3 py-2 text-center bg-[#13131E] group-hover:bg-[#1A1A28] sticky left-0 z-10 border-r border-white/5 transition-colors">
+                                    <input
+                                      type="checkbox"
+                                      checked={isChecked}
+                                      onChange={(e) => {
+                                        setSelectedRows(prev => ({
+                                          ...prev,
+                                          [`${financialTab}_${idx}`]: e.target.checked
+                                        }));
+                                      }}
+                                      className="rounded border-white/10 text-[#D4AF37] focus:ring-[#D4AF37] cursor-pointer"
+                                      title="Select row"
+                                    />
+                                  </td>
 
-                                {financialTab === 'monthly' ? (
-                                  <>
-                                    <td className="px-3 py-2">
-                                      <input
-                                        type="text"
-                                        value={row.month || ''}
-                                        onChange={(e) => handleCellChange(idx, 'month', e.target.value)}
-                                        className="bg-transparent border-none w-full text-xs focus:ring-1 focus:ring-[#D4AF37]/50 rounded px-1.5 py-0.5 outline-none font-medium text-[#F0EFE8]"
-                                        placeholder="YYYY-MM"
-                                      />
-                                    </td>
-                                    <td className="px-3 py-2">
-                                      <input
-                                        type="number"
-                                        value={row.year ?? ''}
-                                        onChange={(e) => handleCellChange(idx, 'year', parseInt(e.target.value) || 0)}
-                                        className="bg-transparent border-none w-full text-xs focus:ring-1 focus:ring-[#D4AF37]/50 rounded px-1.5 py-0.5 outline-none font-medium text-[#F0EFE8]"
-                                        placeholder="Year"
-                                      />
-                                    </td>
-                                  </>
-                                ) : (
-                                  <>
-                                    <td className="px-3 py-2">
-                                      <input
-                                        type="text"
-                                        value={row.from_date || ''}
-                                        onChange={(e) => handleCellChange(idx, 'from_date', e.target.value)}
-                                        className="bg-transparent border-none w-full text-xs focus:ring-1 focus:ring-[#D4AF37]/50 rounded px-1.5 py-0.5 outline-none font-medium text-[#F0EFE8]"
-                                        placeholder="YYYY-MM-DD"
-                                      />
-                                    </td>
-                                    <td className="px-3 py-2">
-                                      <input
-                                        type="text"
-                                        value={row.to_date || ''}
-                                        onChange={(e) => handleCellChange(idx, 'to_date', e.target.value)}
-                                        className="bg-transparent border-none w-full text-xs focus:ring-1 focus:ring-[#D4AF37]/50 rounded px-1.5 py-0.5 outline-none font-medium text-[#F0EFE8]"
-                                        placeholder="YYYY-MM-DD"
-                                      />
-                                    </td>
-                                  </>
-                                )}
+                                  {/* STICKY POPPO ID COLUMN - MONO SPACED READ WRITE WITH COPY SELECT-ALL */}
+                                  <td className="px-4 py-2 sticky left-[48px] bg-[#13131E] group-hover:bg-[#1A1A28] transition-colors border-r border-white/5 z-10 font-mono font-bold text-indigo-500 w-36">
+                                    <input
+                                      type="text"
+                                      value={row.poppo_id || ''}
+                                      onChange={(e) => handleCellChange(idx, 'poppo_id', e.target.value)}
+                                      className="bg-transparent border-none w-full text-xs font-mono font-bold text-[#D4AF37] select-all focus:ring-1 focus:ring-[#D4AF37]/50 rounded px-1.5 py-0.5 outline-none"
+                                      placeholder="Enter Poppo ID"
+                                    />
+                                  </td>
 
-                                <td className="px-3 py-2">
-                                  <input
-                                    type="text"
-                                    value={row.nickname || ''}
-                                    onChange={(e) => handleCellChange(idx, 'nickname', e.target.value)}
-                                    className="bg-transparent border-none w-full text-xs font-semibold text-[#F0EFE8] focus:ring-1 focus:ring-[#D4AF37]/50 rounded px-1.5 py-0.5 outline-none"
-                                    placeholder="Nickname"
-                                  />
-                                </td>
+                                  {financialTab === 'monthly' ? (
+                                    <>
+                                      <td className="px-3 py-2">
+                                        <input
+                                          type="text"
+                                          value={row.month || ''}
+                                          onChange={(e) => handleCellChange(idx, 'month', e.target.value)}
+                                          className="bg-transparent border-none w-full text-xs focus:ring-1 focus:ring-[#D4AF37]/50 rounded px-1.5 py-0.5 outline-none font-medium text-[#F0EFE8]"
+                                          placeholder="YYYY-MM"
+                                        />
+                                      </td>
+                                      <td className="px-3 py-2">
+                                        <input
+                                          type="number"
+                                          value={row.year ?? ''}
+                                          onChange={(e) => handleCellChange(idx, 'year', parseInt(e.target.value) || 0)}
+                                          className="bg-transparent border-none w-full text-xs focus:ring-1 focus:ring-[#D4AF37]/50 rounded px-1.5 py-0.5 outline-none font-medium text-[#F0EFE8]"
+                                          placeholder="Year"
+                                        />
+                                      </td>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <td className="px-3 py-2">
+                                        <input
+                                          type="text"
+                                          value={row.from_date || ''}
+                                          onChange={(e) => handleCellChange(idx, 'from_date', e.target.value)}
+                                          className="bg-transparent border-none w-full text-xs focus:ring-1 focus:ring-[#D4AF37]/50 rounded px-1.5 py-0.5 outline-none font-medium text-[#F0EFE8]"
+                                          placeholder="YYYY-MM-DD"
+                                        />
+                                      </td>
+                                      <td className="px-3 py-2">
+                                        <input
+                                          type="text"
+                                          value={row.to_date || ''}
+                                          onChange={(e) => handleCellChange(idx, 'to_date', e.target.value)}
+                                          className="bg-transparent border-none w-full text-xs focus:ring-1 focus:ring-[#D4AF37]/50 rounded px-1.5 py-0.5 outline-none font-medium text-[#F0EFE8]"
+                                          placeholder="YYYY-MM-DD"
+                                        />
+                                      </td>
+                                    </>
+                                  )}
 
-                                <td className="px-3 py-2">
-                                  <input
-                                    type="number"
-                                    step="any"
-                                    value={row.live_duration ?? ''}
-                                    onChange={(e) => handleCellChange(idx, 'live_duration', parseFloat(e.target.value) || 0)}
-                                    title="Live duration (hours)"
-                                    placeholder="0"
-                                    className="bg-transparent border-none w-full text-xs focus:ring-1 focus:ring-[#D4AF37]/50 rounded px-1.5 py-0.5 outline-none text-[#F0EFE8]"
-                                  />
-                                </td>
+                                  <td className="px-3 py-2">
+                                    <input
+                                      type="text"
+                                      value={row.nickname || ''}
+                                      onChange={(e) => handleCellChange(idx, 'nickname', e.target.value)}
+                                      className="bg-transparent border-none w-full text-xs font-semibold text-[#F0EFE8] focus:ring-1 focus:ring-[#D4AF37]/50 rounded px-1.5 py-0.5 outline-none"
+                                      placeholder="Nickname"
+                                    />
+                                  </td>
 
-                                <td className="px-3 py-2">
-                                  <input
-                                    type="number"
-                                    step="any"
-                                    value={row.party_host_duration ?? ''}
-                                    onChange={(e) => handleCellChange(idx, 'party_host_duration', parseFloat(e.target.value) || 0)}
-                                    title="Party host duration (hours)"
-                                    placeholder="0"
-                                    className="bg-transparent border-none w-full text-xs focus:ring-1 focus:ring-[#D4AF37]/50 rounded px-1.5 py-0.5 outline-none text-[#F0EFE8]"
-                                  />
-                                </td>
+                                  <td className="px-3 py-2">
+                                    <input
+                                      type="number"
+                                      step="any"
+                                      value={row.live_duration ?? ''}
+                                      onChange={(e) => handleCellChange(idx, 'live_duration', parseFloat(e.target.value) || 0)}
+                                      title="Live duration (hours)"
+                                      placeholder="0"
+                                      className="bg-transparent border-none w-full text-xs focus:ring-1 focus:ring-[#D4AF37]/50 rounded px-1.5 py-0.5 outline-none text-[#F0EFE8]"
+                                    />
+                                  </td>
 
-                                <td className="px-3 py-2 font-semibold">
-                                  <input
-                                    type="number"
-                                    value={row.total_points ?? ''}
-                                    onChange={(e) => handleCellChange(idx, 'total_points', parseInt(e.target.value) || 0)}
-                                    title="Total earnings of points"
-                                    placeholder="0"
-                                    className="bg-transparent border-none w-full text-xs font-semibold focus:ring-1 focus:ring-[#D4AF37]/50 rounded px-1.5 py-0.5 outline-none text-[#F0EFE8]"
-                                  />
-                                </td>
+                                  <td className="px-3 py-2">
+                                    <input
+                                      type="number"
+                                      step="any"
+                                      value={row.party_host_duration ?? ''}
+                                      onChange={(e) => handleCellChange(idx, 'party_host_duration', parseFloat(e.target.value) || 0)}
+                                      title="Party host duration (hours)"
+                                      placeholder="0"
+                                      className="bg-transparent border-none w-full text-xs focus:ring-1 focus:ring-[#D4AF37]/50 rounded px-1.5 py-0.5 outline-none text-[#F0EFE8]"
+                                    />
+                                  </td>
 
-                                <td className="px-3 py-2 text-emerald-400 font-semibold">
-                                  <input
-                                    type="number"
-                                    value={row.agent_commission ?? ''}
-                                    onChange={(e) => handleCellChange(idx, 'agent_commission', parseInt(e.target.value) || 0)}
-                                    title="Agent commission"
-                                    placeholder="0"
-                                    className="bg-transparent border-none w-full text-xs text-emerald-400 font-semibold focus:ring-1 focus:ring-[#D4AF37]/50 rounded px-1.5 py-0.5 outline-none"
-                                  />
-                                </td>
+                                  <td className="px-3 py-2 font-semibold">
+                                    <input
+                                      type="number"
+                                      value={row.total_points ?? ''}
+                                      onChange={(e) => handleCellChange(idx, 'total_points', parseInt(e.target.value) || 0)}
+                                      title="Total earnings of points"
+                                      placeholder="0"
+                                      className="bg-transparent border-none w-full text-xs font-semibold focus:ring-1 focus:ring-[#D4AF37]/50 rounded px-1.5 py-0.5 outline-none text-[#F0EFE8]"
+                                    />
+                                  </td>
 
-                                <td className="px-3 py-2">
-                                  <input
-                                    type="number"
-                                    value={row.live_earnings ?? ''}
-                                    onChange={(e) => handleCellChange(idx, 'live_earnings', parseInt(e.target.value) || 0)}
-                                    title="Live earnings"
-                                    placeholder="0"
-                                    className="bg-transparent border-none w-full text-xs focus:ring-1 focus:ring-[#D4AF37]/50 rounded px-1.5 py-0.5 outline-none text-[#F0EFE8]"
-                                  />
-                                </td>
+                                  <td className="px-3 py-2 text-emerald-400 font-semibold">
+                                    <input
+                                      type="number"
+                                      value={row.agent_commission ?? ''}
+                                      onChange={(e) => handleCellChange(idx, 'agent_commission', parseInt(e.target.value) || 0)}
+                                      title="Agent commission"
+                                      placeholder="0"
+                                      className="bg-transparent border-none w-full text-xs text-emerald-400 font-semibold focus:ring-1 focus:ring-[#D4AF37]/50 rounded px-1.5 py-0.5 outline-none"
+                                    />
+                                  </td>
 
-                                <td className="px-3 py-2">
-                                  <input
-                                    type="number"
-                                    value={row.party_earnings ?? ''}
-                                    onChange={(e) => handleCellChange(idx, 'party_earnings', parseInt(e.target.value) || 0)}
-                                    title="Party earnings"
-                                    placeholder="0"
-                                    className="bg-transparent border-none w-full text-xs focus:ring-1 focus:ring-[#D4AF37]/50 rounded px-1.5 py-0.5 outline-none text-[#F0EFE8]"
-                                  />
-                                </td>
+                                  <td className="px-3 py-2">
+                                    <input
+                                      type="number"
+                                      value={row.live_earnings ?? ''}
+                                      onChange={(e) => handleCellChange(idx, 'live_earnings', parseInt(e.target.value) || 0)}
+                                      title="Live earnings"
+                                      placeholder="0"
+                                      className="bg-transparent border-none w-full text-xs focus:ring-1 focus:ring-[#D4AF37]/50 rounded px-1.5 py-0.5 outline-none text-[#F0EFE8]"
+                                    />
+                                  </td>
 
-                                <td className="px-3 py-2">
-                                  <input
-                                    type="number"
-                                    value={row.private_chat ?? ''}
-                                    onChange={(e) => handleCellChange(idx, 'private_chat', parseInt(e.target.value) || 0)}
-                                    title="Private chat earnings"
-                                    placeholder="0"
-                                    className="bg-transparent border-none w-full text-xs focus:ring-1 focus:ring-[#D4AF37]/50 rounded px-1.5 py-0.5 outline-none text-[#F0EFE8]"
-                                  />
-                                </td>
+                                  <td className="px-3 py-2">
+                                    <input
+                                      type="number"
+                                      value={row.party_earnings ?? ''}
+                                      onChange={(e) => handleCellChange(idx, 'party_earnings', parseInt(e.target.value) || 0)}
+                                      title="Party earnings"
+                                      placeholder="0"
+                                      className="bg-transparent border-none w-full text-xs focus:ring-1 focus:ring-[#D4AF37]/50 rounded px-1.5 py-0.5 outline-none text-[#F0EFE8]"
+                                    />
+                                  </td>
 
-                                <td className="px-3 py-2">
-                                  <input
-                                    type="number"
-                                    value={row.tips ?? ''}
-                                    onChange={(e) => handleCellChange(idx, 'tips', parseInt(e.target.value) || 0)}
-                                    title="Tips"
-                                    placeholder="0"
-                                    className="bg-transparent border-none w-full text-xs focus:ring-1 focus:ring-[#D4AF37]/50 rounded px-1.5 py-0.5 outline-none text-[#F0EFE8]"
-                                  />
-                                </td>
+                                  <td className="px-3 py-2">
+                                    <input
+                                      type="number"
+                                      value={row.private_chat ?? ''}
+                                      onChange={(e) => handleCellChange(idx, 'private_chat', parseInt(e.target.value) || 0)}
+                                      title="Private chat earnings"
+                                      placeholder="0"
+                                      className="bg-transparent border-none w-full text-xs focus:ring-1 focus:ring-[#D4AF37]/50 rounded px-1.5 py-0.5 outline-none text-[#F0EFE8]"
+                                    />
+                                  </td>
 
-                                <td className="px-3 py-2">
-                                  <input
-                                    type="number"
-                                    value={row.platform_reward ?? ''}
-                                    onChange={(e) => handleCellChange(idx, 'platform_reward', parseInt(e.target.value) || 0)}
-                                    title="Platform reward"
-                                    placeholder="0"
-                                    className="bg-transparent border-none w-full text-xs focus:ring-1 focus:ring-[#D4AF37]/50 rounded px-1.5 py-0.5 outline-none text-[#F0EFE8]"
-                                  />
-                                </td>
+                                  <td className="px-3 py-2">
+                                    <input
+                                      type="number"
+                                      value={row.tips ?? ''}
+                                      onChange={(e) => handleCellChange(idx, 'tips', parseInt(e.target.value) || 0)}
+                                      title="Tips"
+                                      placeholder="0"
+                                      className="bg-transparent border-none w-full text-xs focus:ring-1 focus:ring-[#D4AF37]/50 rounded px-1.5 py-0.5 outline-none text-[#F0EFE8]"
+                                    />
+                                  </td>
 
-                                <td className="px-3 py-2">
-                                  <input
-                                    type="number"
-                                    value={row.other_earnings ?? row.other_earn ?? ''}
-                                    onChange={(e) => handleCellChange(idx, 'other_earnings', parseInt(e.target.value) || 0)}
-                                    title="Other earnings"
-                                    placeholder="0"
-                                    className="bg-transparent border-none w-full text-xs focus:ring-1 focus:ring-[#D4AF37]/50 rounded px-1.5 py-0.5 outline-none text-[#F0EFE8]"
-                                  />
-                                </td>
+                                  <td className="px-3 py-2">
+                                    <input
+                                      type="number"
+                                      value={row.platform_reward ?? ''}
+                                      onChange={(e) => handleCellChange(idx, 'platform_reward', parseInt(e.target.value) || 0)}
+                                      title="Platform reward"
+                                      placeholder="0"
+                                      className="bg-transparent border-none w-full text-xs focus:ring-1 focus:ring-[#D4AF37]/50 rounded px-1.5 py-0.5 outline-none text-[#F0EFE8]"
+                                    />
+                                  </td>
 
-                                <td className="px-3 py-2">
-                                  <input
-                                    type="number"
-                                    value={row.platform_hourly_salary ?? ''}
-                                    onChange={(e) => handleCellChange(idx, 'platform_hourly_salary', parseInt(e.target.value) || 0)}
-                                    title="Platform hourly salary"
-                                    placeholder="0"
-                                    className="bg-transparent border-none w-full text-xs focus:ring-1 focus:ring-[#D4AF37]/50 rounded px-1.5 py-0.5 outline-none text-[#F0EFE8]"
-                                  />
-                                </td>
+                                  <td className="px-3 py-2">
+                                    <input
+                                      type="number"
+                                      value={row.other_earnings ?? row.other_earn ?? ''}
+                                      onChange={(e) => handleCellChange(idx, 'other_earnings', parseInt(e.target.value) || 0)}
+                                      title="Other earnings"
+                                      placeholder="0"
+                                      className="bg-transparent border-none w-full text-xs focus:ring-1 focus:ring-[#D4AF37]/50 rounded px-1.5 py-0.5 outline-none text-[#F0EFE8]"
+                                    />
+                                  </td>
 
-                                <td className="px-3 py-2">
-                                  <input
-                                    type="number"
-                                    value={row.super_salary ?? ''}
-                                    onChange={(e) => handleCellChange(idx, 'super_salary', parseInt(e.target.value) || 0)}
-                                    title="Super salary"
-                                    placeholder="0"
-                                    className="bg-transparent border-none w-full text-xs focus:ring-1 focus:ring-[#D4AF37]/50 rounded px-1.5 py-0.5 outline-none text-[#F0EFE8]"
-                                  />
-                                </td>
+                                  <td className="px-3 py-2">
+                                    <input
+                                      type="number"
+                                      value={row.platform_hourly_salary ?? ''}
+                                      onChange={(e) => handleCellChange(idx, 'platform_hourly_salary', parseInt(e.target.value) || 0)}
+                                      title="Platform hourly salary"
+                                      placeholder="0"
+                                      className="bg-transparent border-none w-full text-xs focus:ring-1 focus:ring-[#D4AF37]/50 rounded px-1.5 py-0.5 outline-none text-[#F0EFE8]"
+                                    />
+                                  </td>
 
-                                <td className="px-3 py-2">
-                                  <input
-                                    type="number"
-                                    value={row.super_rank ?? ''}
-                                    onChange={(e) => handleCellChange(idx, 'super_rank', parseInt(e.target.value) || 0)}
-                                    title="Super rank"
-                                    placeholder="0"
-                                    className="bg-transparent border-none w-full text-xs focus:ring-1 focus:ring-[#D4AF37]/50 rounded px-1.5 py-0.5 outline-none text-[#F0EFE8]"
-                                  />
-                                </td>
+                                  <td className="px-3 py-2">
+                                    <input
+                                      type="number"
+                                      value={row.super_salary ?? ''}
+                                      onChange={(e) => handleCellChange(idx, 'super_salary', parseInt(e.target.value) || 0)}
+                                      title="Super salary"
+                                      placeholder="0"
+                                      className="bg-transparent border-none w-full text-xs focus:ring-1 focus:ring-[#D4AF37]/50 rounded px-1.5 py-0.5 outline-none text-[#F0EFE8]"
+                                    />
+                                  </td>
 
-                                <td className="px-3 py-2 font-bold">
-                                  <input
-                                    type="number"
-                                    value={row.level ?? ''}
-                                    onChange={(e) => handleCellChange(idx, 'level', parseInt(e.target.value) || 0)}
-                                    title="Level"
-                                    placeholder="0"
-                                    className="bg-transparent border-none w-full text-xs font-bold focus:ring-1 focus:ring-[#D4AF37]/50 rounded px-1.5 py-0.5 outline-none text-[#F0EFE8]"
-                                  />
-                                </td>
-                              </tr>
-                            );
-                          })
-                        )}
-                      </tbody>
-                    </table>
+                                  <td className="px-3 py-2">
+                                    <input
+                                      type="number"
+                                      value={row.super_rank ?? ''}
+                                      onChange={(e) => handleCellChange(idx, 'super_rank', parseInt(e.target.value) || 0)}
+                                      title="Super rank"
+                                      placeholder="0"
+                                      className="bg-transparent border-none w-full text-xs focus:ring-1 focus:ring-[#D4AF37]/50 rounded px-1.5 py-0.5 outline-none text-[#F0EFE8]"
+                                    />
+                                  </td>
+
+                                  <td className="px-3 py-2 font-bold">
+                                    <input
+                                      type="number"
+                                      value={row.level ?? ''}
+                                      onChange={(e) => handleCellChange(idx, 'level', parseInt(e.target.value) || 0)}
+                                      title="Level"
+                                      placeholder="0"
+                                      className="bg-transparent border-none w-full text-xs font-bold focus:ring-1 focus:ring-[#D4AF37]/50 rounded px-1.5 py-0.5 outline-none text-[#F0EFE8]"
+                                    />
+                                  </td>
+                                </tr>
+                              );
+                            })
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Spreadsheet footer info */}
+                    <div className="p-3 border-t border-white/5 bg-[#1A1A28]/40 text-[10px] text-[#A09E9A] font-medium flex items-center gap-1.5">
+                      <span>💡</span>
+                      <span>Poppo ID columns support copy-paste selection. Nicknames are cross-referenced with the active roster instantly. Changes are stored in memory until you click "Save Changes".</span>
+                    </div>
                   </div>
 
-                  {/* Spreadsheet footer info */}
-                  <div className="p-3 border-t border-white/5 bg-[#1A1A28]/40 text-[10px] text-[#A09E9A] font-medium flex items-center gap-1.5">
-                    <span>💡</span>
-                    <span>Poppo ID columns support copy-paste selection. Nicknames are cross-referenced with the active roster instantly. Changes are stored in memory until you click "Save Changes".</span>
-                  </div>
-                </div>
-
-              </motion.div>
-             )
+                </motion.div>
+              )
             )}
 
             {activeView === 'roster_management' && (
               <motion.div key="roster_management" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
-                <RosterManagementTab 
-                  onUpdate={loadData} 
-                  auditLogAction={auditLogAction} 
-                  hosts={hosts} 
+                <RosterManagementTab
+                  onUpdate={loadData}
+                  auditLogAction={auditLogAction}
+                  hosts={hosts}
                   onResetAccountAccess={handleResetAccountAccess}
                 />
               </motion.div>
@@ -2865,8 +2865,8 @@ export const DirectorTab = () => {
                   <AlertCircle className="text-red-400" size={20} />
                   <h3 className="text-md font-black text-[#F0EFE8] uppercase tracking-wider">Reset Account Access</h3>
                 </div>
-                <button 
-                  onClick={() => !isResettingAccess && setResetConfirmTarget(null)} 
+                <button
+                  onClick={() => !isResettingAccess && setResetConfirmTarget(null)}
                   className="text-slate-400 hover:text-white transition-colors"
                   disabled={isResettingAccess}
                   title="Close modal"
@@ -2921,8 +2921,8 @@ export const DirectorTab = () => {
                   <Lock className="text-[#D4AF37]" size={20} />
                   <h3 className="text-md font-black text-[#F0EFE8] uppercase tracking-wider">Duplicate Identity Conflict Detector</h3>
                 </div>
-                <button 
-                  onClick={() => processNextDuplicate(duplicateQueue)} 
+                <button
+                  onClick={() => processNextDuplicate(duplicateQueue)}
                   className="text-slate-400 hover:text-white transition-colors"
                   title="Close merge review"
                   aria-label="Close merge review"
@@ -3091,16 +3091,16 @@ export const DirectorTab = () => {
                     )}
                   >
                     {tab === 'livehouse' ? 'Livehouse Queue' :
-                     tab === 'tasks' ? 'Task Board' :
-                     tab === 'feedback' ? 'Manager Feedbacks' :
-                     'Awards Desk'}
+                      tab === 'tasks' ? 'Task Board' :
+                        tab === 'feedback' ? 'Manager Feedbacks' :
+                          'Awards Desk'}
                   </button>
                 ))}
               </div>
             </div>
 
             {/* Sub-tab Content Rendering */}
-            
+
             {/* 1. Livehouse Queue */}
             {operationsSubTab === 'livehouse' && (
               <div className="space-y-6">
@@ -3148,9 +3148,9 @@ export const DirectorTab = () => {
                                 <span className={cn(
                                   "text-[8px] font-black uppercase px-2 py-0.5 rounded-full border",
                                   req.status === 'Approved' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
-                                  req.status === 'Pending Approval' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
-                                  req.status === 'Proposal Sent' ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20' :
-                                  'bg-[#222235] text-[#A09E9A] border-transparent'
+                                    req.status === 'Pending Approval' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
+                                      req.status === 'Proposal Sent' ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20' :
+                                        'bg-[#222235] text-[#A09E9A] border-transparent'
                                 )}>
                                   {req.status}
                                 </span>
@@ -3200,7 +3200,7 @@ export const DirectorTab = () => {
                       </button>
                       <h4 className="text-sm font-black text-[#F0EFE8] uppercase tracking-wider">Propose Alternate Timeslot</h4>
                       <p className="text-xs text-[#A09E9A]">For: <strong className="text-indigo-400">{proposingAltReq.name} ({proposingAltReq.poppoId})</strong></p>
-                      
+
                       <form onSubmit={handleProposeAlternate} className="space-y-4 pt-2">
                         <div className="space-y-1.5">
                           <label className="text-[9px] font-black uppercase text-[#A09E9A] tracking-wider">New Proposed Date</label>
@@ -3245,7 +3245,7 @@ export const DirectorTab = () => {
                 {/* Task Assignment Form */}
                 <div className="lg:col-span-1 bg-[#1A1A28]/40 border border-white/5 p-6 rounded-3xl space-y-4">
                   <h4 className="text-xs font-black uppercase tracking-widest text-[#F0EFE8] pb-2 border-b border-white/5">Assign Roster Instruction</h4>
-                  
+
                   <form onSubmit={handleDirectorTaskSubmit} className="space-y-4">
                     <div className="space-y-1.5">
                       <label className="text-[9px] font-black uppercase text-[#A09E9A] tracking-wider">Select Host</label>
@@ -3324,7 +3324,7 @@ export const DirectorTab = () => {
                 {/* Tasks Roster History */}
                 <div className="lg:col-span-2 bg-[#1A1A28]/40 border border-white/5 p-6 rounded-3xl flex flex-col gap-4">
                   <h4 className="text-xs font-black uppercase tracking-widest text-[#F0EFE8] pb-2 border-b border-white/5">Active Agency Tasks</h4>
-                  
+
                   <div className="overflow-x-auto font-sans">
                     <table className="w-full text-left text-xs">
                       <thead>
@@ -3381,7 +3381,7 @@ export const DirectorTab = () => {
             {operationsSubTab === 'feedback' && (
               <div className="space-y-6">
                 <h4 className="text-xs font-black uppercase tracking-widest text-[#A09E9A]/50">Chronological Manager Feedback Logs</h4>
-                
+
                 <div className="tech-card !p-0 overflow-hidden">
                   <div className="overflow-x-auto">
                     <table className="w-full text-left text-xs">
@@ -3889,7 +3889,7 @@ export const DirectorTab = () => {
       // 5. Financial & Activity metrics
       const liveDuration = parseFloat(findVal(row, ['live_duration', 'live duration', 'liveduration', 'live hours'], 0)) || 0;
       const partyHostDuration = parseFloat(findVal(row, ['party_host_duration', 'party host duration', 'partyhostduration', 'party duration', 'party hours'], 0)) || 0;
-      
+
       const totalPointsVal = findVal(row, ['total_earnings_of_points', 'total earnings of points', 'total points', 'total_points', 'points', 'totalEarningsPoints'], 0);
       const totalPoints = typeof totalPointsVal === 'number' ? totalPointsVal : parseInt(String(totalPointsVal).replace(/,/g, '')) || 0;
 

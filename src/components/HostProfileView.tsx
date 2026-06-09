@@ -70,12 +70,12 @@ const getIsLastMonth = (startDateStr: string, endDateStr: string): boolean => {
 
     const startYear = parseInt(startParts[0], 10);
     const startMonth = parseInt(startParts[1], 10) - 1;
-    
+
     const endYear = parseInt(endParts[0], 10);
     const endMonth = parseInt(endParts[1], 10) - 1;
 
     return startYear === lastMonthYear && startMonth === lastMonthIndex &&
-           endYear === lastMonthYear && endMonth === lastMonthIndex;
+      endYear === lastMonthYear && endMonth === lastMonthIndex;
   } catch (e) {
     return false;
   }
@@ -130,20 +130,20 @@ const formatLogDateAndTime = (dateInput: any, timeInput: string): string => {
 
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const monthName = months[monthIndex] || 'Jun';
-  
+
   let formattedTime = '';
   if (timeInput) {
     // Grab first part before '-' or space
     const parts = timeInput.split('-');
     const startPart = (parts[0] || '').trim();
-    
+
     // Extract hour, minute, and AM/PM
     const matchAMPM = startPart.match(/^(\d{1,2})(?::(\d{2}))?\s*([ap]m)/i);
     if (matchAMPM) {
       const h = parseInt(matchAMPM[1], 10);
       const mStr = matchAMPM[2]; // minutes if present
       const ampm = matchAMPM[3].toUpperCase();
-      
+
       if (mStr && mStr !== '00') {
         formattedTime = `${h}:${mStr}${ampm}`;
       } else {
@@ -157,7 +157,7 @@ const formatLogDateAndTime = (dateInput: any, timeInput: string): string => {
         const ampm = h >= 12 ? 'PM' : 'AM';
         h = h % 12;
         h = h ? h : 12;
-        
+
         if (mStr && mStr !== '00') {
           formattedTime = `${h}:${mStr}${ampm}`;
         } else {
@@ -168,7 +168,7 @@ const formatLogDateAndTime = (dateInput: any, timeInput: string): string => {
       }
     }
   }
-  
+
   return `${monthName} ${day}/${year}${formattedTime ? ' ' + formattedTime : ''}`;
 };
 
@@ -177,7 +177,7 @@ const formatDateStandard = (dateInput: any): string => {
   if (!dateInput) return '—';
   try {
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    
+
     // First try to parse YYYY-MM-DD string directly to avoid local timezone offset shifting
     if (typeof dateInput === 'string') {
       const clean = dateInput.trim();
@@ -201,10 +201,10 @@ const formatDateStandard = (dateInput: any): string => {
       date = new Date(dateInput);
     }
     if (isNaN(date.getTime())) return '—';
-    
+
     // Detect if Date object represents UTC midnight date (common for date strings parsed in JS)
     const isUTCDate = date.getUTCHours() === 0 && date.getUTCMinutes() === 0 && date.getUTCSeconds() === 0 && date.getUTCMilliseconds() === 0;
-    
+
     const day = String(isUTCDate ? date.getUTCDate() : date.getDate()).padStart(2, '0');
     const month = months[isUTCDate ? date.getUTCMonth() : date.getMonth()];
     const year = isUTCDate ? date.getUTCFullYear() : date.getFullYear();
@@ -284,9 +284,9 @@ const formatDateYYYYMMDD = (dateInput: any): string => {
       date = new Date(dateInput);
     }
     if (isNaN(date.getTime())) return String(dateInput);
-    
+
     const isUTCDate = date.getUTCHours() === 0 && date.getUTCMinutes() === 0 && date.getUTCSeconds() === 0 && date.getUTCMilliseconds() === 0;
-    
+
     const yyyy = isUTCDate ? date.getUTCFullYear() : date.getFullYear();
     const mm = String((isUTCDate ? date.getUTCMonth() : date.getMonth()) + 1).padStart(2, '0');
     const dd = String(isUTCDate ? date.getUTCDate() : date.getDate()).padStart(2, '0');
@@ -300,7 +300,7 @@ const formatDateMMDDYYYY = (dateInput: any): string => {
   if (!dateInput) return '—';
   try {
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    
+
     // First try to parse YYYY-MM-DD string directly to avoid local timezone offset shifting
     if (typeof dateInput === 'string') {
       const clean = dateInput.trim();
@@ -324,13 +324,13 @@ const formatDateMMDDYYYY = (dateInput: any): string => {
       date = new Date(dateInput);
     }
     if (isNaN(date.getTime())) return String(dateInput);
-    
+
     const isUTCDate = date.getUTCHours() === 0 && date.getUTCMinutes() === 0 && date.getUTCSeconds() === 0 && date.getUTCMilliseconds() === 0;
-    
+
     const yyyy = isUTCDate ? date.getUTCFullYear() : date.getFullYear();
     const mm = (isUTCDate ? date.getUTCMonth() : date.getMonth()) + 1;
     const dd = isUTCDate ? date.getUTCDate() : date.getDate();
-    
+
     const monthName = months[mm - 1] || 'Jun';
     const dayStr = String(dd).padStart(2, '0');
     return `${monthName} ${dayStr} - ${yyyy}`;
@@ -342,14 +342,14 @@ const formatDateMMDDYYYY = (dateInput: any): string => {
 const formatTimeslot = (timeStr: string) => {
   if (!timeStr) return 'TBA Manila Time';
   const clean = timeStr.trim();
-  
+
   // Extract time part and strip/ignore any existing timezone string to avoid duplicates or misformatting
   let timePart = clean;
   const tzMatch = clean.match(/\s*(pht|pst|gmt|utc|est|philippine|manila.*)$/i);
   if (tzMatch) {
     timePart = clean.substring(0, tzMatch.index).trim();
   }
-  
+
   let formattedTime = timePart;
   const ampmMatch = timePart.match(/^(\d{1,2}):(\d{2})\s*([ap]\.?m\.?)/i);
   if (ampmMatch) {
@@ -370,7 +370,7 @@ const formatTimeslot = (timeStr: string) => {
       formattedTime = `${hoursStr}:${minutes} ${ampm}`;
     }
   }
-  
+
   return `${formattedTime} Manila Time`;
 };
 
@@ -378,7 +378,7 @@ const convertManilaToLocal = (dateInput: any, timeStr: string): Date | null => {
   try {
     if (!dateInput) return null;
     let baseDateStr = '';
-    
+
     // First try to parse YYYY-MM-DD string directly to avoid local timezone offset shifting
     if (typeof dateInput === 'string') {
       const cleanInput = dateInput.trim();
@@ -387,7 +387,7 @@ const convertManilaToLocal = (dateInput: any, timeStr: string): Date | null => {
         baseDateStr = `${match[1]}-${match[2]}-${match[3]}`;
       }
     }
-    
+
     if (!baseDateStr) {
       let date: Date;
       if (dateInput?.seconds) {
@@ -397,7 +397,7 @@ const convertManilaToLocal = (dateInput: any, timeStr: string): Date | null => {
       } else {
         date = new Date(dateInput);
       }
-      
+
       if (!isNaN(date.getTime())) {
         const isUTCDate = date.getUTCHours() === 0 && date.getUTCMinutes() === 0 && date.getUTCSeconds() === 0 && date.getUTCMilliseconds() === 0;
         const yyyy = isUTCDate ? date.getUTCFullYear() : date.getFullYear();
@@ -411,7 +411,7 @@ const convertManilaToLocal = (dateInput: any, timeStr: string): Date | null => {
 
     let hour = 19; // Default to 7:00 PM if parsing fails
     let min = 0;
-    
+
     if (timeStr) {
       const clean = timeStr.trim();
       let timePart = clean;
@@ -419,7 +419,7 @@ const convertManilaToLocal = (dateInput: any, timeStr: string): Date | null => {
       if (tzMatch) {
         timePart = clean.substring(0, tzMatch.index).trim();
       }
-      
+
       const ampmMatch = timePart.match(/^(\d{1,2}):(\d{2})\s*([ap]\.?m\.?)/i);
       if (ampmMatch) {
         let h = parseInt(ampmMatch[1], 10);
@@ -453,22 +453,22 @@ const formatToLocalTimezone = (date: Date): string => {
   const mm = String(date.getMonth() + 1).padStart(2, '0');
   const dd = String(date.getDate()).padStart(2, '0');
   const yyyy = date.getFullYear();
-  
+
   let hours = date.getHours();
   const minutes = String(date.getMinutes()).padStart(2, '0');
   const ampm = hours >= 12 ? 'PM' : 'AM';
   hours = hours % 12;
   hours = hours ? hours : 12;
   const hoursStr = String(hours).padStart(2, '0');
-  
+
   let tzAbbr = '';
   try {
     const tzName = new Intl.DateTimeFormat('en-US', { timeZoneName: 'short' })
       .formatToParts(date)
       .find(p => p.type === 'timeZoneName')?.value;
     if (tzName) tzAbbr = tzName;
-  } catch (e) {}
-  
+  } catch (e) { }
+
   if (!tzAbbr) {
     const offset = date.getTimezoneOffset();
     const absOffset = Math.abs(offset);
@@ -477,7 +477,7 @@ const formatToLocalTimezone = (date: Date): string => {
     const mins = String(absOffset % 60).padStart(2, '0');
     tzAbbr = `UTC${sign}${hrs}:${mins}`;
   }
-  
+
   return `Local Time: ${mm}-${dd}-${yyyy} • ${hoursStr}:${minutes} ${ampm} (${tzAbbr})`;
 };
 
@@ -500,7 +500,7 @@ const getSocialLink = (type: string, url?: string): string | null => {
   return null;
 };
 
-const MONTH_ORDER = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+const MONTH_ORDER = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
 // Helper to format period uniformly (e.g. "Jan/26")
 const formatPeriodShort = (monthNameOrNum: any, year: any): string => {
@@ -511,7 +511,7 @@ const formatPeriodShort = (monthNameOrNum: any, year: any): string => {
     'january': 'Jan', 'february': 'Feb', 'march': 'Mar', 'april': 'Apr', 'may': 'May', 'june': 'Jun',
     'july': 'Jul', 'august': 'Aug', 'september': 'Sep', 'october': 'Oct', 'november': 'Nov', 'december': 'Dec'
   };
-  
+
   let mStr = 'Jan';
   const inputMonth = String(monthNameOrNum).toLowerCase();
   if (MONTH_SHORT[inputMonth]) {
@@ -524,7 +524,7 @@ const formatPeriodShort = (monthNameOrNum: any, year: any): string => {
       }
     }
   }
-  
+
   let yStr = '26';
   if (year) {
     const fullY = String(year);
@@ -533,9 +533,9 @@ const formatPeriodShort = (monthNameOrNum: any, year: any): string => {
   return `${mStr}/${yStr}`;
 };
 
-export const HostProfileView: React.FC<HostProfileViewProps> = ({ 
-  host, 
-  isReadOnly = false, 
+export const HostProfileView: React.FC<HostProfileViewProps> = ({
+  host,
+  isReadOnly = false,
   onClose,
   onProfileUpdated,
   hidePerformanceStats = false
@@ -644,7 +644,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
     e.preventDefault();
     if (!taskTitle || !taskDescription || !taskDueDateVal) return;
     setIsSubmittingTask(true);
-    
+
     const newTask: Task = {
       taskId: crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 15),
       assignedToUserId: 'agency_wide', // Defaulting for simple task form
@@ -727,7 +727,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
       // Compute start and end dates
       const pad = (n: number) => String(n).padStart(2, '0');
       const startDateStr = `${yearNum}-${pad(bulkMonth)}-01`;
-      
+
       const lastDay = new Date(yearNum, monthIndex + 1, 0).getDate();
       const endDateStr = `${yearNum}-${pad(bulkMonth)}-${pad(lastDay)}`;
 
@@ -735,7 +735,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
 
       for (let rank = 1; rank <= 9; rank++) {
         const awardId = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 15);
-        
+
         let color = 'Gold';
         if (rank >= 4 && rank <= 6) color = 'Orange';
         else if (rank >= 7) color = 'Red';
@@ -754,7 +754,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
 
       await FirebaseService.saveAwards(newAwardsList);
       await FirebaseService.logSystemActivity(`Director/Admin bulk generated Monthly Top Niners awards templates for ${monthName} ${bulkYear}`, 'Info');
-      
+
       showOpsSuccess(`Successfully generated 9 Monthly Top Niner awards for ${monthName} ${bulkYear}!`);
       loadOpsData();
     } catch (err: any) {
@@ -929,7 +929,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
       const id = String(u.poppo_id || u.poppoId || u.id || '');
       const name = String(u.name || '').toLowerCase();
       const nickname = String(u.nickname || '').toLowerCase();
-      
+
       return id.includes(q) || name.includes(q) || nickname.includes(q);
     });
   }, [allUsers, hostSearchQuery]);
@@ -1090,7 +1090,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
 
       await setDoc(doc(db, 'host_requests', requestId), newRequest);
       await FirebaseService.logSystemActivity(`Agent ${managerName} requested intake for host "${intakeNickname}" (Poppo ID: ${intakePoppoId.trim()})`, 'Info');
-      
+
       const msg = `Intake request has been sent! Status: Pending`;
       showToast('success', msg);
       setIntakeSuccess(msg);
@@ -1147,10 +1147,10 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
     }
     setNoteError('');
     setNoteSuccess('');
-    
+
     const selectedHost = assignedHostsList.find(h => (h.poppo_id || h.poppoId || h.id) === noteHostId);
     const hostNickname = selectedHost ? (selectedHost.nickname || selectedHost.name) : '';
-    
+
     try {
       const managerName = rootAuth.nickname || rootAuth.name || 'Manager';
       const newNote = {
@@ -1161,7 +1161,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
         content: noteContent,
         timestamp: new Date().toISOString()
       };
-      
+
       const docRef = await addDoc(collection(db, 'notes'), newNote);
       await FirebaseService.logSystemActivity(`Manager/Agent ${managerName} added coaching feedback note for host "${hostNickname}" (Poppo ID: ${noteHostId})`, 'Info');
       setNoteSuccess('Note successfully saved!');
@@ -1182,7 +1182,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
       const selectedHost = assignedHostsList.find(h => String(h.poppo_id || h.poppoId || h.id || '') === String(hostId));
       const hostNickname = selectedHost ? (selectedHost.nickname || selectedHost.name) : 'Roster';
       const todoId = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 15);
-      
+
       const newTodo = {
         todoId,
         managerId: String(managerPoppoId),
@@ -1230,7 +1230,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
 
         const docRef = await addDoc(collection(db, 'notes'), completionNote);
         await FirebaseService.logSystemActivity(`Manager/Agent ${managerName} completed task "${todo.title}" for host "${hostNickname}"`, 'Info');
-        
+
         if (todo.hostId === noteHostId) {
           setNotesHistory(prev => [{ id: docRef.id, ...completionNote }, ...prev]);
         }
@@ -1256,7 +1256,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
   useEffect(() => {
     const userRoleLower = String(rootAuth?.role || '').toLowerCase();
     const poppoId = rootAuth?.poppo_id || rootAuth?.poppoId || rootAuth?.id;
-    
+
     if (userRoleLower === 'admin' && poppoId) {
       // 1. Subscribe to fanbase reports
       const qFanbase = query(collection(db, 'fanbase_reports'), where('reporterId', '==', poppoId));
@@ -1373,7 +1373,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
             <p className="text-[9px] text-[#A09E9A] uppercase tracking-wider mt-0.5 font-bold">Director Control Panel</p>
           </div>
         </div>
-        
+
         <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
           <div className="impersonation-search-container relative flex-1">
             <input
@@ -1410,7 +1410,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
               </div>
             )}
           </div>
-          
+
           <button
             type="button"
             disabled={!selectedImpersonationUser}
@@ -1468,7 +1468,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
           </div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 pt-2">
-            
+
             {/* LEFT COLUMN: Badge (former Awards Desk) */}
             <div className="space-y-6">
               <div className="flex items-center gap-2 border-b border-white/5 pb-2">
@@ -1773,7 +1773,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
                             <td className="px-3 py-2.5 font-mono text-[#A09E9A]/85 whitespace-nowrap">{t.dueDate}</td>
                             <td className="px-3 py-2.5"><span className="text-[8px] font-black uppercase px-1.5 py-0.5 rounded border bg-amber-500/10 text-amber-400 border-amber-500/20">{t.status}</span></td>
                             <td className="px-3 py-2.5 text-right">
-                              <button type="button" onClick={() => handleDirectorDeleteTask(t.taskId)} className="text-red-400 hover:text-red-300 p-1 cursor-pointer"><Trash2 size={13}/></button>
+                              <button type="button" onClick={() => handleDirectorDeleteTask(t.taskId)} className="text-red-400 hover:text-red-300 p-1 cursor-pointer"><Trash2 size={13} /></button>
                             </td>
                           </tr>
                         ))
@@ -1817,10 +1817,10 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
     const updatesHostNum = Number(gcUpdatesHost);
 
     if (isNaN(followersNum) || followersNum < 0 ||
-        isNaN(gcMembersNum) || gcMembersNum < 0 ||
-        isNaN(subsNum) || subsNum < 0 ||
-        isNaN(updatesFansNum) || updatesFansNum < 0 ||
-        isNaN(updatesHostNum) || updatesHostNum < 0) {
+      isNaN(gcMembersNum) || gcMembersNum < 0 ||
+      isNaN(subsNum) || subsNum < 0 ||
+      isNaN(updatesFansNum) || updatesFansNum < 0 ||
+      isNaN(updatesHostNum) || updatesHostNum < 0) {
       setFanErrors(['All metric counts must be positive numbers.']);
       return;
     }
@@ -1872,7 +1872,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
       );
 
       Storage.addLog('Fanbase', `Submitted admin fanbase report for ${hostNickname}`, rootAuth.nickname || rootAuth.name);
-      
+
       setFanSuccessMsg(`Successfully submitted fanbase report for ${hostNickname}!`);
       showToast('success', `Submitted fanbase report for ${hostNickname}`);
 
@@ -1982,7 +1982,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
           {/* Metrics */}
           <div className="bg-[#0D0D14]/50 p-6 rounded-2xl border border-white/5 space-y-6">
             <span className="text-[10px] font-black text-[#A09E9A] uppercase tracking-widest block border-b border-white/5 pb-2">Fanbase Health Indicators</span>
-            
+
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
               {/* Followers */}
               <div className="space-y-1.5">
@@ -2230,10 +2230,10 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
         const updatesFansNum = Number(editGcUpdatesFans);
 
         if (isNaN(followersNum) || followersNum < 0 ||
-            isNaN(subsNum) || subsNum < 0 ||
-            isNaN(gcMembersNum) || gcMembersNum < 0 ||
-            isNaN(updatesHostNum) || updatesHostNum < 0 ||
-            isNaN(updatesFansNum) || updatesFansNum < 0) {
+          isNaN(subsNum) || subsNum < 0 ||
+          isNaN(gcMembersNum) || gcMembersNum < 0 ||
+          isNaN(updatesHostNum) || updatesHostNum < 0 ||
+          isNaN(updatesFansNum) || updatesFansNum < 0) {
           throw new Error('All metrics must be positive numbers.');
         }
 
@@ -2320,7 +2320,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
 
       setLogSuccessMsg(`Successfully updated the ${editTargetLogItem.logType === 'calendar' ? 'event' : 'report'}!`);
       showToast('success', `Updated ${editTargetLogItem.logType === 'calendar' ? 'event' : 'report'}`);
-      
+
       setTimeout(() => {
         setEditTargetLogItem(null);
       }, 800);
@@ -2420,7 +2420,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
                     typeLabel = 'Fanbase';
                     titleStr = item.nickname || 'Unknown Host';
                     subtitleStr = `Poppo: ${item.poppoId || item.poppo_id}`;
-                    
+
                     const start = formatLogDateAndTime(item.fromDate || item.from_date, '');
                     const end = formatLogDateAndTime(item.toDate || item.to_date, '');
                     dateAndTimeStr = `${start} - ${end}`;
@@ -2503,7 +2503,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
           >
             <X size={16} />
           </button>
-          
+
           <h3 className="text-sm font-black text-[#F0EFE8] uppercase tracking-wider mb-4 flex items-center gap-2">
             <Edit2 size={16} className="text-[#D4AF37]" />
             Edit {editTargetLogItem.logType === 'fanbase' ? 'Fanbase Report' : editTargetLogItem.logType === 'attendance' ? 'Attendance Log' : 'Calendar Event'}
@@ -2530,7 +2530,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
                   <div>Target Host: <span className="text-[#D4AF37]">{editTargetLogItem.nickname || 'Unknown'}</span></div>
                   <div>Poppo ID: <span className="text-[#F0EFE8] font-mono">{editTargetLogItem.poppoId || editTargetLogItem.poppo_id}</span></div>
                 </div>
-                
+
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <label htmlFor="edit-start" className="text-[9px] font-bold text-[#A09E9A] uppercase tracking-widest">Start Date</label>
@@ -2640,7 +2640,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
                 {/* Attendees Selection */}
                 <div className="border border-white/5 rounded-xl bg-black/40 p-4 space-y-3">
                   <span className="text-[9px] font-black text-[#A09E9A] uppercase tracking-widest block text-left">Edit Attendees ({editAttendees.length})</span>
-                  
+
                   <div className="flex flex-wrap gap-1.5 min-h-[40px] p-2 bg-[#0D0D14]/80 rounded-lg border border-white/5">
                     {editAttendees.map((att, idx) => (
                       <span key={idx} className="px-2 py-0.5 rounded bg-[#D4AF37]/10 border border-[#D4AF37]/20 text-[10px] text-[#D4AF37] font-bold flex items-center gap-1">
@@ -2800,7 +2800,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
                 {/* Calendar Participants */}
                 <div className="border border-white/5 rounded-xl bg-black/40 p-4 space-y-3">
                   <span className="text-[9px] font-black text-[#A09E9A] uppercase tracking-widest block text-left">Edit Participants ({editCalParticipants.length})</span>
-                  
+
                   <div className="flex flex-wrap gap-1.5 min-h-[40px] p-2 bg-[#0D0D14]/80 rounded-lg border border-white/5">
                     {editCalParticipants.map((part, idx) => (
                       <span key={idx} className="px-2 py-0.5 rounded bg-[#D4AF37]/10 border border-[#D4AF37]/20 text-[10px] text-[#D4AF37] font-bold flex items-center gap-1">
@@ -3090,7 +3090,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
   const [isSubmittingEvent, setIsSubmittingEvent] = useState(false);
   const [eventActiveTab, setEventActiveTab] = useState<'exposure' | 'attendance' | 'recognitions'>('exposure');
   const [rpkMetadata, setRpkMetadata] = useState<any>(null);
-  
+
   // AI report states
   const [postedAiReport, setPostedAiReport] = useState<any>(null);
   const [myRecentAiReport, setMyRecentAiReport] = useState<any>(null);
@@ -3117,22 +3117,22 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
     setSelfSocialFb(host.social_links?.fb || '');
     setSelfSocialWa(host.social_links?.whatsapp || '');
     setSelfStreamSlots(host.streaming_hours?.length ? host.streaming_hours : [{ from: '', to: '' }]);
-    
+
     const loadProfileData = async () => {
       setIsLoading(true);
       try {
         // Section 1: Query performance_reports by document ID prefix (poppoId_month_year)
         const cleanHostId = String(host.id).trim();
         const perfQuery = query(
-          collection(db, 'performance_reports'), 
+          collection(db, 'performance_reports'),
           where(documentId(), '>=', `${cleanHostId}_`),
           where(documentId(), '<=', `${cleanHostId}_\uf8ff`)
         );
         const perfSnap = await getDocs(perfQuery);
         const perfList: any[] = [];
-        const MONTH_MAP: Record<string,number> = {
-          January:1,February:2,March:3,April:4,May:5,June:6,
-          July:7,August:8,September:9,October:10,November:11,December:12
+        const MONTH_MAP: Record<string, number> = {
+          January: 1, February: 2, March: 3, April: 4, May: 5, June: 6,
+          July: 7, August: 8, September: 9, October: 10, November: 11, December: 12
         };
         perfSnap.forEach(doc => {
           const data = doc.data();
@@ -3165,8 +3165,8 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
             );
             if (hostCommissions.length > 0) {
               const MONTH_MAP2: Record<string, number> = {
-                January:1,February:2,March:3,April:4,May:5,June:6,
-                July:7,August:8,September:9,October:10,November:11,December:12
+                January: 1, February: 2, March: 3, April: 4, May: 5, June: 6,
+                July: 7, August: 8, September: 9, October: 10, November: 11, December: 12
               };
               const mapped = hostCommissions.map((c: any) => {
                 // month field is like "2024-05" or "May" 
@@ -3345,17 +3345,17 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
           const aiSnap = await getDocs(query(collection(db, 'ai_reports'), where('hostId', '==', host.id)));
           const allAi = aiSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
           allAi.sort((a: any, b: any) => (b.timestamp || '').localeCompare(a.timestamp || ''));
-          
+
           const latestPosted = allAi.find((r: any) => r.isPosted === true);
           const currentAuth = Storage.getAuthState();
           const latestByUser = allAi.find((r: any) => r.generatedBy === currentAuth?.poppo_id);
-          
+
           setPostedAiReport(latestPosted || null);
           setMyRecentAiReport(latestByUser || null);
-          
+
           const userRoleLower = String(currentAuth?.role || '').toLowerCase();
           const isStaffUser = ['manager', 'agent', 'admin', 'head admin', 'director'].includes(userRoleLower);
-          
+
           if (isStaffUser) {
             const displayReport = latestByUser || latestPosted;
             if (displayReport) {
@@ -3446,17 +3446,17 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
         const aiSnap = await getDocs(query(collection(db, 'ai_reports'), where('hostId', '==', host.id)));
         const allAi = aiSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         allAi.sort((a: any, b: any) => (b.timestamp || '').localeCompare(a.timestamp || ''));
-        
+
         const latestPosted = allAi.find((r: any) => r.isPosted === true);
         const currentAuth = Storage.getAuthState();
         const latestByUser = allAi.find((r: any) => r.generatedBy === currentAuth?.poppo_id);
-        
+
         setPostedAiReport(latestPosted || null);
         setMyRecentAiReport(latestByUser || null);
-        
+
         const userRoleLower = String(currentAuth?.role || '').toLowerCase();
         const isStaffUser = ['manager', 'agent', 'admin', 'head admin', 'director'].includes(userRoleLower);
-        
+
         if (isStaffUser) {
           const displayReport = latestByUser || latestPosted;
           if (displayReport) {
@@ -3494,8 +3494,8 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
         const allHosts = await FirebaseService.getAllHosts();
         const mgrs = allHosts
           .filter(h => (h.role || '').toLowerCase() === 'manager' || (h.role || '').toLowerCase() === 'agent')
-          .map(h => ({ 
-            id: h.id || (h as any).poppoId || (h as any).poppo_id, 
+          .map(h => ({
+            id: h.id || (h as any).poppoId || (h as any).poppo_id,
             name: h.nickname || h.name || h.id,
             photoUrl: h.photoUrl
           }));
@@ -3536,7 +3536,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
               // Fill background with theme color #0D0D14
               ctx.fillStyle = '#0D0D14';
               ctx.fillRect(0, 0, 1080, 1080);
-              
+
               // Calculate scale to fit original image entirely inside the 1080x1080 square box
               const scale = Math.min(1080 / img.width, 1080 / img.height);
               const drawWidth = img.width * scale;
@@ -3589,10 +3589,10 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
         pk_points: rpkFormData.pk_points,
         pk_sessions: rpkFormData.pk_sessions
       };
-      
+
       await FirebaseService.submitRpkReport(host.id, rpkFormData.from_date, rpkFormData.to_date, reportData);
       await FirebaseService.logSystemActivity(`Submitted RPK report for Host: ${host.nickname || host.name} (Poppo ID: ${host.id}) - Period: ${rpkFormData.from_date} to ${rpkFormData.to_date} - Win %: ${rpkFormData.pk_wins_percent}, Points: ${rpkFormData.pk_points}, Sessions: ${rpkFormData.pk_sessions}`, 'Info');
-      
+
       // Reload latest RPK report immediately from 'pk_reports'
       try {
         const pkSnap = await getDocs(
@@ -3629,9 +3629,9 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
       }
 
       setIsRpkFormOpen(false);
-      setRpkFormData({from_date: '', to_date: '', pk_wins_percent: '', pk_points: '', pk_sessions: ''});
+      setRpkFormData({ from_date: '', to_date: '', pk_wins_percent: '', pk_points: '', pk_sessions: '' });
       alert("RPK Report submitted successfully.");
-    } catch(err) {
+    } catch (err) {
       console.error(err);
       alert("Failed to submit RPK Report");
     } finally {
@@ -3642,7 +3642,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
   // Submit Fanbase Report
   const handleFanbaseSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     setIsSubmittingFanbase(true);
     try {
       const currentAuth = Storage.getAuthState();
@@ -3701,7 +3701,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
 
       await FirebaseService.submitFanbaseReport(host.id, fromDateVal, toDateVal, reportData);
       await FirebaseService.logSystemActivity(`Submitted codebase fanbase report for Host: ${host.nickname || host.name} (Poppo ID: ${host.id}) - Period: ${fromDateVal} to ${toDateVal} - Followers: ${fanbaseFormData.total_followers}, Subscribers: ${fanbaseFormData.fanclub_subscribers}, GC Members: ${fanbaseFormData.fanclub_gc_members}`, 'Info');
-      
+
       // Reload latest fanbase report immediately from 'fanbase_reports'
       try {
         const fanbaseSnap = await getDocs(
@@ -3728,11 +3728,11 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
 
       setIsFanbaseFormOpen(false);
       setFanbaseFormData({
-        from_date: '', to_date: '', total_followers: '', fanclub_subscribers: '', 
+        from_date: '', to_date: '', total_followers: '', fanclub_subscribers: '',
         fanclub_gc_members: '', gc_activity_count_host: '', gc_activity_count_fans: '', notes: ''
       });
       alert("Fanbase Report submitted successfully.");
-    } catch(err) {
+    } catch (err) {
       console.error(err);
       alert("Failed to submit Fanbase Report");
     } finally {
@@ -3804,7 +3804,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
           try {
             const text = await res.clone().text();
             if (text) errMsg = text;
-          } catch (e) {}
+          } catch (e) { }
         }
         showToast('error', errMsg);
         console.error(`[UpdateProfile Error] HTTP ${res.status}: ${errMsg}`);
@@ -3813,7 +3813,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
       try {
         const resData = await res.clone().json();
         console.log("[UpdateProfile Success] Response data:", resData);
-      } catch (e) {}
+      } catch (e) { }
 
       updatedHost = {
         ...host,
@@ -3875,7 +3875,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
     try {
       const currentAuth = Storage.getAuthState();
       const eventId = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 15);
-      
+
       const newEvent = {
         eventDate: Timestamp.fromDate(new Date(eventFormData.eventDate)),
         timeslot: eventFormData.timeslot,
@@ -3967,22 +3967,22 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
 
   const selectedMetrics = useMemo(() => {
     const sum = (fn: (r: any) => number) => filteredReports.reduce((s, r) => s + fn(r), 0);
-    const liveHrs =       sum(r => getLiveHoursForReport(r));
-    const partyHrs =      sum(r => pf(r, 'partyHostDurationMinutes','party_host_duration_minutes','partyHostDuration','partyDuration') / 60);
-    const points =        sum(r => pf(r, 'totalEarningsOfPoints','total_earnings_of_points','totalPoints','total_points','points'));
-    const liveEarnings =  sum(r => pf(r, 'liveEarnings','live_earnings'));
-    const partyEarnings = sum(r => pf(r, 'partyEarnings','party_earnings'));
-    const privateChat =   sum(r => pf(r, 'privateChatEarnings','private_chat_earnings','privateChat'));
-    const tips =          sum(r => pf(r, 'tips'));
-    const platformReward =sum(r => pf(r, 'platformReward','platform_reward'));
-    const otherEarnings = sum(r => pf(r, 'otherEarnings','other_earnings'));
-    const platformHourly =sum(r => pf(r, 'platformHourlySalary','platform_hourly_salary'));
-    const superSalary =   sum(r => pf(r, 'superSalary','super_salary'));
-    const superRank =     sum(r => pf(r, 'superRank','super_rank'));
-    
+    const liveHrs = sum(r => getLiveHoursForReport(r));
+    const partyHrs = sum(r => pf(r, 'partyHostDurationMinutes', 'party_host_duration_minutes', 'partyHostDuration', 'partyDuration') / 60);
+    const points = sum(r => pf(r, 'totalEarningsOfPoints', 'total_earnings_of_points', 'totalPoints', 'total_points', 'points'));
+    const liveEarnings = sum(r => pf(r, 'liveEarnings', 'live_earnings'));
+    const partyEarnings = sum(r => pf(r, 'partyEarnings', 'party_earnings'));
+    const privateChat = sum(r => pf(r, 'privateChatEarnings', 'private_chat_earnings', 'privateChat'));
+    const tips = sum(r => pf(r, 'tips'));
+    const platformReward = sum(r => pf(r, 'platformReward', 'platform_reward'));
+    const otherEarnings = sum(r => pf(r, 'otherEarnings', 'other_earnings'));
+    const platformHourly = sum(r => pf(r, 'platformHourlySalary', 'platform_hourly_salary'));
+    const superSalary = sum(r => pf(r, 'superSalary', 'super_salary'));
+    const superRank = sum(r => pf(r, 'superRank', 'super_rank'));
+
     // Sum of all earnings components for total_earnings
     const totalEarnings = liveEarnings + partyEarnings + platformReward + tips + otherEarnings + superSalary + superRank;
-    
+
     return {
       liveHrs,
       partyHrs,
@@ -4002,12 +4002,12 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
 
   // Sort performance reports chronologically
   const sortedReportsForRender = useMemo(() => {
-    const MONTH_ORDER = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-    
+    const MONTH_ORDER = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
     return [...performanceReports].sort((a, b) => {
       const yearA = Number(a.year) || 0;
       const yearB = Number(b.year) || 0;
-      
+
       let monthA = Number(a.month) || 0;
       if (!monthA && a.monthName) {
         monthA = MONTH_ORDER.findIndex(m => m.toLowerCase() === String(a.monthName).toLowerCase()) + 1;
@@ -4016,7 +4016,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
       if (!monthB && b.monthName) {
         monthB = MONTH_ORDER.findIndex(m => m.toLowerCase() === String(b.monthName).toLowerCase()) + 1;
       }
-      
+
       if (yearA !== yearB) {
         return sortAscending ? yearA - yearB : yearB - yearA;
       }
@@ -4028,7 +4028,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
   const handleGenerateAI = async () => {
     const currentAuth = Storage.getAuthState();
     const userRoleLower = String(currentAuth?.role || '').toLowerCase();
-    const canGenerateAI = 
+    const canGenerateAI =
       (userRoleLower === 'manager' && String(host.assignedManagerId) === String(currentAuth?.poppo_id)) ||
       (userRoleLower === 'agent' && String(host.assignedManagerId) === String(currentAuth?.poppo_id)) ||
       (userRoleLower === 'head admin') ||
@@ -4046,7 +4046,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
       // Check last 7 days successful generation constraint
       const oneWeekAgo = new Date();
       oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-      
+
       const checkQuery = query(
         collection(db, 'ai_reports'),
         where('generatedBy', '==', currentAuth.poppo_id),
@@ -4161,13 +4161,13 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
 
   // Monthly bar chart data - chronologically ascending (earliest to newest)
   const trendChartData = useMemo(() => {
-    const MONTH_ORDER = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    const MONTH_ORDER = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
     return [...performanceReports]
       .sort((a, b) => {
         const yearA = Number(a.year) || 0;
         const yearB = Number(b.year) || 0;
         if (yearA !== yearB) return yearA - yearB;
-        
+
         let monthA = Number(a.month) || 0;
         if (!monthA && a.monthName) {
           monthA = MONTH_ORDER.findIndex(m => m.toLowerCase() === String(a.monthName).toLowerCase()) + 1;
@@ -4181,7 +4181,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
       .map(r => {
         return {
           label: formatPeriodShort(r.monthName || r.month, r.year),
-          points: pf(r, 'totalEarningsOfPoints','total_earnings_of_points','totalPoints','total_points','points'),
+          points: pf(r, 'totalEarningsOfPoints', 'total_earnings_of_points', 'totalPoints', 'total_points', 'points'),
           live_duration: getLiveHoursForReport(r)
         };
       });
@@ -4225,102 +4225,102 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
   // Earnings breakdown tiles definition
   const earningTiles = [
     // Row 1
-    { 
-      label: 'TOTAL EARNINGS', 
-      value: selectedMetrics.totalEarnings, 
-      bgGradient: 'linear-gradient(to bottom right, #3A2A18, #221A15)', 
-      accentColor: '#FFB800', 
+    {
+      label: 'TOTAL EARNINGS',
+      value: selectedMetrics.totalEarnings,
+      bgGradient: 'linear-gradient(to bottom right, #3A2A18, #221A15)',
+      accentColor: '#FFB800',
       hoverBorder: 'hover:border-[#FFB800]/50',
       fmt: (v: number) => v ? v.toLocaleString() : '0'
     },
-    { 
-      label: 'TOTAL POINTS', 
-      value: selectedMetrics.points, 
-      bgGradient: 'linear-gradient(to bottom right, #3D221C, #221515)', 
-      accentColor: '#FF7B00', 
+    {
+      label: 'TOTAL POINTS',
+      value: selectedMetrics.points,
+      bgGradient: 'linear-gradient(to bottom right, #3D221C, #221515)',
+      accentColor: '#FF7B00',
       hoverBorder: 'hover:border-[#FF7B00]/50',
       fmt: (v: number) => v ? v.toLocaleString() : '0'
     },
-    { 
-      label: 'TOTAL INCENTIVES', 
-      value: selectedMetrics.superRank + selectedMetrics.superSalary, 
-      bgGradient: 'linear-gradient(to bottom right, #3A1C28, #20131A)', 
-      accentColor: '#FF3B5C', 
+    {
+      label: 'TOTAL INCENTIVES',
+      value: selectedMetrics.superRank + selectedMetrics.superSalary,
+      bgGradient: 'linear-gradient(to bottom right, #3A1C28, #20131A)',
+      accentColor: '#FF3B5C',
       hoverBorder: 'hover:border-[#FF3B5C]/50',
       fmt: (v: number) => v ? v.toLocaleString() : '0'
     },
     // Row 2
-    { 
-      label: 'SOLO LIVE POINTS', 
-      value: selectedMetrics.liveEarnings, 
-      bgGradient: 'linear-gradient(to bottom right, #3A2A18, #221A15)', 
-      accentColor: '#FFB800', 
+    {
+      label: 'SOLO LIVE POINTS',
+      value: selectedMetrics.liveEarnings,
+      bgGradient: 'linear-gradient(to bottom right, #3A2A18, #221A15)',
+      accentColor: '#FFB800',
       hoverBorder: 'hover:border-[#FFB800]/50',
       fmt: (v: number) => v ? v.toLocaleString() : '0'
     },
-    { 
-      label: 'PARTY LIVE POINTS', 
-      value: selectedMetrics.partyEarnings, 
-      bgGradient: 'linear-gradient(to bottom right, #3D221C, #221515)', 
-      accentColor: '#FF7B00', 
+    {
+      label: 'PARTY LIVE POINTS',
+      value: selectedMetrics.partyEarnings,
+      bgGradient: 'linear-gradient(to bottom right, #3D221C, #221515)',
+      accentColor: '#FF7B00',
       hoverBorder: 'hover:border-[#FF7B00]/50',
       fmt: (v: number) => v ? v.toLocaleString() : '0'
     },
-    { 
-      label: 'TIPS', 
-      value: selectedMetrics.tips, 
-      bgGradient: 'linear-gradient(to bottom right, #3A1C28, #20131A)', 
-      accentColor: '#FF3B5C', 
+    {
+      label: 'TIPS',
+      value: selectedMetrics.tips,
+      bgGradient: 'linear-gradient(to bottom right, #3A1C28, #20131A)',
+      accentColor: '#FF3B5C',
       hoverBorder: 'hover:border-[#FF3B5C]/50',
       fmt: (v: number) => v ? v.toLocaleString() : '0'
     },
     // Row 3
-    { 
-      label: 'SUPER RANK', 
-      value: selectedMetrics.superRank, 
-      bgGradient: 'linear-gradient(to bottom right, #3A2A18, #221A15)', 
-      accentColor: '#FFB800', 
+    {
+      label: 'SUPER RANK',
+      value: selectedMetrics.superRank,
+      bgGradient: 'linear-gradient(to bottom right, #3A2A18, #221A15)',
+      accentColor: '#FFB800',
       hoverBorder: 'hover:border-[#FFB800]/50',
       fmt: (v: number) => v ? v.toLocaleString() : '0'
     },
-    { 
-      label: 'SUPER SALARY', 
-      value: selectedMetrics.superSalary, 
-      bgGradient: 'linear-gradient(to bottom right, #3D221C, #221515)', 
-      accentColor: '#FF7B00', 
+    {
+      label: 'SUPER SALARY',
+      value: selectedMetrics.superSalary,
+      bgGradient: 'linear-gradient(to bottom right, #3D221C, #221515)',
+      accentColor: '#FF7B00',
       hoverBorder: 'hover:border-[#FF7B00]/50',
       fmt: (v: number) => v ? v.toLocaleString() : '0'
     },
-    { 
-      label: 'OTHER EARNINGS', 
-      value: selectedMetrics.otherEarnings, 
-      bgGradient: 'linear-gradient(to bottom right, #3A1C28, #20131A)', 
-      accentColor: '#FF3B5C', 
+    {
+      label: 'OTHER EARNINGS',
+      value: selectedMetrics.otherEarnings,
+      bgGradient: 'linear-gradient(to bottom right, #3A1C28, #20131A)',
+      accentColor: '#FF3B5C',
       hoverBorder: 'hover:border-[#FF3B5C]/50',
       fmt: (v: number) => v ? v.toLocaleString() : '0'
     },
     // Row 4
-    { 
-      label: 'TOTAL HOURS', 
-      value: selectedMetrics.liveHrs + selectedMetrics.partyHrs, 
-      bgGradient: 'linear-gradient(to bottom right, #3A2A18, #221A15)', 
-      accentColor: '#FFB800', 
+    {
+      label: 'TOTAL HOURS',
+      value: selectedMetrics.liveHrs + selectedMetrics.partyHrs,
+      bgGradient: 'linear-gradient(to bottom right, #3A2A18, #221A15)',
+      accentColor: '#FFB800',
       hoverBorder: 'hover:border-[#FFB800]/50',
       fmt: (v: number) => v ? `${v.toFixed(1)}h` : '0.0h'
     },
-    { 
-      label: 'SOLO LIVE HOURS', 
-      value: selectedMetrics.liveHrs, 
-      bgGradient: 'linear-gradient(to bottom right, #3D221C, #221515)', 
-      accentColor: '#FF7B00', 
+    {
+      label: 'SOLO LIVE HOURS',
+      value: selectedMetrics.liveHrs,
+      bgGradient: 'linear-gradient(to bottom right, #3D221C, #221515)',
+      accentColor: '#FF7B00',
       hoverBorder: 'hover:border-[#FF7B00]/50',
       fmt: (v: number) => v ? `${v.toFixed(1)}h` : '0.0h'
     },
-    { 
-      label: 'PARTY LIVE HOURS', 
-      value: selectedMetrics.partyHrs, 
-      bgGradient: 'linear-gradient(to bottom right, #3A1C28, #20131A)', 
-      accentColor: '#FF3B5C', 
+    {
+      label: 'PARTY LIVE HOURS',
+      value: selectedMetrics.partyHrs,
+      bgGradient: 'linear-gradient(to bottom right, #3A1C28, #20131A)',
+      accentColor: '#FF3B5C',
       hoverBorder: 'hover:border-[#FF3B5C]/50',
       fmt: (v: number) => v ? `${v.toFixed(1)}h` : '0.0h'
     },
@@ -4409,8 +4409,8 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                     ? "text-sm sm:text-base md:text-lg"
                     : "text-base sm:text-lg md:text-xl";
                 return (
-                  <div 
-                    key={i} 
+                  <div
+                    key={i}
                     style={{ background: tile.bgGradient }}
                     className={cn(
                       "border border-white/5 p-3 sm:p-4.5 rounded-2xl flex flex-col items-center justify-center text-center min-h-[90px] transition-all duration-300 transform group-hover:translate-y-[-2px] shadow-lg gap-1.5",
@@ -4420,7 +4420,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                     <span className="text-[8px] sm:text-[9px] md:text-[10px] font-black text-white/50 uppercase tracking-widest leading-tight">
                       {tile.label}
                     </span>
-                    <span 
+                    <span
                       style={{ color: tile.accentColor }}
                       className={cn("font-black tracking-tight drop-shadow-md", textClass)}
                     >
@@ -4480,11 +4480,11 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
       <div className={cn("space-y-4 bg-white/5 backdrop-blur-xl border border-white/10 p-5 rounded-3xl transition-all duration-300 hover:border-indigo-500/30 group", styles.shadow)}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-             <div className="w-8 h-8 rounded-full bg-indigo-500/20 flex items-center justify-center text-indigo-400 text-sm shadow-inner">📊</div>
-             <h4 className="text-xs font-black uppercase tracking-widest text-[#F0EFE8]">Points & Duration Trend</h4>
+            <div className="w-8 h-8 rounded-full bg-indigo-500/20 flex items-center justify-center text-indigo-400 text-sm shadow-inner">📊</div>
+            <h4 className="text-xs font-black uppercase tracking-widest text-[#F0EFE8]">Points & Duration Trend</h4>
           </div>
         </div>
-        
+
         <div className="flex items-center justify-between mt-2 pt-2 border-t border-white/5">
           {/* Legend */}
           <div className="flex gap-3 text-[9px] font-black uppercase tracking-widest">
@@ -4527,25 +4527,25 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
               <ComposedChart data={trendChartData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
                 <defs>
                   <linearGradient id="colorPoints" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#D4AF37" stopOpacity={0.4}/>
-                    <stop offset="95%" stopColor="#D4AF37" stopOpacity={0.01}/>
+                    <stop offset="5%" stopColor="#D4AF37" stopOpacity={0.4} />
+                    <stop offset="95%" stopColor="#D4AF37" stopOpacity={0.01} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" vertical={false} />
-                <XAxis 
-                  dataKey="label" 
+                <XAxis
+                  dataKey="label"
                   tick={{ fontSize: 9, fill: '#A09E9A', fontWeight: 'bold' }}
                   axisLine={{ stroke: '#ffffff20' }}
                   tickLine={false}
                 />
-                <YAxis 
+                <YAxis
                   yAxisId="left"
                   tick={{ fontSize: 9, fill: '#A09E9A', fontWeight: 'bold' }}
                   axisLine={false}
                   tickLine={false}
                   tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`}
                 />
-                <YAxis 
+                <YAxis
                   yAxisId="right"
                   orientation="right"
                   tick={{ fontSize: 9, fill: '#A09E9A', fontWeight: 'bold' }}
@@ -4553,28 +4553,28 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                   tickLine={false}
                   tickFormatter={(value) => `${value.toFixed(0)}h`}
                 />
-                <Tooltip 
+                <Tooltip
                   contentStyle={{ backgroundColor: '#13131E', borderColor: '#ffffff20', borderRadius: '12px', fontSize: '10px', fontWeight: 'bold' }}
                   itemStyle={{ color: '#F0EFE8' }}
                   labelStyle={{ color: '#D4AF37', marginBottom: '4px' }}
                 />
-                <Area 
+                <Area
                   yAxisId="left"
-                  type="monotone" 
-                  dataKey="points" 
+                  type="monotone"
+                  dataKey="points"
                   name="Points"
-                  stroke="#D4AF37" 
+                  stroke="#D4AF37"
                   strokeWidth={2}
                   fill="url(#colorPoints)"
                   activeDot={{ r: 6, fill: '#D4AF37', stroke: '#F0EFE8', strokeWidth: 2 }}
                   animationDuration={1000}
                 />
-                <Line 
+                <Line
                   yAxisId="right"
-                  type="monotone" 
-                  dataKey="live_duration" 
+                  type="monotone"
+                  dataKey="live_duration"
                   name="Live Duration"
-                  stroke="#06b6d4" 
+                  stroke="#06b6d4"
                   strokeWidth={3}
                   dot={{ r: 4, fill: '#13131E', stroke: '#06b6d4', strokeWidth: 2 }}
                   activeDot={{ r: 6, fill: '#06b6d4', stroke: '#F0EFE8', strokeWidth: 2 }}
@@ -4586,20 +4586,20 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart data={trendChartData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" vertical={false} />
-                <XAxis 
-                  dataKey="label" 
+                <XAxis
+                  dataKey="label"
                   tick={{ fontSize: 9, fill: '#A09E9A', fontWeight: 'bold' }}
                   axisLine={{ stroke: '#ffffff20' }}
                   tickLine={false}
                 />
-                <YAxis 
+                <YAxis
                   yAxisId="left"
                   tick={{ fontSize: 9, fill: '#A09E9A', fontWeight: 'bold' }}
                   axisLine={false}
                   tickLine={false}
                   tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`}
                 />
-                <YAxis 
+                <YAxis
                   yAxisId="right"
                   orientation="right"
                   tick={{ fontSize: 9, fill: '#A09E9A', fontWeight: 'bold' }}
@@ -4607,25 +4607,25 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                   tickLine={false}
                   tickFormatter={(value) => `${value.toFixed(0)}h`}
                 />
-                <Tooltip 
+                <Tooltip
                   contentStyle={{ backgroundColor: '#13131E', borderColor: '#ffffff20', borderRadius: '12px', fontSize: '10px', fontStyle: 'normal', fontWeight: 'bold' }}
                   itemStyle={{ color: '#F0EFE8' }}
                   labelStyle={{ color: '#D4AF37', marginBottom: '4px' }}
                 />
-                <Bar 
+                <Bar
                   yAxisId="left"
-                  dataKey="points" 
+                  dataKey="points"
                   name="Points"
-                  fill="#D4AF37" 
+                  fill="#D4AF37"
                   radius={[4, 4, 0, 0]}
                   maxBarSize={40}
                   animationDuration={1000}
                 />
-                <Bar 
+                <Bar
                   yAxisId="right"
-                  dataKey="live_duration" 
+                  dataKey="live_duration"
                   name="Live Duration"
-                  fill="#06b6d4" 
+                  fill="#06b6d4"
                   radius={[4, 4, 0, 0]}
                   maxBarSize={40}
                   animationDuration={1000}
@@ -4672,11 +4672,11 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                   <span className="text-[7.5px] font-black text-[#A09E9A]/50 uppercase tracking-widest border border-white/10 px-1.5 py-0.5 rounded bg-white/5">Read-Only</span>
                 )}
               </div>
-              
+
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <label className="text-[8px] font-black text-[#A09E9A] uppercase tracking-widest block">Nickname</label>
-                  <input 
+                  <input
                     type="text"
                     title="Nickname"
                     placeholder="Nickname"
@@ -4775,9 +4775,9 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                     {isProcessingPhoto ? 'Uploading...' : 'Choose File'}
                     <input type="file" accept="image/*" onChange={handleFileChange} className="hidden" disabled={!isOwnProfile && !isDirectorOrHeadAdmin} />
                   </label>
-                  <input 
-                    type="text" 
-                    placeholder="Or paste photo URL..." 
+                  <input
+                    type="text"
+                    placeholder="Or paste photo URL..."
                     value={editPhotoUrl}
                     onChange={(e) => setEditPhotoUrl(e.target.value)}
                     className="w-full bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-1.5 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37] disabled:opacity-50 disabled:cursor-not-allowed"
@@ -4919,7 +4919,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
   }) => {
     const hasLink = !!url && String(url).trim() !== '';
     let linkUrl = '';
-    
+
     if (hasLink) {
       const trimmed = String(url).trim();
       if (type === 'instagram') {
@@ -4936,7 +4936,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
 
     if (!hasLink) {
       return (
-        <div 
+        <div
           className="w-9 h-9 rounded-xl bg-white/[0.02] border border-white/5 flex items-center justify-center text-[#A09E9A]/20 cursor-not-allowed transition-all duration-300"
           title={`${label} (Not linked)`}
         >
@@ -4946,7 +4946,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
     }
 
     return (
-      <a 
+      <a
         href={linkUrl}
         target="_blank"
         rel="noopener noreferrer"
@@ -4975,7 +4975,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
 
     return (
       <div className={cn("backdrop-blur-xl border-2 rounded-3xl overflow-hidden flex flex-col relative group/card transition-all duration-300", styles.gradientBg, styles.borderColor, styles.shadow, styles.topTrim)}>
-        
+
         {/* Full-width square profile photo acting as a header banner */}
         <div className="w-full aspect-square relative bg-[#0D0D14]">
           {isProcessingPhoto && (
@@ -4990,16 +4990,16 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
               {editNickname?.[0]?.toUpperCase() || host.name?.[0] || 'JD'}
             </div>
           )}
-          
+
           {/* Top Overlay (17% total height, top 12% is solid black, remaining 5% fades) */}
           <div className="absolute top-0 inset-x-0 h-[17%] pointer-events-none" style={{ background: 'linear-gradient(to bottom, #000000 0%, #000000 70.6%, transparent 100%)', zIndex: 10 }} />
-          
+
           {/* Bottom Overlay (30% total height, bottom 20% is solid black, remaining 10% fades) */}
           <div className="absolute bottom-0 inset-x-0 h-[30%] pointer-events-none" style={{ background: 'linear-gradient(to top, #000000 0%, #000000 66.7%, transparent 100%)', zIndex: 10 }} />
 
           {/* Faded gradient overlay at the bottom 25% to merge with profile block */}
           <div className="absolute bottom-0 inset-x-0 h-1/3 bg-gradient-to-t from-[#1A1A28] via-[#1A1A28]/60 to-transparent z-10" />
-          
+
           {/* Absolute positioned last month's awards overlaying the image top-left */}
           {lastMonthAwards.length > 0 && (
             <div className="absolute top-4 left-4 z-20 flex flex-col gap-1.5 max-w-[60%] pointer-events-auto">
@@ -5012,8 +5012,8 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                 else if (a.awardColor === 'Orange') badgeColorStyle = 'bg-orange-500/20 text-orange-400 border-orange-500/30';
 
                 return (
-                  <span 
-                    key={a.id} 
+                  <span
+                    key={a.id}
                     className={cn(
                       "text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg border backdrop-blur-md shadow-lg truncate block max-w-full",
                       badgeColorStyle
@@ -5029,10 +5029,10 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
 
           {/* Absolute positioned status badge overlaying the image top-right */}
           <div className="absolute top-4 right-4 z-20">
-             <span className={cn("text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full border backdrop-blur-md shadow-lg", 
-                host.status === 'Active' ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30" : "bg-amber-500/20 text-amber-400 border-amber-500/30")}>
-                {host.status || 'Active'}
-             </span>
+            <span className={cn("text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full border backdrop-blur-md shadow-lg",
+              host.status === 'Active' ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30" : "bg-amber-500/20 text-amber-400 border-amber-500/30")}>
+              {host.status || 'Active'}
+            </span>
           </div>
 
         </div>
@@ -5071,8 +5071,8 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                 else if (a.awardColor === 'Orange') badgeStyle = 'bg-orange-500/10 text-orange-400 border-orange-500/20';
 
                 return (
-                  <span 
-                    key={a.id} 
+                  <span
+                    key={a.id}
                     className={cn("text-[8px] font-black uppercase px-2 py-0.5 rounded-full border shrink-0 backdrop-blur-sm", badgeStyle)}
                     title={`Active Award: ${a.awardName} (${a.startDate} to ${a.endDate})`}
                   >
@@ -5096,9 +5096,9 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                 <span className="text-[9px] font-black uppercase tracking-widest mb-1 text-white/40">Assigned Manager</span>
                 <div className="flex items-center gap-2 mt-0.5">
                   {assignedManager?.photoUrl ? (
-                    <img 
-                      src={assignedManager.photoUrl} 
-                      alt={assignedManager.name || host.manager} 
+                    <img
+                      src={assignedManager.photoUrl}
+                      alt={assignedManager.name || host.manager}
                       className="w-12 h-12 rounded-full object-cover border border-white/10 shrink-0 shadow-inner"
                       referrerPolicy="no-referrer"
                     />
@@ -5124,17 +5124,17 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                 const tiktokLink = getSocialLink('tiktok', host.social_links?.tiktok);
                 const fbLink = getSocialLink('facebook', host.social_links?.fb);
                 const waLink = getSocialLink('whatsapp', host.social_links?.whatsapp);
-                
+
                 const hasAnySocial = igLink || tiktokLink || fbLink || waLink;
                 if (!hasAnySocial) return null;
-                
+
                 return (
                   <div className="flex items-center gap-2 mt-2">
                     {igLink && (
-                      <a 
-                        href={igLink} 
-                        target="_blank" 
-                        rel="noopener noreferrer" 
+                      <a
+                        href={igLink}
+                        target="_blank"
+                        rel="noopener noreferrer"
                         className="w-6 h-6 rounded-full bg-pink-500/10 hover:bg-pink-500/20 border border-pink-500/20 hover:border-pink-500/40 flex items-center justify-center text-pink-400 transition-all shadow-inner"
                         title="Instagram"
                       >
@@ -5142,10 +5142,10 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                       </a>
                     )}
                     {tiktokLink && (
-                      <a 
-                        href={tiktokLink} 
-                        target="_blank" 
-                        rel="noopener noreferrer" 
+                      <a
+                        href={tiktokLink}
+                        target="_blank"
+                        rel="noopener noreferrer"
                         className="w-6 h-6 rounded-full bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/20 hover:border-cyan-500/40 flex items-center justify-center text-cyan-400 transition-all shadow-inner"
                         title="TikTok"
                       >
@@ -5155,10 +5155,10 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                       </a>
                     )}
                     {fbLink && (
-                      <a 
-                        href={fbLink} 
-                        target="_blank" 
-                        rel="noopener noreferrer" 
+                      <a
+                        href={fbLink}
+                        target="_blank"
+                        rel="noopener noreferrer"
                         className="w-6 h-6 rounded-full bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 hover:border-blue-500/40 flex items-center justify-center text-blue-400 transition-all shadow-inner"
                         title="Facebook"
                       >
@@ -5166,10 +5166,10 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                       </a>
                     )}
                     {waLink && (
-                      <a 
-                        href={waLink} 
-                        target="_blank" 
-                        rel="noopener noreferrer" 
+                      <a
+                        href={waLink}
+                        target="_blank"
+                        rel="noopener noreferrer"
                         className="w-6 h-6 rounded-full bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 hover:border-emerald-500/40 flex items-center justify-center text-emerald-400 transition-all shadow-inner"
                         title="WhatsApp"
                       >
@@ -5189,8 +5189,8 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
               <span className="text-[9px] font-black text-white/40 uppercase tracking-widest block">Streaming Schedule</span>
               <div className="grid grid-cols-2 gap-3">
                 {host.streaming_hours.slice(0, 2).map((slot, idx) => (
-                  <div 
-                    key={idx} 
+                  <div
+                    key={idx}
                     className={cn(
                       "bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl px-3 py-2 text-center shadow-inner min-w-0",
                       host.streaming_hours.length === 1 && "col-span-2"
@@ -5228,11 +5228,11 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
       <div className={cn("space-y-4 flex-1 bg-white/5 backdrop-blur-xl border border-white/10 p-5 rounded-3xl transition-all duration-300 hover:border-amber-500/30 group", styles.shadow)}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-             <div className="w-8 h-8 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-400 text-sm shadow-inner">⚔️</div>
-             <h4 className="text-xs font-black uppercase tracking-widest text-[#F0EFE8]">PK Performance</h4>
+            <div className="w-8 h-8 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-400 text-sm shadow-inner">⚔️</div>
+            <h4 className="text-xs font-black uppercase tracking-widest text-[#F0EFE8]">PK Performance</h4>
           </div>
           {(isOwnProfile || isStaffUser) && (
-            <button 
+            <button
               onClick={() => setIsRpkFormOpen(true)}
               className="px-3 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-400 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all cursor-pointer shadow-md hover:shadow-amber-500/20"
             >
@@ -5240,46 +5240,46 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
             </button>
           )}
         </div>
-        
+
         <div className="grid gap-[12px] pt-2" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
           {[
-            { 
-              label: 'WIN %', 
-              value: `${pkData.win_percentage}%`, 
-              subLabel: 'Monthly', 
-              bgGradient: 'linear-gradient(to bottom right, #3A2A18, #221A15)', 
-              accentColor: '#FFB800', 
-              hoverBorder: 'hover:border-[#FFB800]/50' 
+            {
+              label: 'WIN %',
+              value: `${pkData.win_percentage}%`,
+              subLabel: 'Monthly',
+              bgGradient: 'linear-gradient(to bottom right, #3A2A18, #221A15)',
+              accentColor: '#FFB800',
+              hoverBorder: 'hover:border-[#FFB800]/50'
             },
-            { 
-              label: 'SCORE', 
-              value: formatNumber(pkData.pk_score), 
-              subLabel: 'Monthly', 
-              bgGradient: 'linear-gradient(to bottom right, #3D221C, #221515)', 
-              accentColor: '#FF7B00', 
-              hoverBorder: 'hover:border-[#FF7B00]/50' 
+            {
+              label: 'SCORE',
+              value: formatNumber(pkData.pk_score),
+              subLabel: 'Monthly',
+              bgGradient: 'linear-gradient(to bottom right, #3D221C, #221515)',
+              accentColor: '#FF7B00',
+              hoverBorder: 'hover:border-[#FF7B00]/50'
             },
-            { 
-              label: 'SESSIONS', 
-              value: String(pkData.sessions), 
-              subLabel: 'Weekly', 
-              bgGradient: 'linear-gradient(to bottom right, #3A1C28, #20131A)', 
-              accentColor: '#FF3B5C', 
-              hoverBorder: 'hover:border-[#FF3B5C]/50' 
+            {
+              label: 'SESSIONS',
+              value: String(pkData.sessions),
+              subLabel: 'Weekly',
+              bgGradient: 'linear-gradient(to bottom right, #3A1C28, #20131A)',
+              accentColor: '#FF3B5C',
+              hoverBorder: 'hover:border-[#FF3B5C]/50'
             },
           ].map((cell, idx) => (
-            <div 
-              key={idx} 
+            <div
+              key={idx}
               style={{ background: cell.bgGradient }}
               className={cn(
-                "border border-white/5 p-2.5 sm:p-4 rounded-2xl flex flex-col justify-between min-h-[85px] sm:min-h-[90px] transition-all duration-300 transform group-hover:translate-y-[-2px] shadow-lg", 
+                "border border-white/5 p-2.5 sm:p-4 rounded-2xl flex flex-col justify-between min-h-[85px] sm:min-h-[90px] transition-all duration-300 transform group-hover:translate-y-[-2px] shadow-lg",
                 cell.hoverBorder
               )}
             >
               <span className="text-[8px] sm:text-[9px] font-black text-[#A09E9A] uppercase tracking-widest leading-none">
                 {cell.label}
               </span>
-              <span 
+              <span
                 style={{ color: cell.accentColor }}
                 className="text-sm sm:text-lg md:text-xl font-black tracking-tight mt-2 block drop-shadow-md font-mono"
               >
@@ -5306,7 +5306,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
     const isOwnProfile = currentAuth.poppo_id === host.id;
     const userRoleLower = String(currentAuth?.role || '').toLowerCase();
     const canAddEvent = isOwnProfile || userRoleLower !== 'host';
-    
+
     const attendedCount = attendedEvents.length;
     const totalCount = totalAgencyEventsCount || 0;
     const presenceRatio = totalCount > 0 ? (attendedCount / totalCount) : 0;
@@ -5365,7 +5365,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                   const hostName = host.nickname || host.name;
                   const cleanHostName = hostName.trim().toLowerCase();
                   const cleanEventTitle = eventTitle.trim();
-                  
+
                   let displayTitle = '';
                   if (cleanEventTitle.toLowerCase().startsWith(cleanHostName)) {
                     displayTitle = cleanEventTitle;
@@ -5374,13 +5374,13 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                   }
 
                   const localTimeObj = convertManilaToLocal(e.eventDate || e.date, e.timeslot || e.time);
-                  const localTooltip = localTimeObj 
+                  const localTooltip = localTimeObj
                     ? formatToLocalTimezone(localTimeObj)
                     : undefined;
 
                   return (
-                    <div 
-                      key={idx} 
+                    <div
+                      key={idx}
                       className="bg-white/5 border border-white/10 p-3 rounded-xl hover:border-amber-500/30 transition-all duration-300 shadow-sm flex flex-col gap-1.5 group/item cursor-help"
                       title={localTooltip}
                     >
@@ -5419,25 +5419,25 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
           <>
             <div className="grid grid-cols-2 gap-2.5 pt-2">
               {[
-                { 
-                  label: 'Events Attended', 
-                  value: `${attendedCount} / ${totalCount}`, 
+                {
+                  label: 'Events Attended',
+                  value: `${attendedCount} / ${totalCount}`,
                   subLabel: 'Total Agency',
-                  bgGradient: 'linear-gradient(to bottom right, #3A2A18, #221A15)', 
-                  accentColor: '#FFB800', 
+                  bgGradient: 'linear-gradient(to bottom right, #3A2A18, #221A15)',
+                  accentColor: '#FFB800',
                   hoverBorder: 'hover:border-[#FFB800]/50'
                 },
-                { 
-                  label: 'Presence Score', 
-                  value: `${presencePercentage}%`, 
+                {
+                  label: 'Presence Score',
+                  value: `${presencePercentage}%`,
                   subLabel: 'Consistency',
-                  bgGradient: 'linear-gradient(to bottom right, #3D221C, #221515)', 
-                  accentColor: '#FF7B00', 
+                  bgGradient: 'linear-gradient(to bottom right, #3D221C, #221515)',
+                  accentColor: '#FF7B00',
                   hoverBorder: 'hover:border-[#FF7B00]/50'
                 },
               ].map((cell, idx) => (
-                <div 
-                  key={idx} 
+                <div
+                  key={idx}
                   style={{ background: cell.bgGradient }}
                   className={cn(
                     "border border-white/5 p-2.5 sm:p-4 rounded-2xl flex flex-col justify-between min-h-[85px] transition-all duration-300 transform group-hover:translate-y-[-2px] shadow-lg",
@@ -5447,7 +5447,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                   <span className="text-[8px] sm:text-[9px] font-black text-[#A09E9A] uppercase tracking-widest leading-none">
                     {cell.label}
                   </span>
-                  <span 
+                  <span
                     style={{ color: cell.accentColor }}
                     className="text-sm sm:text-lg font-black tracking-tight mt-2 block drop-shadow-md font-mono"
                   >
@@ -5463,8 +5463,8 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
             {/* Progress Bar */}
             <div className="px-1 py-1 mt-2.5">
               <div className="w-full bg-black/40 rounded-full h-1.5 border border-white/5 overflow-hidden">
-                <div 
-                  className="bg-gradient-to-r from-amber-600 via-orange-500 to-yellow-400 h-1.5 rounded-full transition-all duration-500" 
+                <div
+                  className="bg-gradient-to-r from-amber-600 via-orange-500 to-yellow-400 h-1.5 rounded-full transition-all duration-500"
                   style={{ width: `${Math.min(100, Math.max(0, presencePercentage))}%` }}
                 />
               </div>
@@ -5540,10 +5540,10 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                       }
 
                       return (
-                        <div 
-                          key={a.id} 
+                        <div
+                          key={a.id}
                           className={cn(
-                            "flex flex-col justify-center items-center border rounded-xl px-3 py-1.5 transition-all duration-300 hover:scale-[1.02] hover:border-amber-500/50 shadow-md cursor-help relative group/badge w-full min-w-0 text-center", 
+                            "flex flex-col justify-center items-center border rounded-xl px-3 py-1.5 transition-all duration-300 hover:scale-[1.02] hover:border-amber-500/50 shadow-md cursor-help relative group/badge w-full min-w-0 text-center",
                             glowStyle
                           )}
                           title={`Award: ${a.awardName}\nDuration: ${a.startDate} to ${a.endDate}\nStatus: ${isActive ? 'Active Badge' : 'Past Award'}`}
@@ -5594,12 +5594,12 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
       <div className={cn("space-y-4 bg-white/5 backdrop-blur-xl border border-white/10 p-5 rounded-3xl transition-all duration-300 hover:border-pink-500/30 group", styles.shadow)}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-             <div className="w-8 h-8 rounded-full bg-pink-500/20 flex items-center justify-center text-pink-400 text-sm shadow-inner">💖</div>
-             <h4 className="text-xs font-black uppercase tracking-widest text-[#F0EFE8]">Fanbase Health</h4>
+            <div className="w-8 h-8 rounded-full bg-pink-500/20 flex items-center justify-center text-pink-400 text-sm shadow-inner">💖</div>
+            <h4 className="text-xs font-black uppercase tracking-widest text-[#F0EFE8]">Fanbase Health</h4>
           </div>
           <div className="flex items-center gap-2">
             {canSubmitFanbase && (
-              <button 
+              <button
                 onClick={() => setIsFanbaseFormOpen(true)}
                 className="px-3 py-1.5 bg-pink-500/10 hover:bg-pink-500/20 border border-pink-500/30 text-pink-400 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all cursor-pointer shadow-md hover:shadow-pink-500/20"
               >
@@ -5611,49 +5611,49 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
 
         <div className="grid grid-cols-4 gap-3 pt-2 w-full">
           {[
-            { 
-              label: 'Followers', 
-              value: fanbaseLatest?.total_followers != null ? formatNumber(fanbaseLatest.total_followers) : '—', 
-              bgGradient: 'linear-gradient(to bottom right, #3A2A18, #221A15)', 
-              accentColor: '#FFB800', 
-              hoverBorder: 'hover:border-[#FFB800]/50' 
+            {
+              label: 'Followers',
+              value: fanbaseLatest?.total_followers != null ? formatNumber(fanbaseLatest.total_followers) : '—',
+              bgGradient: 'linear-gradient(to bottom right, #3A2A18, #221A15)',
+              accentColor: '#FFB800',
+              hoverBorder: 'hover:border-[#FFB800]/50'
             },
-            { 
-              label: 'FC Subs', 
-              value: fanbaseLatest?.fanclub_subscribers != null ? formatNumber(fanbaseLatest.fanclub_subscribers) : '—', 
-              bgGradient: 'linear-gradient(to bottom right, #3D221C, #221515)', 
-              accentColor: '#FF7B00', 
-              hoverBorder: 'hover:border-[#FF7B00]/50' 
+            {
+              label: 'FC Subs',
+              value: fanbaseLatest?.fanclub_subscribers != null ? formatNumber(fanbaseLatest.fanclub_subscribers) : '—',
+              bgGradient: 'linear-gradient(to bottom right, #3D221C, #221515)',
+              accentColor: '#FF7B00',
+              hoverBorder: 'hover:border-[#FF7B00]/50'
             },
-            { 
-              label: 'GC Members', 
-              value: fanbaseLatest?.fanclub_gc_members != null ? formatNumber(fanbaseLatest.fanclub_gc_members) : '—', 
-              bgGradient: 'linear-gradient(to bottom right, #3A1C28, #20131A)', 
-              accentColor: '#FF3B5C', 
-              hoverBorder: 'hover:border-[#FF3B5C]/50' 
+            {
+              label: 'GC Members',
+              value: fanbaseLatest?.fanclub_gc_members != null ? formatNumber(fanbaseLatest.fanclub_gc_members) : '—',
+              bgGradient: 'linear-gradient(to bottom right, #3A1C28, #20131A)',
+              accentColor: '#FF3B5C',
+              hoverBorder: 'hover:border-[#FF3B5C]/50'
             },
-            { 
-              label: 'GC Activity', 
+            {
+              label: 'GC Activity',
               value: fanbaseLatest && (fanbaseLatest.gc_activity_count_host != null || fanbaseLatest.gc_activity_count_fans != null)
-                ? formatNumber(Number(fanbaseLatest.gc_activity_count_host || 0) + Number(fanbaseLatest.gc_activity_count_fans || 0)) 
-                : '—', 
-              bgGradient: 'linear-gradient(to bottom right, #2A1C3A, #161220)', 
-              accentColor: '#B388FF', 
-              hoverBorder: 'hover:border-[#B388FF]/50' 
+                ? formatNumber(Number(fanbaseLatest.gc_activity_count_host || 0) + Number(fanbaseLatest.gc_activity_count_fans || 0))
+                : '—',
+              bgGradient: 'linear-gradient(to bottom right, #2A1C3A, #161220)',
+              accentColor: '#B388FF',
+              hoverBorder: 'hover:border-[#B388FF]/50'
             },
           ].map((cell, idx) => (
-            <div 
-              key={idx} 
+            <div
+              key={idx}
               style={{ background: cell.bgGradient }}
               className={cn(
-                "border border-white/5 p-2.5 sm:p-4 rounded-2xl flex flex-col justify-between min-h-[85px] sm:min-h-[90px] transition-all duration-300 transform group-hover:translate-y-[-2px] shadow-lg w-full min-w-0", 
+                "border border-white/5 p-2.5 sm:p-4 rounded-2xl flex flex-col justify-between min-h-[85px] sm:min-h-[90px] transition-all duration-300 transform group-hover:translate-y-[-2px] shadow-lg w-full min-w-0",
                 cell.hoverBorder
               )}
             >
               <span className="text-[8px] sm:text-[9px] font-black text-[#A09E9A] uppercase tracking-widest leading-none">
                 {cell.label}
               </span>
-              <span 
+              <span
                 style={{ color: cell.accentColor }}
                 className="text-sm sm:text-lg md:text-xl font-black tracking-tight mt-2 block drop-shadow-md font-mono"
               >
@@ -5675,7 +5675,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
   const renderAIAnalysis = () => {
     const currentAuth = Storage.getAuthState();
     const userRoleLower = String(currentAuth?.role || '').toLowerCase();
-    const canGenerateAI = 
+    const canGenerateAI =
       (userRoleLower === 'manager' && String(host.assignedManagerId) === String(currentAuth?.poppo_id)) ||
       (userRoleLower === 'agent' && String(host.assignedManagerId) === String(currentAuth?.poppo_id)) ||
       (userRoleLower === 'head admin') ||
@@ -5686,8 +5686,8 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
       <div className={cn("space-y-4 bg-white/5 backdrop-blur-xl border border-white/10 p-5 rounded-3xl transition-all duration-300 hover:border-[#D4AF37]/30 group", styles.shadow)}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-             <div className="w-8 h-8 rounded-full bg-[#D4AF37]/20 flex items-center justify-center text-[#D4AF37] text-sm shadow-inner">🤖</div>
-             <h4 className="text-xs font-black uppercase tracking-widest text-[#F0EFE8]">AI Performance Analysis</h4>
+            <div className="w-8 h-8 rounded-full bg-[#D4AF37]/20 flex items-center justify-center text-[#D4AF37] text-sm shadow-inner">🤖</div>
+            <h4 className="text-xs font-black uppercase tracking-widest text-[#F0EFE8]">AI Performance Analysis</h4>
           </div>
           <span className="px-3 py-1 text-[9px] font-black text-[#D4AF37] border border-[#D4AF37]/30 bg-[#D4AF37]/10 rounded-full uppercase tracking-widest shadow-[0_0_10px_rgba(212,175,55,0.2)]">Gemini AI</span>
         </div>
@@ -5698,7 +5698,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
             onClick={handleGenerateAI}
             className="w-full py-4 mt-2 rounded-2xl border border-[#D4AF37]/30 bg-gradient-to-r from-[#D4AF37]/20 to-[#D4AF37]/5 text-[#D4AF37] font-black text-xs uppercase tracking-widest hover:from-[#D4AF37]/30 hover:border-[#D4AF37]/50 transition-all active:scale-[0.99] cursor-pointer flex items-center justify-center gap-2.5 shadow-lg shadow-[#D4AF37]/10"
           >
-            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z"/></svg>
+            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z" /></svg>
             Generate AI Report
           </button>
         )}
@@ -5750,7 +5750,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                 </ul>
               </div>
             )}
-            
+
             {/* Post option for draft reports */}
             {canGenerateAI && myRecentAiReport && !myRecentAiReport.isPosted && (
               <button
@@ -5796,29 +5796,29 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
 
   const renderRpkModal = () => {
     if (!isRpkFormOpen) return null;
-    
+
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
         <div className="bg-[#13131E] border border-white/10 rounded-2xl max-w-sm w-full p-5 shadow-2xl relative">
-          <button 
+          <button
             title="Close"
             onClick={() => setIsRpkFormOpen(false)}
             className="absolute top-4 right-4 p-1.5 bg-[#1A1A28] border border-white/10 rounded-full text-[#A09E9A] hover:text-[#F0EFE8] cursor-pointer"
           >
             <X size={14} />
           </button>
-          
+
           <h3 className="text-sm font-black uppercase tracking-wider text-[#F0EFE8] mb-1">Submit RPK Report</h3>
           <p className="text-[10px] text-[#A09E9A] mb-4">Submitting performance data for Host: <span className="text-[#D4AF37] font-bold">{host.nickname || host.name}</span></p>
 
           <form onSubmit={handleRpkSubmit} className="space-y-3">
             <div className="space-y-1">
               <label className="text-[9px] font-black uppercase tracking-wider text-[#A09E9A]">Date Range</label>
-              <DateRangePicker 
+              <DateRangePicker
                 required
                 startDate={rpkFormData.from_date}
                 endDate={rpkFormData.to_date}
-                onChange={(start, end) => setRpkFormData({...rpkFormData, from_date: start, to_date: end})}
+                onChange={(start, end) => setRpkFormData({ ...rpkFormData, from_date: start, to_date: end })}
                 dateFormat="dd-MM-yyyy"
               />
               <p className="text-[8.5px] text-[#D4AF37]/90 font-medium bg-[#D4AF37]/5 border border-[#D4AF37]/20 rounded-lg px-2.5 py-1.5 mt-1.5 leading-normal">
@@ -5828,38 +5828,38 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
 
             <div className="space-y-1">
               <label className="text-[9px] font-black uppercase tracking-wider text-[#A09E9A]">PK Wins %</label>
-              <input 
-                type="text" 
+              <input
+                type="text"
                 placeholder="e.g. 75%"
                 value={rpkFormData.pk_wins_percent}
-                onChange={(e) => setRpkFormData({...rpkFormData, pk_wins_percent: e.target.value})}
+                onChange={(e) => setRpkFormData({ ...rpkFormData, pk_wins_percent: e.target.value })}
                 className="w-full bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
               />
             </div>
 
             <div className="space-y-1">
               <label className="text-[9px] font-black uppercase tracking-wider text-[#A09E9A]">PK Points</label>
-              <input 
-                type="text" 
+              <input
+                type="text"
                 placeholder="Total PK Points"
                 value={rpkFormData.pk_points}
-                onChange={(e) => setRpkFormData({...rpkFormData, pk_points: e.target.value})}
+                onChange={(e) => setRpkFormData({ ...rpkFormData, pk_points: e.target.value })}
                 className="w-full bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
               />
             </div>
 
             <div className="space-y-1">
               <label className="text-[9px] font-black uppercase tracking-wider text-[#A09E9A]">PK Sessions</label>
-              <input 
-                type="text" 
+              <input
+                type="text"
                 placeholder="Total Sessions"
                 value={rpkFormData.pk_sessions}
-                onChange={(e) => setRpkFormData({...rpkFormData, pk_sessions: e.target.value})}
+                onChange={(e) => setRpkFormData({ ...rpkFormData, pk_sessions: e.target.value })}
                 className="w-full bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
               />
             </div>
 
-            <button 
+            <button
               type="submit"
               disabled={isSubmittingRpk}
               className="w-full mt-2 py-2.5 bg-[#D4AF37] hover:bg-[#C5A028] text-black rounded-xl text-[11px] font-black uppercase tracking-widest transition-all cursor-pointer disabled:opacity-50"
@@ -5878,18 +5878,18 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
     const currentAuth = Storage.getAuthState();
     const roleLower = String(currentAuth?.role || '').toLowerCase();
     const isElevatedStaff = ['admin', 'head admin', 'head_admin', 'director'].includes(roleLower);
-    
+
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
         <div className="bg-[#13131E] border border-white/10 rounded-2xl max-w-sm w-full p-5 shadow-2xl relative max-h-[90vh] overflow-y-auto custom-scrollbar">
-          <button 
+          <button
             title="Close"
             onClick={() => setIsFanbaseFormOpen(false)}
             className="absolute top-4 right-4 p-1.5 bg-[#1A1A28] border border-white/10 rounded-full text-[#A09E9A] hover:text-[#F0EFE8] cursor-pointer"
           >
             <X size={14} />
           </button>
-          
+
           <h3 className="text-sm font-black uppercase tracking-wider text-[#F0EFE8] mb-1">Submit Fanbase Report</h3>
           <p className="text-[10px] text-[#A09E9A] mb-4">Submitting data for Host: <span className="text-indigo-400 font-bold">{host.nickname || host.name}</span></p>
 
@@ -5897,11 +5897,11 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
             {isElevatedStaff && (
               <div className="space-y-1">
                 <label className="text-[9px] font-black uppercase tracking-wider text-[#A09E9A]">Date Range</label>
-                <DateRangePicker 
+                <DateRangePicker
                   required
                   startDate={fanbaseFormData.from_date}
                   endDate={fanbaseFormData.to_date}
-                  onChange={(start, end) => setFanbaseFormData({...fanbaseFormData, from_date: start, to_date: end})}
+                  onChange={(start, end) => setFanbaseFormData({ ...fanbaseFormData, from_date: start, to_date: end })}
                   dateFormat="dd-MM-yyyy"
                 />
               </div>
@@ -5909,11 +5909,11 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
 
             <div className="space-y-1">
               <label className="text-[9px] font-black uppercase tracking-wider text-[#A09E9A]">Total Followers</label>
-              <input 
-                type="text" 
+              <input
+                type="text"
                 placeholder="0"
                 value={fanbaseFormData.total_followers}
-                onChange={(e) => setFanbaseFormData({...fanbaseFormData, total_followers: e.target.value})}
+                onChange={(e) => setFanbaseFormData({ ...fanbaseFormData, total_followers: e.target.value })}
                 className="w-full bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-indigo-500"
               />
             </div>
@@ -5921,21 +5921,21 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
                 <label className="text-[9px] font-black uppercase tracking-wider text-[#A09E9A]">Fanclub Subs</label>
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   placeholder="0"
                   value={fanbaseFormData.fanclub_subscribers}
-                  onChange={(e) => setFanbaseFormData({...fanbaseFormData, fanclub_subscribers: e.target.value})}
+                  onChange={(e) => setFanbaseFormData({ ...fanbaseFormData, fanclub_subscribers: e.target.value })}
                   className="w-full bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-indigo-500"
                 />
               </div>
               <div className="space-y-1">
                 <label className="text-[9px] font-black uppercase tracking-wider text-[#A09E9A]">Fanclub GC</label>
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   placeholder="0"
                   value={fanbaseFormData.fanclub_gc_members}
-                  onChange={(e) => setFanbaseFormData({...fanbaseFormData, fanclub_gc_members: e.target.value})}
+                  onChange={(e) => setFanbaseFormData({ ...fanbaseFormData, fanclub_gc_members: e.target.value })}
                   className="w-full bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-indigo-500"
                 />
               </div>
@@ -5945,39 +5945,39 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <label className="text-[9px] font-black uppercase tracking-wider text-[#A09E9A]">GC Host Activity</label>
-                  <input 
-                    type="text" 
+                  <input
+                    type="text"
                     placeholder="0"
                     value={fanbaseFormData.gc_activity_count_host}
-                    onChange={(e) => setFanbaseFormData({...fanbaseFormData, gc_activity_count_host: e.target.value})}
+                    onChange={(e) => setFanbaseFormData({ ...fanbaseFormData, gc_activity_count_host: e.target.value })}
                     className="w-full bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-indigo-500"
                   />
                 </div>
                 <div className="space-y-1">
                   <label className="text-[9px] font-black uppercase tracking-wider text-[#A09E9A]">GC Fans Activity</label>
-                  <input 
-                    type="text" 
+                  <input
+                    type="text"
                     placeholder="0"
                     value={fanbaseFormData.gc_activity_count_fans}
-                    onChange={(e) => setFanbaseFormData({...fanbaseFormData, gc_activity_count_fans: e.target.value})}
+                    onChange={(e) => setFanbaseFormData({ ...fanbaseFormData, gc_activity_count_fans: e.target.value })}
                     className="w-full bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-indigo-500"
                   />
                 </div>
               </div>
             )}
-            
+
             <div className="space-y-1">
               <label className="text-[9px] font-black uppercase tracking-wider text-[#A09E9A]">Notes</label>
-              <textarea 
+              <textarea
                 placeholder="Optional notes..."
                 rows={2}
                 value={fanbaseFormData.notes}
-                onChange={(e) => setFanbaseFormData({...fanbaseFormData, notes: e.target.value})}
+                onChange={(e) => setFanbaseFormData({ ...fanbaseFormData, notes: e.target.value })}
                 className="w-full bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-indigo-500 resize-none"
               />
             </div>
 
-            <button 
+            <button
               type="submit"
               disabled={isSubmittingFanbase}
               className="w-full mt-2 py-2.5 bg-indigo-500 hover:bg-indigo-400 text-white rounded-xl text-[11px] font-black uppercase tracking-widest transition-all cursor-pointer disabled:opacity-50"
@@ -5996,24 +5996,24 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
         <div className="bg-[#13131E] border border-white/10 rounded-2xl max-w-sm w-full p-5 shadow-2xl relative">
-          <button 
+          <button
             title="Close"
             onClick={() => setIsAddEventFormOpen(false)}
             className="absolute top-4 right-4 p-1.5 bg-[#1A1A28] border border-white/10 rounded-full text-[#A09E9A] hover:text-[#F0EFE8] cursor-pointer"
           >
             <X size={14} />
           </button>
-          
+
           <h3 className="text-sm font-black uppercase tracking-wider text-[#F0EFE8] mb-1">Add Event Exposure</h3>
           <p className="text-[10px] text-[#A09E9A] mb-4">Registering past event for Host: <span className="text-indigo-400 font-bold">{host.nickname || host.name}</span></p>
 
           <form onSubmit={handleAddEventSubmit} className="space-y-3">
             <div className="space-y-1">
               <label className="text-[9px] font-black uppercase tracking-wider text-[#A09E9A]">Event Type</label>
-              <select 
+              <select
                 title="Event Type"
                 value={eventFormData.eventType}
-                onChange={(e) => setEventFormData({...eventFormData, eventType: e.target.value})}
+                onChange={(e) => setEventFormData({ ...eventFormData, eventType: e.target.value })}
                 className="w-full bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-indigo-500"
               >
                 <option value="SOLO LIVEHOUSE" className="bg-[#1A1A28]">SOLO LIVEHOUSE</option>
@@ -6027,38 +6027,38 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
 
             <div className="space-y-1">
               <label className="text-[9px] font-black uppercase tracking-wider text-[#A09E9A]">Event Date</label>
-              <SingleDatePicker 
+              <SingleDatePicker
                 required
                 value={eventFormData.eventDate}
-                onChange={(val) => setEventFormData({...eventFormData, eventDate: val})}
+                onChange={(val) => setEventFormData({ ...eventFormData, eventDate: val })}
               />
             </div>
 
             <div className="space-y-1">
               <label className="text-[9px] font-black uppercase tracking-wider text-[#A09E9A]">Timeslot (e.g. 08:00 PM - 10:00 PM Manila Time)</label>
-              <input 
-                type="text" 
+              <input
+                type="text"
                 required
                 placeholder="08:00 PM - 10:00 PM (Manila Time)"
                 value={eventFormData.timeslot}
-                onChange={(e) => setEventFormData({...eventFormData, timeslot: e.target.value})}
+                onChange={(e) => setEventFormData({ ...eventFormData, timeslot: e.target.value })}
                 className="w-full bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-indigo-500"
               />
             </div>
 
             <div className="space-y-1">
               <label className="text-[9px] font-black uppercase tracking-wider text-[#A09E9A]">Description</label>
-              <textarea 
+              <textarea
                 required
                 placeholder="Event description..."
                 rows={3}
                 value={eventFormData.description}
-                onChange={(e) => setEventFormData({...eventFormData, description: e.target.value})}
+                onChange={(e) => setEventFormData({ ...eventFormData, description: e.target.value })}
                 className="w-full bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-indigo-500 resize-none"
               />
             </div>
 
-            <button 
+            <button
               type="submit"
               disabled={isSubmittingEvent}
               className="w-full mt-2 py-2.5 bg-indigo-500 hover:bg-indigo-400 text-white rounded-xl text-[11px] font-black uppercase tracking-widest transition-all cursor-pointer disabled:opacity-50"
@@ -6108,7 +6108,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
       const prevPoints = pf(prev, 'totalEarningsOfPoints', 'total_earnings_of_points', 'totalPoints', 'total_points', 'points');
       const latestHrs = getLiveHoursForReport(latest);
       const prevHrs = getLiveHoursForReport(prev);
-      
+
       const hrsDiff = latestHrs - prevHrs;
       const ptsDiff = latestPoints - prevPoints;
 
@@ -6136,7 +6136,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
       const partyEarn = pf(latestReport, 'partyEarnings', 'party_earnings');
       const reward = pf(latestReport, 'platformReward', 'platform_reward');
       const tips = pf(latestReport, 'tips');
-      
+
       const total = liveEarn + partyEarn + reward + tips;
       if (total > 0) {
         const livePct = Math.round((liveEarn / total) * 100);
@@ -6209,10 +6209,10 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
     if (performanceReports.length === 0) return null;
     const { trend, pct } = trendData;
     const cfg: Record<string, { icon: React.ReactNode; color: string; bg: string; border: string; label: string }> = {
-      Growing:   { icon: <TrendingUp size={16} />,  color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20', label: `+${pct}% vs 3-mo avg` },
-      Declining: { icon: <TrendingDown size={16} />, color: 'text-red-400',     bg: 'bg-red-500/10',     border: 'border-red-500/20',     label: `${pct}% vs 3-mo avg` },
-      Stable:    { icon: <Minus size={16} />,        color: 'text-amber-400',   bg: 'bg-amber-500/10',   border: 'border-amber-500/20',   label: `${pct >= 0 ? '+' : ''}${pct}% vs 3-mo avg` },
-      New:       { icon: <Star size={16} />,         color: 'text-indigo-400',  bg: 'bg-indigo-500/10',  border: 'border-indigo-500/20',  label: 'New host — tracking started' },
+      Growing: { icon: <TrendingUp size={16} />, color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20', label: `+${pct}% vs 3-mo avg` },
+      Declining: { icon: <TrendingDown size={16} />, color: 'text-red-400', bg: 'bg-red-500/10', border: 'border-red-500/20', label: `${pct}% vs 3-mo avg` },
+      Stable: { icon: <Minus size={16} />, color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/20', label: `${pct >= 0 ? '+' : ''}${pct}% vs 3-mo avg` },
+      New: { icon: <Star size={16} />, color: 'text-indigo-400', bg: 'bg-indigo-500/10', border: 'border-indigo-500/20', label: 'New host — tracking started' },
     };
     const c = cfg[trend] || cfg.Stable;
     const insights = generateCategorizedInsights();
@@ -6282,8 +6282,8 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
       <div className={cn("space-y-4 bg-white/5 backdrop-blur-xl border border-white/10 p-5 rounded-3xl transition-all duration-300 hover:border-emerald-500/30 group", styles.shadow)}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-             <div className="w-8 h-8 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-400 text-sm shadow-inner">📊</div>
-             <h4 className="text-xs font-black uppercase tracking-widest text-[#F0EFE8]">Weekly Live Stats</h4>
+            <div className="w-8 h-8 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-400 text-sm shadow-inner">📊</div>
+            <h4 className="text-xs font-black uppercase tracking-widest text-[#F0EFE8]">Weekly Live Stats</h4>
           </div>
           <span className="px-3 py-1 text-[9px] font-black text-emerald-400 border border-emerald-500/30 bg-emerald-500/10 rounded-full uppercase tracking-widest shadow-[0_0_10px_rgba(16,185,129,0.2)]">
             {weeklyLiveData.length} weeks
@@ -6325,16 +6325,16 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
   const renderAgentNotes = () => {
     if (agentNotes.length === 0) return null;
     const TYPE_STYLES: Record<string, string> = {
-      Note:     'text-indigo-400 border-indigo-500/20 bg-indigo-500/5',
-      Task:     'text-amber-400 border-amber-500/20 bg-amber-500/5',
+      Note: 'text-indigo-400 border-indigo-500/20 bg-indigo-500/5',
+      Task: 'text-amber-400 border-amber-500/20 bg-amber-500/5',
       Feedback: 'text-emerald-400 border-emerald-500/20 bg-emerald-500/5',
     };
     return (
       <div className={cn("space-y-4 bg-white/5 backdrop-blur-xl border border-white/10 p-5 rounded-3xl transition-all duration-300 hover:border-indigo-500/30 group", styles.shadow)}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-             <div className="w-8 h-8 rounded-full bg-indigo-500/20 flex items-center justify-center text-indigo-400 text-sm shadow-inner">📝</div>
-             <h4 className="text-xs font-black uppercase tracking-widest text-[#F0EFE8]">Agent Notes</h4>
+            <div className="w-8 h-8 rounded-full bg-indigo-500/20 flex items-center justify-center text-indigo-400 text-sm shadow-inner">📝</div>
+            <h4 className="text-xs font-black uppercase tracking-widest text-[#F0EFE8]">Agent Notes</h4>
           </div>
           <span className="px-3 py-1 text-[9px] font-black text-indigo-400 border border-indigo-500/30 bg-indigo-500/10 rounded-full uppercase tracking-widest shadow-[0_0_10px_rgba(99,102,241,0.2)]">
             Read-Only
@@ -6390,7 +6390,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
               return (
                 <div key={h.id || idx} className="flex flex-col gap-2">
                   {/* Photo Container */}
-                  <div 
+                  <div
                     onClick={() => setSpotlightHost(h)}
                     className="relative overflow-hidden flex items-center justify-center rounded-xl border border-white/10 bg-gradient-to-br from-[#1E2838] to-[#0E131C] w-full h-[76px] transition-all duration-300 hover:-translate-y-0.5 hover:border-white/20 cursor-pointer select-none"
                   >
@@ -6402,7 +6402,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                       </div>
                     )}
                   </div>
-                  
+
                   {/* Text Elements */}
                   <div className="flex flex-col">
                     <span className="text-sm font-normal text-[#F0EFE8] truncate">
@@ -6505,8 +6505,8 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
         const pIds = evt.participantIds || evt.participants_id || [];
         const participants = evt.participants || [];
         return (Array.isArray(pIds) && pIds.includes(hostId)) ||
-               (Array.isArray(participants) && participants.includes(hostId)) ||
-               String(evt.poppo_id || evt.event_host_id || '') === hostId;
+          (Array.isArray(participants) && participants.includes(hostId)) ||
+          String(evt.poppo_id || evt.event_host_id || '') === hostId;
       });
 
       const getEventDateStringLocal = (evt: any): string => {
@@ -6546,7 +6546,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
         const att = rosterAttendance.find(a => a.eventId === evt.event_id || a.eventId === evt.id);
         if (att) {
           const isPresent = (Array.isArray(att.attendeeIds) && att.attendeeIds.includes(hostId)) ||
-                            (Array.isArray(att.attendees) && att.attendees.some((a: any) => String(a.poppoId || a.id || '').trim() === hostId));
+            (Array.isArray(att.attendees) && att.attendees.some((a: any) => String(a.poppoId || a.id || '').trim() === hostId));
           if (isPresent) {
             hostAttendedEventParticipations++;
           } else {
@@ -6609,38 +6609,35 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
               <p className="text-[9px] text-[#A09E9A] uppercase tracking-wider mt-0.5 font-bold">Record and review host coaching logs</p>
             </div>
           </div>
-          
+
           <div className="flex bg-black/20 p-1 rounded-xl border border-white/5 self-end sm:self-center">
             <button
               type="button"
               onClick={() => setActiveTab('todo')}
-              className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer ${
-                activeTab === 'todo'
+              className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer ${activeTab === 'todo'
                   ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
                   : 'text-[#A09E9A] hover:text-white'
-              }`}
+                }`}
             >
               To-Do List
             </button>
             <button
               type="button"
               onClick={() => setActiveTab('add')}
-              className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer ${
-                activeTab === 'add'
+              className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer ${activeTab === 'add'
                   ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
                   : 'text-[#A09E9A] hover:text-white'
-              }`}
+                }`}
             >
               Add Notes
             </button>
             <button
               type="button"
               onClick={() => setActiveTab('history')}
-              className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer ${
-                activeTab === 'history'
+              className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer ${activeTab === 'history'
                   ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
                   : 'text-[#A09E9A] hover:text-white'
-              }`}
+                }`}
             >
               Notes History
             </button>
@@ -6749,7 +6746,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
               <div className="text-[10px] font-black uppercase tracking-widest text-[#A09E9A] flex items-center gap-1.5 flex-wrap">
                 <span>✨</span> Coaching Recommendations
               </div>
-              
+
               <div className="space-y-5 max-h-[380px] overflow-y-auto pr-1 custom-scrollbar">
                 {categories.map(cat => {
                   const catTemplates = recommendationTemplates.filter(t => t.category === cat);
@@ -6758,7 +6755,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                       <div className="text-[9px] font-black uppercase tracking-widest text-indigo-400 bg-indigo-500/5 px-2 py-1 rounded border border-indigo-500/10 self-start inline-block">
                         {cat}
                       </div>
-                      
+
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         {catTemplates.map(template => {
                           const selectedHostId = recSelectedHosts[template.id] || '';
@@ -6990,8 +6987,8 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
       const pIds = evt.participantIds || evt.participants_id || [];
       const participants = evt.participants || [];
       const isPart = (Array.isArray(pIds) && pIds.some((id: any) => hostIds.includes(String(id)))) ||
-                     (Array.isArray(participants) && participants.some((id: any) => hostIds.includes(String(id)))) ||
-                     hostIds.includes(String(evt.poppo_id || evt.event_host_id || ''));
+        (Array.isArray(participants) && participants.some((id: any) => hostIds.includes(String(id)))) ||
+        hostIds.includes(String(evt.poppo_id || evt.event_host_id || ''));
       return isPart;
     });
 
@@ -7020,10 +7017,10 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
       const participantIds = att.participantIds || [];
       const participants = att.participants || [];
       const isAtt = (Array.isArray(attendeeIds) && attendeeIds.some((id: any) => hostIds.includes(String(id)))) ||
-                    (Array.isArray(participantIds) && participantIds.some((id: any) => hostIds.includes(String(id)))) ||
-                    (Array.isArray(participants) && participants.some((id: any) => hostIds.includes(String(id)))) ||
-                    (Array.isArray(attendees) && attendees.some((a: any) => hostIds.includes(String(a.poppoId || a.id || '')))) ||
-                    hostIds.includes(String(att.poppo_id || att.poppoId || att.hostId || ''));
+        (Array.isArray(participantIds) && participantIds.some((id: any) => hostIds.includes(String(id)))) ||
+        (Array.isArray(participants) && participants.some((id: any) => hostIds.includes(String(id)))) ||
+        (Array.isArray(attendees) && attendees.some((a: any) => hostIds.includes(String(a.poppoId || a.id || '')))) ||
+        hostIds.includes(String(att.poppo_id || att.poppoId || att.hostId || ''));
       return isAtt;
     });
 
@@ -7057,8 +7054,8 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
         const pIds = evt.participantIds || evt.participants_id || [];
         const participants = evt.participants || [];
         return (Array.isArray(pIds) && pIds.includes(hostId)) ||
-               (Array.isArray(participants) && participants.includes(hostId)) ||
-               String(evt.poppo_id || evt.event_host_id || '') === hostId;
+          (Array.isArray(participants) && participants.includes(hostId)) ||
+          String(evt.poppo_id || evt.event_host_id || '') === hostId;
       });
 
       eventHosts.forEach(h => {
@@ -7069,7 +7066,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
         const att = rosterAttendance.find(a => a.eventId === evt.event_id || a.eventId === evt.id);
         if (att) {
           const isPresent = (Array.isArray(att.attendeeIds) && att.attendeeIds.includes(hostId)) ||
-                            (Array.isArray(att.attendees) && att.attendees.some((a: any) => String(a.poppoId || a.id || '').trim() === hostId));
+            (Array.isArray(att.attendees) && att.attendees.some((a: any) => String(a.poppoId || a.id || '').trim() === hostId));
           if (isPresent) {
             totalAttendedEventParticipations++;
           } else {
@@ -7155,8 +7152,8 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                     const pIds = evt.participantIds || evt.participants_id || [];
                     const participants = evt.participants || [];
                     return (Array.isArray(pIds) && pIds.includes(hostId)) ||
-                           (Array.isArray(participants) && participants.includes(hostId)) ||
-                           String(evt.poppo_id || evt.event_host_id || '') === hostId;
+                      (Array.isArray(participants) && participants.includes(hostId)) ||
+                      String(evt.poppo_id || evt.event_host_id || '') === hostId;
                   });
 
                   return (
@@ -7168,7 +7165,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                         </span>
                       </div>
                       <p className="text-[10px] text-[#A09E9A] font-medium leading-relaxed line-clamp-2">{evt.description}</p>
-                      
+
                       <div className="flex flex-col gap-1 pt-1.5 border-t border-white/[0.03] text-[9px] font-mono text-[#A09E9A]/60">
                         <div className="flex items-center gap-1">
                           <span className="text-[#A09E9A]/40">Date:</span>
@@ -7223,10 +7220,10 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                     const participantIds = att.participantIds || [];
                     const participants = att.participants || [];
                     return (Array.isArray(attendeeIds) && attendeeIds.includes(hostId)) ||
-                           (Array.isArray(participantIds) && participantIds.includes(hostId)) ||
-                           (Array.isArray(participants) && participants.includes(hostId)) ||
-                           (Array.isArray(attendees) && attendees.some((a: any) => String(a.poppoId || a.id || '').trim() === hostId)) ||
-                           String(att.poppo_id || att.poppoId || att.hostId || '') === hostId;
+                      (Array.isArray(participantIds) && participantIds.includes(hostId)) ||
+                      (Array.isArray(participants) && participants.includes(hostId)) ||
+                      (Array.isArray(attendees) && attendees.some((a: any) => String(a.poppoId || a.id || '').trim() === hostId)) ||
+                      String(att.poppo_id || att.poppoId || att.hostId || '') === hostId;
                   });
 
                   const formattedDate = att.eventDate || (att.timestamp ? att.timestamp.split('T')[0] : '');
@@ -7244,7 +7241,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                           "{att.eventFeedback}"
                         </p>
                       )}
-                      
+
                       <div className="flex flex-col gap-1 pt-1.5 border-t border-white/[0.03] text-[9px] font-mono text-[#A09E9A]/60">
                         <div className="flex items-center gap-1">
                           <span className="text-[#A09E9A]/40">Date:</span>
@@ -7285,17 +7282,17 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
   return (
     <div className={cn(
       "w-full text-[#F0EFE8] flex flex-col",
-      isSpotlight 
-        ? cn("bg-[#13131E] p-5 space-y-5 relative mx-auto border border-white/5 rounded-[24px] shadow-2xl max-h-[calc(100dvh-2rem)] overflow-y-auto custom-scrollbar", hidePerformanceStats ? "max-w-4xl" : "max-w-md") 
+      isSpotlight
+        ? cn("bg-[#13131E] p-5 space-y-5 relative mx-auto border border-white/5 rounded-[24px] shadow-2xl max-h-[calc(100dvh-2rem)] overflow-y-auto custom-scrollbar", hidePerformanceStats ? "max-w-4xl" : "max-w-md")
         : "space-y-6 max-w-4xl mx-auto pb-12 pt-2"
     )}>
-      
+
       {/* Top Header Grid line style */}
       {isSpotlight ? (
         <div className="flex items-center justify-between pb-3 border-b border-white/5 shrink-0">
           <div className="flex items-center gap-3">
             {onClose && (
-              <button 
+              <button
                 onClick={onClose}
                 className="p-1.5 rounded-full bg-[#1A1A28] hover:bg-[#222235] text-[#A09E9A] hover:text-[#F0EFE8] transition-all border border-white/10 cursor-pointer"
                 aria-label="Back to Roster"
@@ -7311,7 +7308,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
           <div className="flex items-center gap-2">
             <span className="text-[8px] font-black uppercase tracking-[0.2em] text-[#A09E9A]">PUBLIC VIEW</span>
             {onClose && (
-              <button 
+              <button
                 onClick={onClose}
                 className="w-7 h-7 rounded-full bg-[#1A1A28] border border-white/10 flex items-center justify-center text-[#A09E9A] hover:text-[#F0EFE8] hover:border-[#D4AF37]/45 hover:bg-[#222235] transition-all shadow-md cursor-pointer"
                 aria-label="Close Profile Spotlight"
@@ -7356,7 +7353,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
       ) : (
         <div className={cn(
           (isSpotlight && !hidePerformanceStats)
-            ? "space-y-5 overflow-y-auto pr-0.5 py-1 custom-scrollbar max-h-[72vh]" 
+            ? "space-y-5 overflow-y-auto pr-0.5 py-1 custom-scrollbar max-h-[72vh]"
             : "grid grid-cols-1 lg:grid-cols-3 gap-6 pt-2"
         )}>
           {(isSpotlight && !hidePerformanceStats) ? (
@@ -7388,7 +7385,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
               <div className="space-y-6 lg:col-span-1">
                 {renderIdentityCard()}
               </div>
-              
+
               {/* Right Column (Performance Stats) */}
               <div className="space-y-6 lg:col-span-2">
                 {!isSpotlight && String(rootAuth?.role || '').toLowerCase() === 'director' && renderImpersonationBlock()}
@@ -7420,7 +7417,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
           )}
         </div>
       )}
-      
+
       {renderRpkModal()}
       {renderFanbaseModal()}
       {renderSelfEditModal()}
@@ -7430,10 +7427,10 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
 
       {spotlightHost && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm overflow-y-auto">
-          <HostProfileView 
-            host={spotlightHost} 
-            isReadOnly={true} 
-            onClose={() => setSpotlightHost(null)} 
+          <HostProfileView
+            host={spotlightHost}
+            isReadOnly={true}
+            onClose={() => setSpotlightHost(null)}
           />
         </div>
       )}
@@ -7446,7 +7443,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
             key={toast.id}
             className={cn(
               "flex items-center gap-3 px-4 py-3 rounded-xl shadow-2xl border backdrop-blur-xl transition-all duration-300 pointer-events-auto transform translate-y-0 opacity-100",
-              toast.type === 'success' 
+              toast.type === 'success'
                 ? "bg-emerald-950/90 border-emerald-500/30 text-emerald-300 shadow-[0_0_15px_rgba(16,185,129,0.15)]"
                 : "bg-rose-950/90 border-rose-500/30 text-rose-300 shadow-[0_0_15px_rgba(244,63,94,0.15)]"
             )}
