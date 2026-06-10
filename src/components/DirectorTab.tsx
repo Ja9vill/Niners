@@ -48,6 +48,9 @@ import { MANAGERS, BASE_SALARY_POLICIES } from '../lib/constants';
 import { SystemLogsViewer } from './SystemLogsViewer';
 import { CreateMemberForm } from './CreateMemberForm';
 import { RosterManagementTab } from './RosterManagementTab';
+import { AwardsManager } from './AwardsManager';
+import { TasksDesk } from './TasksDesk';
+import { TasksService } from '../lib/TasksService';
 import { db } from '../lib/firebase';
 import { collection, query, where, getDocs, addDoc, deleteDoc, doc, setDoc, writeBatch } from 'firebase/firestore';
 
@@ -644,161 +647,7 @@ export const DirectorTab = () => {
     }
   };
 
-  const handleCreateAward = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newAwardName.trim() || !newAwardStartDate || !newAwardEndDate) return;
-    setIsCreatingAward(true);
-    setErrorMessage(null);
-    setSuccessMessage('');
 
-    try {
-      const awardId = getUUID();
-      const newAward = {
-        id: awardId,
-        name: newAwardName.trim(),
-        color: newAwardColor,
-        startDate: newAwardStartDate,
-        endDate: newAwardEndDate,
-        createdAt: new Date().toISOString()
-      };
-      await setDoc(doc(db, 'awards', awardId), newAward);
-      await FirebaseService.logSystemActivity(`Director/Admin created new award badge "${newAward.name}" with color "${newAward.color}"`, 'Info');
-      setAwards(prev => [...prev, newAward]);
-      setNewAwardName('');
-      setNewAwardStartDate('');
-      setNewAwardEndDate('');
-      setSuccessMessage(`Award "${newAward.name}" created successfully!`);
-    } catch (err: any) {
-      console.error('Create award error:', err);
-      setErrorMessage(err.message || 'Failed to create award.');
-    } finally {
-      setIsCreatingAward(false);
-    }
-  };
-
-  const handleBulkGenerateAwards = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!bulkMonth || !bulkYear) return;
-    setIsCreatingAward(true);
-    setErrorMessage(null);
-    setSuccessMessage('');
-
-    try {
-      const months = [
-        "January", "February", "March", "April", "May", "June",
-        "July", "August", "September", "October", "November", "December"
-      ];
-      const monthIndex = parseInt(bulkMonth, 10) - 1;
-      const monthName = months[monthIndex];
-      const yearNum = parseInt(bulkYear, 10);
-
-      // Compute start and end dates
-      const pad = (n: number) => String(n).padStart(2, '0');
-      const startDateStr = `${yearNum}-${pad(bulkMonth)}-01`;
-
-      const lastDay = new Date(yearNum, monthIndex + 1, 0).getDate();
-      const endDateStr = `${yearNum}-${pad(bulkMonth)}-${pad(lastDay)}`;
-
-      const newAwardsList: any[] = [];
-      const batch = writeBatch(db);
-
-      for (let rank = 1; rank <= 9; rank++) {
-        const awardId = getUUID();
-
-        let color = 'Gold';
-        if (rank >= 4 && rank <= 6) color = 'Orange';
-        else if (rank >= 7) color = 'Red';
-
-        const newAward = {
-          id: awardId,
-          name: `Top ${rank} Niner - ${monthName} ${bulkYear}`,
-          color,
-          startDate: startDateStr,
-          endDate: endDateStr,
-          createdAt: new Date().toISOString()
-        };
-
-        batch.set(doc(db, 'awards', awardId), newAward);
-        newAwardsList.push(newAward);
-      }
-
-      await batch.commit();
-      await FirebaseService.logSystemActivity(`Director/Admin bulk generated Monthly Top Niners awards templates for ${monthName} ${bulkYear}`, 'Info');
-
-      setAwards(prev => [...prev, ...newAwardsList]);
-      setSuccessMessage(`Successfully generated 9 Monthly Top Niner awards for ${monthName} ${bulkYear}!`);
-    } catch (err: any) {
-      console.error('Bulk generate awards error:', err);
-      setErrorMessage(err.message || 'Failed to bulk generate awards.');
-    } finally {
-      setIsCreatingAward(false);
-    }
-  };
-
-  const handleAssignAward = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!assignAwardId || !assignHostId || !awardStartDate || !awardEndDate) {
-      setErrorMessage('All assignment fields are required.');
-      return;
-    }
-    setIsAssigningAward(true);
-    setErrorMessage(null);
-    setSuccessMessage('');
-
-    const matchedAward = awards.find(a => a.id === assignAwardId);
-    const matchedHost = hosts.find(h => h.id === assignHostId);
-
-    if (!matchedAward || !matchedHost) {
-      setErrorMessage('Award or Host not found.');
-      setIsAssigningAward(false);
-      return;
-    }
-
-    try {
-      const assignmentId = getUUID();
-      const newAssignment = {
-        id: assignmentId,
-        awardId: assignAwardId,
-        awardName: matchedAward.name,
-        awardColor: matchedAward.color,
-        hostId: assignHostId,
-        hostNickname: matchedHost.nickname || matchedHost.name,
-        startDate: awardStartDate,
-        endDate: awardEndDate,
-        assignedAt: new Date().toISOString()
-      };
-      await setDoc(doc(db, 'award_assignments', assignmentId), newAssignment);
-      await FirebaseService.logSystemActivity(`Director/Admin assigned award badge "${matchedAward.name}" to host "${newAssignment.hostNickname}" (Poppo ID: ${assignHostId}) from ${awardStartDate} to ${awardEndDate}`, 'Info');
-      setAwardAssignments(prev => [newAssignment, ...prev]);
-      setAssignAwardId('');
-      setAssignHostId('');
-      setAwardStartDate('');
-      setAwardEndDate('');
-      setSuccessMessage(`Assigned award "${matchedAward.name}" to host "${newAssignment.hostNickname}"!`);
-    } catch (err: any) {
-      console.error('Assign award error:', err);
-      setErrorMessage(err.message || 'Failed to assign award.');
-    } finally {
-      setIsAssigningAward(false);
-    }
-  };
-
-  const handleRevokeAssignment = async (assignmentId: string) => {
-    if (!window.confirm('Are you sure you want to revoke this award assignment?')) return;
-    const target = awardAssignments.find(a => a.id === assignmentId);
-    const awardName = target ? target.awardName : 'Unknown Award';
-    const hostNickname = target ? target.hostNickname : 'Unknown Host';
-    const hostId = target ? target.hostId : 'Unknown ID';
-    try {
-      await deleteDoc(doc(db, 'award_assignments', assignmentId));
-      setAwardAssignments(prev => prev.filter(a => a.id !== assignmentId));
-      await FirebaseService.logSystemActivity(`Director/Admin revoked award badge "${awardName}" from host "${hostNickname}" (Poppo ID: ${hostId})`, 'Warning');
-      setSuccessMessage('Award assignment revoked.');
-    } catch (err: any) {
-      console.error('Revoke assignment error:', err);
-      setErrorMessage(err.message || 'Failed to revoke assignment.');
-    }
-  };
 
   // Load all master collections
   const loadData = async () => {
@@ -1109,21 +958,8 @@ export const DirectorTab = () => {
 
   // Convert AI Insight to Task transactional routine
   const handleConvertRecommendationToTask = async (insight: AIInsight) => {
-    const taskId = getUUID();
-    const taskItem: Task = {
-      taskId,
-      assignedToUserId: 'support_staff', // Delegate downward
-      relatedPoppoId: insight.hostId,
-      taskType: insight.ruleType === 'performance_drop' ? 'Coaching' : insight.ruleType === 'profile_gap' ? 'Complete Profile' : 'Tier Review',
-      title: `AI Recommendation: ${insight.suggestedAction}`,
-      description: `Targeting: ${insight.hostName} (${insight.hostId}). Rule details: ${insight.details}`,
-      status: 'Assigned',
-      dueDate: new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString().split('T')[0] // 7 days from now
-    };
-
     try {
-      await FirebaseService.saveTasks([taskItem]);
-      await auditLogAction('CONVERT_RECOMMENDATION_TO_TASK', insight, taskItem);
+      await TasksService.convertInsightToTask(insight, auditLogAction);
       showSuccess(`Converted AI recommendation to task for ${insight.hostName}`);
       loadData();
     } catch (err) {
@@ -1594,303 +1430,29 @@ export const DirectorTab = () => {
             {/* MODULE 2: AWARDS & BADGES */}
             {activeView === 'awards' && (
               <motion.div key="awards" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  <div className="space-y-1">
-                    <h3 className="font-bold text-xl flex items-center gap-2">
-                      <Award size={20} className="text-[#D4AF37]" />
-                      Custom Monthly Awards & Badges
-                    </h3>
-                    <p className="text-[10px] text-[#A09E9A]/40 uppercase tracking-widest font-black">Assign badges to top performing talent</p>
-                  </div>
-
-                  <div className="flex items-center gap-3 bg-[#1A1A28] p-2 px-4 rounded-xl border border-white/5">
-                    <span className="text-[9px] font-black uppercase tracking-widest text-[#A09E9A]/50">Target Month:</span>
-                    <div className="flex items-center gap-1">
-                      <select
-                        value={selectedMonth.split('-')[0]}
-                        onChange={(e) => setSelectedMonth(`${e.target.value}-${selectedMonth.split('-')[1]}`)}
-                        className="bg-transparent text-indigo-400 font-bold text-xs outline-none cursor-pointer focus:ring-0"
-                        title="Target Year selection"
-                      >
-                        <option value="2024" className="bg-[#1A1A28] text-[#F0EFE8]">2024</option>
-                        <option value="2025" className="bg-[#1A1A28] text-[#F0EFE8]">2025</option>
-                        <option value="2026" className="bg-[#1A1A28] text-[#F0EFE8]">2026</option>
-                        <option value="2027" className="bg-[#1A1A28] text-[#F0EFE8]">2027</option>
-                      </select>
-                      <span className="text-white/20 text-xs">-</span>
-                      <select
-                        value={selectedMonth.split('-')[1]}
-                        onChange={(e) => setSelectedMonth(`${selectedMonth.split('-')[0]}-${e.target.value}`)}
-                        className="bg-transparent text-indigo-400 font-bold text-xs outline-none cursor-pointer focus:ring-0"
-                        title="Target Month selection"
-                      >
-                        {['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'].map(m => (
-                          <option key={m} value={m} className="bg-[#1A1A28] text-[#F0EFE8]">{m}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="tech-card !p-0 overflow-hidden">
-                  <table className="w-full text-left text-xs">
-                    <thead>
-                      <tr className="border-b border-white/5 text-[9px] font-black text-[#A09E9A]/40 uppercase tracking-widest bg-white/[0.02]">
-                        <th className="px-6 py-4">Poppo ID</th>
-                        <th className="px-6 py-4">Nickname</th>
-                        <th className="px-6 py-4">Month</th>
-                        <th className="px-6 py-4">Monthly Award Badge</th>
-                        <th className="px-6 py-4 text-right">Assign Action</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-white/5">
-                      {hosts.map(host => {
-                        const summary = earningsSummaries.find(s => s.poppoId === host.id);
-                        const currentBadge = summary?.profilePhotoUrl || 'None'; // profilePhotoUrl maps to local award badge here
-
-                        return (
-                          <tr key={host.id} className="hover:bg-white/[0.01] transition-colors">
-                            <td className="px-6 py-4 font-mono font-bold text-indigo-400">{host.id}</td>
-                            <td className="px-6 py-4 font-bold text-[#F0EFE8]">{host.nickname || host.name}</td>
-                            <td className="px-6 py-4 text-[#A09E9A]/40">{selectedMonth}</td>
-                            <td className="px-6 py-4">
-                              <span className={cn(
-                                "text-[10px] font-bold px-2 py-0.5 rounded-full border",
-                                currentBadge !== 'None' ? 'bg-[#D4AF37]/10 text-[#D4AF37] border-[#D4AF37]/20' : 'bg-[#222235] text-[#A09E9A] border-transparent'
-                              )}>
-                                {currentBadge}
-                              </span>
-                            </td>
-                            <td className="px-6 py-4 text-right">
-                              <select
-                                onChange={async (e) => {
-                                  const val = e.target.value;
-                                  if (!val) return;
-
-                                  const original = summary ? { ...summary } : null;
-                                  const updatedSummary: TopNinersEarningsSummary = summary ? {
-                                    ...summary,
-                                    profilePhotoUrl: val
-                                  } : {
-                                    summaryId: `${host.id}_${selectedMonth}`,
-                                    periodKey: selectedMonth,
-                                    month: parseInt(selectedMonth.split('-')[1]),
-                                    year: parseInt(selectedMonth.split('-')[0]),
-                                    poppoId: host.id,
-                                    nickname: host.nickname || host.name,
-                                    role: host.role || 'Host',
-                                    totalEarningsPoints: summary?.totalEarningsPoints || 0,
-                                    rank: summary?.rank || 99,
-                                    isPublished: true,
-                                    profilePhotoUrl: val
-                                  };
-
-                                  try {
-                                    await FirebaseService.saveTopNinersSummary([updatedSummary]);
-                                    await auditLogAction('ASSIGN_AWARD', original, updatedSummary);
-                                    showSuccess(`Award badge assigned to ${host.nickname || host.name}`);
-                                    const updated = await FirebaseService.getTopNinersSummary(selectedMonth);
-                                    setEarningsSummaries(updated);
-                                  } catch (err) {
-                                    alert("Failed to assign award badge");
-                                  }
-                                }}
-                                value={currentBadge}
-                                className="bg-[#1A1A28] border border-white/10 rounded-lg px-2 py-1 text-xs text-[#D4AF37] font-bold outline-none cursor-pointer"
-                                title="Assign award badge"
-                                aria-label="Assign award badge"
-                              >
-                                <option value="">-- Choose badge --</option>
-                                <option value="Top Earner">🏆 Top Earner</option>
-                                <option value="Rising Star">⭐ Rising Star</option>
-                                <option value="Gifting Queen">💖 Gifting Queen</option>
-                                <option value="PK Elite">⚔️ PK Elite</option>
-                                <option value="None">None (Remove Badge)</option>
-                              </select>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
+                <AwardsManager
+                  hosts={hosts}
+                  earningsSummaries={earningsSummaries}
+                  selectedMonth={selectedMonth}
+                  onMonthChange={setSelectedMonth}
+                  onAwardAssigned={async () => {
+                    const updated = await FirebaseService.getTopNinersSummary(selectedMonth);
+                    setEarningsSummaries(updated);
+                  }}
+                  auditLogAction={auditLogAction}
+                />
               </motion.div>
             )}
 
             {/* MODULE 3: TASKS MANAGEMENT DESK */}
             {activeView === 'tasks' && (
               <motion.div key="tasks" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  <div className="space-y-1">
-                    <h3 className="font-bold text-xl flex items-center gap-2 text-[#F0EFE8]">
-                      <ListTodo size={20} className="text-indigo-400" />
-                      Tasks Coordination Desk
-                    </h3>
-                    <p className="text-[10px] text-[#A09E9A]/40 uppercase tracking-widest font-black">Delegate instruction tasks to agency staff</p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                  {/* Create Task Form */}
-                  <div className="tech-card h-fit space-y-6">
-                    <h4 className="text-[10px] font-black uppercase tracking-widest text-[#D4AF37] border-b border-white/5 pb-2">Delegate New Task</h4>
-
-                    <form
-                      onSubmit={async (e) => {
-                        e.preventDefault();
-                        const formData = new FormData(e.currentTarget);
-                        const taskId = getUUID();
-                        const newTask: Task = {
-                          taskId,
-                          assignedToUserId: String(formData.get('assignedTo') || 'support_staff'),
-                          relatedPoppoId: String(formData.get('relatedPoppo') || ''),
-                          taskType: String(formData.get('type') || 'Coaching'),
-                          title: String(formData.get('title') || 'Coaching Task'),
-                          description: String(formData.get('description') || ''),
-                          status: 'Assigned',
-                          dueDate: String(formData.get('dueDate') || '')
-                        };
-
-                        try {
-                          await FirebaseService.saveTasks([newTask]);
-                          await auditLogAction('CREATE_TASK', null, newTask);
-                          showSuccess('Task delegated down successfully.');
-                          e.currentTarget.reset();
-                          loadData();
-                        } catch (err) {
-                          alert("Failed to create task.");
-                        }
-                      }}
-                      className="space-y-4"
-                    >
-                      <div className="space-y-1.5">
-                        <label htmlFor="task-assignee" className="text-[9px] font-black uppercase text-[#A09E9A]/40 tracking-wider">Assignee Role</label>
-                        <select id="task-assignee" name="assignedTo" className="w-full bg-[#1A1A28] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-[#F0EFE8]" title="Select assignee role" aria-label="Select assignee role">
-                          <option value="support_staff" className="bg-[#1A1A28] text-[#F0EFE8]">Support Staff (Assistant)</option>
-                          <option value="Manager" className="bg-[#1A1A28] text-[#F0EFE8]">Manager</option>
-                          <option value="Admin" className="bg-[#1A1A28] text-[#F0EFE8]">Admin</option>
-                        </select>
-                      </div>
-
-                      <div className="space-y-1.5">
-                        <label htmlFor="task-related-poppo" className="text-[9px] font-black uppercase text-[#A09E9A]/40 tracking-wider">Related Talent</label>
-                        <select id="task-related-poppo" name="relatedPoppo" className="w-full bg-[#1A1A28] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-[#F0EFE8]" title="Select related talent" aria-label="Select related talent">
-                          <option value="" className="bg-[#1A1A28] text-[#F0EFE8]">-- No Related Host --</option>
-                          {hosts.map(h => (
-                            <option key={h.id} value={h.id} className="bg-[#1A1A28] text-[#F0EFE8]">{h.nickname || h.name} ({h.id})</option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div className="space-y-1.5">
-                        <label htmlFor="task-type" className="text-[9px] font-black uppercase text-[#A09E9A]/40 tracking-wider">Task Type</label>
-                        <input id="task-type" name="type" type="text" placeholder="e.g. Coaching" className="w-full glass-input text-xs text-[#F0EFE8]" required title="Enter task type" aria-label="Enter task type" />
-                      </div>
-
-                      <div className="space-y-1.5">
-                        <label htmlFor="task-title" className="text-[9px] font-black uppercase text-[#A09E9A]/40 tracking-wider">Task Title</label>
-                        <input id="task-title" name="title" type="text" placeholder="Complete Profile Info" className="w-full glass-input text-xs text-[#F0EFE8]" required title="Enter task title" aria-label="Enter task title" />
-                      </div>
-
-                      <div className="space-y-1.5">
-                        <label htmlFor="task-description" className="text-[9px] font-black uppercase text-[#A09E9A]/40 tracking-wider">Task Description</label>
-                        <textarea id="task-description" name="description" placeholder="Specify missing fields or guidelines..." className="w-full glass-input text-xs text-[#F0EFE8] h-20 resize-none" required title="Enter task description" aria-label="Enter task description" />
-                      </div>
-
-                      <div className="space-y-1.5">
-                        <label htmlFor="task-due-date" className="text-[9px] font-black uppercase text-[#A09E9A]/40 tracking-wider">Due Date</label>
-                        <SingleDatePicker
-                          id="task-due-date"
-                          name="dueDate"
-                          value={taskDueDate}
-                          onChange={(val) => setTaskDueDate(val)}
-                          required
-                          title="Select task due date"
-                        />
-                      </div>
-
-                      <button type="submit" className="w-full py-3 btn-gold rounded-xl text-xs font-black uppercase tracking-widest text-[#0D0D14] transition-all shadow-lg active:scale-95 cursor-pointer">
-                        Delegate Task
-                      </button>
-                    </form>
-                  </div>
-
-                  {/* Tasks List */}
-                  <div className="lg:col-span-2 space-y-4">
-                    <h4 className="text-[10px] font-black uppercase tracking-widest text-[#A09E9A]/40">Active Assignments</h4>
-
-                    <div className="space-y-3">
-                      {tasks.length === 0 ? (
-                        <div className="text-center py-12 border border-dashed border-white/10 rounded-3xl text-[#A09E9A]/30 italic text-xs">
-                          No delegated tasks found.
-                        </div>
-                      ) : (
-                        tasks.map(task => (
-                          <div key={task.taskId} className="tech-card !p-6 flex flex-col sm:flex-row justify-between sm:items-center gap-4 bg-white/[0.01]">
-                            <div className="space-y-1">
-                              <div className="flex items-center gap-2">
-                                <span className={cn(
-                                  "text-[8px] font-black uppercase px-2 py-0.5 rounded-full border",
-                                  task.status === 'Completed' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
-                                )}>
-                                  {task.status}
-                                </span>
-                                <span className="text-[9px] font-black text-indigo-400 uppercase tracking-wider">{task.taskType}</span>
-                              </div>
-                              <h5 className="font-black text-[#F0EFE8] text-sm">{task.title}</h5>
-                              <p className="text-xs text-[#A09E9A]/60 leading-relaxed font-medium">{task.description}</p>
-                              <div className="text-[9px] text-[#A09E9A]/40 font-bold flex gap-4 pt-1">
-                                <span>Assignee: {task.assignedToUserId}</span>
-                                <span>Related Poppo ID: {task.relatedPoppoId}</span>
-                                <span>Due: {task.dueDate}</span>
-                              </div>
-                            </div>
-
-                            <div className="flex gap-2">
-                              {task.status !== 'Completed' && (
-                                <button
-                                  onClick={async () => {
-                                    const original = { ...task };
-                                    const updated: Task = { ...task, status: 'Completed' };
-                                    try {
-                                      await FirebaseService.saveTasks([updated]);
-                                      await auditLogAction('UPDATE_TASK', original, updated);
-                                      showSuccess('Task marked as completed.');
-                                      loadData();
-                                    } catch (err) {
-                                      alert("Failed to complete task");
-                                    }
-                                  }}
-                                  className="px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500 text-emerald-400 hover:text-[#0D0D14] rounded-lg text-[9px] font-black uppercase transition-all cursor-pointer"
-                                >
-                                  Complete
-                                </button>
-                              )}
-                              <button
-                                onClick={async () => {
-                                  if (!confirm("Hard delete this task assignment?")) return;
-                                  try {
-                                    await FirebaseService.deleteTask(task.taskId);
-                                    await auditLogAction('DELETE_TASK', task, null);
-                                    showSuccess('Task removed.');
-                                    loadData();
-                                  } catch (err) {
-                                    alert("Failed to delete task");
-                                  }
-                                }}
-                                className="p-2 bg-red-500/10 hover:bg-red-500 text-red-400 hover:text-[#0D0D14] rounded-lg transition-all cursor-pointer"
-                                title="Delete task"
-                                aria-label="Delete task"
-                              >
-                                <Trash2 size={12} />
-                              </button>
-                            </div>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </div>
-                </div>
+                <TasksDesk
+                  hosts={hosts}
+                  tasks={tasks}
+                  auditLogAction={auditLogAction}
+                  onTasksUpdated={() => loadData()}
+                />
               </motion.div>
             )}
 

@@ -11,7 +11,7 @@ import { collection, query, where, getDocs, Timestamp, documentId, doc, setDoc, 
 import { db, auth } from '../lib/firebase';
 import { ComposedChart, Area, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, BarChart, Bar, Cell } from 'recharts';
 import { SingleDatePicker, DateRangePicker } from './InteractiveDatePicker';
-
+import { BadgeAndTaskControlPanel } from './BadgeAndTaskControlPanel';
 interface HostProfileViewProps {
   host: Host;
   isReadOnly?: boolean;
@@ -1365,7 +1365,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
 
   const renderImpersonationBlock = () => {
     return (
-      <div className="bg-white/5 backdrop-blur-xl border border-white/10 p-5 rounded-3xl transition-all duration-300 hover:border-indigo-500/30 group space-y-4 shadow-lg">
+      <div className="bg-[#1A140A]/80 backdrop-blur-xl border border-[#D4AF37]/20 p-5 rounded-3xl transition-all duration-300 hover:border-[#D4AF37]/50 group space-y-4 shadow-[0_0_15px_rgba(212,175,55,0.15)]">
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-full bg-indigo-500/20 flex items-center justify-center text-indigo-400 text-sm shadow-inner">👤</div>
           <div>
@@ -1431,362 +1431,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
 
   const renderBadgeAndTaskAssignment = () => {
     return (
-      <div className="bg-white/5 backdrop-blur-xl border border-white/10 p-6 rounded-3xl space-y-6 shadow-lg">
-        {/* Title block */}
-        <div className="flex items-center gap-2.5 pb-4 border-b border-white/5">
-          <div className="w-8 h-8 rounded-full bg-indigo-500/20 flex items-center justify-center text-indigo-400 text-sm shadow-inner">
-            <Award size={16} />
-          </div>
-          <div>
-            <h4 className="text-xs font-black uppercase tracking-widest text-[#F0EFE8]">Badge &amp; Task Assignment</h4>
-            <p className="text-[9px] text-[#A09E9A] uppercase tracking-wider mt-0.5 font-bold">Admin Delegation Control Panel</p>
-          </div>
-        </div>
-
-        {/* Global Messages inside Ops */}
-        {opsErrorMessage && (
-          <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-2xl flex items-start gap-3">
-            <AlertCircle size={16} className="text-red-400 mt-0.5" />
-            <div className="space-y-1">
-              <p className="text-[11px] font-black uppercase text-red-400">System Alert</p>
-              <p className="text-[10px] text-red-300 font-mono leading-relaxed">{opsErrorMessage}</p>
-            </div>
-            <button onClick={() => setOpsErrorMessage(null)} className="ml-auto text-red-400">✕</button>
-          </div>
-        )}
-        {opsSuccessMessage && (
-          <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl flex items-center gap-3">
-            <CheckCircle2 size={16} className="text-emerald-400" />
-            <p className="text-[11px] font-bold text-emerald-400 uppercase tracking-tight">{opsSuccessMessage}</p>
-            <button onClick={() => setOpsSuccessMessage('')} className="ml-auto text-emerald-400">✕</button>
-          </div>
-        )}
-
-        {isOpsLoading ? (
-          <div className="flex justify-center py-12">
-            <Loader2 className="animate-spin text-indigo-400" size={32} />
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 pt-2">
-
-            {/* LEFT COLUMN: Badge (former Awards Desk) */}
-            <div className="space-y-6">
-              <div className="flex items-center gap-2 border-b border-white/5 pb-2">
-                <Award size={18} className="text-indigo-400" />
-                <h5 className="font-black text-xs uppercase tracking-wider text-[#F0EFE8]">Badge</h5>
-              </div>
-
-              {/* Create Award Form */}
-              <div className="bg-[#11111A]/40 border border-white/5 p-5 rounded-2xl space-y-4 shadow-md">
-                <div className="flex items-center justify-between pb-2 border-b border-white/5">
-                  <h6 className="text-[10px] font-black uppercase tracking-wider text-[#F0EFE8]">Create Badge Template</h6>
-                  <div className="flex gap-1 bg-[#0D0D14] p-1 rounded-lg border border-white/5">
-                    <button
-                      type="button"
-                      onClick={() => setAwardCreateMode('single')}
-                      className={cn("px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider transition-all cursor-pointer",
-                        awardCreateMode === 'single' ? "bg-indigo-600 text-white shadow-sm font-extrabold" : "text-[#A09E9A] hover:text-[#F0EFE8]")}
-                    >
-                      Single
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setAwardCreateMode('bulk')}
-                      className={cn("px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider transition-all cursor-pointer",
-                        awardCreateMode === 'bulk' ? "bg-indigo-600 text-white shadow-sm font-extrabold" : "text-[#A09E9A] hover:text-[#F0EFE8]")}
-                    >
-                      Bulk Top 9
-                    </button>
-                  </div>
-                </div>
-
-                {awardCreateMode === 'single' ? (
-                  <form onSubmit={handleCreateAward} className="space-y-4">
-                    <div className="space-y-1.5">
-                      <label className="text-[9px] font-black uppercase text-[#A09E9A] tracking-wider">Badge Name</label>
-                      <input type="text" value={newAwardName} onChange={e => setNewAwardName(e.target.value)} placeholder="e.g. Star Host" className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-indigo-500/50" required />
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="text-[9px] font-black uppercase text-[#A09E9A] tracking-wider">Badge Color</label>
-                      <select value={newAwardColor} onChange={e => setNewAwardColor(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-indigo-500/50 cursor-pointer">
-                        <option value="Gold">🏆 Gold</option>
-                        <option value="Purple">⭐ Purple</option>
-                        <option value="Emerald">💚 Emerald</option>
-                        <option value="Blue">💙 Blue</option>
-                        <option value="Red">❤️ Red</option>
-                        <option value="Orange">🧡 Orange</option>
-                      </select>
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="text-[9px] font-black uppercase text-[#A09E9A] tracking-wider">Effectivity Period</label>
-                      <div className="grid grid-cols-2 gap-3">
-                        <SingleDatePicker id="new-start" name="newStart" value={newAwardStartDate} onChange={setNewAwardStartDate} required />
-                        <SingleDatePicker id="new-end" name="newEnd" value={newAwardEndDate} onChange={setNewAwardEndDate} required />
-                      </div>
-                    </div>
-                    <button type="submit" disabled={isCreatingAward} className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer shadow-md">
-                      {isCreatingAward ? 'Creating...' : 'Create Badge'}
-                    </button>
-                  </form>
-                ) : (
-                  <form onSubmit={handleBulkGenerateAwards} className="space-y-4 animate-in fade-in duration-200 font-medium">
-                    <div className="space-y-1.5">
-                      <label className="text-[9px] font-black uppercase text-[#A09E9A] tracking-wider">Select Month</label>
-                      <select
-                        value={bulkMonth}
-                        onChange={(e) => setBulkMonth(e.target.value)}
-                        className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-indigo-500/50 cursor-pointer"
-                      >
-                        <option value="01">January</option>
-                        <option value="02">February</option>
-                        <option value="03">March</option>
-                        <option value="04">April</option>
-                        <option value="05">May</option>
-                        <option value="06">June</option>
-                        <option value="07">July</option>
-                        <option value="08">August</option>
-                        <option value="09">September</option>
-                        <option value="10">October</option>
-                        <option value="11">November</option>
-                        <option value="12">December</option>
-                      </select>
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="text-[9px] font-black uppercase text-[#A09E9A] tracking-wider">Select Year</label>
-                      <select
-                        value={bulkYear}
-                        onChange={(e) => setBulkYear(e.target.value)}
-                        className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-indigo-500/50 cursor-pointer"
-                      >
-                        <option value="2024">2024</option>
-                        <option value="2025">2025</option>
-                        <option value="2026">2026</option>
-                        <option value="2027">2027</option>
-                        <option value="2028">2028</option>
-                        <option value="2029">2029</option>
-                        <option value="2030">2030</option>
-                      </select>
-                    </div>
-                    <button
-                      type="submit"
-                      disabled={isCreatingAward}
-                      className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer shadow-md"
-                    >
-                      {isCreatingAward ? 'Generating...' : 'Bulk Generate Top 9 Badges'}
-                    </button>
-                  </form>
-                )}
-              </div>
-
-              {/* Assign Badge Form */}
-              <div className="bg-[#11111A]/40 border border-white/5 p-5 rounded-2xl space-y-4 shadow-md">
-                <h6 className="text-[10px] font-black uppercase tracking-wider text-[#F0EFE8] pb-2 border-b border-white/5">Assign Badge to Member</h6>
-                <form onSubmit={handleAssignAward} className="space-y-4">
-                  <div className="space-y-1.5">
-                    <label className="text-[9px] font-black uppercase text-[#A09E9A] tracking-wider">Select Created Badge</label>
-                    <select value={assignAwardId} onChange={e => setAssignAwardId(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-indigo-500/50 cursor-pointer" required>
-                      <option value="">-- Select Badge --</option>
-                      {opsAwards.map(a => <option key={a.id} value={a.id}>{a.name} ({a.color})</option>)}
-                    </select>
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-[9px] font-black uppercase text-[#A09E9A] tracking-wider">Filter by Role</label>
-                    <select value={assignRoleFilter} onChange={e => setAssignRoleFilter(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-indigo-500/50 cursor-pointer">
-                      <option value="All">All Roles (Excl. Director)</option>
-                      <option value="Host">Host / Talent</option>
-                      <option value="Manager">Manager</option>
-                      <option value="Agent">Agent</option>
-                      <option value="Admin">Admin</option>
-                      <option value="Head Admin">Head Admin</option>
-                    </select>
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-[9px] font-black uppercase text-[#A09E9A] tracking-wider">Select Member</label>
-                    <select value={assignHostId} onChange={e => setAssignHostId(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-indigo-500/50 cursor-pointer" required>
-                      <option value="">-- Choose Member --</option>
-                      {filteredAssignHosts.map(h => <option key={h.id} value={h.id}>{h.nickname || h.name} - {h.id} ({String(h.role || 'Host').toUpperCase()})</option>)}
-                    </select>
-                  </div>
-                  {assignAwardId && (
-                    <div className="space-y-1.5">
-                      <label className="text-[9px] font-black uppercase text-[#A09E9A] tracking-wider">Effectivity Period</label>
-                      <div className="grid grid-cols-2 gap-3 bg-black/20 p-3 rounded-lg border border-white/5 text-xs text-[#F0EFE8] font-mono">
-                        <div>
-                          <span className="text-[8px] text-[#A09E9A] block uppercase mb-0.5">Start Date</span>
-                          {awardStartDate || 'N/A'}
-                        </div>
-                        <div>
-                          <span className="text-[8px] text-[#A09E9A] block uppercase mb-0.5">End Date</span>
-                          {awardEndDate || 'N/A'}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                  <button type="submit" disabled={isAssigningAward} className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer shadow-md">
-                    {isAssigningAward ? 'Assigning...' : 'Assign Badge'}
-                  </button>
-                </form>
-              </div>
-
-              {/* Available Badges & Active Assignments stacked */}
-              <div className="space-y-4">
-                <div className="bg-[#11111A]/40 border border-white/5 p-5 rounded-2xl shadow-md space-y-3">
-                  <div className="flex items-center justify-between border-b border-[#D4AF37]/20 pb-2">
-                    <span className="text-[10px] font-black uppercase tracking-wider text-[#F0EFE8]">Available Badges</span>
-                    <span className="text-[9px] text-[#A09E9A]/60 font-mono">{opsAwards.length} created</span>
-                  </div>
-                  <div className="overflow-y-auto max-h-[200px] custom-scrollbar space-y-2.5 pr-1.5">
-                    {opsAwards.length === 0 ? (
-                      <p className="text-xs text-[#A09E9A]/30 italic py-4 text-center">No badges created yet.</p>
-                    ) : (
-                      opsAwards.map(a => {
-                        let labelStyle = 'bg-amber-500/10 text-amber-400 border-amber-500/20';
-                        if (a.color === 'Purple') labelStyle = 'bg-purple-500/10 text-purple-400 border-purple-500/20';
-                        else if (a.color === 'Emerald') labelStyle = 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
-                        else if (a.color === 'Blue') labelStyle = 'bg-blue-500/10 text-blue-400 border-blue-500/20';
-                        else if (a.color === 'Red') labelStyle = 'bg-red-500/10 text-red-400 border-red-500/20';
-                        else if (a.color === 'Orange') labelStyle = 'bg-orange-500/10 text-orange-400 border-orange-500/20';
-
-                        return (
-                          <div key={a.id} className="bg-black/30 border border-white/5 rounded-xl p-3 flex items-center justify-between transition-all hover:bg-black/40">
-                            <div className="space-y-1 min-w-0">
-                              <span className={cn("text-[9px] font-black uppercase px-2 py-0.5 rounded-full border tracking-wider", labelStyle)}>
-                                {a.name}
-                              </span>
-                              <div className="text-[9px] text-[#A09E9A] font-mono mt-1">
-                                {a.startDate || 'N/A'} to {a.endDate || 'N/A'}
-                              </div>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setAssignAwardId(a.id);
-                              }}
-                              className="text-[9px] font-black uppercase text-[#D4AF37] hover:bg-[#D4AF37]/10 px-2.5 py-1 border border-[#D4AF37]/35 rounded-lg transition-all cursor-pointer"
-                            >
-                              Assign
-                            </button>
-                          </div>
-                        );
-                      })
-                    )}
-                  </div>
-                </div>
-
-                <div className="bg-[#11111A]/40 border border-white/5 p-5 rounded-2xl shadow-md space-y-3">
-                  <div className="flex items-center justify-between border-b border-[#D4AF37]/20 pb-2">
-                    <span className="text-[10px] font-black uppercase tracking-wider text-[#F0EFE8]">Active Badge Assignments</span>
-                    <span className="text-[9px] text-[#A09E9A]/60 font-mono">{opsAwardAssignments.length} assigned</span>
-                  </div>
-                  <div className="overflow-y-auto max-h-[200px] custom-scrollbar space-y-2.5 pr-1.5">
-                    {opsAwardAssignments.length === 0 ? (
-                      <p className="text-xs text-[#A09E9A]/30 italic py-4 text-center">No badges assigned.</p>
-                    ) : (
-                      opsAwardAssignments.map(a => {
-                        let labelStyle = 'bg-amber-500/10 text-amber-400 border-amber-500/20';
-                        if (a.awardColor === 'Purple') labelStyle = 'bg-purple-500/10 text-purple-400 border-purple-500/20';
-                        else if (a.awardColor === 'Emerald') labelStyle = 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
-                        else if (a.awardColor === 'Blue') labelStyle = 'bg-blue-500/10 text-blue-400 border-blue-500/20';
-                        else if (a.awardColor === 'Red') labelStyle = 'bg-red-500/10 text-red-400 border-red-500/20';
-                        else if (a.awardColor === 'Orange') labelStyle = 'bg-orange-500/10 text-orange-400 border-orange-500/20';
-
-                        return (
-                          <div key={a.id} className="bg-black/30 border border-white/5 rounded-xl p-3 flex items-center justify-between transition-all hover:bg-black/40">
-                            <div className="space-y-1 min-w-0">
-                              <p className="text-xs font-bold text-[#F0EFE8] truncate">{a.hostNickname}</p>
-                              <div className="flex flex-wrap items-center gap-1.5 mt-1">
-                                <span className={cn("text-[8px] font-black uppercase px-1.5 py-0.5 rounded border tracking-wider", labelStyle)}>
-                                  {a.awardName}
-                                </span>
-                                <span className="text-[9px] text-white/30 font-mono">
-                                  {a.startDate} to {a.endDate}
-                                </span>
-                              </div>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => handleRevokeAssignment(a.id)}
-                              className="text-[9px] font-black uppercase text-red-400 hover:bg-red-500/10 px-2 py-1 border border-red-500/35 rounded-lg transition-all cursor-pointer"
-                            >
-                              Revoke
-                            </button>
-                          </div>
-                        );
-                      })
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* RIGHT COLUMN: Task (former Task Board) */}
-            <div className="space-y-6">
-              <div className="flex items-center gap-2 border-b border-white/5 pb-2">
-                <ListTodo size={18} className="text-indigo-400" />
-                <h5 className="font-black text-xs uppercase tracking-wider text-[#F0EFE8]">Task</h5>
-              </div>
-
-              {/* Delegate Task Form */}
-              <div className="bg-[#11111A]/40 border border-white/5 p-5 rounded-2xl space-y-4 shadow-md">
-                <h6 className="text-[10px] font-black uppercase tracking-wider text-[#F0EFE8] pb-2 border-b border-white/5">Delegate New Task</h6>
-                <form onSubmit={handleCreateTask} className="space-y-4">
-                  <div className="space-y-1.5">
-                    <label className="text-[9px] font-black uppercase text-[#A09E9A] tracking-wider">Task Title</label>
-                    <input type="text" value={taskTitle} onChange={e => setTaskTitle(e.target.value)} placeholder="e.g. Boost solo live hours" className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-indigo-500/50" required />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-[9px] font-black uppercase text-[#A09E9A] tracking-wider">Guidelines</label>
-                    <textarea value={taskDescription} onChange={e => setTaskDescription(e.target.value)} placeholder="Provide steps..." className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-indigo-500/50 h-24 resize-none" required />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-[9px] font-black uppercase text-[#A09E9A] tracking-wider">Due Date</label>
-                    <SingleDatePicker id="due-date" name="dueDate" value={taskDueDateVal} onChange={setTaskDueDateVal} required />
-                  </div>
-                  <button type="submit" disabled={isSubmittingTask} className="w-full py-2.5 bg-[#D4AF37] hover:bg-[#D4AF37]/80 text-[#0D0D14] rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer shadow-md font-bold">
-                    {isSubmittingTask ? 'Assigning...' : 'Delegate Task'}
-                  </button>
-                </form>
-              </div>
-
-              {/* Active Agency Tasks table */}
-              <div className="bg-[#11111A]/40 border border-white/5 p-5 rounded-2xl shadow-md space-y-3">
-                <h6 className="text-[10px] font-black uppercase tracking-wider text-[#F0EFE8] pb-2 border-b border-white/5">Active Agency Tasks</h6>
-                <div className="overflow-x-auto custom-scrollbar">
-                  <table className="w-full text-left text-xs">
-                    <thead>
-                      <tr className="border-b border-white/5 text-[8px] font-black text-[#A09E9A]/40 uppercase">
-                        <th className="px-3 py-2.5">Assignee</th>
-                        <th className="px-3 py-2.5">Details</th>
-                        <th className="px-3 py-2.5">Due Date</th>
-                        <th className="px-3 py-2.5">Status</th>
-                        <th className="px-3 py-2.5 text-right">Action</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-white/5">
-                      {opsTasks.length === 0 ? (
-                        <tr><td colSpan={5} className="py-6 text-center text-[#A09E9A]/20 font-medium">No active delegated tasks.</td></tr>
-                      ) : (
-                        opsTasks.map(t => (
-                          <tr key={t.taskId}>
-                            <td className="px-3 py-2.5 font-mono text-indigo-400 font-bold truncate max-w-[80px]">{t.assigneeId || t.assignedToUserId}</td>
-                            <td className="px-3 py-2.5"><div className="font-bold text-[#F0EFE8]">{t.title}</div><div className="text-[9px] text-[#A09E9A]/50">{t.taskType}</div></td>
-                            <td className="px-3 py-2.5 font-mono text-[#A09E9A]/85 whitespace-nowrap">{t.dueDate}</td>
-                            <td className="px-3 py-2.5"><span className="text-[8px] font-black uppercase px-1.5 py-0.5 rounded border bg-amber-500/10 text-amber-400 border-amber-500/20">{t.status}</span></td>
-                            <td className="px-3 py-2.5 text-right">
-                              <button type="button" onClick={() => handleDirectorDeleteTask(t.taskId)} className="text-red-400 hover:text-red-300 p-1 cursor-pointer"><Trash2 size={13} /></button>
-                            </td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-
-          </div>
-        )}
-      </div>
+      <BadgeAndTaskControlPanel />
     );
   };
 
@@ -2073,6 +1718,13 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
     return combined;
   }, [rawFanbase, rawAttendance, rawCalendar]);
 
+  const adminLogBadgeStyles = useMemo(() => ({
+    base: "px-2 py-0.5 rounded border text-[9px] font-black uppercase tracking-wider",
+    gold: "bg-[#D4AF37]/10 text-[#D4AF37] border-[#D4AF37]/20",
+    indigo: "bg-indigo-500/10 text-indigo-400 border-indigo-500/20",
+    pink: "bg-pink-500/10 text-pink-400 border-pink-500/20"
+  }), []);
+
   const filteredEditUsers = useMemo(() => {
     return allUsers.filter(u => {
       const userRole = String(u.role || '').toLowerCase();
@@ -2350,7 +2002,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
 
   const renderAdminsLogSection = () => {
     return (
-      <div className="bg-white/5 backdrop-blur-xl border border-white/10 p-5 rounded-3xl transition-all duration-300 hover:border-[#D4AF37]/30 group space-y-6 shadow-lg text-left">
+      <div className="bg-[#1A140A]/80 backdrop-blur-xl border border-[#D4AF37]/20 p-5 rounded-3xl transition-all duration-300 hover:border-[#D4AF37]/50 group space-y-6 shadow-[0_0_15px_rgba(212,175,55,0.15)] text-left">
         <div className="flex items-center justify-between pb-4 border-b border-white/5">
           <div className="flex items-center gap-4">
             <div className="p-3 rounded-2xl bg-[#D4AF37]/10 text-[#D4AF37] border border-[#D4AF37]/20">
@@ -2378,14 +2030,14 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
               </thead>
               <tbody className="divide-y divide-white/5 bg-black/10 font-medium">
                 {combinedAdminLogs.map((item) => {
-                  let badgeColor = '';
+                  let badgeStyles = adminLogBadgeStyles.base;
                   let typeLabel = '';
                   let titleStr = '';
                   let subtitleStr = '';
                   let dateAndTimeStr = '';
 
                   if (item.logType === 'fanbase') {
-                    badgeColor = 'bg-[#D4AF37]/10 text-[#D4AF37] border-[#D4AF37]/20';
+                    badgeStyles = cn(badgeStyles, adminLogBadgeStyles.gold);
                     typeLabel = 'Fanbase';
                     titleStr = item.nickname || 'Unknown Host';
                     subtitleStr = `Poppo: ${item.poppoId || item.poppo_id}`;
@@ -2394,13 +2046,13 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
                     const end = formatLogDateAndTime(item.toDate || item.to_date, '');
                     dateAndTimeStr = `${start} - ${end}`;
                   } else if (item.logType === 'attendance') {
-                    badgeColor = 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20';
+                    badgeStyles = cn(badgeStyles, adminLogBadgeStyles.indigo);
                     typeLabel = 'Attendance';
                     titleStr = item.eventTitle || 'Unknown Event';
                     subtitleStr = `Poppo IDs: ${(item.attendeeIds || []).length} logged`;
                     dateAndTimeStr = formatLogDateAndTime(item.eventDate, item.timeslot || '');
                   } else if (item.logType === 'calendar') {
-                    badgeColor = 'bg-pink-500/10 text-pink-400 border-pink-500/20';
+                    badgeStyles = cn(badgeStyles, adminLogBadgeStyles.pink);
                     typeLabel = 'Event';
                     titleStr = item.title || 'Untitled Event';
                     subtitleStr = `Type: ${item.type || 'solo'}`;
@@ -2412,7 +2064,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
                   return (
                     <tr key={item.id} className="hover:bg-white/[0.01] transition-colors">
                       <td className="px-4 py-3.5 whitespace-nowrap">
-                        <span className={cn("px-2 py-0.5 rounded border text-[9px] font-black uppercase tracking-wider", badgeColor)}>
+                        <span className={badgeStyles}>
                           {typeLabel}
                         </span>
                       </td>
@@ -2897,61 +2549,43 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
   const [sortAscending, setSortAscending] = useState(true);
 
   // Dynamic styles based on tier_pay
-  const styles = useMemo(() => {
-    const getCategoryStyles = (category: string) => {
+  const tierPayStyles = useMemo(() => {
+    const getTierPayStyles = (category: string) => {
       const norm = String(category || '').trim().toLowerCase();
-      if (norm === 'star host') {
+      if (norm === 'agency founder') {
         return {
-          borderColor: 'border-[#D4AF37]/50',
-          shadow: 'shadow-lg shadow-[#D4AF37]/15',
-          badgeText: 'text-[#D4AF37]',
-          accentColor: '#D4AF37',
-          topTrim: 'border-t-[#D4AF37] border-t-2',
-          gradientBg: 'bg-gradient-to-br from-[#D4AF37]/20 via-[#D4AF37]/5 to-black/80',
+          borderColor: 'border-white',
+          badgeText: 'text-white font-bold',
+          bgStyle: 'bg-white/10 shadow-[0_0_20px_rgba(255,255,255,0.8)]'
         };
+      }
+      if (norm === 'star host') {
+        return { borderColor: 'border-[#D4AF37]/50', badgeText: 'text-[#D4AF37]', bgStyle: 'bg-black/40 shadow-[0_0_12px_rgba(212,175,55,0.25)]' };
       }
       if (norm === 's idol') {
-        return {
-          borderColor: 'border-[#ec4899]/50',
-          shadow: 'shadow-lg shadow-[#ec4899]/15',
-          badgeText: 'text-[#ec4899]',
-          accentColor: '#ec4899',
-          topTrim: 'border-t-[#ec4899] border-t-2',
-          gradientBg: 'bg-gradient-to-br from-[#ec4899]/20 via-[#ec4899]/5 to-black/80',
-        };
+        return { borderColor: 'border-[#ec4899]/50', badgeText: 'text-[#ec4899]', bgStyle: 'bg-black/40 shadow-[0_0_12px_rgba(236,72,153,0.25)]' };
       }
       if (norm === 'rocket host') {
-        return {
-          borderColor: 'border-[#3b82f6]/50',
-          shadow: 'shadow-lg shadow-[#3b82f6]/15',
-          badgeText: 'text-[#3b82f6]',
-          accentColor: '#3b82f6',
-          topTrim: 'border-t-[#3b82f6] border-t-2',
-          gradientBg: 'bg-gradient-to-br from-[#3b82f6]/20 via-[#3b82f6]/5 to-black/80',
-        };
+        return { borderColor: 'border-[#3b82f6]/50', badgeText: 'text-[#3b82f6]', bgStyle: 'bg-black/40 shadow-[0_0_12px_rgba(59,130,246,0.25)]' };
       }
       if (norm === 'esport host' || norm.includes('esport')) {
-        return {
-          borderColor: 'border-[#a855f7]/50',
-          shadow: 'shadow-lg shadow-[#a855f7]/15',
-          badgeText: 'text-[#a855f7]',
-          accentColor: '#a855f7',
-          topTrim: 'border-t-[#a855f7] border-t-2',
-          gradientBg: 'bg-gradient-to-br from-[#a855f7]/20 via-[#a855f7]/5 to-black/80',
-        };
+        return { borderColor: 'border-[#a855f7]/50', badgeText: 'text-[#a855f7]', bgStyle: 'bg-black/40 shadow-[0_0_12px_rgba(168,85,247,0.25)]' };
       }
       // Regular Host
-      return {
-        borderColor: 'border-white/5',
-        shadow: 'shadow-md',
-        badgeText: 'text-[#F0EFE8]',
-        accentColor: '#ffffff',
-        topTrim: 'border-t-white/10 border-t-2',
-        gradientBg: 'bg-gradient-to-br from-white/10 via-white/5 to-[#000000]/80',
-      };
+      return { borderColor: 'border-white/20', badgeText: 'text-[#F0EFE8]', bgStyle: 'bg-black/40 shadow-sm' };
     };
-    return getCategoryStyles(host.tier_pay || '');
+    return getTierPayStyles(host.tier_pay || '');
   }, [host.tier_pay]);
+
+  // Global fiery gold glassmorphism UI design
+  const styles = useMemo(() => ({
+    borderColor: 'border-[#D4AF37]/30',
+    shadow: 'shadow-[0_0_20px_rgba(212,175,55,0.15)]',
+    badgeText: 'text-[#D4AF37]',
+    accentColor: '#D4AF37',
+    topTrim: 'border-t-[#D4AF37] border-t-2',
+    gradientBg: 'bg-[#1A140A]/80'
+  }), []);
 
   // Profile Edit States
   const [editNickname, setEditNickname] = useState(host.nickname || host.name || '');
@@ -4298,7 +3932,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
   const renderPerformanceMetricsAndDiversity = () => {
     if (performanceReports.length === 0) return null;
     return (
-      <div className={cn("space-y-4 bg-white/5 backdrop-blur-xl border border-white/10 p-5 rounded-3xl transition-all duration-300 hover:border-amber-500/30 group", styles.shadow)}>
+      <div className={cn("space-y-4 bg-[#1A140A]/80 backdrop-blur-xl border border-[#D4AF37]/20 p-5 rounded-3xl transition-all duration-300 hover:border-[#D4AF37]/50 group", styles.shadow)}>
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-2 pb-2 border-b border-white/5">
           {/* Tab Switcher on the left */}
           <div className="flex items-center gap-1 bg-black/40 p-1 rounded-xl border border-white/5 self-start">
@@ -4446,7 +4080,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
     if (trendChartData.length === 0) return null;
 
     return (
-      <div className={cn("space-y-4 bg-white/5 backdrop-blur-xl border border-white/10 p-5 rounded-3xl transition-all duration-300 hover:border-indigo-500/30 group", styles.shadow)}>
+      <div className={cn("space-y-4 bg-[#1A140A]/80 backdrop-blur-xl border border-[#D4AF37]/20 p-5 rounded-3xl transition-all duration-300 hover:border-[#D4AF37]/50 group", styles.shadow)}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-full bg-indigo-500/20 flex items-center justify-center text-indigo-400 text-sm shadow-inner">📊</div>
@@ -4943,7 +4577,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
     const lastMonthAwards = assignedAwards.filter(a => a.startDate && a.startDate.startsWith(lastMonthStr));
 
     return (
-      <div className={cn("backdrop-blur-xl border-2 rounded-3xl overflow-hidden flex flex-col relative group/card transition-all duration-300", styles.gradientBg, styles.borderColor, styles.shadow, styles.topTrim)}>
+      <div className={cn("bg-[#1A140A]/80 backdrop-blur-xl border-2 border-[#D4AF37]/30 shadow-[0_0_20px_rgba(212,175,55,0.15)] rounded-3xl overflow-hidden flex flex-col relative group/card transition-all duration-300 border-t-[#D4AF37] border-t-2")}>
 
         {/* Full-width square profile photo acting as a header banner */}
         <div className="w-full aspect-square relative bg-black">
@@ -5031,7 +4665,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
           <div className="grid grid-cols-2 gap-x-4 items-center">
             {/* Left Column: ID and Awards */}
             <div className="flex items-center flex-wrap gap-2">
-              <span className={cn("text-xs font-mono font-bold", styles.badgeText)}>ID: {host.id}</span>
+              <span className="text-xs font-mono font-bold text-[#D4AF37]">ID: {host.id}</span>
               {activeAwards.map(a => {
                 let badgeStyle = 'bg-amber-500/10 text-amber-400 border-amber-500/20';
                 if (a.awardColor === 'Purple') badgeStyle = 'bg-purple-500/10 text-purple-400 border-purple-500/20';
@@ -5054,7 +4688,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
 
             {/* Right Column: Tier Pay Badge */}
             <div>
-              <span className={cn("text-[9px] font-black uppercase tracking-widest px-2.5 py-0.5 rounded-full border backdrop-blur-md shadow-[0_0_12px_rgba(212,175,55,0.25)] inline-block", styles.badgeText, styles.borderColor, "bg-black/40")}>
+              <span className={cn("text-[9px] font-black uppercase tracking-widest px-2.5 py-0.5 rounded-full border inline-block backdrop-blur-md", tierPayStyles.badgeText, tierPayStyles.borderColor, tierPayStyles.bgStyle)}>
                 {host.tier_pay || 'Regular Host'}
               </span>
             </div>
@@ -5077,7 +4711,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                       {(assignedManager?.name || host.manager || 'M')[0].toUpperCase()}
                     </div>
                   )}
-                  <span className={cn("font-bold truncate", styles.badgeText)}>{assignedManager?.name || host.manager}</span>
+                  <span className="font-bold truncate text-[#D4AF37]">{assignedManager?.name || host.manager}</span>
                 </div>
               </div>
             ) : (
@@ -5480,7 +5114,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
     const activeCount = assignedAwards.filter(a => a.startDate && a.endDate && getIsLastMonth(a.startDate, a.endDate)).length;
 
     return (
-      <div className={cn("space-y-4 bg-white/5 backdrop-blur-xl border border-white/10 p-5 rounded-3xl transition-all duration-300 hover:border-amber-500/30 group", styles.shadow)}>
+      <div className={cn("space-y-4 bg-[#1A140A]/80 backdrop-blur-xl border border-[#D4AF37]/20 p-5 rounded-3xl transition-all duration-300 hover:border-[#D4AF37]/50 group", styles.shadow)}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-400 text-sm shadow-inner">🏆</div>
@@ -5648,7 +5282,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
       (userRoleLower === 'director');
 
     return (
-      <div className={cn("space-y-4 bg-white/5 backdrop-blur-xl border border-white/10 p-5 rounded-3xl transition-all duration-300 hover:border-[#D4AF37]/30 group", styles.shadow)}>
+      <div className={cn("space-y-4 bg-[#1A140A]/80 backdrop-blur-xl border border-[#D4AF37]/20 p-5 rounded-3xl transition-all duration-300 hover:border-[#D4AF37]/50 group", styles.shadow)}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-full bg-[#D4AF37]/20 flex items-center justify-center text-[#D4AF37] text-sm shadow-inner">🤖</div>
@@ -6219,7 +5853,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
   const renderWeeklyLiveStats = () => {
     if (weeklyLiveData.length === 0) return null;
     return (
-      <div className={cn("space-y-4 bg-white/5 backdrop-blur-xl border border-white/10 p-5 rounded-3xl transition-all duration-300 hover:border-emerald-500/30 group", styles.shadow)}>
+      <div className={cn("space-y-4 bg-[#1A140A]/80 backdrop-blur-xl border border-[#D4AF37]/20 p-5 rounded-3xl transition-all duration-300 hover:border-[#D4AF37]/50 group", styles.shadow)}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-400 text-sm shadow-inner">📊</div>
@@ -6270,7 +5904,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
       Feedback: 'text-emerald-400 border-emerald-500/20 bg-emerald-500/5',
     };
     return (
-      <div className={cn("space-y-4 bg-white/5 backdrop-blur-xl border border-white/10 p-5 rounded-3xl transition-all duration-300 hover:border-indigo-500/30 group", styles.shadow)}>
+      <div className={cn("space-y-4 bg-[#1A140A]/80 backdrop-blur-xl border border-[#D4AF37]/20 p-5 rounded-3xl transition-all duration-300 hover:border-[#D4AF37]/50 group", styles.shadow)}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-full bg-indigo-500/20 flex items-center justify-center text-indigo-400 text-sm shadow-inner">📝</div>
@@ -6305,7 +5939,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
     if (userRoleLower !== 'agent' && userRoleLower !== 'manager') return null;
 
     return (
-      <div className="space-y-4 bg-white/5 backdrop-blur-xl border border-white/10 p-5 rounded-3xl transition-all duration-300 hover:border-indigo-500/30 group shadow-lg">
+      <div className="space-y-4 bg-[#1A140A]/80 backdrop-blur-xl border border-[#D4AF37]/20 p-5 rounded-3xl transition-all duration-300 hover:border-[#D4AF37]/50 group shadow-[0_0_15px_rgba(212,175,55,0.15)]">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-full bg-indigo-500/20 flex items-center justify-center text-indigo-400 text-sm shadow-inner">👤</div>
@@ -6363,7 +5997,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
     if (userRole !== 'Agent' && userRole !== 'agent') return null;
 
     return (
-      <div className="bg-white/5 backdrop-blur-xl border border-white/10 p-5 rounded-3xl transition-all duration-300 hover:border-indigo-500/30 group shadow-lg">
+      <div className="bg-[#1A140A]/80 backdrop-blur-xl border border-[#D4AF37]/20 p-5 rounded-3xl transition-all duration-300 hover:border-[#D4AF37]/50 group shadow-[0_0_15px_rgba(212,175,55,0.15)]">
         <div className="flex items-center gap-2 mb-4 border-b border-white/5 pb-3">
           <div className="w-8 h-8 rounded-full bg-indigo-500/20 flex items-center justify-center text-indigo-400 text-sm shadow-inner">📥</div>
           <div>
@@ -6539,7 +6173,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
     const categories = ['Exposure & Scheduling', 'Coaching & Retention', 'Live & Engagement', 'Fanbase & Communication'];
 
     return (
-      <div className="bg-white/5 backdrop-blur-xl border border-white/10 p-5 rounded-3xl transition-all duration-300 hover:border-indigo-500/30 group shadow-lg space-y-4">
+      <div className="bg-[#1A140A]/80 backdrop-blur-xl border border-[#D4AF37]/20 p-5 rounded-3xl transition-all duration-300 hover:border-[#D4AF37]/50 group shadow-[0_0_15px_rgba(212,175,55,0.15)] space-y-4">
         {/* Header and Tabs */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/5 pb-3">
           <div className="flex items-center gap-2">
@@ -7036,7 +6670,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
     }
 
     return (
-      <div className="bg-white/5 backdrop-blur-xl border border-white/10 p-5 rounded-3xl transition-all duration-300 hover:border-indigo-500/30 group shadow-lg space-y-5">
+      <div className="bg-[#1A140A]/80 backdrop-blur-xl border border-[#D4AF37]/20 p-5 rounded-3xl transition-all duration-300 hover:border-[#D4AF37]/50 group shadow-[0_0_15px_rgba(212,175,55,0.15)] space-y-5">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-white/5 pb-3">
           <div className="flex items-center gap-2">
@@ -7224,12 +6858,12 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
       <div className={cn(
         "w-full text-[#F0EFE8] flex flex-col",
         isSpotlight
-          ? cn("glass-card p-5 space-y-5 relative mx-auto rounded-[24px] overflow-y-auto custom-scrollbar max-h-[calc(100dvh-2rem)]", hidePerformanceStats ? "max-w-4xl" : "max-w-md")
-          : "space-y-6 max-w-4xl mx-auto pb-12 pt-2"
+          ? cn("glass-card p-5 space-y-4 relative mx-auto rounded-[24px] overflow-y-auto custom-scrollbar max-h-[calc(100dvh-2rem)]", hidePerformanceStats ? "max-w-4xl" : "max-w-md")
+          : "space-y-4 max-w-4xl mx-auto pb-8 pt-0"
       )}>
 
       {/* Top Header Grid line style */}
-      {isSpotlight ? (
+      {isSpotlight && (
         <div className="flex items-center justify-between pb-3 border-b border-white/5 shrink-0">
           <div className="flex items-center gap-3">
             {onClose && (
@@ -7257,12 +6891,6 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
             )}
           </div>
         </div>
-      ) : (
-        <div className="flex items-center justify-between pb-4 border-b border-white/5 shrink-0">
-          <div className="flex flex-col">
-            <span className="text-lg font-black text-[#F0EFE8] leading-tight tracking-[0.05em]">{host.nickname || host.name}'s Profile</span>
-          </div>
-        </div>
       )}
 
       {isLoading ? (
@@ -7271,13 +6899,13 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
           <p className="text-[10px] font-black uppercase tracking-widest text-[#D4AF37]/45">Syncing Profile Metrics...</p>
         </div>
       ) : profileOwnerRole === 'director' ? (
-        <div className={cn("mx-auto w-full pt-2 space-y-6", (!onClose && (loggedInUserRole === 'director' || loggedInUserRole === 'head admin' || loggedInUserRole === 'head_admin')) ? "max-w-4xl" : "max-w-xl")}>
+        <div className={cn("mx-auto w-full pt-1 space-y-4", (!onClose && (loggedInUserRole === 'director' || loggedInUserRole === 'head admin' || loggedInUserRole === 'head_admin')) ? "max-w-4xl" : "max-w-xl")}>
           {renderIdentityCard()}
           {!isSpotlight && String(rootAuth?.role || '').toLowerCase() === 'director' && renderImpersonationBlock()}
           {!onClose && (loggedInUserRole === 'director' || loggedInUserRole === 'head admin' || loggedInUserRole === 'head_admin') && renderBadgeAndTaskAssignment()}
         </div>
       ) : isNonHostRole ? (
-        <div className={cn("mx-auto w-full pt-2 space-y-6", (String(rootAuth?.role || '').toLowerCase() === 'admin' || (!onClose && (loggedInUserRole === 'director' || loggedInUserRole === 'head admin' || loggedInUserRole === 'head_admin'))) ? "max-w-4xl" : "max-w-xl")}>
+        <div className={cn("mx-auto w-full pt-1 space-y-4", (String(rootAuth?.role || '').toLowerCase() === 'admin' || (!onClose && (loggedInUserRole === 'director' || loggedInUserRole === 'head admin' || loggedInUserRole === 'head_admin'))) ? "max-w-4xl" : "max-w-xl")}>
           {renderIdentityCard()}
           {renderAssignedHostsSection()}
           {renderIntakeSection()}
@@ -7291,8 +6919,8 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
       ) : (
         <div className={cn(
           (isSpotlight && !hidePerformanceStats)
-            ? "space-y-5 py-1"
-            : "grid grid-cols-1 lg:grid-cols-3 gap-6 pt-2"
+            ? "space-y-4 py-1"
+            : "grid grid-cols-1 lg:grid-cols-3 gap-6 pt-1"
         )}>
           {(isSpotlight && !hidePerformanceStats) ? (
             <>
@@ -7326,7 +6954,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
               </div>
 
               {/* Right Column (Performance Stats) */}
-              <div className="space-y-6 lg:col-span-2">
+              <div className="space-y-4 lg:col-span-2">
                 {!isSpotlight && String(rootAuth?.role || '').toLowerCase() === 'director' && renderImpersonationBlock()}
                 {renderFanbaseBlock()}
                 <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">

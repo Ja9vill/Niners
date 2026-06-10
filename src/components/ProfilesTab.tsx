@@ -122,6 +122,18 @@ export const ProfilesTab: React.FC<ProfilesTabProps> = ({ isReadOnly = false }) 
       }
 
       return true;
+    }).sort((a, b) => {
+      // 1. Photo presence (photo first)
+      const aHasPhoto = !!a.photoUrl;
+      const bHasPhoto = !!b.photoUrl;
+      if (aHasPhoto !== bHasPhoto) {
+        return aHasPhoto ? -1 : 1;
+      }
+      
+      // 2. Alphabetical by nickname/name
+      const aName = (a.nickname || a.name || '').toLowerCase();
+      const bName = (b.nickname || b.name || '').toLowerCase();
+      return aName.localeCompare(bName);
     });
   }, [hosts, searchTerm, roleFilter, tierFilter]);
 
@@ -191,7 +203,6 @@ export const ProfilesTab: React.FC<ProfilesTabProps> = ({ isReadOnly = false }) 
             <option value="Rocket Host">Rocket Host</option>
             <option value="S idol">S idol</option>
             <option value="Esports">Esports</option>
-            <option value="Influencer">Influencer</option>
             <option value="Regular Host">Regular Host</option>
           </select>
         </div>
@@ -251,8 +262,10 @@ export const ProfilesTab: React.FC<ProfilesTabProps> = ({ isReadOnly = false }) 
                     <Star size={10} />
                     {host.tier_pay || 'N/A'}
                   </div>
-                  {host.status === 'Active' && (
-                    <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"></div>
+                  {host.status && host.status !== 'Active' && (
+                    <div className="text-[10px] text-red-400 font-bold bg-red-400/10 px-2 py-1 rounded-md border border-red-400/20">
+                      {host.status}
+                    </div>
                   )}
                 </div>
               </div>

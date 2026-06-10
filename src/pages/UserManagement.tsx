@@ -188,7 +188,7 @@ export default function UserManagement() {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Form Card Section */}
-          <div className="bg-[#1A1A28] border border-white/5 rounded-3xl p-6 shadow-xl space-y-6 self-start animate-fade-in">
+          <div className="glass-card p-6 space-y-6 self-start animate-fade-in">
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-full bg-[#D4AF37]/10 flex items-center justify-center border border-[#D4AF37]/20">
                 <UserPlus className="text-[#D4AF37]" size={16} />
@@ -267,7 +267,7 @@ export default function UserManagement() {
           </div>
 
           {/* User Display Table Card */}
-          <div className="bg-[#1A1A28] border border-white/5 rounded-3xl p-6 shadow-xl space-y-4 lg:col-span-2">
+          <div className="glass-card p-6 space-y-4 lg:col-span-2">
             <div className="flex items-center gap-2 mb-2">
               <div className="w-8 h-8 rounded-full bg-[#D4AF37]/10 flex items-center justify-center border border-[#D4AF37]/20">
                 <Users className="text-[#D4AF37]" size={16} />

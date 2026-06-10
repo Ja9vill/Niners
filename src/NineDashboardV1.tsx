@@ -997,7 +997,7 @@ export default function App() {
                     initial={{ opacity: 0, y: 6 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.25 }}
-                    className="max-w-6xl mx-auto p-4 sm:p-8"
+                    className={cn("max-w-6xl mx-auto", (activeTab === 'home' || activeTab === 'roster' || activeTab === 'calendar' || activeTab === 'dashboard' || activeTab === 'account') ? "p-0" : "p-4 sm:p-8")}
                   >
                     {renderContent()}
                   </motion.div>

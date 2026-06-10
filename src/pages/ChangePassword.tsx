@@ -95,7 +95,7 @@ export default function ChangePassword() {
 
   return (
     <div className="flex flex-col items-center justify-center p-6 min-h-[60vh] select-none text-[#F0EFE8]">
-      <div className="w-full max-w-md bg-[#1A1A28] border border-[#D4AF37]/20 p-8 rounded-3xl shadow-xl space-y-6">
+      <div className="glass-card w-full max-w-md p-8 space-y-6">
         <div className="flex flex-col items-center gap-2">
           <div className="w-12 h-12 rounded-full bg-[#D4AF37]/10 flex items-center justify-center border border-[#D4AF37]/20">
             <Key className="text-[#D4AF37]" size={24} />
