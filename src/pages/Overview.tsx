@@ -228,7 +228,7 @@ export const Overview = () => {
       byHost[id].months += 1;
       byHost[id].commission += getAgentComm(r);
     });
-    return Object.values(byHost).sort((a, b) => b.points - a.points);
+    return Object.values(byHost).sort((a, b) => b.commission - a.commission);
   }, [lbReports, hostLookup]);
 
   const lbTotalPeriodCommission = useMemo(() => {
@@ -431,7 +431,7 @@ export const Overview = () => {
       `}</style>
 
       {/* Base Salary Tiers Block */}
-      <div className="bg-[#1A1A28]/80 backdrop-blur-md border border-[#D4AF37]/15 shadow-2xl rounded-2xl p-5 relative overflow-hidden">
+      <div className="glass-card relative overflow-hidden">
         {/* Subtle background glow for the entire section */}
         <div className="absolute -top-24 -left-24 w-48 h-48 bg-[#D4AF37]/5 blur-3xl rounded-full pointer-events-none"></div>
         <div className="absolute -bottom-24 -right-24 w-48 h-48 bg-indigo-500/5 blur-3xl rounded-full pointer-events-none"></div>
@@ -492,7 +492,14 @@ export const Overview = () => {
               <p className="text-xs text-[#A09E9A]/50 italic py-2">No members in this tier category.</p>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 max-h-48 overflow-y-auto pr-1">
-                {baseSalaryTiersData[selectedTierForList]?.hosts.map((h, idx) => {
+                {baseSalaryTiersData[selectedTierForList]?.hosts
+                  .slice()
+                  .sort((a, b) => {
+                    const nameA = (a.nickname || a.name || 'Unnamed').toLowerCase();
+                    const nameB = (b.nickname || b.name || 'Unnamed').toLowerCase();
+                    return nameA.localeCompare(nameB);
+                  })
+                  .map((h, idx) => {
                   const nickname = h.nickname || h.name || 'Unnamed';
                   return (
                     <div
@@ -546,7 +553,7 @@ export const Overview = () => {
       </div>
 
       {/* Agency Performance Metrics */}
-      <div className="bg-[#1A1A28]/80 backdrop-blur-md border border-[#D4AF37]/15 shadow-2xl rounded-2xl p-4 sm:p-5 relative overflow-hidden">
+      <div className="glass-card relative overflow-hidden">
         {/* Subtle background glow for the entire section */}
         <div className="absolute -top-24 -right-24 w-48 h-48 bg-[#D4AF37]/5 blur-3xl rounded-full pointer-events-none"></div>
         <p className="text-[9px] font-black text-[#A09E9A] uppercase tracking-[0.2em] mb-4 sm:mb-5 relative z-10 flex items-center gap-2">
@@ -646,7 +653,7 @@ export const Overview = () => {
 
 
       {monthlyTrend.length > 0 && (
-        <div className="bg-[#1A1A28] border border-[#D4AF37]/10 rounded-2xl p-5">
+        <div className="glass-card">
           <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
             <div className="flex items-center gap-2">
               <TrendingUp size={16} className="text-[#D4AF37]" />
@@ -750,7 +757,7 @@ export const Overview = () => {
       )}
 
       {/* Merged Agency Leaderboard & Spotlight Block */}
-      <div className="bg-[#1A1A28]/80 backdrop-blur-md border border-[#D4AF37]/15 rounded-2xl p-5 relative overflow-hidden flex flex-col gap-4">
+      <div className="glass-card relative overflow-hidden flex flex-col gap-4">
         <div className="absolute -top-10 -right-10 w-32 h-32 bg-indigo-500/10 blur-3xl rounded-full pointer-events-none"></div>
         
         {/* Combined Header */}
@@ -822,8 +829,8 @@ export const Overview = () => {
 
           <div className="space-y-1.5">
             {topPerformers.slice(0, 15).map((h, idx) => {
-              const maxPts = topPerformers[0]?.points || 1;
-              const pct = (h.points / maxPts) * 100;
+              const maxComm = topPerformers[0]?.commission || 1;
+              const pct = (h.commission / maxComm) * 100;
               const medals = ['🥇', '🥈', '🥉'];
               
               // Define fading colors for Top 9: Light Yellow -> Gold -> Orange -> Red
@@ -999,6 +1006,7 @@ export const Overview = () => {
             onClose={() => setSpotlightHost(null)} 
             onProfileUpdated={() => {}}
             isSpotlight={true}
+            hidePerformanceStats={true}
           />
         </div>
       )}
