@@ -227,6 +227,7 @@ export default function UserManagement() {
                 <label className="text-[9px] uppercase font-black tracking-wider text-[#A09E9A]">System Role</label>
                 <div className="relative">
                   <select
+                    title="System Role"
                     value={role}
                     onChange={(e) => setRole(e.target.value)}
                     disabled={isSubmitLoading}

@@ -13,6 +13,8 @@ export interface AuthState {
   token: string;
   mockRole?: string;
   originalRole?: string;
+  poppoId?: string;
+  id?: string;
 }
 
 const PREFIX = "nine_";

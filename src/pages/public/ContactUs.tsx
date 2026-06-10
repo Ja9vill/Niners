@@ -81,7 +81,7 @@ export const ContactUs = () => {
               </div>
               <h3 className="text-xl font-bold text-white mb-2">Fast-Track Agency Registration</h3>
               <p className="text-[#A09E9A] text-sm mb-6">Want to start your agency right now? You don't need to wait for an email reply. Just click our automated portal link below.</p>
-              <a href="https://invite-poppo.com/6CxF5E" target="_blank" rel="noreferrer" className="inline-flex items-center justify-center w-full bg-white/5 border border-[#D4AF37]/30 text-[#D4AF37] hover:bg-[#D4AF37] hover:text-black font-bold py-3 rounded-xl transition-colors">
+              <a href="https://invite-poppo.com/6CxF5E" target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center w-full bg-white/5 border border-[#D4AF37]/30 text-[#D4AF37] hover:bg-[#D4AF37] hover:text-black font-bold py-3 rounded-xl transition-colors">
                 Access Agent Portal
               </a>
             </div>

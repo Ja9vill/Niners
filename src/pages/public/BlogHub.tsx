@@ -108,6 +108,7 @@ export const BlogHub = () => {
           </div>
           <div className="flex gap-4">
             <select
+              title="Blog Category Filter"
               value={selectedCategory}
               onChange={(e) => setSelectedCategory(e.target.value)}
               className="bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-[#D4AF37] outline-none cursor-pointer"
@@ -115,6 +116,7 @@ export const BlogHub = () => {
               {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
             <select
+              title="Blog Sort Order"
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value)}
               className="bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-[#D4AF37] outline-none cursor-pointer"

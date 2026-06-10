@@ -768,6 +768,7 @@ export const Overview = () => {
           </div>
           <div className="flex items-center gap-2 relative z-10">
             <select
+              title="Leaderboard Year"
               value={lbYear}
               onChange={e => setLbYear(e.target.value)}
               className="bg-[#0D0D14] border border-[#D4AF37]/20 rounded-lg px-3 py-1.5 text-xs font-bold text-[#F0EFE8] outline-none focus:border-[#D4AF37] cursor-pointer shadow-inner"
@@ -776,6 +777,7 @@ export const Overview = () => {
               {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
             </select>
             <select
+              title="Leaderboard Month"
               value={lbMonth}
               onChange={e => setLbMonth(e.target.value)}
               className="bg-[#0D0D14] border border-[#D4AF37]/20 rounded-lg px-3 py-1.5 text-xs font-bold text-[#F0EFE8] outline-none focus:border-[#D4AF37] cursor-pointer shadow-inner"

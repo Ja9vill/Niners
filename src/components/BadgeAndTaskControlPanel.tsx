@@ -386,6 +386,7 @@ export const BadgeAndTaskControlPanel = () => {
                         )} />
                       </div>
                       <select 
+                        title="Badge Color"
                         value={badgeColor}
                         onChange={(e) => setBadgeColor(e.target.value)}
                         className="w-full bg-transparent border border-white/10 rounded-xl pl-10 pr-10 py-3 text-sm text-[#F0EFE8] appearance-none focus:border-[#D4AF37] focus:outline-none focus:ring-1 focus:ring-[#D4AF37]/30 transition-colors cursor-pointer"
@@ -418,6 +419,7 @@ export const BadgeAndTaskControlPanel = () => {
                     <label className="text-[9px] font-black uppercase text-[#A09E9A]/60 tracking-wider">Select Period</label>
                     <div className="flex gap-2">
                       <select 
+                        title="Bulk Month"
                         value={bulkMonth}
                         onChange={e => setBulkMonth(e.target.value)}
                         className="flex-1 bg-transparent border border-white/10 rounded-xl px-4 py-3 text-sm text-[#F0EFE8] appearance-none focus:border-[#D4AF37] focus:outline-none focus:ring-1 focus:ring-[#D4AF37]/30 transition-colors cursor-pointer"
@@ -430,6 +432,7 @@ export const BadgeAndTaskControlPanel = () => {
                         ))}
                       </select>
                       <select 
+                        title="Bulk Year"
                         value={bulkYear}
                         onChange={e => setBulkYear(e.target.value)}
                         className="w-1/3 bg-transparent border border-white/10 rounded-xl px-4 py-3 text-sm text-[#F0EFE8] appearance-none focus:border-[#D4AF37] focus:outline-none focus:ring-1 focus:ring-[#D4AF37]/30 transition-colors cursor-pointer"
@@ -603,6 +606,7 @@ export const BadgeAndTaskControlPanel = () => {
                 Assign Badge
               </h3>
               <button 
+                title="Close Modal"
                 onClick={() => {
                   setIsAssignModalOpen(false);
                   setBadgeToAssign(null);
@@ -619,6 +623,8 @@ export const BadgeAndTaskControlPanel = () => {
               <div className="space-y-1.5">
                 <label className="text-[9px] font-black uppercase text-[#A09E9A]/60 tracking-wider">Selected Badge</label>
                 <input 
+                  title="Selected Badge"
+                  placeholder="Selected Badge"
                   type="text" 
                   value={badgeToAssign.name} 
                   disabled 

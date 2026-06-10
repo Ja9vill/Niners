@@ -245,6 +245,7 @@ export const BlogEditor: React.FC<BlogEditorProps> = ({ blog, onSave, onCancel, 
           <div className="space-y-1">
             <label className="text-[10px] font-black uppercase tracking-widest text-[#D4AF37]">Category</label>
             <select
+              title="Blog Category"
               value={category}
               onChange={(e) => setCategory(e.target.value)}
               className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:border-[#D4AF37] outline-none"
@@ -325,7 +326,7 @@ export const BlogEditor: React.FC<BlogEditorProps> = ({ blog, onSave, onCancel, 
             
             <label className="p-2 hover:bg-white/10 rounded text-white/70 hover:text-white cursor-pointer" title="Upload Image Inline">
               <ImageIcon size={16} />
-              <input type="file" className="hidden" accept="image/*" onChange={handleImageUpload} />
+              <input title="Upload Image" placeholder="Upload Image" type="file" className="hidden" accept="image/*" onChange={handleImageUpload} />
             </label>
             
             <button type="button" onClick={() => setEmbedModalOpen(true)} className="p-2 hover:bg-white/10 rounded text-white/70 hover:text-white" title="Insert Embed (YouTube, TikTok, etc.)"><Youtube size={16} /></button>
@@ -383,7 +384,7 @@ export const BlogEditor: React.FC<BlogEditorProps> = ({ blog, onSave, onCancel, 
                 <Youtube size={18} className="text-[#D4AF37]" />
                 Insert Embed Widget
               </h3>
-              <button onClick={() => setEmbedModalOpen(false)} className="text-white/40 hover:text-white transition-colors">
+              <button title="Close Embed Modal" onClick={() => setEmbedModalOpen(false)} className="text-white/40 hover:text-white transition-colors">
                 <X size={20} />
               </button>
             </div>

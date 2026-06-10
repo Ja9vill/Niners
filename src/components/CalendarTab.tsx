@@ -301,15 +301,19 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
     setLivehouseRequests(updatedRequests);
     Storage.setLivehouseRequests(updatedRequests);
     // Create Calendar Event
+    const newId = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 15);
     const newEvent: CalendarEvent = {
-      event_id: crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 15),
+      id: newId,
+      event_id: newId,
       poppo_id: req.poppoId,
       event_host_id: req.poppoId,
       title: `Livehouse: ${req.name}`,
       description: req.notes || 'Livehouse timeslot approved.',
       date: req.date,
+      event_date: req.date,
       time: req.timeslot,
       type: (req.livehouseType || 'SOLO LIVEHOUSE') as EventType,
+      type_of_event: req.livehouseType || 'SOLO LIVEHOUSE',
       location: 'VIRTUAL ROOM (LIVEHOUSE)',
       created_by_name: auth.nickname || auth.name || 'Admin',
       created_by_role: auth.role || 'Admin',
@@ -317,6 +321,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
       visibility: 'All',
       participants: [req.poppoId],
       participantIds: [req.poppoId],
+      participants_id: [req.poppoId],
       timestamp: new Date().toISOString()
     };
 
@@ -495,15 +500,19 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
     const formData = new FormData(e.currentTarget);
     const isTalent = auth.role === 'Talent';
 
+    const newId = crypto.randomUUID();
     const newEvent: CalendarEvent = {
-      event_id: crypto.randomUUID(),
+      id: newId,
+      event_id: newId,
       poppo_id: isTalent ? auth.poppo_id : (formData.get('hostId') as string || 'Agency'),
       event_host_id: formData.get('eventHostId') as string || '',
       title: formData.get('title') as string,
       description: formData.get('description') as string,
       date: formData.get('date') as string,
+      event_date: formData.get('date') as string,
       time: formData.get('time') as string,
       type: formData.get('type') as string || 'Agency Event',
+      type_of_event: formData.get('type') as string || 'Agency Event',
       location: formData.get('location') as string || 'ONLINE',
       created_by_name: auth.name,
       created_by_role: auth.role,
@@ -511,6 +520,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
       visibility: formData.get('visibility') as any || 'All',
       participants: [...selectedParticipants],
       participantIds: [...selectedParticipants], // alias for Firestore array-contains queries
+      participants_id: [...selectedParticipants],
       timestamp: new Date().toISOString()
     };
     
@@ -1514,6 +1524,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                       <div>
                         <label className="block text-[10px] font-black uppercase tracking-widest text-[#D4AF37] mb-2">Event Type</label>
                         <select
+                          title="Edit Event Type"
                           value={editType}
                           onChange={(e) => setEditType(e.target.value)}
                           disabled
@@ -1529,6 +1540,8 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                       <div>
                         <label className="block text-[10px] font-black uppercase tracking-widest text-[#D4AF37] mb-2">Date</label>
                         <input
+                          title="Edit Event Date"
+                          placeholder="YYYY-MM-DD"
                           type="date"
                           value={editDate}
                           onChange={(e) => setEditDate(e.target.value)}
@@ -1593,6 +1606,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                           className="flex-1 glass-input text-xs px-3 py-2"
                         />
                         <select
+                          title="Participant Role Filter"
                           value={editParticipantRoleFilter}
                           onChange={(e) => setEditParticipantRoleFilter(e.target.value)}
                           className="glass-input text-xs px-3 py-2 appearance-none cursor-pointer"
@@ -1888,6 +1902,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                           className="flex-1 glass-input text-xs px-3 py-2"
                         />
                         <select
+                          title="Attendance Role Filter"
                           value={attRoleFilter}
                           onChange={(e) => setAttRoleFilter(e.target.value)}
                           className="glass-input text-xs px-3 py-2 appearance-none cursor-pointer"

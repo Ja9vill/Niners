@@ -115,15 +115,15 @@ export const PoppoLivePage = () => {
         </div>
 
         <div className="flex flex-wrap items-center justify-center gap-6">
-          <a href="https://www.facebook.com/share/1Bxc59ksHM/?mibextid=wwXIfr" target="_blank" rel="noreferrer" className="text-[#F0EFE8] hover:text-[#D4AF37] transition-colors flex items-center gap-2">
+          <a href="https://www.facebook.com/share/1Bxc59ksHM/?mibextid=wwXIfr" target="_blank" rel="noopener noreferrer" className="text-[#F0EFE8] hover:text-[#D4AF37] transition-colors flex items-center gap-2">
             <Facebook size={20} />
             <span className="text-xs font-bold tracking-wider">Facebook</span>
           </a>
-          <a href="https://instagram.com/9TalentManagement" target="_blank" rel="noreferrer" className="text-[#F0EFE8] hover:text-[#D4AF37] transition-colors flex items-center gap-2">
+          <a href="https://instagram.com/9TalentManagement" target="_blank" rel="noopener noreferrer" className="text-[#F0EFE8] hover:text-[#D4AF37] transition-colors flex items-center gap-2">
             <Instagram size={20} />
             <span className="text-xs font-bold tracking-wider">@9TalentManagement</span>
           </a>
-          <a href="https://wa.me/message/5Y6QFQXSIEZRI1" target="_blank" rel="noreferrer" className="text-[#F0EFE8] hover:text-[#D4AF37] transition-colors flex items-center gap-2">
+          <a href="https://wa.me/message/5Y6QFQXSIEZRI1" target="_blank" rel="noopener noreferrer" className="text-[#F0EFE8] hover:text-[#D4AF37] transition-colors flex items-center gap-2">
             <MessageCircle size={20} />
             <span className="text-xs font-bold tracking-wider">Whatsapp +639558416320</span>
           </a>

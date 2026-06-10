@@ -55,7 +55,7 @@ export const AgentRegistrationGuide = () => {
                 <CheckCircle size={18} className="text-[#D4AF37]" /> Step 1: Open the Portal
               </h3>
               <p className="text-[#A09E9A] text-sm">
-                Click our <a href="https://invite-poppo.com/6CxF5E" target="_blank" rel="noreferrer" className="text-[#D4AF37] hover:underline">Official Registration Link</a> to access the fast-track agency portal.
+                Click our <a href="https://invite-poppo.com/6CxF5E" target="_blank" rel="noopener noreferrer" className="text-[#D4AF37] hover:underline">Official Registration Link</a> to access the fast-track agency portal.
               </p>
             </div>
 

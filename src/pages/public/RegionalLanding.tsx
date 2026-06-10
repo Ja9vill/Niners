@@ -73,7 +73,7 @@ export const RegionalLanding = () => {
           </p>
 
           <div className="pt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
-            <a href="https://invite-poppo.com/6CxF5E" target="_blank" rel="noreferrer" className="w-full sm:w-auto bg-[#D4AF37] hover:bg-[#D4AF37]/90 text-black px-8 py-4 rounded-xl font-bold uppercase tracking-wider transition-all shadow-[0_0_20px_rgba(212,175,55,0.3)] hover:-translate-y-1">
+            <a href="https://invite-poppo.com/6CxF5E" target="_blank" rel="noopener noreferrer" className="w-full sm:w-auto bg-[#D4AF37] hover:bg-[#D4AF37]/90 text-black px-8 py-4 rounded-xl font-bold uppercase tracking-wider transition-all shadow-[0_0_20px_rgba(212,175,55,0.3)] hover:-translate-y-1">
               Join as a Host
             </a>
             <a href="/contact" className="w-full sm:w-auto bg-white/5 border border-[#D4AF37]/30 hover:bg-[#D4AF37]/10 text-white px-8 py-4 rounded-xl font-bold uppercase tracking-wider transition-all hover:-translate-y-1">

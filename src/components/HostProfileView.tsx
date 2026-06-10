@@ -2997,7 +2997,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
 
         // Load awards
         try {
-          const awardsData = await FirebaseService.getAwards(host.id);
+          const awardsData = await FirebaseService.getHostAwards(host.id);
           const sortedAwards = (awardsData || []).sort((a: any, b: any) => {
             const dateA = a.dateAwarded || a.awardedAt || '';
             const dateB = b.dateAwarded || b.awardedAt || '';
@@ -3679,6 +3679,15 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
         points: r.earningsBreakdown?.totalEarningsOfPoints || r.totalEarningsOfPoints || r.total_points || 0,
         liveHrs: r.liveDurationMinutes ? (r.liveDurationMinutes / 60).toFixed(1) : (r.liveDuration || 0),
       }));
+
+      const perfTotals = performanceReports.reduce((acc, r) => {
+        acc.liveEarnings += Number(r.earningsBreakdown?.liveEarnings || r.liveEarnings || r.live_earnings || 0);
+        acc.partyEarnings += Number(r.earningsBreakdown?.partyEarnings || r.partyEarnings || r.party_earnings || 0);
+        acc.points += Number(r.earningsBreakdown?.totalEarningsOfPoints || r.totalEarningsOfPoints || r.total_points || 0);
+        acc.liveHrs += Number(r.liveDurationMinutes ? r.liveDurationMinutes / 60 : (r.liveDuration || 0));
+        return acc;
+      }, { liveEarnings: 0, partyEarnings: 0, points: 0, liveHrs: 0 });
+      perfTotals.liveHrs = parseFloat(perfTotals.liveHrs.toFixed(1));
 
       const prompt = `You are an AI analyst and mentor for Nine Talent Management, a live streaming agency.
 Analyze the following host data and write a performance report addressed DIRECTLY to the host. Use the second-person perspective ("you", "your", "yours") throughout the entire response. Do not use third-person (e.g. "this host", "she", "he", "their", "Miss Nine").
