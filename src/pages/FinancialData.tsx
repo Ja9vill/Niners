@@ -57,15 +57,26 @@ export const FinancialData = () => {
   const handleAddRow = () => {
     const newEntry: CommissionEntry = {
       poppo_id: '',
-      poppo_name: '',
-      month: financialTab === 'monthly' ? '' : undefined,
+      nickname: '',
+      month: financialTab === 'monthly' ? '' : '',
+      year: new Date().getFullYear(),
       from_date: financialTab === 'weekly' ? '' : undefined,
       to_date: financialTab === 'weekly' ? '' : undefined,
+      level: 0,
       live_duration: 0,
+      party_host_duration: 0,
+      total_earnings: 0,
+      agent_commission: 0,
       live_earnings: 0,
-      total_points: 0,
-      my_commission: 0,
-      timestamp: new Date().toISOString()
+      party_earnings: 0,
+      private_chat: 0,
+      tips: 0,
+      platform_reward: 0,
+      other_earnings: 0,
+      platform_hourly_salary: 0,
+      super_salary: 0,
+      super_rank: 0,
+      agentweb_commission_rate: 0,
     };
     if (financialTab === 'monthly') setMonthlyLedger([newEntry, ...monthlyLedger]);
     else setWeeklyLedger([newEntry, ...weeklyLedger]);
@@ -125,10 +136,25 @@ export const FinancialData = () => {
         // Very simplified parsing logic for demonstration
         parsedCommissions.push({
           poppo_id: poppoId,
-          poppo_name: cols[1] || 'Unknown',
-          month: cols[2] || '', // Assume column 2 is month if monthly
+          nickname: cols[1] || 'Unknown',
+          month: cols[2] || '',
+          year: new Date().getFullYear(),
+          level: 0,
+          live_duration: 0,
+          party_host_duration: 0,
+          total_earnings: parseInt((cols[3] || '0').replace(/,/g, '')) || 0,
+          agent_commission: 0,
+          live_earnings: 0,
+          party_earnings: 0,
+          private_chat: 0,
+          tips: 0,
+          platform_reward: 0,
+          other_earnings: 0,
+          platform_hourly_salary: 0,
+          super_salary: 0,
+          super_rank: 0,
+          agentweb_commission_rate: 0,
           total_points: parseInt((cols[3] || '0').replace(/,/g, '')) || 0,
-          timestamp: new Date().toISOString()
         });
       }
       
@@ -212,7 +238,7 @@ export const FinancialData = () => {
             <button onClick={handleDeleteSelection} className="px-3.5 py-2 bg-red-550 hover:bg-red-650 text-white rounded-lg text-[10px] font-black uppercase transition-all">🗑️ Delete</button>
             <button onClick={handleSaveGrid} className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-[10px] font-black uppercase transition-all ml-4">💾 Save Changes</button>
           </div>
-        <div className="text-[10px] font-black text-[#A09E9A]">Rows: {(financialTab === 'monthly' ? monthlyLedger : weeklyLedger).length}</div>
+          <div className="text-[10px] font-black text-[#A09E9A]">Rows: {(financialTab === 'monthly' ? monthlyLedger : weeklyLedger).length}</div>
         </div>
 
         <div className="overflow-x-auto max-h-[500px] relative">
@@ -255,40 +281,41 @@ export const FinancialData = () => {
                 return (
                   <tr key={idx} className="hover:bg-white/[0.01]">
                     <td className="px-3 py-2 text-center sticky left-0 z-10 bg-[#13131E] border-r border-white/5">
-                      <input type="checkbox" checked={isChecked} onChange={e => setSelectedRows(prev => ({...prev, [`${financialTab}_${idx}`]: e.target.checked}))} className="rounded" />
+                      <input type="checkbox" checked={isChecked} onChange={e => setSelectedRows(prev => ({...prev, [`${financialTab}_${idx}`]: e.target.checked}))} className="rounded" title={`Select row ${idx + 1}`} aria-label={`Select row ${idx + 1}`} />
                     </td>
                     <td className="px-4 py-2 sticky left-[48px] bg-[#13131E] border-r border-white/5 z-10">
-                      <input type="text" value={row.poppo_id} onChange={e => handleCellChange(idx, 'poppo_id', e.target.value)} className="bg-transparent border-none w-full text-indigo-400 font-mono font-bold outline-none" />
+                      <input type="text" value={row.poppo_id} onChange={e => handleCellChange(idx, 'poppo_id', e.target.value)} className="bg-transparent border-none w-full text-indigo-400 font-mono font-bold outline-none" title="Poppo ID" aria-label="Poppo ID" />
                     </td>
-                    <td className="px-3 py-2"><input type="text" value={row.nickname || ''} onChange={e => handleCellChange(idx, 'nickname', e.target.value)} className="bg-transparent w-full text-white outline-none" /></td>
+                    <td className="px-3 py-2"><input type="text" value={row.nickname || ''} onChange={e => handleCellChange(idx, 'nickname', e.target.value)} className="bg-transparent w-full text-white outline-none" title="Nickname" aria-label="Nickname" /></td>
                     {financialTab === 'monthly' ? (
-                      <td className="px-3 py-2"><input type="text" value={row.month || ''} onChange={e => handleCellChange(idx, 'month', e.target.value)} className="bg-transparent w-full text-white outline-none" /></td>
+                      <td className="px-3 py-2"><input type="text" value={row.month || ''} onChange={e => handleCellChange(idx, 'month', e.target.value)} className="bg-transparent w-full text-white outline-none" title="Month" aria-label="Month" /></td>
                     ) : (
                       <>
-                        <td className="px-3 py-2"><input type="text" value={row.from_date || ''} onChange={e => handleCellChange(idx, 'from_date', e.target.value)} className="bg-transparent w-full text-white outline-none" /></td>
-                        <td className="px-3 py-2"><input type="text" value={row.to_date || ''} onChange={e => handleCellChange(idx, 'to_date', e.target.value)} className="bg-transparent w-full text-white outline-none" /></td>
+                        <td className="px-3 py-2"><input type="text" value={row.from_date || ''} onChange={e => handleCellChange(idx, 'from_date', e.target.value)} className="bg-transparent w-full text-white outline-none" title="From date" aria-label="From date" /></td>
+                        <td className="px-3 py-2"><input type="text" value={row.to_date || ''} onChange={e => handleCellChange(idx, 'to_date', e.target.value)} className="bg-transparent w-full text-white outline-none" title="To date" aria-label="To date" /></td>
                       </>
                     )}
-                    <td className="px-3 py-2"><input type="number" value={new Date(row.timestamp).getFullYear() || ''} readOnly className="bg-transparent w-full text-white outline-none" /></td>
-                    <td className="px-3 py-2"><input type="number" value={row.live_duration || 0} onChange={e => handleCellChange(idx, 'live_duration', parseInt(e.target.value) || 0)} className="bg-transparent w-full text-white outline-none" /></td>
-                    <td className="px-3 py-2"><input type="number" value={row.party_host_duration || 0} onChange={e => handleCellChange(idx, 'party_host_duration', parseInt(e.target.value) || 0)} className="bg-transparent w-full text-white outline-none" /></td>
-                    <td className="px-3 py-2"><input type="number" value={row.total_earnings || 0} onChange={e => handleCellChange(idx, 'total_earnings', parseInt(e.target.value) || 0)} className="bg-transparent w-full text-white outline-none" /></td>
-                    <td className="px-3 py-2"><input type="number" value={row.agent_commission || 0} onChange={e => handleCellChange(idx, 'agent_commission', parseInt(e.target.value) || 0)} className="bg-transparent w-full text-white outline-none" /></td>
-                    <td className="px-3 py-2"><input type="number" value={row.live_earnings || 0} onChange={e => handleCellChange(idx, 'live_earnings', parseInt(e.target.value) || 0)} className="bg-transparent w-full text-white outline-none" /></td>
-                    <td className="px-3 py-2"><input type="number" value={row.party_earnings || 0} onChange={e => handleCellChange(idx, 'party_earnings', parseInt(e.target.value) || 0)} className="bg-transparent w-full text-white outline-none" /></td>
-                    <td className="px-3 py-2"><input type="number" value={row.private_chat || 0} onChange={e => handleCellChange(idx, 'private_chat', parseInt(e.target.value) || 0)} className="bg-transparent w-full text-white outline-none" /></td>
-                    <td className="px-3 py-2"><input type="number" value={row.tips || 0} onChange={e => handleCellChange(idx, 'tips', parseInt(e.target.value) || 0)} className="bg-transparent w-full text-white outline-none" /></td>
-                    <td className="px-3 py-2"><input type="number" value={row.platform_reward || 0} onChange={e => handleCellChange(idx, 'platform_reward', parseInt(e.target.value) || 0)} className="bg-transparent w-full text-white outline-none" /></td>
-                    <td className="px-3 py-2"><input type="number" value={row.other_earnings || 0} onChange={e => handleCellChange(idx, 'other_earnings', parseInt(e.target.value) || 0)} className="bg-transparent w-full text-white outline-none" /></td>
-                    <td className="px-3 py-2"><input type="number" value={row.platform_hourly_salary || 0} onChange={e => handleCellChange(idx, 'platform_hourly_salary', parseInt(e.target.value) || 0)} className="bg-transparent w-full text-white outline-none" /></td>
-                    <td className="px-3 py-2"><input type="number" value={row.super_salary || 0} onChange={e => handleCellChange(idx, 'super_salary', parseInt(e.target.value) || 0)} className="bg-transparent w-full text-white outline-none" /></td>
-                    <td className="px-3 py-2"><input type="number" value={row.super_rank || 0} onChange={e => handleCellChange(idx, 'super_rank', parseInt(e.target.value) || 0)} className="bg-transparent w-full text-white outline-none" /></td>
-                    <td className="px-3 py-2"><input type="number" value={row.level || 0} onChange={e => handleCellChange(idx, 'level', parseInt(e.target.value) || 0)} className="bg-transparent w-full text-white outline-none" /></td>
+                    <td className="px-3 py-2"><input type="number" value={new Date(row.timestamp).getFullYear() || ''} readOnly className="bg-transparent w-full text-white outline-none" title="Year" aria-label="Year" /></td>
+                    <td className="px-3 py-2"><input type="number" value={row.live_duration || 0} onChange={e => handleCellChange(idx, 'live_duration', parseInt(e.target.value) || 0)} className="bg-transparent w-full text-white outline-none" title="Live duration" aria-label="Live duration" /></td>
+                    <td className="px-3 py-2"><input type="number" value={row.party_host_duration || 0} onChange={e => handleCellChange(idx, 'party_host_duration', parseInt(e.target.value) || 0)} className="bg-transparent w-full text-white outline-none" title="Party host duration" aria-label="Party host duration" /></td>
+                    <td className="px-3 py-2"><input type="number" value={row.total_earnings || 0} onChange={e => handleCellChange(idx, 'total_earnings', parseInt(e.target.value) || 0)} className="bg-transparent w-full text-white outline-none" title="Total earnings of points" aria-label="Total earnings of points" /></td>
+                    <td className="px-3 py-2"><input type="number" value={row.agent_commission || 0} onChange={e => handleCellChange(idx, 'agent_commission', parseInt(e.target.value) || 0)} className="bg-transparent w-full text-white outline-none" title="Agent commission" aria-label="Agent commission" /></td>
+                    <td className="px-3 py-2"><input type="number" value={row.live_earnings || 0} onChange={e => handleCellChange(idx, 'live_earnings', parseInt(e.target.value) || 0)} className="bg-transparent w-full text-white outline-none" title="Live earnings" aria-label="Live earnings" /></td>
+                    <td className="px-3 py-2"><input type="number" value={row.party_earnings || 0} onChange={e => handleCellChange(idx, 'party_earnings', parseInt(e.target.value) || 0)} className="bg-transparent w-full text-white outline-none" title="Party earnings" aria-label="Party earnings" /></td>
+                    <td className="px-3 py-2"><input type="number" value={row.private_chat || 0} onChange={e => handleCellChange(idx, 'private_chat', parseInt(e.target.value) || 0)} className="bg-transparent w-full text-white outline-none" title="Private chat" aria-label="Private chat" /></td>
+                    <td className="px-3 py-2"><input type="number" value={row.tips || 0} onChange={e => handleCellChange(idx, 'tips', parseInt(e.target.value) || 0)} className="bg-transparent w-full text-white outline-none" title="Tips" aria-label="Tips" /></td>
+                    <td className="px-3 py-2"><input type="number" value={row.platform_reward || 0} onChange={e => handleCellChange(idx, 'platform_reward', parseInt(e.target.value) || 0)} className="bg-transparent w-full text-white outline-none" title="Platform reward" aria-label="Platform reward" /></td>
+                    <td className="px-3 py-2"><input type="number" value={row.other_earnings || 0} onChange={e => handleCellChange(idx, 'other_earnings', parseInt(e.target.value) || 0)} className="bg-transparent w-full text-white outline-none" title="Other earnings" aria-label="Other earnings" /></td>
+                    <td className="px-3 py-2"><input type="number" value={row.platform_hourly_salary || 0} onChange={e => handleCellChange(idx, 'platform_hourly_salary', parseInt(e.target.value) || 0)} className="bg-transparent w-full text-white outline-none" title="Platform hourly salary" aria-label="Platform hourly salary" /></td>
+                    <td className="px-3 py-2"><input type="number" value={row.super_salary || 0} onChange={e => handleCellChange(idx, 'super_salary', parseInt(e.target.value) || 0)} className="bg-transparent w-full text-white outline-none" title="Super salary" aria-label="Super salary" /></td>
+                    <td className="px-3 py-2"><input type="number" value={row.super_rank || 0} onChange={e => handleCellChange(idx, 'super_rank', parseInt(e.target.value) || 0)} className="bg-transparent w-full text-white outline-none" title="Super rank" aria-label="Super rank" /></td>
+                    <td className="px-3 py-2"><input type="number" value={row.level || 0} onChange={e => handleCellChange(idx, 'level', parseInt(e.target.value) || 0)} className="bg-transparent w-full text-white outline-none" title="Level" aria-label="Level" /></td>
                   </tr>
                 );
               })}
             </tbody>
           </table>
+        </div>
       </div>
     </div>
   );

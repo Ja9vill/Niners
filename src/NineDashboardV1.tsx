@@ -69,7 +69,7 @@ import ChangePassword from './pages/ChangePassword';
 import UserManagement from './pages/UserManagement';
 import appLogo from './logo.jpg';
 
-type Tab = 'home' | 'overview' | 'roster' | 'profiles' | 'trends' | 'calendar' | 'events' | 'dashboard' | 'reporting' | 'glossary' | 'privacy' | 'terms' | 'agency-policy' | 'account' | 'app-users' | 'update-password' | 'user-management' | 'tasks' | 'learning-resources';
+type Tab = 'home' | 'overview' | 'roster' | 'profiles' | 'trends' | 'calendar' | 'events' | 'dashboard' | 'reporting' | 'privacy' | 'terms' | 'agency-policy' | 'account' | 'app-users' | 'update-password' | 'user-management' | 'tasks' | 'learning-resources';
 
 const PUBLIC_LINKS = [
   { label: 'Poppo Live', icon: Globe, href: 'https://invite=poppo.com/2kHNSf' },
@@ -489,7 +489,6 @@ export default function App() {
   { id: 'overview', label: 'Analytics', icon: Activity, protected: true },
   { id: 'roster', label: 'Roster', icon: Users, protected: true },
   { id: 'trends', label: 'Trends', icon: TrendingUp, protected: true },
-  { id: 'glossary', label: 'Glossary', icon: BookOpen },
   { id: 'update-password', label: 'Security', icon: Shield },
   { id: 'user-management', label: 'User Management', icon: Users, protected: true },];
 
