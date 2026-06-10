@@ -240,7 +240,7 @@ export const BadgeAndTaskControlPanel = () => {
   }
 
   return (
-    <div className="w-full bg-[#0D0D14] text-white p-6 rounded-2xl border border-white/5 shadow-2xl relative">
+    <div className="w-full bg-[#0A0A0F]/90 backdrop-blur-xl text-white p-6 rounded-2xl border-2 border-[#D4AF37]/30 shadow-[0_0_25px_rgba(212,175,55,0.2)] relative">
       
       {/* 1. Header & Primary Navigation */}
       <header className="space-y-6">

@@ -21,6 +21,7 @@
     "bcrypt": "^5.1.1",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
+    "dompurify": "^3.0.0",
     "dotenv": "^17.2.3",
     "express": "^4.21.2",
     "express-validator": "^7.3.2",
@@ -42,6 +43,7 @@
   "devDependencies": {
     "@firebase/eslint-plugin-security-rules": "^0.0.2",
     "@types/bcrypt": "^5.0.2",
+    "@types/dompurify": "^3.0.5",
     "@types/express": "^4.17.21",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^22.14.0",

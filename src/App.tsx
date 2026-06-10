@@ -22,8 +22,21 @@ import { PoppoLivePage } from './pages/PoppoLivePage';
 import { ProvisionUser } from './pages/ProvisionUser';
 import { FinancialData } from './pages/FinancialData';
 import { PublicLanding } from './pages/PublicLanding';
+import { BlogManagement } from './pages/cms/BlogManagement';
+import { PageAssetsCMS } from './pages/cms/PageAssetsCMS';
 import { AgencyPolicy } from './pages/AgencyPolicy';
 import { OnboardingProcess } from './pages/OnboardingProcess';
+import { LoginSetup } from './pages/public/LoginSetup';
+import { FindPoppoIdGuide } from './pages/public/FindPoppoIdGuide';
+import { WithdrawGuide } from './pages/public/WithdrawGuide';
+import { PKBattlesGuide } from './pages/public/PKBattlesGuide';
+import { AgentRegistrationGuide } from './pages/public/AgentRegistrationGuide';
+import { RegionalLanding } from './pages/public/RegionalLanding';
+import { BlogHub } from './pages/public/BlogHub';
+import { BlogPostView } from './pages/public/BlogPostView';
+import { PrivacyPolicy } from './pages/public/PrivacyPolicy';
+import { TermsOfService } from './pages/public/TermsOfService';
+import { ContactUs } from './pages/public/ContactUs';
 import { Storage } from './lib/storage';
 import { SmartRoute } from './components/SmartRoute';
 import { Analytics } from './pages/TeamAnalytics';
@@ -57,6 +70,18 @@ export default function App() {
         <Route element={<PublicLayout />}>
           {/* Dynamic Root Index inside public layout so it gets the footer when logged out */}
           <Route path="/" element={<RootIndex />} />
+          <Route path="/guides/login" element={<LoginSetup />} />
+          <Route path="/guides/find-poppo-id" element={<FindPoppoIdGuide />} />
+          <Route path="/guides/withdraw-earnings" element={<WithdrawGuide />} />
+          <Route path="/guides/how-pk-battles-work" element={<PKBattlesGuide />} />
+          <Route path="/guides/how-to-register-agent" element={<AgentRegistrationGuide />} />
+          <Route path="/region/:country" element={<RegionalLanding />} />
+          <Route path="/blog" element={<BlogHub />} />
+          <Route path="/blog/:slug" element={<BlogPostView />} />
+          <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+          <Route path="/terms-of-service" element={<TermsOfService />} />
+          <Route path="/contact" element={<ContactUs />} />
+          <Route path="/streamers" element={<OnboardingProcess />} />
           <Route path="login" element={<Login />} />
           <Route path="policy" element={<AgencyPolicy />} />
           <Route path="onboarding" element={<OnboardingProcess />} />
@@ -120,6 +145,26 @@ export default function App() {
             element={
               <RoleGuard roles={['director', 'head admin', 'head_admin']}>
                 <SystemLogsPage />
+              </RoleGuard>
+            }
+          />
+
+          {/* CMS: Blog Management */}
+          <Route
+            path="cms/blogs"
+            element={
+              <RoleGuard roles={['director', 'head admin', 'head_admin']}>
+                <BlogManagement />
+              </RoleGuard>
+            }
+          />
+
+          {/* CMS: Page Assets */}
+          <Route
+            path="cms/assets"
+            element={
+              <RoleGuard roles={['director', 'head admin', 'head_admin']}>
+                <PageAssetsCMS />
               </RoleGuard>
             }
           />

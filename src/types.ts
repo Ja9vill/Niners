@@ -378,6 +378,38 @@ export interface ManagerNote {
   content: string;
   timestamp: string;
 }
+
+export interface PublicPageAsset {
+  id: string;
+  slotId: string;
+  imageUrl: string;
+  description?: string;
+  updatedAt: string;
+  updatedBy: string;
+}
+
+export interface BlogPost {
+  id: string;
+  title: string;
+  subtitle?: string;
+  slug: string;
+  content: string;
+  coverImage?: string;
+  authorName: string;
+  authorRole: string;
+  category?: string;
+  tags?: string[];
+  createdAt: string;
+  updatedAt: string;
+  isPublished: boolean;
+  readTimeMinutes?: number;
+  viewCount?: number;
+  seoMetadata?: {
+    metaTitle?: string;
+    metaDescription?: string;
+  };
+}
+
 export const emptyAuthState: AuthState = {
   level: 0,
   role: "",

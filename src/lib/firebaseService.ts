@@ -207,6 +207,101 @@ export const FirebaseService = {
     }
   },
 
+  // === CMS: Public Page Assets ===
+  async getPublicPageAssets(): Promise<any[]> {
+    const path = 'public_page_assets';
+    try {
+      const snapshot = await getDocs(collection(db, path));
+      return snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.LIST, path);
+      return [];
+    }
+  },
+
+  async savePublicPageAsset(asset: any): Promise<void> {
+    const path = `public_page_assets/${asset.slotId}`;
+    try {
+      await setDoc(doc(db, 'public_page_assets', asset.slotId), {
+        ...asset,
+        updatedAt: new Date().toISOString()
+      }, { merge: true });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, path);
+    }
+  },
+
+  // === CMS: Blogs ===
+  async getBlogs(): Promise<any[]> {
+    const path = 'blogs';
+    try {
+      const snapshot = await getDocs(collection(db, path));
+      return snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.LIST, path);
+      return [];
+    }
+  },
+
+  async getBlogBySlug(slug: string): Promise<any | null> {
+    const path = `blogs (slug: ${slug})`;
+    try {
+      const q = query(collection(db, 'blogs'), where('slug', '==', slug));
+      const snapshot = await getDocs(q);
+      if (snapshot.empty) return null;
+      const doc = snapshot.docs[0];
+      return { id: doc.id, ...doc.data() };
+    } catch (error) {
+      handleFirestoreError(error, OperationType.GET, path);
+      return null;
+    }
+  },
+
+  async saveBlog(blog: any): Promise<void> {
+    const path = `blogs/${blog.id}`;
+    try {
+      await setDoc(doc(db, 'blogs', blog.id), {
+        ...blog,
+        updatedAt: new Date().toISOString(),
+        createdAt: blog.createdAt || new Date().toISOString()
+      }, { merge: true });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, path);
+    }
+  },
+
+  async incrementBlogViewCount(blogId: string): Promise<void> {
+    const path = `blogs/${blogId}`;
+    try {
+      const docRef = doc(db, 'blogs', blogId);
+      const snapshot = await getDocs(query(collection(db, 'blogs'), where('id', '==', blogId)));
+      // Note: In a production app, use increment() from firestore. But we are working with the simple generic wrapper here.
+      if (!snapshot.empty) {
+        const currentData = snapshot.docs[0].data();
+        await setDoc(docRef, { viewCount: (currentData.viewCount || 0) + 1 }, { merge: true });
+      }
+    } catch (error) {
+      console.error('Failed to increment view count', error);
+    }
+  },
+
+  async uploadBlogImage(file: File): Promise<string> {
+    const { storage } = await import('./firebase');
+    const { ref, uploadBytes, getDownloadURL } = await import('firebase/storage');
+    const storageRef = ref(storage, `blog-images/${Date.now()}_${file.name}`);
+    await uploadBytes(storageRef, file);
+    return await getDownloadURL(storageRef);
+  },
+
+  async deleteBlog(blogId: string): Promise<void> {
+    const path = `blogs/${blogId}`;
+    try {
+      await deleteDoc(doc(db, 'blogs', blogId));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, path);
+    }
+  },
+
   async updateRoleMetadata(role: string, id: string, data: any): Promise<void> {
     try {
       if (!id) throw new Error("ID is required for role metadata updates.");
@@ -1264,6 +1359,33 @@ export const FirebaseService = {
       const q = query(collection(db, path), where('periodKey', '==', periodKey));
       const snapshot = await getDocs(q);
       return snapshot.docs.map(d => d.data() as TopNinersEarningsSummary);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.LIST, path);
+      return [];
+    }
+  },
+
+  async getLatestTopNinersSummaries(): Promise<TopNinersEarningsSummary[]> {
+    const path = 'top_niners_earnings_summary';
+    try {
+      const q = query(collection(db, path));
+      const snapshot = await getDocs(q);
+      const allSummaries = snapshot.docs.map(d => d.data() as TopNinersEarningsSummary);
+      
+      if (allSummaries.length === 0) return [];
+      
+      let maxYear = 0;
+      let maxMonth = 0;
+      allSummaries.forEach(s => {
+        if (s.year > maxYear) {
+          maxYear = s.year;
+          maxMonth = s.month;
+        } else if (s.year === maxYear && s.month > maxMonth) {
+          maxMonth = s.month;
+        }
+      });
+      
+      return allSummaries.filter(s => s.year === maxYear && s.month === maxMonth).sort((a, b) => b.totalPoints - a.totalPoints);
     } catch (error) {
       handleFirestoreError(error, OperationType.LIST, path);
       return [];

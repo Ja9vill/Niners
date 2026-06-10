@@ -139,9 +139,9 @@ export const Login = () => {
   };
 
   // ── Shared styles ──────────────────────────────────────────────────────────
-  const inputCls = 'w-full bg-[#0D0D14] border border-white/10 rounded-xl pl-4 pr-12 py-3 text-sm tracking-widest focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37]/50 outline-none transition-all text-[#F0EFE8] placeholder-white/20';
-  const labelCls = 'text-[10px] font-black text-[#A09E9A]/60 uppercase tracking-[0.20em] ml-1 block';
-  const btnCls   = 'w-full py-3.5 rounded-xl bg-[#D4AF37] text-black text-xs font-black uppercase tracking-[0.25em] transition-all flex items-center justify-center gap-2 active:scale-95 shadow-[0_0_20px_rgba(212,175,55,0.3)] hover:bg-[#c4a133] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed';
+  const inputCls = 'w-full bg-[#0F0A06]/80 border border-[#D4AF37]/20 rounded-xl pl-4 pr-12 py-3 text-sm tracking-widest focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37]/50 focus:shadow-[0_0_15px_rgba(212,175,55,0.15)] outline-none transition-all text-[#F0EFE8] placeholder-[#A09E9A]/40 backdrop-blur-sm';
+  const labelCls = 'text-[10px] font-black text-[#D4AF37]/80 uppercase tracking-[0.20em] ml-1 block';
+  const btnCls   = 'w-full py-3.5 rounded-xl bg-gradient-to-r from-[#D4AF37] to-[#F3E5AB] text-[#0A0A0F] text-xs font-black uppercase tracking-[0.25em] transition-all flex items-center justify-center gap-2 active:scale-95 shadow-[0_0_20px_rgba(212,175,55,0.4)] hover:shadow-[0_0_30px_rgba(212,175,55,0.6)] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed';
 
   return (
     <div className="w-full flex flex-col items-center justify-center p-4 bg-[#0A0A0F] relative overflow-hidden min-h-[100dvh]">
@@ -150,12 +150,12 @@ export const Login = () => {
         <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-[400px] h-[400px] rounded-full bg-[#D4AF37]/5 blur-[120px]" />
       </div>
 
-      <div className="w-full max-w-sm border border-[#D4AF37]/20 rounded-[24px] p-6 space-y-6 bg-[#1A1A28] shadow-2xl relative z-10">
+      <div className="w-full max-w-sm border border-[#D4AF37]/40 rounded-[24px] p-6 space-y-6 bg-[#1A140A]/80 backdrop-blur-xl shadow-[0_0_40px_rgba(212,175,55,0.15)] relative z-10">
 
         {/* Header */}
-        <div className="border-b border-t border-white/5 py-3 flex items-center justify-center gap-2">
-          <img src={appLogo} alt="Niners App Logo" className="h-6 w-6 rounded-md border border-[#D4AF37]/20 object-cover select-none pointer-events-none" />
-          <span className="text-xs font-black tracking-[0.25em] text-[#D4AF37]">NINERS APP</span>
+        <div className="border-b border-t border-white/5 py-3 flex items-center justify-center gap-3">
+          <img src={appLogo} alt="Nine Talent Management Logo" className="h-7 w-7 rounded-md border border-[#D4AF37]/20 object-cover select-none pointer-events-none" />
+          <span className="text-[11px] font-black tracking-[0.15em] text-[#D4AF37] leading-tight">NINE TALENT MANAGEMENT</span>
         </div>
 
         {/* Title area */}
@@ -325,20 +325,9 @@ export const Login = () => {
             <span>No account?</span>
             <button type="button" className="text-[#A09E9A] hover:text-[#D4AF37] hover:underline transition-all">Contact Agency.</button>
           </div>
-          <button
-            type="button"
-            onClick={async () => {
-              try { const { getAuth, signOut } = await import('firebase/auth'); await signOut(getAuth()); } catch {}
-              localStorage.clear(); sessionStorage.clear();
-              window.location.reload();
-            }}
-            className="mt-1 text-red-400 hover:text-red-300 hover:underline transition-all uppercase tracking-widest text-[9px] font-black cursor-pointer"
-          >
-            ⚠️ Nuke Session & Reset
-          </button>
         </div>
 
-        <div className="border-b border-t border-white/5 py-1" />
+        <div className="border-b border-t border-[#D4AF37]/10 py-1" />
       </div>
     </div>
   );

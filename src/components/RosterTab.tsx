@@ -160,38 +160,24 @@ export const RosterTab: React.FC<RosterTabProps> = ({ isReadOnly = false }) => {
   // Top Niners & Badges
   const [allAwards, setAllAwards] = useState<any[]>([]);
   const [top9NinerIds, setTop9NinerIds] = useState<string[]>([]);
-  const [showTopNiners, setShowTopNiners] = useState(false);
+  const [showTopNiners, setShowTopNiners] = useState(() => {
+    return window.location.search.includes('filter=top-niners');
+  });
 
   useEffect(() => {
     const fetchUsers = async () => {
       setIsLoading(true);
       try {
-        const [users, awards, reports] = await Promise.all([
+        const [users, awards, topNiners] = await Promise.all([
           FirebaseService.getAllRoleMetadata(),
           FirebaseService.getAllAssignedAwards(),
-          FirebaseService.getAllPerformanceReports()
+          FirebaseService.getLatestTopNinersSummaries()
         ]);
         setHosts(users.map(u => ({ ...u, id: u.poppo_id || u.poppoId || u.id } as Host)));
         setAllAwards(awards);
 
-        if (reports.length > 0) {
-          let maxYear = 0;
-          let maxMonth = 0;
-          reports.forEach(r => {
-            if (r.year > maxYear) {
-              maxYear = r.year;
-              maxMonth = r.month;
-            } else if (r.year === maxYear && r.month > maxMonth) {
-              maxMonth = r.month;
-            }
-          });
-          const lastMonthReports = reports.filter(r => r.year === maxYear && r.month === maxMonth);
-          const sorted = lastMonthReports.sort((a, b) => {
-            const ptA = Number(a.totalEarningsPoints || a.total_earnings || a.total_points || 0);
-            const ptB = Number(b.totalEarningsPoints || b.total_earnings || b.total_points || 0);
-            return ptB - ptA;
-          });
-          const top9 = sorted.slice(0, 9).map(r => r.poppoId || r.poppo_id);
+        if (topNiners && topNiners.length > 0) {
+          const top9 = topNiners.slice(0, 9).map(r => r.poppoId);
           setTop9NinerIds(top9);
         }
       } catch (err: any) {
@@ -359,7 +345,19 @@ export const RosterTab: React.FC<RosterTabProps> = ({ isReadOnly = false }) => {
             <div className="w-[1px] h-6 bg-white/10 mx-1"></div>
             
             <button
-              onClick={() => setShowTopNiners(!showTopNiners)}
+              onClick={() => {
+                const newValue = !showTopNiners;
+                setShowTopNiners(newValue);
+                if (newValue) {
+                  const url = new URL(window.location.href);
+                  url.searchParams.set('filter', 'top-niners');
+                  window.history.replaceState({}, '', url);
+                } else {
+                  const url = new URL(window.location.href);
+                  url.searchParams.delete('filter');
+                  window.history.replaceState({}, '', url);
+                }
+              }}
               disabled={top9NinerIds.length === 0}
               className={cn(
                 "px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all border flex items-center gap-1.5",

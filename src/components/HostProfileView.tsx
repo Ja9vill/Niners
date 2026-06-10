@@ -950,9 +950,9 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
   }, []);
 
   useEffect(() => {
-    const userRoleLower = String(rootAuth?.role || '').toLowerCase();
-    const poppoId = rootAuth?.poppo_id || rootAuth?.poppoId || rootAuth?.id;
-    if ((userRoleLower === 'agent' || userRoleLower === 'manager') && poppoId) {
+    const profileRoleLower = String(host.role || '').toLowerCase();
+    const poppoId = host.poppo_id || host.poppoId || host.id;
+    if ((profileRoleLower === 'agent' || profileRoleLower === 'manager') && poppoId) {
       const fetchAssignedHosts = async () => {
         setIsLoadingAssignedHosts(true);
         try {
@@ -970,13 +970,15 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
         }
       };
       fetchAssignedHosts();
+    } else {
+      setAssignedHostsList([]);
     }
-  }, [rootAuth?.role, rootAuth?.poppo_id, rootAuth?.poppoId, rootAuth?.id]);
+  }, [host.role, host.poppo_id, host.poppoId, host.id]);
 
   useEffect(() => {
-    const userRoleLower = String(rootAuth?.role || '').toLowerCase();
-    const poppoId = rootAuth?.poppo_id || rootAuth?.poppoId || rootAuth?.id;
-    const isManagerOrAgent = userRoleLower === 'manager' || userRoleLower === 'agent';
+    const profileRoleLower = String(host.role || '').toLowerCase();
+    const poppoId = host.poppo_id || host.poppoId || host.id;
+    const isManagerOrAgent = profileRoleLower === 'manager' || profileRoleLower === 'agent';
 
     if (isManagerOrAgent && poppoId && assignedHostsList.length > 0) {
       const fetchRosterData = async () => {
@@ -1010,7 +1012,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
       setRosterEvents([]);
       setRosterAttendance([]);
     }
-  }, [assignedHostsList, rootAuth?.role, rootAuth?.poppo_id, rootAuth?.poppoId, rootAuth?.id]);
+  }, [assignedHostsList, host.role, host.poppo_id, host.poppoId, host.id]);
 
   useEffect(() => {
     const userRoleLower = String(rootAuth?.role || '').toLowerCase();
@@ -4698,7 +4700,13 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
             {String(host.role || '').toLowerCase() === 'host' || String(host.role || '').toLowerCase() === 'talent' ? (
               <div className="flex flex-col">
                 <span className="text-[9px] font-black uppercase tracking-widest mb-1 text-white/40">Assigned Manager</span>
-                <div className="flex items-center gap-2 mt-0.5">
+                <div 
+                  className={cn("flex items-center gap-2 mt-0.5", assignedManager ? "cursor-pointer hover:opacity-80 transition-opacity" : "")}
+                  onClick={() => {
+                    if (assignedManager) setSpotlightHost(assignedManager);
+                  }}
+                  title={assignedManager ? "View Manager Profile" : ""}
+                >
                   {assignedManager?.photoUrl ? (
                     <img
                       src={assignedManager.photoUrl}
@@ -5935,15 +5943,21 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
   };
 
   const renderAssignedHostsSection = () => {
-    const userRoleLower = String(rootAuth?.role || '').toLowerCase();
-    if (userRoleLower !== 'agent' && userRoleLower !== 'manager') return null;
+    const profileRoleLower = String(host.role || '').toLowerCase();
+    if (profileRoleLower !== 'agent' && profileRoleLower !== 'manager') return null;
+
+    const displayName = host.nickname || host.name || 'Unnamed';
+    let blockTitle = `${displayName}'s Team`;
+    if (profileRoleLower === 'agent') {
+      blockTitle = host.teamAnchor || host.team || `${displayName}'s Team`;
+    }
 
     return (
       <div className="space-y-4 bg-[#1A140A]/80 backdrop-blur-xl border border-[#D4AF37]/20 p-5 rounded-3xl transition-all duration-300 hover:border-[#D4AF37]/50 group shadow-[0_0_15px_rgba(212,175,55,0.15)]">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-full bg-indigo-500/20 flex items-center justify-center text-indigo-400 text-sm shadow-inner">👤</div>
-            <h4 className="text-xs font-black uppercase tracking-widest text-[#F0EFE8]">Assigned Hosts</h4>
+            <div className="w-8 h-8 rounded-full bg-[#D4AF37]/20 flex items-center justify-center text-[#D4AF37] text-sm shadow-inner">👤</div>
+            <h4 className="text-xs font-black uppercase tracking-widest text-[#D4AF37]">{blockTitle}</h4>
           </div>
           <span className="px-3 py-1 text-[9px] font-black text-indigo-400 border border-indigo-500/30 bg-indigo-500/10 rounded-full uppercase tracking-widest">
             {assignedHostsList.length} assigned
@@ -6530,8 +6544,8 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
   };
 
   const renderRosterEventsAndAttendance = () => {
-    const userRole = String(rootAuth?.role || '').toLowerCase();
-    const isManagerOrAgent = userRole === 'manager' || userRole === 'agent';
+    const profileRoleLower = String(host.role || '').toLowerCase();
+    const isManagerOrAgent = profileRoleLower === 'manager' || profileRoleLower === 'agent';
     if (!isManagerOrAgent) return null;
 
     // Helper to extract date string in YYYY-MM-DD
@@ -6674,39 +6688,41 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
         {/* Header */}
         <div className="flex items-center justify-between border-b border-white/5 pb-3">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-full bg-[#1A1A28] border border-white/10 flex items-center justify-center text-indigo-400 text-sm shadow-inner">
+            <div className="w-8 h-8 rounded-full bg-[#D4AF37]/20 border border-[#D4AF37]/20 flex items-center justify-center text-[#D4AF37] text-sm shadow-inner">
               <Calendar size={16} />
             </div>
             <div>
-              <h4 className="text-xs font-black uppercase tracking-widest text-[#F0EFE8]">Roster Events &amp; Attendance</h4>
+              <h4 className="text-xs font-black uppercase tracking-widest text-[#D4AF37]">Roster Events &amp; Attendance</h4>
               <p className="text-[9px] text-[#A09E9A] uppercase tracking-wider mt-0.5 font-bold">Roster scheduling and check-in logs</p>
             </div>
           </div>
         </div>
 
         {/* Actionable Insights callout box */}
-        <div className={cn(
-          "p-4 rounded-2xl border text-xs leading-relaxed flex items-start gap-3 shadow-md transition-all duration-300",
-          insightType === 'warning'
-            ? "bg-amber-500/10 border-amber-500/20 text-amber-400"
-            : "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
-        )}>
-          <span className="text-base leading-none select-none shrink-0 mt-0.5">
-            {insightType === 'warning' ? '⚠️' : '✅'}
-          </span>
-          <div className="space-y-1">
-            <h5 className="font-black uppercase tracking-wider text-[10px]">
-              {insightType === 'warning' ? 'Actionable Insights' : 'Recommendations'}
-            </h5>
-            <p className="font-medium text-[#F0EFE8]/90">{insightMessage}</p>
+        {!isSpotlight && (
+          <div className={cn(
+            "p-4 rounded-2xl border text-xs leading-relaxed flex items-start gap-3 shadow-md transition-all duration-300",
+            insightType === 'warning'
+              ? "bg-amber-500/10 border-amber-500/20 text-amber-400"
+              : "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
+          )}>
+            <span className="text-base leading-none select-none shrink-0 mt-0.5">
+              {insightType === 'warning' ? '⚠️' : '✅'}
+            </span>
+            <div className="space-y-1">
+              <h5 className="font-black uppercase tracking-wider text-[10px]">
+                {insightType === 'warning' ? 'Actionable Insights' : 'Recommendations'}
+              </h5>
+              <p className="font-medium text-[#F0EFE8]/90">{insightMessage}</p>
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Content Layout */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Upcoming Events Column */}
           <div className="space-y-3">
-            <h5 className="text-[10px] font-black uppercase tracking-widest text-[#A09E9A] flex items-center gap-1.5 border-b border-white/5 pb-1.5">
+            <h5 className="text-[10px] font-black uppercase tracking-widest text-[#D4AF37] flex items-center gap-1.5 border-b border-white/5 pb-1.5">
               <span>📅</span> Upcoming Events ({upcomingEvents.length})
             </h5>
             {isLoadingRosterData ? (
@@ -6772,7 +6788,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
 
           {/* Recent Attendance Logs Column */}
           <div className="space-y-3">
-            <h5 className="text-[10px] font-black uppercase tracking-widest text-[#A09E9A] flex items-center gap-1.5 border-b border-white/5 pb-1.5">
+            <h5 className="text-[10px] font-black uppercase tracking-widest text-[#D4AF37] flex items-center gap-1.5 border-b border-white/5 pb-1.5">
               <span>📋</span> Recent Attendance Logs ({filteredAttendance.length})
             </h5>
             {isLoadingRosterData ? (
@@ -6910,7 +6926,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
           {renderAssignedHostsSection()}
           {renderIntakeSection()}
           {renderProgressNotes()}
-          {['agent', 'manager'].includes(String(rootAuth?.role || '').toLowerCase()) && renderRosterEventsAndAttendance()}
+          {['agent', 'manager'].includes(profileOwnerRole) && renderRosterEventsAndAttendance()}
           {!isSpotlight && String(rootAuth?.role || '').toLowerCase() === 'director' && renderImpersonationBlock()}
           {String(rootAuth?.role || '').toLowerCase() === 'admin' && renderAdminFanbaseReportSection()}
           {String(rootAuth?.role || '').toLowerCase() === 'admin' && renderAdminsLogSection()}

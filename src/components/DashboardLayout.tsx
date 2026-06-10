@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Outlet, useNavigate, useLocation, Link } from 'react-router-dom';
 import { 
   Menu, X, LogOut, LayoutDashboard, Users, User, Shield, Calendar, DollarSign, Activity, FileText,
-  Bell, Trash2, Plus, Clock, ChevronDown, Monitor, Smartphone, TrendingUp
+  Bell, Trash2, Plus, Clock, ChevronDown, Monitor, Smartphone, TrendingUp, Edit3, Image as ImageIcon
 } from 'lucide-react';
 import { useViewMode } from '../hooks/useViewMode';
 import { Storage } from '../lib/storage';
@@ -581,15 +581,17 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
       links.push({ isTitle: true, label: "Director's Hub", id: 'title-director' });
       
       links.push({ path: '/profiles', label: 'Roster Management', icon: Users });
-      
-      links.push({ 
-        id: 'dropdown-dashboard',
+
+
+
+      links.push({
+        id: 'dropdown-cms',
         isDropdown: true,
-        label: 'Dashboard',
-        icon: LayoutDashboard,
+        label: 'Content Management',
+        icon: Edit3,
         subLinks: [
-          { path: '/director-operations', label: 'Operations', icon: Activity },
-          { path: '/system-logs', label: 'System Logs', icon: FileText }
+          { path: '/cms/blogs', label: 'Blog Management', icon: Edit3 },
+          { path: '/cms/assets', label: 'Page Assets', icon: ImageIcon }
         ]
       });
       
@@ -681,7 +683,7 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
             </div>
           </div>
 
-          <div className="p-4 flex-1 overflow-y-auto space-y-2">
+          <div className="p-3 overflow-y-auto flex-1 space-y-1 mb-2">
             <div className="mb-6 px-2 flex items-center justify-between">
               <div className="flex-1 overflow-hidden">
                 <div className="text-sm font-bold truncate pr-2">{authState.name}</div>
@@ -737,14 +739,14 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
                     <button
                       onClick={() => toggleDropdown(link.id)}
                       className={cn(
-                        "w-full flex items-center justify-between px-3 py-3 rounded-xl transition-all font-bold text-sm",
+                        "w-full flex items-center justify-between px-3 py-2 rounded-lg transition-all font-bold text-xs",
                         isAnyChildActive || isOpen
                           ? "bg-[#D4AF37]/10 text-[#D4AF37] shadow-[inset_0_0_12px_rgba(212,175,55,0.05)]" 
                           : "text-[#A09E9A] hover:bg-white/[0.02] hover:text-[#F0EFE8]"
                       )}
                     >
                       <div className="flex items-center gap-3">
-                        <Icon size={18} />
+                        <Icon size={16} />
                         <span>{link.label}</span>
                       </div>
                       <ChevronDown size={14} className={cn("transition-transform duration-200", isOpen ? "rotate-180" : "")} />
@@ -760,7 +762,7 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
                               to={subLink.path}
                               onClick={() => setIsSidebarOpen(false)}
                               className={cn(
-                                "flex items-center gap-3 px-3 py-2 rounded-lg transition-all font-bold text-xs",
+                                "flex items-center gap-3 px-3 py-1.5 rounded-md transition-all font-bold text-[11px]",
                                 isSubActive
                                   ? "bg-[#D4AF37]/10 text-[#D4AF37]"
                                   : "text-[#A09E9A] hover:text-[#F0EFE8] hover:bg-white/5"
@@ -784,25 +786,25 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
                   to={link.path}
                   onClick={() => setIsSidebarOpen(false)}
                   className={cn(
-                    "flex items-center gap-3 px-3 py-3 rounded-xl transition-all font-bold text-sm",
+                    "flex items-center gap-3 px-3 py-2 rounded-lg transition-all font-bold text-xs",
                     isActive 
                       ? "bg-[#D4AF37]/10 text-[#D4AF37] shadow-[inset_0_0_12px_rgba(212,175,55,0.05)]" 
                       : "text-[#A09E9A] hover:bg-white/[0.02] hover:text-[#F0EFE8]"
                   )}
                 >
-                  <Icon size={18} />
+                  <Icon size={16} />
                   <span>{link.label}</span>
                 </Link>
               );
             })}
           </div>
 
-          <div className="p-4 border-t border-white/5">
+          <div className="p-4 pb-24 md:pb-4 border-t border-white/5">
             <button 
               onClick={handleLogout}
-              className="flex items-center gap-3 px-3 py-3 w-full text-left rounded-xl transition-all text-red-400 hover:bg-red-500/10 font-bold text-sm"
+              className="flex items-center gap-3 px-3 py-2 w-full text-left rounded-lg transition-all text-red-400 hover:bg-red-500/10 font-bold text-xs"
             >
-              <LogOut size={18} />
+              <LogOut size={16} />
               <span>Sign Out</span>
             </button>
           </div>

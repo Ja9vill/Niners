@@ -2,7 +2,7 @@ import { onCall, HttpsError, type CallableRequest } from "firebase-functions/v2/
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { getAuth } from "firebase-admin/auth";
 import { initializeApp } from "firebase-admin/app";
-import { getFirestore } from "firebase-admin/firestore";
+import { getFirestore, FieldValue } from "firebase-admin/firestore";
 
 // Initialize Firebase Admin SDK
 initializeApp();
@@ -122,5 +122,110 @@ export const cleanupOldSystemLogs = onSchedule("every day 00:00", async (event) 
     console.log(`Successfully deleted ${deletedCount} old system_logs.`);
   } catch (err) {
     console.error("Failed to clean up old system_logs:", err);
+  }
+});
+
+/**
+ * Parses date ("YYYY-MM-DD") and time ("HH:MM AM Manila Time") 
+ * to a UTC millisecond timestamp. Manila is UTC+8.
+ */
+function parseManilaTimeToUTC(dateStr: string, timeStr: string): number {
+  try {
+    const timeMatch = timeStr.match(/(\d{1,2}):(\d{2})\s+(AM|PM)/i);
+    if (!timeMatch) return 0;
+    
+    let hours = parseInt(timeMatch[1], 10);
+    const minutes = parseInt(timeMatch[2], 10);
+    const ampm = timeMatch[3].toUpperCase();
+    
+    if (ampm === "PM" && hours < 12) hours += 12;
+    if (ampm === "AM" && hours === 12) hours = 0;
+    
+    // Parse the date as UTC and apply the Manila offset manually to get accurate UTC timestamp
+    // e.g. "2024-06-10T09:00:00.000+08:00"
+    const paddedHours = hours.toString().padStart(2, '0');
+    const paddedMinutes = minutes.toString().padStart(2, '0');
+    
+    const isoString = `${dateStr}T${paddedHours}:${paddedMinutes}:00+08:00`;
+    const eventDate = new Date(isoString);
+    
+    return eventDate.getTime();
+  } catch (e) {
+    return 0;
+  }
+}
+
+/**
+ * Scheduled function to check upcoming events and post announcements.
+ * Runs every 5 minutes.
+ */
+export const checkUpcomingEvents = onSchedule("every 5 minutes", async (event) => {
+  const db = getFirestore();
+  const now = Date.now();
+  
+  try {
+    const calendarRef = db.collection("calendar");
+    // Get events from today and future (or roughly recent) to avoid pulling whole history.
+    // We'll pull a reasonable chunk of events that don't have both notified flags set.
+    const snapshot = await calendarRef
+      .where("notifiedStart", "!=", true)
+      .get();
+      
+    if (snapshot.empty) return;
+
+    const batch = db.batch();
+    const announcementsRef = db.collection("announcements");
+    let batchCount = 0;
+
+    snapshot.docs.forEach((doc) => {
+      const data = doc.data();
+      if (!data.date || !data.time) return;
+
+      const eventTimeMs = parseManilaTimeToUTC(data.date, data.time);
+      if (eventTimeMs === 0) return;
+
+      const timeDiffMins = (eventTimeMs - now) / (1000 * 60);
+
+      // 30-minute warning (between 25 and 35 mins before event)
+      if (!data.notified30Min && timeDiffMins > 0 && timeDiffMins <= 35 && timeDiffMins >= 25) {
+        const annRef = announcementsRef.doc();
+        batch.set(annRef, {
+          title: `Starting in 30 mins: ${data.title || "Upcoming Event"}`,
+          content: `${data.title || "The event"} starts in 30 minutes! Show up and support your co-niners. Flag the comment section to help boost their livestream. Remember, all attendance is recorded and impacts your performance scores/ratio!`,
+          type: "System",
+          priority: "high",
+          timestamp: new Date().toISOString(),
+          createdAt: FieldValue.serverTimestamp()
+        });
+        
+        batch.update(doc.ref, { notified30Min: true });
+        batchCount += 2;
+      }
+      
+      // Event Start warning (between -5 and +5 mins of start)
+      if (!data.notifiedStart && timeDiffMins <= 5 && timeDiffMins >= -5) {
+        const annRef = announcementsRef.doc();
+        batch.set(annRef, {
+          title: `Event Starting NOW: ${data.title || "Live Event"}`,
+          content: `${data.title || "The event"} is starting right now! Join the stream, drop your comments, and support the agency!`,
+          type: "System",
+          priority: "urgent",
+          timestamp: new Date().toISOString(),
+          createdAt: FieldValue.serverTimestamp()
+        });
+        
+        // Also implicitly set notified30Min to true if it somehow missed it
+        batch.update(doc.ref, { notifiedStart: true, notified30Min: true });
+        batchCount += 2;
+      }
+    });
+
+    if (batchCount > 0) {
+      await batch.commit();
+      console.log(`Committed ${batchCount} operations for upcoming events.`);
+    }
+
+  } catch (err) {
+    console.error("Failed to check upcoming events:", err);
   }
 });
