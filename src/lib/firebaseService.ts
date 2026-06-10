@@ -1063,6 +1063,50 @@ export const FirebaseService = {
     }
   },
 
+  async getAllAssignedAwards(): Promise<any[]> {
+    try {
+      let legacyAwards: any[] = [];
+      try {
+        const topSnap = await getDocs(collection(db, 'host_awards'));
+        legacyAwards = topSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+      } catch (err) {
+        console.warn('[FirebaseService] Failed to load top-level host_awards for all hosts', err);
+      }
+
+      let assignedAwards: any[] = [];
+      try {
+        const assignSnap = await getDocs(collection(db, 'award_assignments'));
+        assignedAwards = assignSnap.docs.map(d => {
+          const data = d.data();
+          return {
+            id: d.id,
+            title: data.awardName,
+            description: `Effectivity Period: ${data.startDate} to ${data.endDate}`,
+            dateAwarded: data.startDate || data.assignedAt,
+            awardedAt: data.assignedAt,
+            color: data.awardColor,
+            hostId: data.hostId || data.poppoId,
+            poppoId: data.hostId || data.poppoId,
+            ...data
+          };
+        });
+      } catch (err) {
+        console.warn('[FirebaseService] Failed to load award_assignments for all hosts', err);
+      }
+
+      const allAwards = [...legacyAwards, ...assignedAwards];
+      const seen = new Set<string>();
+      return allAwards.filter(a => {
+        if (seen.has(a.id)) return false;
+        seen.add(a.id);
+        return true;
+      });
+    } catch (error) {
+      console.warn('[FirebaseService] getAllAssignedAwards failed', error);
+      return [];
+    }
+  },
+
   async assignAward(hostId: string, awardData: any): Promise<void> {
     try {
       // We will write to the top-level host_awards collection

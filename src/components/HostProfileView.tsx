@@ -1898,7 +1898,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
 
   const renderAdminFanbaseReportSection = () => {
     return (
-      <div className="bg-white/5 backdrop-blur-xl border border-white/10 p-5 rounded-3xl transition-all duration-300 hover:border-[#D4AF37]/30 group space-y-6 shadow-lg">
+      <div className={cn("backdrop-blur-xl border-2 rounded-3xl p-5 space-y-6 transition-all duration-300 group shadow-lg", styles.gradientBg, styles.borderColor, styles.topTrim)}>
         <div className="flex items-center gap-4 pb-4 border-b border-white/5">
           <div className="p-3 rounded-2xl bg-[#D4AF37]/10 text-[#D4AF37] border border-[#D4AF37]/20">
             <Users size={24} />
@@ -2030,37 +2030,6 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 pt-2">
-              {/* GC Updates Host */}
-              <div className="space-y-1.5">
-                <label htmlFor="gc-updates-host" className="text-[10px] font-bold text-[#A09E9A]">GC Updates (By Host)</label>
-                <input
-                  id="gc-updates-host"
-                  type="number"
-                  value={gcUpdatesHost}
-                  onChange={(e) => setGcUpdatesHost(e.target.value)}
-                  placeholder="Updates count"
-                  required
-                  min="0"
-                  className="w-full bg-[#0D0D14] border border-white/10 rounded-xl px-4 py-3 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
-                />
-              </div>
-
-              {/* GC Updates Fans */}
-              <div className="space-y-1.5">
-                <label htmlFor="gc-updates-fans" className="text-[10px] font-bold text-[#A09E9A]">GC Updates (By Fans)</label>
-                <input
-                  id="gc-updates-fans"
-                  type="number"
-                  value={gcUpdatesFans}
-                  onChange={(e) => setGcUpdatesFans(e.target.value)}
-                  placeholder="Updates count"
-                  required
-                  min="0"
-                  className="w-full bg-[#0D0D14] border border-white/10 rounded-xl px-4 py-3 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
-                />
-              </div>
-            </div>
           </div>
 
           {/* Submitter & Host Metadata */}
@@ -2086,7 +2055,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
             <button
               type="submit"
               disabled={isFanProcessing}
-              className="w-full sm:w-auto px-8 py-3 bg-[#D4AF37] hover:bg-[#C5A028] text-black rounded-xl text-xs font-black uppercase tracking-widest flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50 cursor-pointer shadow-lg shadow-[#D4AF37]/10 transition-all font-black"
+              className={cn("w-full sm:w-auto px-8 py-3 rounded-xl border-2 text-xs font-black uppercase tracking-widest flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50 cursor-pointer shadow-lg transition-all", styles.gradientBg, styles.borderColor, styles.shadow, styles.badgeText)}
             >
               <Send size={14} className="text-[#0D0D14]" />
               {isFanProcessing ? 'Processing...' : 'Submit fanbase report'}
@@ -2938,7 +2907,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
           badgeText: 'text-[#D4AF37]',
           accentColor: '#D4AF37',
           topTrim: 'border-t-[#D4AF37] border-t-2',
-          gradientBg: 'bg-gradient-to-br from-[#D4AF37]/20 via-[#D4AF37]/5 to-[#1A1A28]/80',
+          gradientBg: 'bg-gradient-to-br from-[#D4AF37]/20 via-[#D4AF37]/5 to-black/80',
         };
       }
       if (norm === 's idol') {
@@ -2948,7 +2917,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
           badgeText: 'text-[#ec4899]',
           accentColor: '#ec4899',
           topTrim: 'border-t-[#ec4899] border-t-2',
-          gradientBg: 'bg-gradient-to-br from-[#ec4899]/20 via-[#ec4899]/5 to-[#1A1A28]/80',
+          gradientBg: 'bg-gradient-to-br from-[#ec4899]/20 via-[#ec4899]/5 to-black/80',
         };
       }
       if (norm === 'rocket host') {
@@ -2958,7 +2927,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
           badgeText: 'text-[#3b82f6]',
           accentColor: '#3b82f6',
           topTrim: 'border-t-[#3b82f6] border-t-2',
-          gradientBg: 'bg-gradient-to-br from-[#3b82f6]/20 via-[#3b82f6]/5 to-[#1A1A28]/80',
+          gradientBg: 'bg-gradient-to-br from-[#3b82f6]/20 via-[#3b82f6]/5 to-black/80',
         };
       }
       if (norm === 'esport host' || norm.includes('esport')) {
@@ -2968,7 +2937,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
           badgeText: 'text-[#a855f7]',
           accentColor: '#a855f7',
           topTrim: 'border-t-[#a855f7] border-t-2',
-          gradientBg: 'bg-gradient-to-br from-[#a855f7]/20 via-[#a855f7]/5 to-[#1A1A28]/80',
+          gradientBg: 'bg-gradient-to-br from-[#a855f7]/20 via-[#a855f7]/5 to-black/80',
         };
       }
       // Regular Host
@@ -2978,7 +2947,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
         badgeText: 'text-[#F0EFE8]',
         accentColor: '#ffffff',
         topTrim: 'border-t-white/10 border-t-2',
-        gradientBg: 'bg-gradient-to-br from-white/10 via-white/5 to-[#1A1A28]/80',
+        gradientBg: 'bg-gradient-to-br from-white/10 via-white/5 to-[#000000]/80',
       };
     };
     return getCategoryStyles(host.tier_pay || '');
@@ -4665,7 +4634,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
 
           <div className="space-y-4">
             {/* 1. Administrative Fields Section */}
-            <div className="bg-[#1A1A28] border border-white/5 p-4 rounded-xl space-y-3">
+            <div className="bg-black/40 border border-white/5 p-4 rounded-xl space-y-3">
               <div className="border-b border-white/5 pb-1 flex justify-between items-center">
                 <span className="text-[9px] font-black text-[#D4AF37] uppercase tracking-wider">Administrative Fields</span>
                 {!isDirectorOrHeadAdmin && (
@@ -4760,7 +4729,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
             </div>
 
             {/* 2. Profile Details & Pay Tier (Owner or Admin) */}
-            <div className="bg-[#1A1A28]/50 border border-white/5 p-4 rounded-xl space-y-3">
+            <div className="bg-black/20 border border-white/5 p-4 rounded-xl space-y-3">
               <div className="border-b border-white/5 pb-1 flex justify-between items-center">
                 <span className="text-[9px] font-black text-[#D4AF37] uppercase tracking-wider">Profile Info &amp; Pay Tier</span>
                 {!isOwnProfile && !isDirectorOrHeadAdmin && (
@@ -4890,7 +4859,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
           </div>
 
           <div className="flex gap-3 mt-5">
-            <button onClick={() => setIsSelfEditing(false)} className="flex-1 py-2.5 bg-[#1A1A28] border border-white/10 text-[#A09E9A] rounded-xl text-[9px] font-black uppercase tracking-wider hover:bg-[#222235] transition-all cursor-pointer">
+            <button onClick={() => setIsSelfEditing(false)} className="flex-1 py-2.5 bg-black/40 border border-white/10 text-[#A09E9A] rounded-xl text-[9px] font-black uppercase tracking-wider hover:bg-[#222235] transition-all cursor-pointer">
               Cancel
             </button>
             <button
@@ -4977,7 +4946,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
       <div className={cn("backdrop-blur-xl border-2 rounded-3xl overflow-hidden flex flex-col relative group/card transition-all duration-300", styles.gradientBg, styles.borderColor, styles.shadow, styles.topTrim)}>
 
         {/* Full-width square profile photo acting as a header banner */}
-        <div className="w-full aspect-square relative bg-[#0D0D14]">
+        <div className="w-full aspect-square relative bg-black">
           {isProcessingPhoto && (
             <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-20">
               <Loader2 size={24} className="animate-spin text-[#D4AF37]" />
@@ -4986,7 +4955,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
           {editPhotoUrl ? (
             <img src={editPhotoUrl} alt={host.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
           ) : (
-            <div className="w-full h-full flex items-center justify-center text-7xl text-[#A09E9A] font-black bg-gradient-to-br from-[#1A1A28] to-[#0D0D14]">
+            <div className="w-full h-full flex items-center justify-center text-7xl text-[#A09E9A] font-black bg-gradient-to-br from-black/80 to-black">
               {editNickname?.[0]?.toUpperCase() || host.name?.[0] || 'JD'}
             </div>
           )}
@@ -4998,24 +4967,24 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
           <div className="absolute bottom-0 inset-x-0 h-[30%] pointer-events-none" style={{ background: 'linear-gradient(to top, #000000 0%, #000000 66.7%, transparent 100%)', zIndex: 10 }} />
 
           {/* Faded gradient overlay at the bottom 25% to merge with profile block */}
-          <div className="absolute bottom-0 inset-x-0 h-1/3 bg-gradient-to-t from-[#1A1A28] via-[#1A1A28]/60 to-transparent z-10" />
+          <div className="absolute bottom-0 inset-x-0 h-1/3 bg-gradient-to-t from-black via-black/60 to-transparent z-10" />
 
           {/* Absolute positioned last month's awards overlaying the image top-left */}
           {lastMonthAwards.length > 0 && (
             <div className="absolute top-4 left-4 z-20 flex flex-col gap-1.5 max-w-[60%] pointer-events-auto">
               {lastMonthAwards.map((a: any) => {
-                let badgeColorStyle = 'bg-amber-500/20 text-amber-400 border-amber-500/30';
-                if (a.awardColor === 'Purple') badgeColorStyle = 'bg-purple-500/20 text-purple-400 border-purple-500/30';
-                else if (a.awardColor === 'Emerald') badgeColorStyle = 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30';
-                else if (a.awardColor === 'Blue') badgeColorStyle = 'bg-blue-500/20 text-blue-400 border-blue-500/30';
-                else if (a.awardColor === 'Red') badgeColorStyle = 'bg-red-500/20 text-red-400 border-red-500/30';
-                else if (a.awardColor === 'Orange') badgeColorStyle = 'bg-orange-500/20 text-orange-400 border-orange-500/30';
+                let badgeColorStyle = 'border-amber-500 text-amber-200 bg-amber-500/30 shadow-[0_0_20px_rgba(245,158,11,0.8)]';
+                if (a.awardColor === 'Purple') badgeColorStyle = 'border-purple-500 text-purple-200 bg-purple-500/30 shadow-[0_0_20px_rgba(168,85,247,0.8)]';
+                else if (a.awardColor === 'Emerald') badgeColorStyle = 'border-emerald-500 text-emerald-200 bg-emerald-500/30 shadow-[0_0_20px_rgba(16,185,129,0.8)]';
+                else if (a.awardColor === 'Blue') badgeColorStyle = 'border-blue-500 text-blue-200 bg-blue-500/30 shadow-[0_0_20px_rgba(59,130,246,0.8)]';
+                else if (a.awardColor === 'Red') badgeColorStyle = 'border-red-500 text-red-200 bg-red-500/30 shadow-[0_0_20px_rgba(239,68,68,0.8)]';
+                else if (a.awardColor === 'Orange') badgeColorStyle = 'border-orange-500 text-orange-200 bg-orange-500/30 shadow-[0_0_20px_rgba(249,115,22,0.8)]';
 
                 return (
                   <span
                     key={a.id}
                     className={cn(
-                      "text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg border backdrop-blur-md shadow-lg truncate block max-w-full",
+                      "text-[9px] font-black uppercase tracking-wider leading-tight px-3 py-1.5 rounded-xl border backdrop-blur-md truncate block max-w-full text-white text-center z-10",
                       badgeColorStyle
                     )}
                     title={`Last Month's Award: ${a.awardName}`}
@@ -5028,12 +4997,13 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
           )}
 
           {/* Absolute positioned status badge overlaying the image top-right */}
-          <div className="absolute top-4 right-4 z-20">
-            <span className={cn("text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full border backdrop-blur-md shadow-lg",
-              host.status === 'Active' ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30" : "bg-amber-500/20 text-amber-400 border-amber-500/30")}>
-              {host.status || 'Active'}
-            </span>
-          </div>
+          {host.status && String(host.status).toLowerCase() !== 'active' && (
+            <div className="absolute top-4 right-4 z-20">
+              <span className="text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full border backdrop-blur-md shadow-lg bg-red-500/20 text-red-400 border-red-500/30">
+                {host.status}
+              </span>
+            </div>
+          )}
 
         </div>
 
@@ -5103,7 +5073,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                       referrerPolicy="no-referrer"
                     />
                   ) : (
-                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#1A1A28] to-[#0D0D14] border border-white/10 flex items-center justify-center text-base font-black text-indigo-400 shrink-0 shadow-inner">
+                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-black/80 to-black border border-white/10 flex items-center justify-center text-base font-black text-indigo-400 shrink-0 shadow-inner">
                       {(assignedManager?.name || host.manager || 'M')[0].toUpperCase()}
                     </div>
                   )}
@@ -5225,7 +5195,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
     const isStaffUser = ['manager', 'agent', 'admin', 'head admin', 'director'].includes(userRoleLower);
 
     return (
-      <div className={cn("space-y-4 flex-1 bg-white/5 backdrop-blur-xl border border-white/10 p-5 rounded-3xl transition-all duration-300 hover:border-amber-500/30 group", styles.shadow)}>
+      <div className={cn("space-y-4 flex-1 backdrop-blur-xl border-2 rounded-3xl p-5 transition-all duration-300 group", styles.gradientBg, styles.borderColor, styles.shadow, styles.topTrim)}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-400 text-sm shadow-inner">⚔️</div>
@@ -5313,7 +5283,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
     const presencePercentage = Math.round(presenceRatio * 100);
 
     return (
-      <div className={cn("space-y-4 flex-1 bg-white/5 backdrop-blur-xl border border-white/10 p-5 rounded-3xl transition-all duration-300 hover:border-amber-500/30 group", styles.shadow)}>
+      <div className={cn("space-y-4 flex-1 backdrop-blur-xl border-2 rounded-3xl p-5 transition-all duration-300 group", styles.gradientBg, styles.borderColor, styles.shadow, styles.topTrim)}>
         <div className="flex items-center justify-between gap-3">
           <div className="flex-1 bg-black/40 p-1 rounded-xl border border-white/5 flex">
             <button
@@ -5340,18 +5310,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
             >
               ATTENDANCE
             </button>
-            <button
-              type="button"
-              onClick={() => setEventActiveTab('recognitions')}
-              className={cn(
-                "flex-1 py-2 rounded-lg text-xs font-black uppercase tracking-wider transition-all cursor-pointer text-center",
-                eventActiveTab === 'recognitions'
-                  ? "bg-amber-500/20 text-amber-400 border border-amber-500/30"
-                  : "text-white/40 hover:text-white/70 border border-transparent"
-              )}
-            >
-              RECOGNITIONS
-            </button>
+
           </div>
         </div>
 
@@ -5502,73 +5461,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
           </>
         )}
 
-        {eventActiveTab === 'recognitions' && (() => {
-          const activeCount = assignedAwards.filter(a => a.startDate && a.endDate && getIsLastMonth(a.startDate, a.endDate)).length;
 
-          return (
-            <>
-              {/* Header stats inside tab */}
-              <div className="flex items-center justify-between bg-black/20 border border-white/5 p-3 rounded-2xl">
-                <span className="text-[10px] font-black uppercase text-[#A09E9A] tracking-wider">Agency Badges & Recognitions</span>
-                <span className="px-2.5 py-0.5 text-[9px] font-black text-amber-400 border border-amber-500/20 bg-amber-500/10 rounded-full uppercase tracking-widest shadow-inner">
-                  {activeCount} active / {assignedAwards.length} total
-                </span>
-              </div>
-
-              {/* Badges list */}
-              <div className="space-y-3 mt-4 max-h-48 overflow-y-auto custom-scrollbar pr-1">
-                {assignedAwards.length > 0 ? (
-                  <div className="grid grid-cols-2 gap-2.5 pt-1">
-                    {assignedAwards.map((a: any) => {
-                      const isActive = getIsLastMonth(a.startDate, a.endDate);
-
-                      let glowStyle = '';
-                      if (isActive) {
-                        if (a.awardColor === 'Purple') glowStyle = 'border-purple-500 text-purple-200 bg-purple-500/20 shadow-[0_0_12px_rgba(168,85,247,0.4)] opacity-100';
-                        else if (a.awardColor === 'Emerald') glowStyle = 'border-emerald-500 text-emerald-200 bg-emerald-500/20 shadow-[0_0_12px_rgba(16,185,129,0.4)] opacity-100';
-                        else if (a.awardColor === 'Blue') glowStyle = 'border-blue-500 text-blue-200 bg-blue-500/20 shadow-[0_0_12px_rgba(59,130,246,0.4)] opacity-100';
-                        else if (a.awardColor === 'Red') glowStyle = 'border-red-500 text-red-200 bg-red-500/20 shadow-[0_0_12px_rgba(239,68,68,0.4)] opacity-100';
-                        else if (a.awardColor === 'Orange') glowStyle = 'border-orange-500 text-orange-200 bg-orange-500/20 shadow-[0_0_12px_rgba(249,115,22,0.4)] opacity-100';
-                        else glowStyle = 'border-amber-500 text-amber-200 bg-amber-500/20 shadow-[0_0_12px_rgba(245,158,11,0.4)] opacity-100';
-                      } else {
-                        if (a.awardColor === 'Purple') glowStyle = 'bg-purple-500/5 text-purple-400/50 border-purple-500/10 opacity-40 hover:opacity-80';
-                        else if (a.awardColor === 'Emerald') glowStyle = 'bg-emerald-500/5 text-emerald-400/50 border-emerald-500/10 opacity-40 hover:opacity-80';
-                        else if (a.awardColor === 'Blue') glowStyle = 'bg-blue-500/5 text-blue-400/50 border-blue-500/10 opacity-40 hover:opacity-80';
-                        else if (a.awardColor === 'Red') glowStyle = 'bg-red-500/5 text-red-400/50 border-red-500/10 opacity-40 hover:opacity-80';
-                        else if (a.awardColor === 'Orange') glowStyle = 'bg-orange-500/5 text-orange-400/50 border-orange-500/10 opacity-40 hover:opacity-80';
-                        else glowStyle = 'bg-amber-500/5 text-amber-400/50 border-amber-500/10 opacity-40 hover:opacity-80';
-                      }
-
-                      return (
-                        <div
-                          key={a.id}
-                          className={cn(
-                            "flex flex-col justify-center items-center border rounded-xl px-3 py-1.5 transition-all duration-300 hover:scale-[1.02] hover:border-amber-500/50 shadow-md cursor-help relative group/badge w-full min-w-0 text-center",
-                            glowStyle
-                          )}
-                          title={`Award: ${a.awardName}\nDuration: ${a.startDate} to ${a.endDate}\nStatus: ${isActive ? 'Active Badge' : 'Past Award'}`}
-                        >
-                          <div className="flex flex-col min-w-0 items-center justify-center">
-                            <span className={cn("text-[9px] font-black uppercase tracking-wider leading-tight truncate w-full", isActive ? "text-white" : "text-[#F0EFE8]/70")}>
-                              {abbreviateMonths(a.awardName)}
-                            </span>
-                            {isActive && (
-                              <span className="text-[7px] font-bold uppercase tracking-wider mt-0.5 opacity-90 text-white animate-pulse">
-                                Active
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <p className="text-xs text-[#A09E9A]/40 italic text-center py-6 font-medium">No agency badges or recognitions found for this host.</p>
-                )}
-              </div>
-            </>
-          );
-        })()}
         {participatedEvents.length > 0 && (() => {
           const latestEvent = participatedEvents[0];
           return renderCardFooter(
@@ -5577,6 +5470,78 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
             latestEvent.attendanceSubmittedBy?.name || latestEvent.created_by_name || latestEvent.createdBy
           );
         })()}
+      </div>
+    );
+  };
+
+  const renderRecognitionsCard = () => {
+    if (assignedAwards.length === 0) return null;
+
+    const activeCount = assignedAwards.filter(a => a.startDate && a.endDate && getIsLastMonth(a.startDate, a.endDate)).length;
+
+    return (
+      <div className={cn("space-y-4 bg-white/5 backdrop-blur-xl border border-white/10 p-5 rounded-3xl transition-all duration-300 hover:border-amber-500/30 group", styles.shadow)}>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-400 text-sm shadow-inner">🏆</div>
+            <h4 className="text-xs font-black uppercase tracking-widest text-[#F0EFE8]">AGENCY RECOGNITION</h4>
+          </div>
+        </div>
+
+        {/* Header stats inside tab */}
+        <div className="flex items-center justify-between bg-black/20 border border-white/5 p-3 rounded-2xl">
+          <span className="text-[10px] font-black uppercase text-[#A09E9A] tracking-wider">Agency Badges & Recognitions</span>
+          <span className="px-2.5 py-0.5 text-[9px] font-black text-amber-400 border border-amber-500/20 bg-amber-500/10 rounded-full uppercase tracking-widest shadow-inner">
+            {activeCount} active / {assignedAwards.length} total
+          </span>
+        </div>
+
+        {/* Badges list */}
+        <div className="space-y-3 mt-4 max-h-48 overflow-y-auto custom-scrollbar pr-1">
+          {assignedAwards.length > 0 ? (
+            <div className="grid grid-cols-2 gap-2.5 pt-1">
+              {assignedAwards.map((a: any) => {
+                const isActive = getIsLastMonth(a.startDate, a.endDate);
+
+                let glowStyle = '';
+                if (isActive) {
+                  if (a.awardColor === 'Purple') glowStyle = 'border-purple-500 text-purple-200 bg-purple-500/30 shadow-[0_0_20px_rgba(168,85,247,0.8)] opacity-100 z-10 font-bold';
+                  else if (a.awardColor === 'Emerald') glowStyle = 'border-emerald-500 text-emerald-200 bg-emerald-500/30 shadow-[0_0_20px_rgba(16,185,129,0.8)] opacity-100 z-10 font-bold';
+                  else if (a.awardColor === 'Blue') glowStyle = 'border-blue-500 text-blue-200 bg-blue-500/30 shadow-[0_0_20px_rgba(59,130,246,0.8)] opacity-100 z-10 font-bold';
+                  else if (a.awardColor === 'Red') glowStyle = 'border-red-500 text-red-200 bg-red-500/30 shadow-[0_0_20px_rgba(239,68,68,0.8)] opacity-100 z-10 font-bold';
+                  else if (a.awardColor === 'Orange') glowStyle = 'border-orange-500 text-orange-200 bg-orange-500/30 shadow-[0_0_20px_rgba(249,115,22,0.8)] opacity-100 z-10 font-bold';
+                  else glowStyle = 'border-amber-500 text-amber-200 bg-amber-500/30 shadow-[0_0_20px_rgba(245,158,11,0.8)] opacity-100 z-10 font-bold';
+                } else {
+                  if (a.awardColor === 'Purple') glowStyle = 'bg-purple-500/10 text-purple-300 border-purple-500/30 opacity-100';
+                  else if (a.awardColor === 'Emerald') glowStyle = 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30 opacity-100';
+                  else if (a.awardColor === 'Blue') glowStyle = 'bg-blue-500/10 text-blue-300 border-blue-500/30 opacity-100';
+                  else if (a.awardColor === 'Red') glowStyle = 'bg-red-500/10 text-red-300 border-red-500/30 opacity-100';
+                  else if (a.awardColor === 'Orange') glowStyle = 'bg-orange-500/10 text-orange-300 border-orange-500/30 opacity-100';
+                  else glowStyle = 'bg-amber-500/10 text-amber-300 border-amber-500/30 opacity-100';
+                }
+
+                return (
+                  <div
+                    key={a.id}
+                    className={cn(
+                      "flex flex-col justify-center items-center border rounded-xl px-3 py-1.5 transition-all duration-300 hover:scale-[1.02] hover:border-amber-500/50 shadow-md cursor-help relative group/badge w-full min-w-0 text-center",
+                      glowStyle
+                    )}
+                    title={`Award: ${a.awardName}\nDuration: ${a.startDate} to ${a.endDate}\nStatus: ${isActive ? 'Active Badge' : 'Past Award'}`}
+                  >
+                    <div className="flex flex-col min-w-0 items-center justify-center">
+                      <span className={cn("text-[9px] font-black uppercase tracking-wider leading-tight truncate w-full", isActive ? "text-white" : "text-[#F0EFE8]/70")}>
+                        {abbreviateMonths(a.awardName)}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="text-xs text-[#A09E9A]/40 italic text-center py-6 font-medium">No agency badges or recognitions found for this host.</p>
+          )}
+        </div>
       </div>
     );
   };
@@ -5591,7 +5556,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
     const canSubmitFanbase = isOwnProfile || isAssignedManagerAgent || isElevatedStaff;
 
     return (
-      <div className={cn("space-y-4 bg-white/5 backdrop-blur-xl border border-white/10 p-5 rounded-3xl transition-all duration-300 hover:border-pink-500/30 group", styles.shadow)}>
+      <div className={cn("space-y-4 backdrop-blur-xl border-2 rounded-3xl p-5 transition-all duration-300 group", styles.gradientBg, styles.borderColor, styles.shadow, styles.topTrim)}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-full bg-pink-500/20 flex items-center justify-center text-pink-400 text-sm shadow-inner">💖</div>
@@ -5798,8 +5763,8 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
     if (!isRpkFormOpen) return null;
 
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-        <div className="bg-[#13131E] border border-white/10 rounded-2xl max-w-sm w-full p-5 shadow-2xl relative">
+      <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+        <div className={cn("backdrop-blur-xl border-2 rounded-3xl max-w-sm w-full p-5 shadow-2xl relative max-h-[90vh] overflow-y-auto custom-scrollbar", styles.gradientBg, styles.borderColor, styles.shadow, styles.topTrim)}>
           <button
             title="Close"
             onClick={() => setIsRpkFormOpen(false)}
@@ -5862,7 +5827,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
             <button
               type="submit"
               disabled={isSubmittingRpk}
-              className="w-full mt-2 py-2.5 bg-[#D4AF37] hover:bg-[#C5A028] text-black rounded-xl text-[11px] font-black uppercase tracking-widest transition-all cursor-pointer disabled:opacity-50"
+              className={cn("w-full py-3 rounded-xl border-2 text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 active:scale-[0.98] transition-all mt-6 shadow-lg", styles.gradientBg, styles.borderColor, styles.shadow, styles.badgeText)}
             >
               {isSubmittingRpk ? 'Submitting...' : 'Submit Report'}
             </button>
@@ -5880,8 +5845,8 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
     const isElevatedStaff = ['admin', 'head admin', 'head_admin', 'director'].includes(roleLower);
 
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-        <div className="bg-[#13131E] border border-white/10 rounded-2xl max-w-sm w-full p-5 shadow-2xl relative max-h-[90vh] overflow-y-auto custom-scrollbar">
+      <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+        <div className={cn("backdrop-blur-xl border-2 rounded-3xl max-w-sm w-full p-5 shadow-2xl relative max-h-[90vh] overflow-y-auto custom-scrollbar", styles.gradientBg, styles.borderColor, styles.shadow, styles.topTrim)}>
           <button
             title="Close"
             onClick={() => setIsFanbaseFormOpen(false)}
@@ -5941,31 +5906,6 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
               </div>
             </div>
 
-            {isElevatedStaff && (
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="text-[9px] font-black uppercase tracking-wider text-[#A09E9A]">GC Host Activity</label>
-                  <input
-                    type="text"
-                    placeholder="0"
-                    value={fanbaseFormData.gc_activity_count_host}
-                    onChange={(e) => setFanbaseFormData({ ...fanbaseFormData, gc_activity_count_host: e.target.value })}
-                    className="w-full bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-indigo-500"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[9px] font-black uppercase tracking-wider text-[#A09E9A]">GC Fans Activity</label>
-                  <input
-                    type="text"
-                    placeholder="0"
-                    value={fanbaseFormData.gc_activity_count_fans}
-                    onChange={(e) => setFanbaseFormData({ ...fanbaseFormData, gc_activity_count_fans: e.target.value })}
-                    className="w-full bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-indigo-500"
-                  />
-                </div>
-              </div>
-            )}
-
             <div className="space-y-1">
               <label className="text-[9px] font-black uppercase tracking-wider text-[#A09E9A]">Notes</label>
               <textarea
@@ -5980,7 +5920,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
             <button
               type="submit"
               disabled={isSubmittingFanbase}
-              className="w-full mt-2 py-2.5 bg-indigo-500 hover:bg-indigo-400 text-white rounded-xl text-[11px] font-black uppercase tracking-widest transition-all cursor-pointer disabled:opacity-50"
+              className={cn("w-full py-3 rounded-xl border-2 text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 active:scale-[0.98] transition-all mt-6 shadow-lg", styles.gradientBg, styles.borderColor, styles.shadow, styles.badgeText)}
             >
               {isSubmittingFanbase ? 'Submitting...' : 'Submit Report'}
             </button>
@@ -5994,8 +5934,8 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
     if (!isAddEventFormOpen) return null;
 
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-        <div className="bg-[#13131E] border border-white/10 rounded-2xl max-w-sm w-full p-5 shadow-2xl relative">
+      <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+        <div className={cn("backdrop-blur-xl border-2 rounded-3xl max-w-sm w-full p-5 shadow-2xl relative max-h-[90vh] overflow-y-auto custom-scrollbar", styles.gradientBg, styles.borderColor, styles.shadow, styles.topTrim)}>
           <button
             title="Close"
             onClick={() => setIsAddEventFormOpen(false)}
@@ -6016,12 +5956,12 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                 onChange={(e) => setEventFormData({ ...eventFormData, eventType: e.target.value })}
                 className="w-full bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-indigo-500"
               >
-                <option value="SOLO LIVEHOUSE" className="bg-[#1A1A28]">SOLO LIVEHOUSE</option>
-                <option value="PARTY LIVEHOUSE" className="bg-[#1A1A28]">PARTY LIVEHOUSE</option>
-                <option value="OFFICIAL PK" className="bg-[#1A1A28]">OFFICIAL PK</option>
-                <option value="AGENCY EVENT" className="bg-[#1A1A28]">AGENCY EVENT</option>
-                <option value="POPPO EVENT" className="bg-[#1A1A28]">POPPO EVENT</option>
-                <option value="EXTERNAL EVENT" className="bg-[#1A1A28]">EXTERNAL EVENT</option>
+                <option value="SOLO LIVEHOUSE" className="bg-black/40">SOLO LIVEHOUSE</option>
+                <option value="PARTY LIVEHOUSE" className="bg-black/40">PARTY LIVEHOUSE</option>
+                <option value="OFFICIAL PK" className="bg-black/40">OFFICIAL PK</option>
+                <option value="AGENCY EVENT" className="bg-black/40">AGENCY EVENT</option>
+                <option value="POPPO EVENT" className="bg-black/40">POPPO EVENT</option>
+                <option value="EXTERNAL EVENT" className="bg-black/40">EXTERNAL EVENT</option>
               </select>
             </div>
 
@@ -6061,7 +6001,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
             <button
               type="submit"
               disabled={isSubmittingEvent}
-              className="w-full mt-2 py-2.5 bg-indigo-500 hover:bg-indigo-400 text-white rounded-xl text-[11px] font-black uppercase tracking-widest transition-all cursor-pointer disabled:opacity-50"
+              className={cn("w-full py-3 rounded-xl border-2 text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 active:scale-[0.98] transition-all mt-6 shadow-lg", styles.gradientBg, styles.borderColor, styles.shadow, styles.badgeText)}
             >
               {isSubmittingEvent ? 'Submitting...' : 'Register Event'}
             </button>
@@ -6218,7 +6158,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
     const insights = generateCategorizedInsights();
 
     return (
-      <div className={cn("bg-[#1A1A28] border-2 rounded-2xl p-5 space-y-4 transition-all duration-300", styles.borderColor, styles.shadow, styles.topTrim)}>
+      <div className={cn("backdrop-blur-xl border-2 rounded-3xl p-5 space-y-4 transition-all duration-300", styles.gradientBg, styles.borderColor, styles.shadow, styles.topTrim)}>
         {/* Header with main badge */}
         <div className="flex items-center justify-between pb-3 border-b border-white/5">
           <div className="flex items-center gap-2">
@@ -6615,8 +6555,8 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
               type="button"
               onClick={() => setActiveTab('todo')}
               className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer ${activeTab === 'todo'
-                  ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
-                  : 'text-[#A09E9A] hover:text-white'
+                ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
+                : 'text-[#A09E9A] hover:text-white'
                 }`}
             >
               To-Do List
@@ -6625,8 +6565,8 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
               type="button"
               onClick={() => setActiveTab('add')}
               className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer ${activeTab === 'add'
-                  ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
-                  : 'text-[#A09E9A] hover:text-white'
+                ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
+                : 'text-[#A09E9A] hover:text-white'
                 }`}
             >
               Add Notes
@@ -6635,8 +6575,8 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
               type="button"
               onClick={() => setActiveTab('history')}
               className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer ${activeTab === 'history'
-                  ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
-                  : 'text-[#A09E9A] hover:text-white'
+                ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
+                : 'text-[#A09E9A] hover:text-white'
                 }`}
             >
               Notes History
@@ -7280,12 +7220,13 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
   const isNonHostRole = ['admin', 'manager', 'agent', 'head admin', 'head_admin', 'director'].includes(profileOwnerRole);
 
   return (
-    <div className={cn(
-      "w-full text-[#F0EFE8] flex flex-col",
-      isSpotlight
-        ? cn("bg-[#13131E] p-5 space-y-5 relative mx-auto border border-white/5 rounded-[24px] shadow-2xl max-h-[calc(100dvh-2rem)] overflow-y-auto custom-scrollbar", hidePerformanceStats ? "max-w-4xl" : "max-w-md")
-        : "space-y-6 max-w-4xl mx-auto pb-12 pt-2"
-    )}>
+    <>
+      <div className={cn(
+        "w-full text-[#F0EFE8] flex flex-col",
+        isSpotlight
+          ? cn("glass-card p-5 space-y-5 relative mx-auto rounded-[24px] overflow-y-auto custom-scrollbar max-h-[calc(100dvh-2rem)]", hidePerformanceStats ? "max-w-4xl" : "max-w-md")
+          : "space-y-6 max-w-4xl mx-auto pb-12 pt-2"
+      )}>
 
       {/* Top Header Grid line style */}
       {isSpotlight ? (
@@ -7294,23 +7235,21 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
             {onClose && (
               <button
                 onClick={onClose}
-                className="p-1.5 rounded-full bg-[#1A1A28] hover:bg-[#222235] text-[#A09E9A] hover:text-[#F0EFE8] transition-all border border-white/10 cursor-pointer"
+                className="p-1.5 rounded-full bg-black/40 hover:bg-black/60 text-[#A09E9A] hover:text-[#F0EFE8] transition-all border border-white/10 cursor-pointer"
                 aria-label="Back to Roster"
               >
                 <ChevronLeft size={18} />
               </button>
             )}
             <div className="flex flex-col">
-              <span className="text-sm font-black text-[#F0EFE8] leading-tight tracking-[0.05em]">NINERS</span>
-              <span className="text-[8px] font-bold uppercase tracking-[0.2em] text-[#D4AF37]">APP</span>
+              <span className="text-sm font-black text-[#F0EFE8] leading-tight tracking-[0.05em]">{host.nickname || host.name}'s Profile</span>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-[8px] font-black uppercase tracking-[0.2em] text-[#A09E9A]">PUBLIC VIEW</span>
             {onClose && (
               <button
                 onClick={onClose}
-                className="w-7 h-7 rounded-full bg-[#1A1A28] border border-white/10 flex items-center justify-center text-[#A09E9A] hover:text-[#F0EFE8] hover:border-[#D4AF37]/45 hover:bg-[#222235] transition-all shadow-md cursor-pointer"
+                className="w-7 h-7 rounded-full bg-black/40 border border-white/10 flex items-center justify-center text-[#A09E9A] hover:text-[#F0EFE8] hover:border-[#D4AF37]/45 hover:bg-black/60 transition-all shadow-md cursor-pointer"
                 aria-label="Close Profile Spotlight"
               >
                 <X size={12} />
@@ -7321,8 +7260,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
       ) : (
         <div className="flex items-center justify-between pb-4 border-b border-white/5 shrink-0">
           <div className="flex flex-col">
-            <span className="text-lg font-black text-[#F0EFE8] leading-tight tracking-[0.05em]">MY PROFILE &amp; SETTINGS</span>
-            <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#D4AF37]">Niners App Portal</span>
+            <span className="text-lg font-black text-[#F0EFE8] leading-tight tracking-[0.05em]">{host.nickname || host.name}'s Profile</span>
           </div>
         </div>
       )}
@@ -7353,7 +7291,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
       ) : (
         <div className={cn(
           (isSpotlight && !hidePerformanceStats)
-            ? "space-y-5 overflow-y-auto pr-0.5 py-1 custom-scrollbar max-h-[72vh]"
+            ? "space-y-5 py-1"
             : "grid grid-cols-1 lg:grid-cols-3 gap-6 pt-2"
         )}>
           {(isSpotlight && !hidePerformanceStats) ? (
@@ -7364,6 +7302,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                 {renderRandomPK()}
                 {renderExposuresAndAttendance()}
               </div>
+              {renderRecognitionsCard()}
               {renderMonthlyTrend()}
               {renderPerformanceMetricsAndDiversity()}
               {renderTrendBadge()}
@@ -7373,7 +7312,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
               {onClose && (
                 <button
                   onClick={onClose}
-                  className="w-full mt-4 py-3 bg-[#222235] hover:bg-[#2A2A3F] border border-white/10 hover:border-[#D4AF37]/45 hover:text-[#D4AF37] rounded-xl text-xs font-black uppercase tracking-widest transition-all cursor-pointer text-center"
+                  className={cn("w-full mt-4 py-3 border-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all cursor-pointer text-center backdrop-blur-md", styles.gradientBg, styles.borderColor, styles.shadow, styles.badgeText)}
                 >
                   Close Profile Spotlight
                 </button>
@@ -7394,6 +7333,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                   {renderRandomPK()}
                   {renderExposuresAndAttendance()}
                 </div>
+                {renderRecognitionsCard()}
                 {!hidePerformanceStats && (
                   <>
                     {renderMonthlyTrend()}
@@ -7407,7 +7347,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                 {isSpotlight && onClose && (
                   <button
                     onClick={onClose}
-                    className="w-full mt-4 py-3 bg-[#222235] hover:bg-[#2A2A3F] border border-white/10 hover:border-[#D4AF37]/45 hover:text-[#D4AF37] rounded-xl text-xs font-black uppercase tracking-widest transition-all cursor-pointer text-center"
+                    className={cn("w-full mt-4 py-3 border-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all cursor-pointer text-center backdrop-blur-md", styles.gradientBg, styles.borderColor, styles.shadow, styles.badgeText)}
                   >
                     Close Profile Spotlight
                   </button>
@@ -7417,6 +7357,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
           )}
         </div>
       )}
+    </div>
 
       {renderRpkModal()}
       {renderFanbaseModal()}
@@ -7426,12 +7367,17 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
       {/* renderMonthlyDataModal() */}
 
       {spotlightHost && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm overflow-y-auto">
-          <HostProfileView
-            host={spotlightHost}
-            isReadOnly={true}
-            onClose={() => setSpotlightHost(null)}
-          />
+        <div className="fixed inset-0 z-[100]">
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setSpotlightHost(null)}></div>
+          <div className="absolute inset-0 p-4 overflow-y-auto pointer-events-none flex flex-col items-center py-10">
+            <div className="pointer-events-auto w-full h-full flex justify-center">
+              <HostProfileView
+                host={spotlightHost}
+                isReadOnly={true}
+                onClose={() => setSpotlightHost(null)}
+              />
+            </div>
+          </div>
         </div>
       )}
 
@@ -7455,7 +7401,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
           </div>
         ))}
       </div>
-    </div>
+    </>
   );
 };
 
