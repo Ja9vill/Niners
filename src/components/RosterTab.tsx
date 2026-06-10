@@ -74,6 +74,10 @@ const getTierFilterStyle = (tierInput: string, isSelected: boolean) => {
 
 const formatBadgeTitle = (title: string) => {
   if (!title) return '';
+  const match = title.match(/Top (\d+) Niner/i);
+  if (match) {
+    return `Top ${match[1]} Niner`;
+  }
   return title
     .replace(/\bJanuary\b/i, 'Jan')
     .replace(/\bFebruary\b/i, 'Feb')
@@ -159,7 +163,47 @@ export const RosterTab: React.FC<RosterTabProps> = ({ isReadOnly = false }) => {
 
   // Top Niners & Badges
   const [allAwards, setAllAwards] = useState<any[]>([]);
-  const [top9NinerIds, setTop9NinerIds] = useState<string[]>([]);
+
+  const [allReports, setAllReports] = useState<any[]>([]);
+
+  const top9NinerData = useMemo(() => {
+    if (!allReports || allReports.length === 0) return [];
+    
+    // Find the latest month
+    let maxYear = 0;
+    let maxMonth = 0;
+    allReports.forEach(r => {
+      if (r.year > maxYear) {
+        maxYear = r.year;
+        maxMonth = r.month;
+      } else if (r.year === maxYear && r.month > maxMonth) {
+        maxMonth = r.month;
+      }
+    });
+
+    if (maxYear === 0) return [];
+
+    // Filter to latest month
+    const latestReports = allReports.filter(r => r.year === maxYear && r.month === maxMonth);
+    
+    // Aggregate by poppoId
+    const commByHost: Record<string, number> = {};
+    latestReports.forEach(r => {
+      const comm = Number(r.agentCommission || r.agent_commission || r.agentComm || r.commission || r.Commission || 0);
+      const id = String(r.poppoId || r.poppo_id);
+      commByHost[id] = (commByHost[id] || 0) + comm;
+    });
+
+    // Sort by commission descending and take top 9
+    const sorted = Object.entries(commByHost)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 9)
+      .map(([id, comm], index) => ({ id, rank: index + 1 }));
+
+    return sorted;
+  }, [allReports]);
+
+  const top9NinerIds = useMemo(() => top9NinerData.map(d => d.id), [top9NinerData]);
   const [showTopNiners, setShowTopNiners] = useState(() => {
     return window.location.search.includes('filter=top-niners');
   });
@@ -168,18 +212,14 @@ export const RosterTab: React.FC<RosterTabProps> = ({ isReadOnly = false }) => {
     const fetchUsers = async () => {
       setIsLoading(true);
       try {
-        const [users, awards, topNiners] = await Promise.all([
+        const [users, awards, reports] = await Promise.all([
           FirebaseService.getAllRoleMetadata(),
           FirebaseService.getAllAssignedAwards(),
-          FirebaseService.getLatestTopNinersSummaries()
+          FirebaseService.getAllPerformanceReports()
         ]);
         setHosts(users.map(u => ({ ...u, id: u.poppo_id || u.poppoId || u.id } as Host)));
         setAllAwards(awards);
-
-        if (topNiners && topNiners.length > 0) {
-          const top9 = topNiners.slice(0, 9).map(r => r.poppoId);
-          setTop9NinerIds(top9);
-        }
+        setAllReports(reports);
       } catch (err: any) {
         console.error("Failed to load users from Firebase:", err);
         setError(err.message || 'Failed to connect to Database');
@@ -358,13 +398,11 @@ export const RosterTab: React.FC<RosterTabProps> = ({ isReadOnly = false }) => {
                   window.history.replaceState({}, '', url);
                 }
               }}
-              disabled={top9NinerIds.length === 0}
               className={cn(
                 "px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all border flex items-center gap-1.5",
                 showTopNiners
                   ? "bg-[#D4AF37]/20 text-[#D4AF37] border-[#D4AF37]/50 shadow-[0_0_10px_rgba(212,175,55,0.3)]"
-                  : "bg-black/20 text-[#A09E9A] border-white/10 hover:border-white/30 hover:text-[#F0EFE8]",
-                top9NinerIds.length === 0 && "opacity-50 cursor-not-allowed"
+                  : "bg-black/20 text-[#A09E9A] border-white/10 hover:border-white/30 hover:text-[#F0EFE8]"
               )}
             >
               <Medal size={12} className={showTopNiners ? "fill-[#D4AF37]" : ""} />
@@ -430,22 +468,23 @@ export const RosterTab: React.FC<RosterTabProps> = ({ isReadOnly = false }) => {
                 <div className="relative z-10 w-full px-3 pt-1.5 pb-3 flex justify-between items-start pointer-events-none">
                   {/* Status indicator or Badge on top-left */}
                   <div className="flex flex-col gap-1 items-start">
-                    {/* Top Niner Badge */}
+                    {/* Top Niner (Dynamic Share%) or Manual Badges (Active or Last Month) */}
                     {(() => {
-                      const rank = top9NinerIds.indexOf(String(host.id)) + 1;
-                      if (rank > 0 && rank <= 9) {
+                      const dynamicTopNiner = top9NinerData.find(d => String(d.id) === String(host.id));
+                      if (dynamicTopNiner) {
+                        const rank = dynamicTopNiner.rank;
+                        let badgeColorStyle = 'border-amber-500 text-amber-200 bg-amber-500/30 shadow-[0_0_8px_rgba(245,158,11,0.6)]';
+                        if (rank >= 4 && rank <= 6) badgeColorStyle = 'border-orange-500 text-orange-200 bg-orange-500/30 shadow-[0_0_8px_rgba(249,115,22,0.6)]';
+                        else if (rank >= 7) badgeColorStyle = 'border-red-500 text-red-200 bg-red-500/30 shadow-[0_0_8px_rgba(239,68,68,0.6)]';
+
                         return (
-                          <div className="px-1.5 py-0.5 rounded text-[7.5px] font-black uppercase tracking-wider border backdrop-blur-sm flex items-center gap-1 border-amber-500 text-amber-200 bg-amber-500/30 shadow-[0_0_8px_rgba(245,158,11,0.6)]">
-                            <Medal size={8} className="drop-shadow-md" />
+                          <div className={cn("px-1.5 py-0.5 rounded text-[7.5px] font-black uppercase tracking-wider border backdrop-blur-sm flex items-center gap-1", badgeColorStyle)}>
+                            <Star size={8} className="drop-shadow-md" />
                             Top {rank} Niner
                           </div>
                         );
                       }
-                      return null;
-                    })()}
 
-                    {/* Manual Badges (Active or Last Month) */}
-                    {(() => {
                       const now = new Date();
                       const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1).getTime();
                       const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
@@ -458,20 +497,34 @@ export const RosterTab: React.FC<RosterTabProps> = ({ isReadOnly = false }) => {
                         if (a.startDate && a.endDate) {
                           const start = new Date(a.startDate).getTime();
                           const end = new Date(a.endDate).getTime();
-                          if (current >= start && current <= end) isActive = true;
+                          // Expand end date boundary to end of day to be generous
+                          if (current >= start && current <= end + 86400000) isActive = true;
                         }
                         
-                        let isLastMonth = false;
+                        let isRecentlyAssigned = false;
                         const assignedDate = new Date(a.awardedAt || a.dateAwarded || a.assignedAt || 0).getTime();
-                        if (assignedDate >= lastMonthStart && assignedDate < thisMonthStart) {
-                          isLastMonth = true;
+                        if (assignedDate >= lastMonthStart) {
+                          isRecentlyAssigned = true;
                         }
 
-                        return isActive || isLastMonth;
+                        // We will count it if it is strictly active, OR if it was assigned within the last month or so.
+                        return isActive || isRecentlyAssigned;
                       });
 
                       if (hostAwards.length > 0) {
-                        const latestAward = hostAwards.sort((a, b) => new Date(b.awardedAt || b.dateAwarded || 0).getTime() - new Date(a.awardedAt || a.dateAwarded || 0).getTime())[0];
+                        const latestAward = hostAwards.sort((a, b) => {
+                          const aIsTopNiner = /Top (\d+) Niner/i.test(String(a.title || a.awardName || a.name || ''));
+                          const bIsTopNiner = /Top (\d+) Niner/i.test(String(b.title || b.awardName || b.name || ''));
+                          if (aIsTopNiner && !bIsTopNiner) return -1;
+                          if (!aIsTopNiner && bIsTopNiner) return 1;
+                          return new Date(b.awardedAt || b.dateAwarded || b.assignedAt || 0).getTime() - new Date(a.awardedAt || a.dateAwarded || a.assignedAt || 0).getTime();
+                        })[0];
+                        
+                        // Prevent duplicate dynamic badge if they somehow manually assigned a Top Niner badge as well
+                        if (/Top (\d+) Niner/i.test(String(latestAward.title || latestAward.awardName || latestAward.name || ''))) {
+                          return null;
+                        }
+
                         let badgeColorStyle = 'border-amber-500 text-amber-200 bg-amber-500/30 shadow-[0_0_8px_rgba(245,158,11,0.6)]';
                         if (latestAward.awardColor === 'Purple' || latestAward.color === 'Purple') badgeColorStyle = 'border-purple-500 text-purple-200 bg-purple-500/30 shadow-[0_0_8px_rgba(168,85,247,0.6)]';
                         else if (latestAward.awardColor === 'Emerald' || latestAward.color === 'Emerald') badgeColorStyle = 'border-emerald-500 text-emerald-200 bg-emerald-500/30 shadow-[0_0_8px_rgba(16,185,129,0.6)]';

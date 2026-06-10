@@ -936,7 +936,15 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
 
   useEffect(() => {
     const userRoleLower = String(rootAuth?.role || '').toLowerCase();
-    if (userRoleLower === 'director' || userRoleLower === 'admin') {
+    const profileRoleLower = String(host.role || '').toLowerCase();
+    
+    if (
+      userRoleLower === 'director' || 
+      userRoleLower === 'admin' ||
+      profileRoleLower === 'head admin' ||
+      profileRoleLower === 'head_admin' ||
+      profileRoleLower === 'admin'
+    ) {
       const fetchAllUsers = async () => {
         try {
           const list = await FirebaseService.getAllRoleMetadata();
@@ -947,7 +955,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
       };
       fetchAllUsers();
     }
-  }, []);
+  }, [host.role, rootAuth?.role]);
 
   useEffect(() => {
     const profileRoleLower = String(host.role || '').toLowerCase();
@@ -2601,7 +2609,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
 
   const [editLevel, setEditLevel] = useState<number>(host.level || 1);
   const [isProcessingPhoto, setIsProcessingPhoto] = useState(false);
-  const [managersList, setManagersList] = useState<{ id: string; name: string; photoUrl?: string }[]>([]);
+  const [managersList, setManagersList] = useState<any[]>([]);
 
   const assignedManager = useMemo(() => {
     const managerId = host.assignedManagerId || host.assigned_manager_poppo_id;
@@ -3100,6 +3108,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
         const mgrs = allHosts
           .filter(h => (h.role || '').toLowerCase() === 'manager' || (h.role || '').toLowerCase() === 'agent')
           .map(h => ({
+            ...h,
             id: h.id || (h as any).poppoId || (h as any).poppo_id,
             name: h.nickname || h.name || h.id,
             photoUrl: h.photoUrl
@@ -4816,12 +4825,14 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
           )}
 
           {/* Host Public Message */}
-          <div className="pt-2 border-t border-white/5 space-y-1.5">
-            <span className="text-[9px] font-black text-white/40 uppercase tracking-widest block">Host Public Message</span>
-            <p className="text-xs text-[#A09E9A] leading-relaxed italic whitespace-pre-wrap bg-black/20 p-3 rounded-xl border border-white/5">
-              "{String(host.bio || host.description || 'No public message set.').slice(0, 100)}"
-            </p>
-          </div>
+          {String(host.bio || host.description || '').trim() && (
+            <div className="pt-2 border-t border-white/5 space-y-1.5">
+              <span className="text-[9px] font-black text-white/40 uppercase tracking-widest block">Host Public Message</span>
+              <p className="text-xs text-[#A09E9A] leading-relaxed italic whitespace-pre-wrap bg-black/20 p-3 rounded-xl border border-white/5">
+                "{String(host.bio || host.description).trim().slice(0, 100)}"
+              </p>
+            </div>
+          )}
 
         </div>
       </div>
@@ -6866,6 +6877,354 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
     );
   };
 
+  const renderHeadAdminReportsTo = () => {
+    const directorUser = allUsers.find(u => String(u.role || '').toLowerCase() === 'director');
+    const headAdminNickname = host.nickname || host.name || 'Unnamed';
+
+    return (
+      <div className="bg-[#1A140A]/80 backdrop-blur-xl border border-[#D4AF37]/20 p-5 rounded-3xl transition-all duration-300 hover:border-[#D4AF37]/50 group shadow-[0_0_15px_rgba(212,175,55,0.15)] space-y-4">
+        <h4 className="text-[10px] font-black uppercase tracking-widest text-[#A09E9A] border-b border-white/5 pb-2">
+          Reports To:
+        </h4>
+        {directorUser ? (
+          <div 
+            className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity p-2 rounded-xl bg-white/[0.02] border border-white/5"
+            onClick={() => setSpotlightHost(directorUser)}
+          >
+            {directorUser.photoUrl ? (
+              <img src={directorUser.photoUrl} alt="Director" className="w-14 h-14 rounded-full object-cover border-2 border-[#D4AF37]/30 shadow-inner" referrerPolicy="no-referrer" />
+            ) : (
+              <div className="w-14 h-14 rounded-full bg-gradient-to-br from-black/80 to-black border-2 border-[#D4AF37]/30 flex items-center justify-center text-xl font-black text-[#D4AF37]">
+                {(directorUser.nickname || directorUser.name || 'D')[0].toUpperCase()}
+              </div>
+            )}
+            <div className="flex flex-col">
+              <span className="text-[10px] font-black uppercase tracking-widest text-[#D4AF37]">Director</span>
+              <span className="text-sm font-bold text-[#F0EFE8]">{directorUser.nickname || directorUser.name}</span>
+            </div>
+          </div>
+        ) : (
+          <p className="text-xs text-[#A09E9A]/60 italic">Director profile not found.</p>
+        )}
+
+        <div className="pt-4 mt-2 border-t border-white/5 space-y-3">
+          <h3 className="text-sm font-black">
+            <span className="text-[#D4AF37]">{headAdminNickname}'s Position:</span> <span className="text-[#F0EFE8]">Head of Operations</span>
+          </h3>
+          <div className="bg-black/20 p-4 rounded-xl border border-white/5">
+            <h5 className="text-[9px] font-black uppercase tracking-widest text-[#D4AF37] mb-2">Role Description</h5>
+            <p className="text-sm font-medium text-[#F0EFE8]/90 leading-relaxed">
+              Leads daily agency operations and oversees all Agents and Managers to keep teams running smoothly. Handles escalations, high-level issues, and account troubleshooting through direct access to Poppo Live admins. Ensures structure, compliance, and efficient day-to-day performance.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderGrid = (title: string, list: any[], colorClass: string, bgClass: string, borderClass: string) => (
+    <div className={cn("p-4 rounded-2xl border backdrop-blur-md shadow-inner space-y-4", bgClass, borderClass)}>
+      <div className="flex items-center justify-between border-b border-white/5 pb-2">
+        <h4 className={cn("text-[10px] font-black uppercase tracking-widest", colorClass)}>{title}</h4>
+        <span className={cn("px-2 py-0.5 text-[8px] font-black rounded-full uppercase tracking-widest border", colorClass, bgClass, borderClass)}>
+          {list.length} Total
+        </span>
+      </div>
+      {list.length === 0 ? (
+        <p className="text-xs text-[#A09E9A]/40 italic py-4 text-center">No profiles found.</p>
+      ) : (
+        <div className="grid grid-cols-4 gap-3">
+          {list.map((u, idx) => {
+            const nickname = u.nickname || u.name || 'Unnamed';
+            return (
+              <div key={u.id || idx} className="flex flex-col gap-2">
+                <div
+                  onClick={() => setSpotlightHost(u)}
+                  className="relative overflow-hidden flex items-center justify-center rounded-xl border border-white/10 bg-gradient-to-br from-[#1E2838] to-[#0E131C] w-full h-[76px] transition-all duration-300 hover:-translate-y-0.5 hover:border-white/20 cursor-pointer select-none"
+                  title={`View ${nickname}`}
+                >
+                  {u.photoUrl ? (
+                    <img src={u.photoUrl} alt={nickname} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-xl text-[#A09E9A] font-black">
+                      {nickname[0]?.toUpperCase() || 'U'}
+                    </div>
+                  )}
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-xs font-bold text-[#F0EFE8] truncate">{nickname}</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+
+  const renderRoleSupervision = () => {
+    const managers = allUsers.filter(u => String(u.role || '').toLowerCase() === 'manager');
+    const agents = allUsers.filter(u => String(u.role || '').toLowerCase() === 'agent');
+    const admins = allUsers.filter(u => String(u.role || '').toLowerCase() === 'admin');
+    const hosts = allUsers.filter(u => {
+      const r = String(u.role || '').toLowerCase();
+      const s = String(u.status || '').toLowerCase();
+      return (r === 'host' || r === 'talent') && s !== 'released';
+    });
+
+    return (
+      <div className="bg-[#1A140A]/80 backdrop-blur-xl border border-[#D4AF37]/20 p-5 rounded-3xl transition-all duration-300 hover:border-[#D4AF37]/50 group shadow-[0_0_15px_rgba(212,175,55,0.15)] space-y-6">
+        <h3 className="text-sm font-black uppercase tracking-widest text-[#D4AF37] border-b border-[#D4AF37]/20 pb-3">
+          Role Oversight & Supervision
+        </h3>
+        
+        {renderGrid('Managers', managers, 'text-emerald-400', 'bg-emerald-500/10', 'border-emerald-500/30')}
+        {renderGrid('Agents', agents, 'text-indigo-400', 'bg-indigo-500/10', 'border-indigo-500/30')}
+        {renderGrid('Admins', admins, 'text-purple-400', 'bg-purple-500/10', 'border-purple-500/30')}
+        {renderGrid('Hosts', hosts, 'text-[#D4AF37]', 'bg-[#D4AF37]/10', 'border-[#D4AF37]/30')}
+      </div>
+    );
+  };
+
+  const renderAdminReportsTo = () => {
+    const directorUser = allUsers.find(u => String(u.role || '').toLowerCase() === 'director');
+    const headAdminUser = allUsers.find(u => String(u.role || '').toLowerCase() === 'head admin' || String(u.role || '').toLowerCase() === 'head_admin');
+    const adminNickname = host.nickname || host.name || 'Unnamed';
+
+    return (
+      <div className="bg-[#1A140A]/80 backdrop-blur-xl border border-[#D4AF37]/20 p-5 rounded-3xl transition-all duration-300 hover:border-[#D4AF37]/50 group shadow-[0_0_15px_rgba(212,175,55,0.15)] space-y-4">
+        <h4 className="text-[10px] font-black uppercase tracking-widest text-[#A09E9A] border-b border-white/5 pb-2">
+          Reports To:
+        </h4>
+        
+        <div className="grid grid-cols-2 gap-4">
+          {directorUser ? (
+            <div 
+              className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity p-2 rounded-xl bg-white/[0.02] border border-white/5"
+              onClick={() => setSpotlightHost(directorUser)}
+            >
+              {directorUser.photoUrl ? (
+                <img src={directorUser.photoUrl} alt="Director" className="w-14 h-14 rounded-full object-cover border-2 border-[#D4AF37]/30 shadow-inner" referrerPolicy="no-referrer" />
+              ) : (
+                <div className="w-14 h-14 rounded-full bg-gradient-to-br from-black/80 to-black border-2 border-[#D4AF37]/30 flex items-center justify-center text-xl font-black text-[#D4AF37]">
+                  {(directorUser.nickname || directorUser.name || 'D')[0].toUpperCase()}
+                </div>
+              )}
+              <div className="flex flex-col overflow-hidden">
+                <span className="text-[10px] font-black uppercase tracking-widest text-[#D4AF37]">Director</span>
+                <span className="text-sm font-bold text-[#F0EFE8] truncate">{directorUser.nickname || directorUser.name}</span>
+              </div>
+            </div>
+          ) : (
+            <p className="text-xs text-[#A09E9A]/60 italic p-2">Director profile not found.</p>
+          )}
+
+          {headAdminUser ? (
+            <div 
+              className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity p-2 rounded-xl bg-white/[0.02] border border-white/5"
+              onClick={() => setSpotlightHost(headAdminUser)}
+            >
+              {headAdminUser.photoUrl ? (
+                <img src={headAdminUser.photoUrl} alt="Head Admin" className="w-14 h-14 rounded-full object-cover border-2 border-[#D4AF37]/30 shadow-inner" referrerPolicy="no-referrer" />
+              ) : (
+                <div className="w-14 h-14 rounded-full bg-gradient-to-br from-black/80 to-black border-2 border-[#D4AF37]/30 flex items-center justify-center text-xl font-black text-indigo-400">
+                  {(headAdminUser.nickname || headAdminUser.name || 'H')[0].toUpperCase()}
+                </div>
+              )}
+              <div className="flex flex-col overflow-hidden">
+                <span className="text-[10px] font-black uppercase tracking-widest text-indigo-400">Head Admin</span>
+                <span className="text-sm font-bold text-[#F0EFE8] truncate">{headAdminUser.nickname || headAdminUser.name}</span>
+              </div>
+            </div>
+          ) : (
+            <p className="text-xs text-[#A09E9A]/60 italic p-2">Head Admin profile not found.</p>
+          )}
+        </div>
+
+        <div className="pt-4 mt-2 border-t border-white/5 space-y-3">
+          <h3 className="text-sm font-black">
+            <span className="text-[#D4AF37]">{adminNickname}'s Position:</span> <span className="text-[#F0EFE8]">Agency Admin</span>
+          </h3>
+          <div className="bg-black/20 p-4 rounded-xl border border-white/5">
+            <h5 className="text-[9px] font-black uppercase tracking-widest text-[#D4AF37] mb-2">Role Description</h5>
+            <p className="text-sm font-medium text-[#F0EFE8]/90 leading-relaxed">
+              Responsible for daily reporting of all hosts' livestream data for growth tracking. Manages accurate data entry, including Fanbase Health metrics, event creation, and attendance logs, ensuring all host records stay updated and organized. Also handles events promotion inside the platform's fanclub group chat feature.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderAdminRoleSupervision = () => {
+    const hosts = allUsers.filter(u => {
+      const r = String(u.role || '').toLowerCase();
+      const s = String(u.status || '').toLowerCase();
+      return (r === 'host' || r === 'talent') && s !== 'released';
+    });
+
+    return (
+      <div className="bg-[#1A140A]/80 backdrop-blur-xl border border-[#D4AF37]/20 p-5 rounded-3xl transition-all duration-300 hover:border-[#D4AF37]/50 group shadow-[0_0_15px_rgba(212,175,55,0.15)] space-y-6">
+        <h3 className="text-sm font-black uppercase tracking-widest text-[#D4AF37] border-b border-[#D4AF37]/20 pb-3">
+          Role Oversight & Supervision
+        </h3>
+        
+        <div className="p-4 rounded-2xl border backdrop-blur-md shadow-inner space-y-4 bg-[#D4AF37]/5 border-[#D4AF37]/20">
+          <div className="flex items-center justify-between border-b border-white/5 pb-2">
+            <h4 className="text-[10px] font-black uppercase tracking-widest text-[#D4AF37]">Hosts</h4>
+            <span className="px-2 py-0.5 text-[8px] font-black rounded-full uppercase tracking-widest border text-[#D4AF37] bg-[#D4AF37]/10 border-[#D4AF37]/30">
+              {hosts.length} Total
+            </span>
+          </div>
+          {hosts.length === 0 ? (
+            <p className="text-xs text-[#A09E9A]/40 italic py-4 text-center">No profiles found.</p>
+          ) : (
+            <div className="grid grid-cols-4 gap-3">
+              {hosts.map((u, idx) => {
+                const nickname = u.nickname || u.name || 'Unnamed';
+                return (
+                  <div key={u.id || idx} className="flex flex-col gap-2">
+                    <div
+                      onClick={() => setSpotlightHost(u)}
+                      className="relative overflow-hidden flex items-center justify-center rounded-xl border border-white/10 bg-gradient-to-br from-[#1E2838] to-[#0E131C] w-full h-[76px] transition-all duration-300 hover:-translate-y-0.5 hover:border-white/20 cursor-pointer select-none"
+                      title={`View ${nickname}`}
+                    >
+                      {u.photoUrl ? (
+                        <img src={u.photoUrl} alt={nickname} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-xl text-[#A09E9A] font-black">
+                          {nickname[0]?.toUpperCase() || 'U'}
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-xs font-bold text-[#F0EFE8] truncate">{nickname}</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  const renderManagerAgentReportsTo = () => {
+    const directorUser = allUsers.find(u => String(u.role || '').toLowerCase() === 'director');
+    const headAdminUser = allUsers.find(u => String(u.role || '').toLowerCase() === 'head admin' || String(u.role || '').toLowerCase() === 'head_admin');
+    const roleNickname = host.nickname || host.name || 'Unnamed';
+    const displayRole = (host.role || 'Manager').charAt(0).toUpperCase() + (host.role || 'Manager').slice(1).toLowerCase();
+
+    return (
+      <div className="bg-[#1A140A]/80 backdrop-blur-xl border border-[#D4AF37]/20 p-5 rounded-3xl transition-all duration-300 hover:border-[#D4AF37]/50 group shadow-[0_0_15px_rgba(212,175,55,0.15)] space-y-4">
+        <h4 className="text-[10px] font-black uppercase tracking-widest text-[#A09E9A] border-b border-white/5 pb-2">
+          Reports To:
+        </h4>
+        
+        <div className="grid grid-cols-2 gap-4">
+          {directorUser ? (
+            <div 
+              className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity p-2 rounded-xl bg-white/[0.02] border border-white/5"
+              onClick={() => setSpotlightHost(directorUser)}
+            >
+              {directorUser.photoUrl ? (
+                <img src={directorUser.photoUrl} alt="Director" className="w-14 h-14 rounded-full object-cover border-2 border-[#D4AF37]/30 shadow-inner" referrerPolicy="no-referrer" />
+              ) : (
+                <div className="w-14 h-14 rounded-full bg-gradient-to-br from-black/80 to-black border-2 border-[#D4AF37]/30 flex items-center justify-center text-xl font-black text-[#D4AF37]">
+                  {(directorUser.nickname || directorUser.name || 'D')[0].toUpperCase()}
+                </div>
+              )}
+              <div className="flex flex-col overflow-hidden">
+                <span className="text-[10px] font-black uppercase tracking-widest text-[#D4AF37]">Director</span>
+                <span className="text-sm font-bold text-[#F0EFE8] truncate">{directorUser.nickname || directorUser.name}</span>
+              </div>
+            </div>
+          ) : (
+            <p className="text-xs text-[#A09E9A]/60 italic p-2">Director profile not found.</p>
+          )}
+
+          {headAdminUser ? (
+            <div 
+              className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity p-2 rounded-xl bg-white/[0.02] border border-white/5"
+              onClick={() => setSpotlightHost(headAdminUser)}
+            >
+              {headAdminUser.photoUrl ? (
+                <img src={headAdminUser.photoUrl} alt="Head Admin" className="w-14 h-14 rounded-full object-cover border-2 border-[#D4AF37]/30 shadow-inner" referrerPolicy="no-referrer" />
+              ) : (
+                <div className="w-14 h-14 rounded-full bg-gradient-to-br from-black/80 to-black border-2 border-[#D4AF37]/30 flex items-center justify-center text-xl font-black text-indigo-400">
+                  {(headAdminUser.nickname || headAdminUser.name || 'H')[0].toUpperCase()}
+                </div>
+              )}
+              <div className="flex flex-col overflow-hidden">
+                <span className="text-[10px] font-black uppercase tracking-widest text-indigo-400">Head Admin</span>
+                <span className="text-sm font-bold text-[#F0EFE8] truncate">{headAdminUser.nickname || headAdminUser.name}</span>
+              </div>
+            </div>
+          ) : (
+            <p className="text-xs text-[#A09E9A]/60 italic p-2">Head Admin profile not found.</p>
+          )}
+        </div>
+
+        <div className="pt-4 mt-2 border-t border-white/5 space-y-3">
+          <h3 className="text-sm font-black">
+            <span className="text-[#D4AF37]">{roleNickname}'s Position:</span> <span className="text-[#F0EFE8]">{displayRole}</span>
+          </h3>
+          <div className="bg-black/20 p-4 rounded-xl border border-white/5">
+            <h5 className="text-[9px] font-black uppercase tracking-widest text-[#D4AF37] mb-2">Role Description</h5>
+            <p className="text-sm font-medium text-[#F0EFE8]/90 leading-relaxed">
+              Oversees the growth of their assigned hosts through close, one-on-one guidance. Serves as the primary contact for their team and ensures hosts receive steady exposure opportunities. Actively watches over their hosts during livestreams to safeguard them, provide real-time support, and handle any situations that require attention.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderDirectorPosition = () => {
+    const directorNickname = host.nickname || host.name || 'Unnamed';
+
+    return (
+      <div className="bg-[#1A140A]/80 backdrop-blur-xl border border-[#D4AF37]/20 p-5 rounded-3xl transition-all duration-300 hover:border-[#D4AF37]/50 group shadow-[0_0_15px_rgba(212,175,55,0.15)] space-y-4">
+        <h3 className="text-sm font-black">
+          <span className="text-[#D4AF37]">{directorNickname}'s Position:</span> <span className="text-[#F0EFE8]">Founder & Director</span>
+        </h3>
+        <div className="bg-black/20 p-4 rounded-xl border border-white/5">
+          <h5 className="text-[9px] font-black uppercase tracking-widest text-[#D4AF37] mb-2">Role Description</h5>
+          <p className="text-sm font-medium text-[#F0EFE8]/90 leading-relaxed">
+            Serves as the agency's primary decision-maker for all operational and strategic matters. Plans and organizes exposure-driven events, sets direction, and ensures every host has the tools, resources, and support needed for growth. Oversees overall agency performance and maintains the standards, structure, and vision that guide the entire organization.
+          </p>
+        </div>
+      </div>
+    );
+  };
+
+  const renderDirectorRoleSupervision = () => {
+    const headAdmins = allUsers.filter(u => String(u.role || '').toLowerCase() === 'head admin' || String(u.role || '').toLowerCase() === 'head_admin');
+    const managers = allUsers.filter(u => String(u.role || '').toLowerCase() === 'manager');
+    const agents = allUsers.filter(u => String(u.role || '').toLowerCase() === 'agent');
+    const admins = allUsers.filter(u => String(u.role || '').toLowerCase() === 'admin');
+    const hosts = allUsers.filter(u => {
+      const r = String(u.role || '').toLowerCase();
+      const s = String(u.status || '').toLowerCase();
+      return (r === 'host' || r === 'talent') && s !== 'released';
+    });
+
+    return (
+      <div className="bg-[#1A140A]/80 backdrop-blur-xl border border-[#D4AF37]/20 p-5 rounded-3xl transition-all duration-300 hover:border-[#D4AF37]/50 group shadow-[0_0_15px_rgba(212,175,55,0.15)] space-y-6">
+        <h3 className="text-sm font-black uppercase tracking-widest text-[#D4AF37] border-b border-[#D4AF37]/20 pb-3">
+          Role Oversight & Supervision
+        </h3>
+        
+        {renderGrid('Head Admins', headAdmins, 'text-pink-400', 'bg-pink-500/10', 'border-pink-500/30')}
+        {renderGrid('Managers', managers, 'text-emerald-400', 'bg-emerald-500/10', 'border-emerald-500/30')}
+        {renderGrid('Agents', agents, 'text-indigo-400', 'bg-indigo-500/10', 'border-indigo-500/30')}
+        {renderGrid('Admins', admins, 'text-purple-400', 'bg-purple-500/10', 'border-purple-500/30')}
+        {renderGrid('Hosts', hosts, 'text-[#D4AF37]', 'bg-[#D4AF37]/10', 'border-[#D4AF37]/30')}
+      </div>
+    );
+  };
+
   const profileOwnerRole = String(host.role || '').toLowerCase();
   const isNonHostRole = ['admin', 'manager', 'agent', 'head admin', 'head_admin', 'director'].includes(profileOwnerRole);
 
@@ -6917,12 +7276,33 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
       ) : profileOwnerRole === 'director' ? (
         <div className={cn("mx-auto w-full pt-1 space-y-4", (!onClose && (loggedInUserRole === 'director' || loggedInUserRole === 'head admin' || loggedInUserRole === 'head_admin')) ? "max-w-4xl" : "max-w-xl")}>
           {renderIdentityCard()}
+          {isSpotlight && renderDirectorPosition()}
+          {isSpotlight && renderDirectorRoleSupervision()}
+          {!isSpotlight && String(rootAuth?.role || '').toLowerCase() === 'director' && renderImpersonationBlock()}
+          {!onClose && (loggedInUserRole === 'director' || loggedInUserRole === 'head admin' || loggedInUserRole === 'head_admin') && renderBadgeAndTaskAssignment()}
+        </div>
+      ) : (profileOwnerRole === 'head admin' || profileOwnerRole === 'head_admin') ? (
+        <div className={cn("mx-auto w-full pt-1 space-y-4", (!onClose && (loggedInUserRole === 'director' || loggedInUserRole === 'head admin' || loggedInUserRole === 'head_admin')) ? "max-w-4xl" : "max-w-xl")}>
+          {renderIdentityCard()}
+          {renderHeadAdminReportsTo()}
+          {renderRoleSupervision()}
+          {!isSpotlight && String(rootAuth?.role || '').toLowerCase() === 'director' && renderImpersonationBlock()}
+          {!onClose && (loggedInUserRole === 'director' || loggedInUserRole === 'head admin' || loggedInUserRole === 'head_admin') && renderBadgeAndTaskAssignment()}
+        </div>
+      ) : profileOwnerRole === 'admin' ? (
+        <div className={cn("mx-auto w-full pt-1 space-y-4", (String(rootAuth?.role || '').toLowerCase() === 'admin' || (!onClose && (loggedInUserRole === 'director' || loggedInUserRole === 'head admin' || loggedInUserRole === 'head_admin'))) ? "max-w-4xl" : "max-w-xl")}>
+          {renderIdentityCard()}
+          {renderAdminReportsTo()}
+          {renderAdminRoleSupervision()}
+          {String(rootAuth?.role || '').toLowerCase() === 'admin' && renderAdminFanbaseReportSection()}
+          {String(rootAuth?.role || '').toLowerCase() === 'admin' && renderAdminsLogSection()}
           {!isSpotlight && String(rootAuth?.role || '').toLowerCase() === 'director' && renderImpersonationBlock()}
           {!onClose && (loggedInUserRole === 'director' || loggedInUserRole === 'head admin' || loggedInUserRole === 'head_admin') && renderBadgeAndTaskAssignment()}
         </div>
       ) : isNonHostRole ? (
         <div className={cn("mx-auto w-full pt-1 space-y-4", (String(rootAuth?.role || '').toLowerCase() === 'admin' || (!onClose && (loggedInUserRole === 'director' || loggedInUserRole === 'head admin' || loggedInUserRole === 'head_admin'))) ? "max-w-4xl" : "max-w-xl")}>
           {renderIdentityCard()}
+          {['manager', 'agent'].includes(profileOwnerRole) && renderManagerAgentReportsTo()}
           {renderAssignedHostsSection()}
           {renderIntakeSection()}
           {renderProgressNotes()}
