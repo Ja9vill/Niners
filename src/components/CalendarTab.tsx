@@ -12,18 +12,7 @@ import { EVENT_COLORS, TIMESLOTS } from '../lib/constants';
 import { collection, getDocs, doc, setDoc, Timestamp } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 
-const TIMEZONES = [
-  { label: 'Philippines (Manila)', value: 'Asia/Manila' },
-  { label: 'Cali (Pacific)', value: 'America/Los_Angeles' },
-  { label: 'Chicago (Central)', value: 'America/Chicago' },
-  { label: 'NYC (Eastern)', value: 'America/New_York' },
-  { label: 'UK (London)', value: 'Europe/London' },
-  { label: 'Nigeria (Lagos)', value: 'Africa/Lagos' },
-  { label: 'Pakistan (Karachi)', value: 'Asia/Karachi' },
-  { label: 'Nepal (Kathmandu)', value: 'Asia/Kathmandu' },
-  { label: 'HongKong', value: 'Asia/Hong_Kong' },
-  { label: 'Brazil (Sao Paulo)', value: 'America/Sao_Paulo' },
-];
+
 
 const TIMESLOT_BLOCKS = [
   {
@@ -67,7 +56,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [events, setEvents] = useState<CalendarEvent[]>(Storage.getEvents());
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
-  const [selectedTimezone, setSelectedTimezone] = useState(TIMEZONES[0].value);
+  const [timeDisplayMode, setTimeDisplayMode] = useState<'Manila' | 'Local'>('Manila');
   
   // Modals States
   const [isAdding, setIsAdding] = useState(false);
@@ -797,6 +786,33 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
     return new Date(isoString);
   };
 
+  const formatTimeRangeToLocal = (dateStr: string, timeStr: string) => {
+    const startParsed = getEventTimeParsed(dateStr, timeStr, true);
+    const endParsed = getEventTimeParsed(dateStr, timeStr, false);
+    
+    const formatOpts: Intl.DateTimeFormatOptions = { hour: '2-digit', minute: '2-digit', hour12: true };
+    const localStart = startParsed.toLocaleTimeString([], formatOpts);
+
+    // Get strictly local date strings
+    const localYear = startParsed.getFullYear();
+    const localMonth = String(startParsed.getMonth() + 1).padStart(2, '0');
+    const localDay = String(startParsed.getDate()).padStart(2, '0');
+    const localDateStr = `${localYear}-${localMonth}-${localDay}`;
+    
+    let dateLabel = '';
+    if (localDateStr !== dateStr) {
+      const formattedLocalDate = startParsed.toLocaleDateString([], { month: 'short', day: 'numeric' });
+      dateLabel = ` [${formattedLocalDate}]`;
+    }
+
+    if (!timeStr.includes('-')) {
+        return `${localStart}${dateLabel} (Local Time)`;
+    }
+
+    const localEnd = endParsed.toLocaleTimeString([], formatOpts);
+    return `${localStart} - ${localEnd}${dateLabel} (Local Time)`;
+  };
+
   const canModifyEvent = !isReadOnly && selectedEvent && (
     ['director', 'head admin', 'head_admin'].includes(String(auth?.role || '').toLowerCase()) ||
     String(auth?.poppo_id || auth?.id || '') === String(selectedEvent.created_by_id)
@@ -1158,18 +1174,18 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
               </div>
               
               <div className="flex items-center gap-2">
-                <Globe size={14} className="text-[#D4AF37]" />
-                <select 
-                  title="Select timezone"
-                  aria-label="Select timezone"
-                  value={selectedTimezone}
-                  onChange={(e) => setSelectedTimezone(e.target.value)}
-                  className="bg-black/20 border border-[#D4AF37]/20 rounded-lg px-2 py-1 text-[10px] font-bold text-white/80 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37]/35 outline-none cursor-pointer tracking-widest uppercase appearance-none"
+                <button
+                  onClick={() => setTimeDisplayMode('Manila')}
+                  className={cn("btn-capsule-gold", timeDisplayMode === 'Manila' && "active")}
                 >
-                  {TIMEZONES.map(tz => (
-                    <option key={tz.value} value={tz.value} className="bg-[#0e0a08] text-[#F0EFE8]">{tz.label}</option>
-                  ))}
-                </select>
+                  Manila Time
+                </button>
+                <button
+                  onClick={() => setTimeDisplayMode('Local')}
+                  className={cn("btn-capsule-gold", timeDisplayMode === 'Local' && "active")}
+                >
+                  Local Time
+                </button>
               </div>
             </div>
 
@@ -1181,9 +1197,9 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                   const colorConfig = EVENT_COLORS[e.type || ''] || { text: 'text-[#D4AF37]', bg: 'bg-[#D4AF37]/10', gradient: 'from-[#D4AF37] to-[#b8960c]' };
                   
                   // For the timezone display mock
-                  const timezoneLabel = TIMEZONES.find(t => t.value === selectedTimezone)?.label.split(' ')[0] || '';
-                  const rawTime = e.time.replace(' (Manila Time)', '');
-                  const displayTime = selectedTimezone === 'Asia/Manila' ? e.time : `${rawTime} (${timezoneLabel} Time)`;
+                  const displayTime = timeDisplayMode === 'Manila' 
+                    ? e.time 
+                    : formatTimeRangeToLocal(e.date || e.event_date || '', e.time || '');
 
                   const startTimeParsed = getEventTimeParsed(e.date || e.event_date || '', e.time || '', true);
                   const isOngoingOrPast = new Date() >= startTimeParsed;
@@ -1209,7 +1225,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                                 ev.stopPropagation();
                                 handleAttendanceClick(e);
                               }}
-                              className="px-3.5 py-1.5 border border-[#D4AF37]/30 bg-gradient-to-r from-[#D4AF37]/20 to-[#D4AF37]/5 text-[#D4AF37] hover:from-[#D4AF37]/30 hover:border-[#D4AF37]/50 font-black text-[10px] uppercase tracking-widest rounded-xl transition-all active:scale-[0.99] cursor-pointer z-10 shrink-0 shadow-md shadow-[#D4AF37]/5"
+                              className="btn-capsule-gold z-10 shrink-0"
                             >
                               Attendance
                             </button>
@@ -1262,7 +1278,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
         {isAdding && (
           <div className="fixed inset-0 z-[1000] flex items-center justify-center p-6">
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsAdding(false)} className="absolute inset-0 bg-black/20 backdrop-blur-sm" />
-            <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="relative bg-black/20 border border-[#D4AF37]/20 w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl z-10 max-h-[90vh] overflow-y-auto custom-scrollbar">
+            <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="relative glass-card w-full max-w-lg rounded-3xl overflow-hidden z-10 max-h-[90vh] overflow-y-auto custom-scrollbar p-0">
               <div className="p-6 border-b border-[#D4AF37]/20 font-black text-white uppercase tracking-widest text-[10px]">Schedule New Calendar Event</div>
               <div className="p-6">
                 <AddEventForm 
@@ -1284,7 +1300,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
         {isReservingLivehouse && (
           <div className="fixed inset-0 z-[1000] flex items-center justify-center p-6">
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsReservingLivehouse(false)} className="absolute inset-0 bg-black/20 backdrop-blur-sm" />
-            <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="relative bg-black/20 border border-[#D4AF37]/20 w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl z-10 max-h-[90vh] overflow-y-auto custom-scrollbar">
+            <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="relative glass-card w-full max-w-lg rounded-3xl overflow-hidden z-10 max-h-[90vh] overflow-y-auto custom-scrollbar p-0">
               <div className="p-6 border-b border-[#D4AF37]/20 font-black text-white uppercase tracking-widest text-[10px]">SCHEDULE LIVEHOUSE</div>
               <form onSubmit={handleReserveLivehouse} className="p-6 space-y-5">
                 
@@ -1295,7 +1311,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                       id="res-poppo-id"
                       disabled 
                       value={auth.poppo_id} 
-                      className="w-full bg-[#0c0806] border border-[#D4AF37]/15 rounded-xl px-4 py-3 text-sm text-[#A09E9A]/60 cursor-not-allowed outline-none" 
+                      className="w-full glass-input text-xs cursor-not-allowed opacity-50" 
                     />
                   </div>
                   <div className="space-y-1.5">
@@ -1304,7 +1320,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                       id="res-host-name"
                       disabled 
                       value={auth.nickname || auth.name} 
-                      className="w-full bg-[#0c0806] border border-[#D4AF37]/15 rounded-xl px-4 py-3 text-sm text-[#A09E9A]/60 cursor-not-allowed outline-none" 
+                      className="w-full glass-input text-xs cursor-not-allowed opacity-50" 
                     />
                   </div>
                 </div>
@@ -1317,7 +1333,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                       value={selectedLivehouseType}
                       onChange={(e) => setSelectedLivehouseType(e.target.value as any)}
                       title="Livehouse Type" 
-                      className="w-full bg-[#0e0a08]/90 border border-[#D4AF37]/15 rounded-xl px-4 py-3 text-sm focus:border-[#D4AF37] outline-none text-[#F0EFE8] font-bold cursor-pointer"
+                      className="w-full glass-input text-xs font-bold cursor-pointer appearance-none"
                     >
                       <option value="SOLO LIVEHOUSE" className="bg-[#0e0a08] text-[#F0EFE8]">SOLO LIVEHOUSE</option>
                       <option value="PARTY LIVEHOUSE" className="bg-[#0e0a08] text-[#F0EFE8]">PARTY LIVEHOUSE</option>
@@ -1423,9 +1439,8 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                     id="reserve-notes" 
                     value={reserveNotes} 
                     onChange={(e) => setReserveNotes(e.target.value)} 
-                    title="Reservation Notes" 
-                    className="w-full bg-[#0e0a08]/90 border border-[#D4AF37]/15 rounded-xl p-4 text-sm focus:border-[#D4AF37] outline-none text-[#F0EFE8] h-24 resize-none placeholder-white/20" 
-                    placeholder="Provide details for your livehouse set..." 
+                    placeholder="e.g. Any specific requests for the livehouse?" 
+                    className="w-full glass-input text-xs min-h-[100px] resize-none"
                   />
                 </div>
 
@@ -1455,7 +1470,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
               initial={{ scale: 0.95, opacity: 0, y: 20 }} 
               animate={{ scale: 1, opacity: 1, y: 0 }} 
               exit={{ scale: 0.95, opacity: 0, y: 20 }} 
-              className="relative w-full max-w-2xl bg-black/20 border border-[#D4AF37]/20 rounded-3xl shadow-[0_0_50px_rgba(212,175,55,0.1)] z-10 max-h-[90vh] overflow-hidden flex flex-col"
+              className="relative w-full max-w-2xl glass-card z-10 max-h-[90vh] overflow-hidden flex flex-col p-0"
             >
               <div className="absolute inset-0 bg-gradient-to-tr from-[#D4AF37]/5 via-transparent to-orange-500/5 pointer-events-none" />
               
@@ -1489,7 +1504,8 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                         value={editTitle}
                         onChange={(e) => setEditTitle(e.target.value)}
                         required
-                        className="w-full bg-[#0A0B0E] border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] outline-none"
+                        disabled
+                        className="w-full glass-input text-xs cursor-not-allowed opacity-50"
                         placeholder="e.g. Host PK Battle"
                       />
                     </div>
@@ -1500,7 +1516,8 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                         <select
                           value={editType}
                           onChange={(e) => setEditType(e.target.value)}
-                          className="w-full bg-[#0A0B0E] border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] outline-none"
+                          disabled
+                          className="w-full glass-input text-xs cursor-not-allowed opacity-50 appearance-none"
                         >
                           <option value="SOLO LIVEHOUSE">SOLO LIVEHOUSE</option>
                           <option value="PARTY LIVEHOUSE">PARTY LIVEHOUSE</option>
@@ -1516,7 +1533,8 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                           value={editDate}
                           onChange={(e) => setEditDate(e.target.value)}
                           required
-                          className="w-full bg-[#0A0B0E] border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] outline-none"
+                          disabled
+                          className="w-full glass-input text-xs cursor-not-allowed opacity-50"
                         />
                       </div>
                     </div>
@@ -1529,7 +1547,8 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                           value={editTime}
                           onChange={(e) => setEditTime(e.target.value)}
                           required
-                          className="w-full bg-[#0A0B0E] border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] outline-none"
+                          disabled
+                          className="w-full glass-input text-xs cursor-not-allowed opacity-50"
                           placeholder="e.g. 09:00 AM - 10:00 AM (Manila Time)"
                         />
                       </div>
@@ -1541,7 +1560,8 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                           value={editLocation}
                           onChange={(e) => setEditLocation(e.target.value)}
                           required
-                          className="w-full bg-[#0A0B0E] border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] outline-none"
+                          disabled
+                          className="w-full glass-input text-xs cursor-not-allowed opacity-50"
                           placeholder="e.g. Virtual Room"
                         />
                       </div>
@@ -1552,7 +1572,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                       <textarea
                         value={editDescription}
                         onChange={(e) => setEditDescription(e.target.value)}
-                        className="w-full bg-[#0A0B0E] border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] outline-none min-h-[100px]"
+                        className="w-full glass-input text-xs min-h-[100px] resize-none"
                         placeholder="Add details about this event..."
                       />
                     </div>
@@ -1570,12 +1590,12 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                           value={editParticipantSearch}
                           onChange={(e) => setEditParticipantSearch(e.target.value)}
                           placeholder="Search nickname or poppoId..."
-                          className="flex-1 bg-[#0A0B0E] border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:border-[#D4AF37] outline-none"
+                          className="flex-1 glass-input text-xs px-3 py-2"
                         />
                         <select
                           value={editParticipantRoleFilter}
                           onChange={(e) => setEditParticipantRoleFilter(e.target.value)}
-                          className="bg-[#0A0B0E] border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:border-[#D4AF37] outline-none"
+                          className="glass-input text-xs px-3 py-2 appearance-none cursor-pointer"
                         >
                           <option value="All Roles">All Roles</option>
                           <option value="hosts">Hosts</option>
@@ -1810,7 +1830,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
               initial={{ scale: 0.95, opacity: 0, y: 20 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.95, opacity: 0, y: 20 }}
-              className="relative w-full max-w-2xl bg-black/20 border border-[#D4AF37]/20 rounded-3xl shadow-[0_0_50px_rgba(212,175,55,0.1)] z-10 max-h-[90vh] overflow-hidden flex flex-col"
+              className="relative w-full max-w-2xl glass-card z-10 max-h-[90vh] overflow-hidden flex flex-col p-0"
             >
               <div className="absolute inset-0 bg-gradient-to-tr from-[#D4AF37]/5 via-transparent to-orange-500/5 pointer-events-none" />
               
@@ -1865,12 +1885,12 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                           value={attSearch}
                           onChange={(e) => setAttSearch(e.target.value)}
                           placeholder="Search nickname or poppoId..."
-                          className="flex-1 bg-[#0A0B0E] border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:border-[#D4AF37] outline-none"
+                          className="flex-1 glass-input text-xs px-3 py-2"
                         />
                         <select
                           value={attRoleFilter}
                           onChange={(e) => setAttRoleFilter(e.target.value)}
-                          className="bg-[#0A0B0E] border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:border-[#D4AF37] outline-none"
+                          className="glass-input text-xs px-3 py-2 appearance-none cursor-pointer"
                         >
                           <option value="All Roles">All Roles</option>
                           <option value="hosts">Hosts</option>
