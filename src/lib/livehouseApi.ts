@@ -1,6 +1,6 @@
 import { LivehouseDataRow } from '../types/livehouse';
 
-const API_URL = 'https://script.google.com/macros/s/AKfycbxM3XxkT30dpaNbVSsUFVlLhSCejbcZcIizqEE1StZpj4nKGGMmMSzN0xn0tmYHQuuwaQ/exec';
+const API_URL = 'https://script.google.com/macros/s/AKfycbxI-gtTa_gjoBHJZIZ1k7XYkXsEomPhBYi6oweGi_9_4GLC8YloEs72IOCj89EKBrQsfw/exec';
 
 let cachedData: LivehouseDataRow[] | null = null;
 let lastFetchTime = 0;

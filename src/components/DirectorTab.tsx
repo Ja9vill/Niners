@@ -79,10 +79,11 @@ export const DirectorTab = () => {
   const localAuth = Storage.getAuthState();
   const isDirector = localAuth.role?.toLowerCase() === 'director';
   const isHeadAdmin = localAuth.role?.toLowerCase() === 'head admin' || localAuth.role?.toLowerCase() === 'head_admin';
-  const hasAccess = isDirector || isHeadAdmin;
+  const isAgent = localAuth.role?.toLowerCase() === 'agent';
+  const hasAccess = isDirector || isHeadAdmin || isAgent;
 
   // Sidebar views: roster_management, financials, system_logs, create_user
-  const [activeView, setActiveView] = useState<string>('roster_management');
+  const [activeView, setActiveView] = useState<string>(isAgent && !isDirector && !isHeadAdmin ? 'financials' : 'roster_management');
 
   // Data State
   const [hosts, setHosts] = useState<Host[]>([]);
@@ -99,6 +100,7 @@ export const DirectorTab = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [successMessage, setSuccessMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [agentOverride, setAgentOverride] = useState<string>('');
 
   // Operations sub-tab states
   const [operationsSubTab, setOperationsSubTab] = useState<'livehouse' | 'tasks' | 'feedback' | 'awards'>('livehouse');
@@ -215,6 +217,9 @@ export const DirectorTab = () => {
   const [weeklyLedger, setWeeklyLedger] = useState<any[]>([]);
   const [selectedRows, setSelectedRows] = useState<Record<string, boolean>>({});
   const [isSavingFinancials, setIsSavingFinancials] = useState(false);
+  const [ledgerSearch, setLedgerSearch] = useState('');
+  const [bulkEditField, setBulkEditField] = useState('month');
+  const [bulkEditValue, setBulkEditValue] = useState('');
 
   const handleCellChange = (index: number, field: string, value: any) => {
     const ledger = financialTab === 'monthly' ? monthlyLedger : weeklyLedger;
@@ -299,91 +304,160 @@ export const DirectorTab = () => {
 
   const handleBulkPaste = (text: string) => {
     if (!text.trim()) return;
-    const rows = text.split('\n').filter(r => r.trim() !== '').map(r => r.split('\t'));
+    let rows = text.split('\n').filter(r => r.trim() !== '').map(r => r.split('\t'));
     const setLedger = financialTab === 'monthly' ? setMonthlyLedger : setWeeklyLedger;
 
-    const startIdx = (rows[0] && (
-      rows[0][0]?.toLowerCase().includes('poppo') ||
-      rows[0][0]?.toLowerCase().includes('id') ||
-      rows[0][1]?.toLowerCase().includes('date') ||
-      rows[0][1]?.toLowerCase().includes('month')
-    )) ? 1 : 0;
+    if (rows.length === 0) return;
+
+    // Check if the first row is the "My Commission" row (Agent format)
+    if (rows[0][0] && rows[0][0].toLowerCase().includes('my commission')) {
+      rows = rows.slice(1);
+    }
+
+    if (rows.length === 0) return;
+
+    const headerRow = rows[0].map(h => h.toLowerCase().trim());
+    const hasHeaders = headerRow.some(h => h.includes('poppo') || h.includes('id') || h.includes('month') || h.includes('nickname') || h.includes('earnings'));
+    
+    let startIdx = hasHeaders ? 1 : 0;
+    
+    const colMap: Record<string, number> = {};
+    if (hasHeaders) {
+      headerRow.forEach((h, idx) => {
+        if (h === 'poppo id' || h === 'id' || h === 'poppoid') colMap['poppoId'] = idx;
+        else if (h.includes('nickname') || h.includes('name')) colMap['nickname'] = idx;
+        else if (h === 'month' || h.includes('from date') || h.includes('start') || h === 'date') colMap['month'] = idx;
+        else if (h === 'year' || h.includes('to date') || h.includes('end')) colMap['year'] = idx;
+        else if (h.includes('live duration')) colMap['live_duration'] = idx;
+        else if (h.includes('party host duration') || h.includes('party duration') || h.includes('party live duration')) colMap['party_host_duration'] = idx;
+        else if (h.includes('total earnings of points') || h.includes('total points') || h === 'points') colMap['total_earnings'] = idx;
+        else if (h.includes('agent commission') || h.includes('agentweb_commission_earning')) colMap['agent_commission'] = idx;
+        else if (h === 'live earnings') colMap['live_earnings'] = idx;
+        else if (h === 'party earnings') colMap['party_earnings'] = idx;
+        else if (h.includes('private chat')) colMap['private_chat'] = idx;
+        else if (h === 'tips') colMap['tips'] = idx;
+        else if (h.includes('platform reward')) colMap['platform_reward'] = idx;
+        else if (h.includes('other earnings')) colMap['other_earnings'] = idx;
+        else if (h.includes('hourly salary')) colMap['platform_hourly_salary'] = idx;
+        else if (h.includes('super salary')) colMap['super_salary'] = idx;
+        else if (h.includes('super rank')) colMap['super_rank'] = idx;
+        else if (h === 'level') colMap['level'] = idx;
+      });
+    }
+
+    const cleanNum = (val: string) => parseInt(val?.replace(/,/g, '')) || 0;
+    const cleanFloat = (val: string) => parseFloat(val?.replace(/,/g, '')) || 0;
 
     const parsed: any[] = [];
     for (let i = startIdx; i < rows.length; i++) {
       const r = rows[i];
-      if (r.length < 3) continue;
+      if (r.length < 2) continue;
 
-      const poppoId = r[0]?.trim() || '';
+      const getVal = (colName: string, fallbackIdx: number) => {
+        if (colMap[colName] !== undefined) return r[colMap[colName]];
+        return r[fallbackIdx];
+      };
+
+      const poppoId = getVal('poppoId', 0)?.trim() || '';
+      if (!poppoId) continue;
+
       const matchingHost = hosts.find(h => String(h.id).trim() === poppoId);
-
-      // Enforce nickname if host exists, otherwise keep original but it won't be saved
-      const nickname = matchingHost ? (matchingHost.nickname || matchingHost.name) : (r[3]?.trim() || 'Pending Intake');
+      const rawNickname = getVal('nickname', 1)?.trim() || '';
+      const nickname = matchingHost ? (matchingHost.nickname || matchingHost.name) : (rawNickname || 'Pending Intake');
 
       let parsedYear = new Date().getFullYear();
       let parsedMonth = '';
-      const r1 = r[1]?.trim() || '';
-      const r2 = r[2]?.trim() || '';
+      const rawMonth = getVal('month', 2)?.trim() || '';
+      const rawYear = getVal('year', 3)?.trim() || '';
 
-      // If r2 is just a 4-digit year (e.g. "2024"), it's the old monthly format
-      if (/^20\d{2}$/.test(r2)) {
-        parsedYear = parseInt(r2);
-        parsedMonth = r1;
-      } else if (r1) {
-        // Otherwise, it's a date (e.g. "2024-05-01", "05/01/2024", or "20/05/24")
-        const d = new Date(r1);
-        if (!isNaN(d.getTime())) {
-          parsedYear = d.getFullYear();
-          parsedMonth = `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, '0')}`;
-        } else {
-          // Fallback: try to find a 4-digit year or 2-digit year at the end
-          const match4 = r1.match(/\b(20\d{2})\b/);
-          const match2 = r1.match(/\/(\d{2})$/);
-          if (match4) {
-            parsedYear = parseInt(match4[1]);
-          } else if (match2) {
-            parsedYear = 2000 + parseInt(match2[1]);
-          }
-          parsedMonth = r1;
-        }
+      if (rawYear && /^\d{4}$/.test(rawYear)) {
+         parsedYear = parseInt(rawYear);
+         parsedMonth = rawMonth;
+      } else if (rawMonth && !rawYear) {
+         const d = new Date(rawMonth);
+         if (!isNaN(d.getTime())) {
+           parsedYear = d.getFullYear();
+           parsedMonth = `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, '0')}`;
+         } else {
+           const match4 = rawMonth.match(/\b(20\d{2})\b/);
+           if (match4) parsedYear = parseInt(match4[1]);
+           parsedMonth = rawMonth;
+         }
+      } else if (rawYear) {
+         parsedYear = parseInt(rawYear) || parsedYear;
+         parsedMonth = rawMonth;
+      } else {
+         // Fallback to globally selected month/year from UI
+         const [sYear, sMonth] = selectedMonth.split('-');
+         parsedYear = parseInt(sYear);
+         parsedMonth = selectedMonth;
       }
 
-      const rowObj = {
+      parsed.push({
         poppo_id: poppoId,
-        poppo_name: nickname, // Required by CommissionEntry
-        month: parsedMonth, // Required by CommissionEntry
-        year: parsedYear, // Ensure year is present
-        from_date: r1,
-        to_date: r2,
+        poppo_name: nickname,
+        month: parsedMonth,
+        year: parsedYear,
+        from_date: rawMonth,
+        to_date: rawYear,
         nickname: nickname,
-        live_duration: parseFloat(r[4]) || 0,
-        party_host_duration: parseFloat(r[5]) || 0,
-        total_points: parseInt(r[6]?.replace(/,/g, '')) || 0,
-        agent_commission: parseInt(r[7]?.replace(/,/g, '')) || 0,
-        live_earnings: parseInt(r[8]?.replace(/,/g, '')) || 0,
-        party_earnings: parseInt(r[9]?.replace(/,/g, '')) || 0,
-        private_chat: parseInt(r[10]?.replace(/,/g, '')) || 0,
-        tips: parseInt(r[11]?.replace(/,/g, '')) || 0,
-        platform_reward: parseInt(r[12]?.replace(/,/g, '')) || 0,
-        other_earnings: parseInt(r[13]?.replace(/,/g, '')) || 0,
-        platform_hourly_salary: parseInt(r[14]?.replace(/,/g, '')) || 0,
-        super_salary: parseInt(r[15]?.replace(/,/g, '')) || 0,
-        super_rank: parseInt(r[16]?.replace(/,/g, '')) || 0,
-        level: parseInt(r[17]?.replace(/,/g, '')) || 0,
-        // Legacy Required fields to satisfy TS CommissionEntry
+        live_duration: cleanFloat(getVal('live_duration', 4)),
+        party_host_duration: cleanFloat(getVal('party_host_duration', 5)),
+        total_points: cleanNum(getVal('total_earnings', 6)),
+        agent_commission: cleanNum(getVal('agent_commission', 7)),
+        live_earnings: cleanNum(getVal('live_earnings', 8)),
+        party_earnings: cleanNum(getVal('party_earnings', 9)),
+        private_chat: cleanNum(getVal('private_chat', 10)),
+        tips: cleanNum(getVal('tips', 11)),
+        platform_reward: cleanNum(getVal('platform_reward', 12)),
+        other_earnings: cleanNum(getVal('other_earnings', 13)),
+        platform_hourly_salary: cleanNum(getVal('platform_hourly_salary', 14)),
+        super_salary: cleanNum(getVal('super_salary', 15)),
+        super_rank: cleanNum(getVal('super_rank', 16)),
+        level: cleanNum(getVal('level', 17)),
         video_duration: 0,
         video_earnings: 0,
         agentweb_commission_rate: 0,
         agentweb_commission_earning: 0,
-        total_earnings: parseInt(r[6]?.replace(/,/g, '')) || 0,
-        my_commission: parseInt(r[7]?.replace(/,/g, '')) || 0,
-        _isUnknownHost: !matchingHost // Used to filter out before saving
-      };
-
-      parsed.push(rowObj);
+        total_earnings: cleanNum(getVal('total_earnings', 6)),
+        my_commission: cleanNum(getVal('agent_commission', 7)),
+        owner_id: agentOverride || localAuth.poppo_id || 'system',
+        owner_role: agentOverride ? 'Agent' : (localAuth.role === 'Director' || localAuth.role === 'Head Admin' ? 'Director' : 'Agent'),
+        _isUnknownHost: !matchingHost
+      });
     }
     setLedger(prev => [...prev, ...parsed]);
     showSuccess(`Successfully added ${parsed.length} rows locally. Click "Save Changes" to upload.`);
+  };
+
+  const handleBulkEdit = () => {
+    const isMonthly = financialTab === 'monthly';
+    const ledger = isMonthly ? [...monthlyLedger] : [...weeklyLedger];
+    const setLedger = isMonthly ? setMonthlyLedger : setWeeklyLedger;
+    let count = 0;
+    ledger.forEach((row, idx) => {
+      if (selectedRows[`${financialTab}_${idx}`]) {
+        let val: any = bulkEditValue;
+        if (['live_duration', 'party_host_duration', 'total_points', 'agent_commission', 'live_earnings', 'party_earnings', 'private_chat', 'tips', 'platform_reward', 'other_earnings', 'platform_hourly_salary', 'super_salary', 'super_rank', 'level'].includes(bulkEditField)) {
+           val = parseFloat(val) || 0;
+           ledger[idx] = { ...ledger[idx], [bulkEditField]: val };
+        } else if (bulkEditField === 'year') {
+           val = parseInt(val) || new Date().getFullYear();
+           ledger[idx] = { ...ledger[idx], year: val, to_date: val };
+        } else if (bulkEditField === 'month') {
+           ledger[idx] = { ...ledger[idx], month: val, from_date: val };
+        } else if (bulkEditField === 'to_date') {
+           ledger[idx] = { ...ledger[idx], to_date: val, year: parseInt(val) || new Date().getFullYear() };
+        } else {
+           ledger[idx] = { ...ledger[idx], [bulkEditField]: val };
+        }
+        count++;
+      }
+    });
+    if (count > 0) {
+      setLedger(ledger);
+      showSuccess(`Bulk updated ${count} rows!`);
+    }
   };
 
 
@@ -1179,11 +1253,11 @@ export const DirectorTab = () => {
         </div>
 
         {[
-          { id: 'roster_management', label: 'Roster Management', icon: Users },
-          { id: 'operations', label: 'Operations', icon: Briefcase },
+          (isDirector || isHeadAdmin) && { id: 'roster_management', label: 'Roster Management', icon: Users },
+          (isDirector || isHeadAdmin) && { id: 'operations', label: 'Operations', icon: Briefcase },
           isDirector && { id: 'create_user', label: 'Provision User', icon: UserPlus },
-          isDirector && { id: 'financials', label: 'Financial Data', icon: FileUp },
-          { id: 'system_logs', label: 'System Logs', icon: AlertCircle },
+          (isDirector || isAgent) && { id: 'financials', label: 'Financial Data', icon: FileUp },
+          (isDirector || isHeadAdmin) && { id: 'system_logs', label: 'System Logs', icon: AlertCircle },
         ].filter((item): item is { id: string; label: string; icon: any } => !!item).map(item => (
           <button
             key={item.id}
@@ -2025,9 +2099,26 @@ export const DirectorTab = () => {
                         <label htmlFor="bulk-ledger-paste" className="text-sm font-black uppercase tracking-widest text-[#F0EFE8] flex items-center gap-2">
                           <span className="text-[#D4AF37]">📋</span> Paste Raw Ledger Data
                         </label>
-                        <span className="text-[9px] text-[#A09E9A] uppercase tracking-wider font-bold">
-                          Supports direct paste from Excel/Sheets
-                        </span>
+                        <div className="flex items-center gap-4">
+                          {(isDirector || isHeadAdmin) && (
+                            <div className="flex items-center gap-2 border-r border-white/10 pr-4">
+                              <span className="text-[10px] font-bold text-[#A09E9A] uppercase tracking-wider">Assign to Agent:</span>
+                              <select
+                                value={agentOverride}
+                                onChange={(e) => setAgentOverride(e.target.value)}
+                                className="bg-[#0D0D14] border border-white/10 text-white text-[10px] uppercase font-bold py-1 px-2 rounded focus:outline-none focus:border-[#D4AF37]"
+                              >
+                                <option value="">None (Upload as Nine Agency)</option>
+                                {hosts.filter(h => h.role === 'Agent' || h.role === 'Manager').map(agent => (
+                                  <option key={agent.id} value={agent.id}>{agent.nickname || agent.name}</option>
+                                ))}
+                              </select>
+                            </div>
+                          )}
+                          <span className="text-[9px] text-[#A09E9A] uppercase tracking-wider font-bold">
+                            Supports direct paste from Excel/Sheets
+                          </span>
+                        </div>
                       </div>
                       <textarea
                         id="bulk-ledger-paste"
@@ -2053,26 +2144,67 @@ export const DirectorTab = () => {
                   <div className="tech-card !p-0 border border-white/5 overflow-hidden bg-[#13131E] shadow-xl">
 
                     {/* Grid Action Bar */}
-                    <div className="flex items-center justify-between p-4 border-b border-white/5 bg-[#1A1A28]/40">
-                      <div className="flex items-center gap-3">
-                        <button
-                          onClick={handleAddRow}
-                          className="px-3.5 py-2 bg-emerald-550 hover:bg-emerald-600 text-white rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer shadow-sm shadow-emerald-500/10 active:scale-95"
-                        >
-                          + Add Row
-                        </button>
-                        <button
-                          onClick={handleDeleteSelection}
-                          disabled={!Object.keys(selectedRows).some(key => key.startsWith(`${financialTab}_`) && selectedRows[key])}
-                          className="px-3.5 py-2 bg-red-550 hover:bg-red-650 disabled:bg-[#222235] text-white disabled:text-[#A09E9A]/40 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer shadow-sm active:scale-95"
-                        >
-                          🗑️ Delete Selection
-                        </button>
+                    <div className="flex flex-col gap-4 p-4 border-b border-white/5 bg-[#1A1A28]/40">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <button
+                            onClick={handleAddRow}
+                            className="px-3.5 py-2 bg-emerald-550 hover:bg-emerald-600 text-white rounded-lg text-[10px] font-black uppercase tracking-wider transition-all shadow-sm"
+                          >
+                            + Add Row
+                          </button>
+                          <button
+                            onClick={handleDeleteSelection}
+                            disabled={!Object.keys(selectedRows).some(key => key.startsWith(`${financialTab}_`) && selectedRows[key])}
+                            className="px-3.5 py-2 bg-red-550 hover:bg-red-650 disabled:bg-[#222235] text-white disabled:text-[#A09E9A]/40 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all shadow-sm"
+                          >
+                            🗑️ Delete Selection
+                          </button>
+                        </div>
+                        <div className="flex items-center gap-4">
+                          <input
+                            type="text"
+                            placeholder="Search Poppo ID or Name..."
+                            value={ledgerSearch}
+                            onChange={(e) => setLedgerSearch(e.target.value)}
+                            className="px-3 py-1.5 bg-[#0D0D14] border border-white/10 rounded-lg text-xs text-white focus:outline-none focus:ring-1 focus:ring-[#D4AF37] w-64"
+                          />
+                          <div className="text-[10px] font-black uppercase tracking-widest text-[#A09E9A]">
+                            {(financialTab === 'monthly' ? monthlyLedger : weeklyLedger).length} Total rows
+                          </div>
+                        </div>
                       </div>
-
-                      <div className="text-[10px] font-black uppercase tracking-widest text-[#A09E9A]">
-                        {(financialTab === 'monthly' ? monthlyLedger : weeklyLedger).length} Total rows in workspace
-                      </div>
+                      
+                      {Object.keys(selectedRows).some(key => key.startsWith(`${financialTab}_`) && selectedRows[key]) && (
+                        <motion.div initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} className="flex items-center gap-3 bg-[#0D0D14] p-2.5 rounded-xl border border-[#D4AF37]/30">
+                           <span className="text-[10px] font-black uppercase text-[#D4AF37] ml-2">Bulk Edit:</span>
+                           <select 
+                             value={bulkEditField} 
+                             onChange={(e) => setBulkEditField(e.target.value)}
+                             className="bg-[#1A1A28] border border-white/10 text-white text-xs rounded px-2 py-1.5 focus:outline-none focus:border-[#D4AF37]"
+                           >
+                              <option value="month">Month / From Date</option>
+                              <option value="to_date">To Date</option>
+                              <option value="year">Year</option>
+                              <option value="agent_commission">Agent Commission</option>
+                              <option value="total_points">Total Points</option>
+                              <option value="level">Level</option>
+                           </select>
+                           <input
+                             type="text"
+                             value={bulkEditValue}
+                             onChange={(e) => setBulkEditValue(e.target.value)}
+                             placeholder="New value..."
+                             className="bg-[#1A1A28] border border-white/10 text-white text-xs rounded px-2 py-1.5 focus:outline-none focus:border-[#D4AF37] w-32"
+                           />
+                           <button
+                             onClick={handleBulkEdit}
+                             className="px-3 py-1.5 bg-[#D4AF37] hover:bg-[#c9a832] text-[#0D0D14] rounded text-[10px] font-black uppercase tracking-wider transition-all shadow-md active:scale-95"
+                           >
+                             Apply to Selected
+                           </button>
+                        </motion.div>
+                      )}
                     </div>
 
                     {/* Spreadsheet Grid Container */}
@@ -2084,15 +2216,21 @@ export const DirectorTab = () => {
                               <input
                                 type="checkbox"
                                 onChange={(e) => {
-                                  const currentData = financialTab === 'monthly' ? monthlyLedger : weeklyLedger;
+                                  const data = financialTab === 'monthly' ? monthlyLedger : weeklyLedger;
+                                  const lowerSearch = ledgerSearch.toLowerCase();
+                                  const filtered = data.map((row, idx) => ({ row, idx })).filter(({ row }) => 
+                                    !ledgerSearch || 
+                                    String(row.poppo_id).toLowerCase().includes(lowerSearch) || 
+                                    String(row.nickname || '').toLowerCase().includes(lowerSearch)
+                                  );
                                   const nextSelected = { ...selectedRows };
-                                  currentData.forEach((_, idx) => {
+                                  filtered.forEach(({ idx }) => {
                                     nextSelected[`${financialTab}_${idx}`] = e.target.checked;
                                   });
                                   setSelectedRows(nextSelected);
                                 }}
                                 className="rounded border-white/10 text-[#D4AF37] focus:ring-[#D4AF37] cursor-pointer"
-                                title="Select all rows"
+                                title="Select all filtered rows"
                               />
                             </th>
                             {/* STICKY COLUMN FOR POPPO ID */}
@@ -2126,18 +2264,45 @@ export const DirectorTab = () => {
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-white/5 bg-transparent">
-                          {(financialTab === 'monthly' ? monthlyLedger : weeklyLedger).length === 0 ? (
-                            <tr>
-                              <td colSpan={20} className="py-12 text-center text-[#A09E9A] italic">
-                                No ledger entries found. Click "+ Add Row" or paste data above.
-                              </td>
-                            </tr>
-                          ) : (
-                            (financialTab === 'monthly' ? monthlyLedger : weeklyLedger).map((row, idx) => {
-                              const isChecked = !!selectedRows[`${financialTab}_${idx}`];
-                              return (
-                                <tr key={idx} className="hover:bg-white/[0.01] transition-colors group">
-                                  <td className="px-3 py-2 text-center bg-[#13131E] group-hover:bg-[#1A1A28] sticky left-0 z-10 border-r border-white/5 transition-colors">
+                          {(() => {
+                             const data = financialTab === 'monthly' ? monthlyLedger : weeklyLedger;
+                             const lowerSearch = ledgerSearch.toLowerCase();
+                             const filtered = data.map((row, idx) => {
+                               const isDup = data.some((other, otherIdx) => 
+                                  otherIdx !== idx && 
+                                  other.poppo_id && other.poppo_id === row.poppo_id && 
+                                  other.month === row.month && 
+                                  other.year === row.year && 
+                                  other.total_points === row.total_points
+                               );
+                               return { row: { ...row, _isDuplicate: isDup }, idx };
+                             }).filter(({ row }) => 
+                               !ledgerSearch || 
+                               String(row.poppo_id).toLowerCase().includes(lowerSearch) || 
+                               String(row.nickname || '').toLowerCase().includes(lowerSearch)
+                             );
+                             
+                             if (filtered.length === 0) {
+                               return (
+                                 <tr>
+                                   <td colSpan={20} className="py-12 text-center text-[#A09E9A] italic">
+                                     {ledgerSearch ? "No ledger entries found matching your search." : "No ledger entries found. Click \"+ Add Row\" or paste data above."}
+                                   </td>
+                                 </tr>
+                               );
+                             }
+                             
+                             return filtered.map(({ row, idx }) => {
+                               const isChecked = !!selectedRows[`${financialTab}_${idx}`];
+                               return (
+                                 <tr key={idx} className={cn(
+                                   "transition-colors group",
+                                   row._isDuplicate ? "bg-red-500/10 hover:bg-red-500/20" : "hover:bg-white/[0.01]"
+                                 )}>
+                                  <td className={cn(
+                                    "px-3 py-2 text-center sticky left-0 z-10 border-r border-white/5 transition-colors",
+                                    row._isDuplicate ? "bg-[#251010] group-hover:bg-[#301515]" : "bg-[#13131E] group-hover:bg-[#1A1A28]"
+                                  )}>
                                     <input
                                       type="checkbox"
                                       checked={isChecked}
@@ -2150,15 +2315,24 @@ export const DirectorTab = () => {
                                       className="rounded border-white/10 text-[#D4AF37] focus:ring-[#D4AF37] cursor-pointer"
                                       title="Select row"
                                     />
+                                    {row._isDuplicate && (
+                                      <div className="absolute top-1/2 -translate-y-1/2 left-8 text-xs cursor-help" title="Duplicate Entry Detected">⚠️</div>
+                                    )}
                                   </td>
 
                                   {/* STICKY POPPO ID COLUMN - MONO SPACED READ WRITE WITH COPY SELECT-ALL */}
-                                  <td className="px-4 py-2 sticky left-[48px] bg-[#13131E] group-hover:bg-[#1A1A28] transition-colors border-r border-white/5 z-10 font-mono font-bold text-indigo-500 w-36">
+                                  <td className={cn(
+                                    "px-4 py-2 sticky left-[48px] transition-colors border-r border-white/5 z-10 font-mono font-bold w-36",
+                                    row._isDuplicate ? "bg-[#251010] group-hover:bg-[#301515] text-red-400" : "bg-[#13131E] group-hover:bg-[#1A1A28] text-indigo-500"
+                                  )}>
                                     <input
                                       type="text"
                                       value={row.poppo_id || ''}
                                       onChange={(e) => handleCellChange(idx, 'poppo_id', e.target.value)}
-                                      className="bg-transparent border-none w-full text-xs font-mono font-bold text-[#D4AF37] select-all focus:ring-1 focus:ring-[#D4AF37]/50 rounded px-1.5 py-0.5 outline-none"
+                                      className={cn(
+                                        "bg-transparent border-none w-full text-xs font-mono font-bold select-all focus:ring-1 focus:ring-[#D4AF37]/50 rounded px-1.5 py-0.5 outline-none",
+                                        row._isDuplicate ? "text-red-400" : "text-[#D4AF37]"
+                                      )}
                                       placeholder="Enter Poppo ID"
                                     />
                                   </td>
@@ -2374,8 +2548,8 @@ export const DirectorTab = () => {
                                   </td>
                                 </tr>
                               );
-                            })
-                          )}
+                            });
+                          })()}
                         </tbody>
                       </table>
                     </div>

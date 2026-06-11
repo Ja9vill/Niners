@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Plus, Clock, MapPin, Info, User, X, Globe, Edit2, Trash2, CheckCircle2 } from 'lucide-react';
 import { CalendarEvent, EventType, Host, LivehouseRequest } from '../types';
 import { Storage } from '../lib/storage';
-import { FirebaseService } from '../lib/firebaseService';
+import { FirebaseService, generateSubmissionId } from '../lib/firebaseService';
 import { cn } from '../lib/utils';
 import { format, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay, addWeeks, subWeeks, startOfMonth, endOfMonth, addMonths, subMonths, isSameMonth, parseISO } from 'date-fns';
 import { motion, AnimatePresence } from 'motion/react';
@@ -43,6 +43,37 @@ const TIMESLOT_BLOCKS = [
     ]
   }
 ];
+
+export const parseTimeStringToHourMin = (timeStr: string) => {
+  const match = timeStr.match(/(\d+)(?::(\d+))?\s*(AM|PM)?/i);
+  if (!match) return null;
+  let h = parseInt(match[1], 10);
+  let m = match[2] ? parseInt(match[2], 10) : 0;
+  const isPM = match[3] && match[3].toUpperCase() === 'PM';
+  const isAM = match[3] && match[3].toUpperCase() === 'AM';
+  if (isPM && h < 12) h += 12;
+  if ((isAM || (!isAM && !isPM && h === 12)) && h === 12) h = 0;
+  return { h, m };
+};
+
+export const getTargetDisplayDate = (event: CalendarEvent, mode: 'Manila' | 'Local'): string => {
+  const rawDate = event.date || event.event_date || '';
+  if (!rawDate) return '';
+  if (mode === 'Manila') return rawDate;
+  
+  const timeStr = event.time || event.description || '';
+  const firstTimePart = timeStr === '00:00' ? '00:00' : timeStr.split('-')[0].trim();
+  const parsedTime = parseTimeStringToHourMin(firstTimePart);
+  
+  if (!parsedTime) return rawDate;
+  
+  const isoString = `${rawDate}T${parsedTime.h.toString().padStart(2, '0')}:${parsedTime.m.toString().padStart(2, '0')}:00+08:00`;
+  const dateObj = new Date(isoString);
+  
+  if (isNaN(dateObj.getTime())) return rawDate;
+  
+  return format(dateObj, 'yyyy-MM-dd');
+};
 
 
 
@@ -244,9 +275,10 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
       const currentAuth = Storage.getAuthState();
       const existing = attendanceRecords.find(r => r.eventId === attendanceModalEvent.event_id);
       const attendanceId = existing?.attendanceId || (crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 15));
+      const docId = existing?.attendanceId ? existing.attendanceId : generateSubmissionId(currentAuth?.poppo_id || '', currentAuth?.role || '', currentAuth?.name || currentAuth?.nickname || '');
 
       const payload = {
-        attendanceId,
+        attendanceId: docId,
         eventId: attendanceModalEvent.event_id,
         eventTitle: attendanceModalEvent.title || 'Unknown Event',
         eventDate: attendanceModalEvent.date,
@@ -264,7 +296,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
         })),
         adminFeedback: attFeedback, // For backward compatibility
         eventFeedback: attFeedback,
-        createdBy: spotlightEvent.createdBy || currentAuth?.name || 'Admin',
+        createdBy: spotlightEvent?.createdBy || currentAuth?.name || 'Admin',
         attendanceSubmittedBy: {
           poppoId: currentAuth?.poppo_id || '',
           name: currentAuth?.name || currentAuth?.nickname || '',
@@ -273,7 +305,11 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
         timestamp: new Date().toISOString()
       };
 
-      await setDoc(doc(db, 'attendance', attendanceModalEvent.event_id), payload, { merge: true });
+      // If we are updating an existing record, we should write to the exact same doc ID to avoid duplicates.
+      // If it's a new record, we use the new standardized docId format.
+      // However, previously records were saved with `event_id` as the docId.
+      const targetDocId = existing ? (existing.id || existing.eventId || docId) : docId;
+      await setDoc(doc(db, 'attendance', targetDocId), payload, { merge: true });
       
       // Update local state and trigger UI changes
       setAttendanceRecord(payload);
@@ -373,7 +409,10 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
 
   const getEventsForDay = (day: Date) => {
     const formattedStr = format(day, 'yyyy-MM-dd');
-    return filteredEvents.filter(e => e.date === formattedStr);
+    return filteredEvents.filter(e => {
+      const targetDate = getTargetDisplayDate(e, timeDisplayMode);
+      return targetDate === formattedStr;
+    });
   };
 
   const handleDateClick = (day: Date) => {
@@ -929,7 +968,10 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
       const timeslot = attendanceModalEvent.time || '';
 
       const existing = attendanceRecords.find(r => r.eventId === eventId);
-      const attendanceId = existing?.attendanceId || (crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 15));
+      const reporterPoppoId = auth.poppo_id || auth.id || 'SystemAdmin';
+      const reporterRoleStr = auth.role || 'Admin';
+      const reporterNameStr = auth.nickname || auth.name || 'Admin';
+      const attendanceId = existing?.attendanceId || generateSubmissionId(reporterPoppoId, reporterRoleStr, reporterNameStr);
 
       const attendanceData = {
         attendanceId,
@@ -1482,13 +1524,11 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                <div className="text-xs sm:text-[13px] font-black tracking-[0.15em] uppercase text-transparent bg-clip-text bg-gradient-to-r from-[#FFF0B3] via-[#D4AF37] to-[#FF8C00] text-center px-4">
                   {(() => {
                     const activeDateStr = format(selectedDate, 'yyyy-MM-dd');
+                    const localAgnosticDate = parseISO(activeDateStr);
                     if (timeDisplayMode === 'Manila') {
-                      const localAgnosticDate = parseISO(activeDateStr);
                       return `${format(localAgnosticDate, 'MMMM dd, yyyy')} | UTC+8 Manila, PH`;
                     } else {
-                      // Anchor to the START of the Manila day, since that represents the bulk of the day for western timezones
-                      const manilaStart = new Date(`${activeDateStr}T00:00:00+08:00`); 
-                      return `${format(manilaStart, 'MMMM dd, yyyy')} | ${localTzAbbr}`;
+                      return `${format(localAgnosticDate, 'MMMM dd, yyyy')} | ${localTzAbbr}`;
                     }
                   })()}
                </div>
@@ -1506,18 +1546,6 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                   .map(e => {
                     const colorConfig = EVENT_COLORS[e.type || ''] || { gradient: 'from-[#D4AF37] to-[#b8960c]', text: 'text-[#D4AF37]' };
                     const displayTime = e.time === '00:00' ? 'TBD' : e.time;
-                    
-                    const parseTimeStringToHourMin = (timeStr: string) => {
-                      const match = timeStr.match(/(\d+)(?::(\d+))?\s*(AM|PM)?/i);
-                      if (!match) return null;
-                      let h = parseInt(match[1], 10);
-                      let m = match[2] ? parseInt(match[2], 10) : 0;
-                      const isPM = match[3] && match[3].toUpperCase() === 'PM';
-                      const isAM = match[3] && match[3].toUpperCase() === 'AM';
-                      if (isPM && h < 12) h += 12;
-                      if ((isAM || (!isAM && !isPM && h === 12)) && h === 12) h = 0;
-                      return { h, m };
-                    };
                     
                     let eventDateObj = new Date();
                     const firstTimePart = e.time === '00:00' ? '00:00' : e.time.split('-')[0].trim();
@@ -1576,7 +1604,6 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                               {timeDisplayMode === 'Local' ? (() => {
                                 if (displayTime === 'TBD' || !displayTime) return displayTime;
                                 try {
-                                  const manilaStart = new Date(`${e.date}T00:00:00+08:00`); 
                                   const formatLocal = (timeStr: string) => {
                                     const parsed = parseTimeStringToHourMin(timeStr);
                                     if (!parsed) return timeStr;
@@ -1590,7 +1617,8 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                                     else if (localH === 12) result = `12${mStr}PM`;
                                     else result = localH < 12 ? `${localH}${mStr}AM` : `${localH - 12}${mStr}PM`;
 
-                                    if (dateObj.getDate() !== manilaStart.getDate()) {
+                                    const localDateStr = format(dateObj, 'yyyy-MM-dd');
+                                    if (localDateStr !== e.date) {
                                       result += ` (${format(dateObj, 'MMM d')})`;
                                     }
                                     return result;
@@ -1779,19 +1807,8 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                                 const displayTime = spotlightEvent.time;
                                 if (displayTime === 'TBD' || !displayTime) return displayTime;
                                 try {
-                                  const parseTimeStringToHourMin = (timeStr: string) => {
-                                    const match = timeStr.match(/(\d+)(?::(\d+))?\s*(AM|PM)?/i);
-                                    if (!match) return null;
-                                    let h = parseInt(match[1], 10);
-                                    let m = match[2] ? parseInt(match[2], 10) : 0;
-                                    const isPM = match[3] && match[3].toUpperCase() === 'PM';
-                                    const isAM = match[3] && match[3].toUpperCase() === 'AM';
-                                    if (isPM && h < 12) h += 12;
-                                    if ((isAM || (!isAM && !isPM && h === 12)) && h === 12) h = 0;
-                                    return { h, m };
-                                  };
+                                  // using global parseTimeStringToHourMin
 
-                                  const manilaStart = new Date(`${spotlightEvent.date}T00:00:00+08:00`); 
                                   const formatLocal = (timeStr: string) => {
                                     const parsed = parseTimeStringToHourMin(timeStr);
                                     if (!parsed) return timeStr;
@@ -1805,7 +1822,8 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                                     else if (localH === 12) result = `12${mStr}PM`;
                                     else result = localH < 12 ? `${localH}${mStr}AM` : `${localH - 12}${mStr}PM`;
 
-                                    if (dateObj.getDate() !== manilaStart.getDate()) {
+                                    const localDateStr = format(dateObj, 'yyyy-MM-dd');
+                                    if (localDateStr !== spotlightEvent.date) {
                                       result += ` (${format(dateObj, 'MMM d')})`;
                                     }
                                     return result;

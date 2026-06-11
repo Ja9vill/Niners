@@ -1,9 +1,27 @@
 import { auth, db, storage } from './firebase';
 import { ref, uploadString, getBytes, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { Storage } from './storage';
-import { doc, setDoc, getDoc, collection, query, where, getDocs, deleteDoc, writeBatch, Timestamp, onSnapshot, updateDoc, arrayUnion, arrayRemove, deleteField } from 'firebase/firestore';
+import { doc, setDoc, getDoc, collection, query, where, getDocs, deleteDoc, writeBatch, Timestamp, onSnapshot, updateDoc, arrayUnion, arrayRemove, deleteField, orderBy, limit } from 'firebase/firestore';
 import { CommissionEntry, Host, PKEntry, ExposureEntry, FanbaseHealthEntry, WeeklyLiveDataEntry, MonthlyLiveDataEntry, TopNinersEarningsSummary, EventsCalendarPublic, Task, ActivityAuditLog, CalendarEvent, LivehouseRequest, AwardBadge, AwardAssignment, ManagerNote } from '../types';
 import { LivehouseDataRow } from '../types/livehouse';
+
+export const generateSubmissionId = (reporterId: string, role: string, name: string): string => {
+  const safeId = reporterId || 'Unknown';
+  const safeRole = role || 'Unknown';
+  const safeName = name || 'Unknown';
+  
+  const now = new Date();
+  const dateStr = `${now.getMonth() + 1}-${now.getDate()}-${now.getFullYear()}`;
+  let hours = now.getHours();
+  const ampm = hours >= 12 ? 'PM' : 'AM';
+  hours = hours % 12;
+  hours = hours ? hours : 12;
+  const minutes = now.getMinutes().toString().padStart(2, '0');
+  const timeStr = `${hours}:${minutes}${ampm}`;
+  const timestamp = `${dateStr}-${timeStr}`;
+  
+  return `${safeId}_${safeRole}_${safeName}_${timestamp}`.replace(/\s+/g, '');
+};
 
 export enum OperationType {
   CREATE = 'create',
@@ -607,30 +625,114 @@ export const FirebaseService = {
     return allMetadata;
   },
 
-
-
-  async submitRpkReport(hostId: string, fromDate: string, toDate: string, data: any) {
-    const docId = `${hostId}_${fromDate}_${toDate}`;
-    const path = `pk_reports/${docId}`;
+  // ---------------------------------------------------------
+  // DATABASE VAULT & STAGING QUEUE (Safeguard Mechanism)
+  // ---------------------------------------------------------
+  async submitToStaging(originalCollection: string, docId: string, data: any) {
+    const path = `staging_queue/${docId}`;
     try {
-      const docRef = doc(db, 'pk_reports', docId);
-      await setDoc(docRef, { ...data, poppo_id: hostId, timestamp: new Date().toISOString() });
+      const payload = {
+        id: docId,
+        isBulk: false,
+        originalCollection,
+        data,
+        status: 'PENDING',
+        tags: [],
+        timestamp: new Date().toISOString()
+      };
+      await setDoc(doc(db, 'staging_queue', docId), payload);
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, path);
     }
   },
 
-
-
-  async submitFanbaseReport(hostId: string, fromDate: string, toDate: string, data: any) {
-    const docId = `${hostId}_${fromDate}_${toDate}`;
-    const path = `fanbase_reports/${docId}`;
+  async submitBulkToStaging(originalCollection: string, uploadId: string, items: any[], submitterName: string = 'Admin') {
+    const docId = `BULK_${originalCollection}_${uploadId}`;
+    const path = `staging_queue/${docId}`;
     try {
-      const docRef = doc(db, 'fanbase_reports', docId);
-      await setDoc(docRef, { ...data, poppo_id: hostId, timestamp: new Date().toISOString() });
+      const payload = {
+        id: docId,
+        isBulk: true,
+        originalCollection,
+        items,
+        status: 'PENDING',
+        tags: [],
+        submittedBy: submitterName,
+        timestamp: new Date().toISOString()
+      };
+      await setDoc(doc(db, 'staging_queue', docId), payload);
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, path);
     }
+  },
+
+  async getPendingStagingData() {
+    try {
+      const q = query(collection(db, 'staging_queue'), where('status', '==', 'PENDING'));
+      const snap = await getDocs(q);
+      return snap.docs.map(d => ({ ...d.data(), id: d.id }));
+    } catch (error) {
+      console.error("Error fetching staging data:", error);
+      return [];
+    }
+  },
+
+  async approveStagingData(stagingDoc: any) {
+    const { id: stagingId, originalCollection, isBulk, data, items } = stagingDoc;
+    try {
+      if (isBulk && items) {
+        // Bulk approval: Write all items via batch
+        const batch = writeBatch(db);
+        items.forEach((item: any) => {
+          // Attempt to extract an ID from the item, or generate a random one
+          const itemId = item.poppo_id ? `${item.poppo_id}_${item.month || item.from_date || item.id || Math.random().toString(36).substring(2,9)}` : Math.random().toString(36).substring(2, 15);
+          const lockedData = { ...item, isLocked: true, lockedAt: new Date().toISOString() };
+          const docRef = doc(db, originalCollection, itemId);
+          batch.set(docRef, lockedData);
+        });
+        await batch.commit();
+      } else {
+        // Single approval
+        const lockedData = { ...data, isLocked: true, lockedAt: new Date().toISOString() };
+        await setDoc(doc(db, originalCollection, stagingId), lockedData);
+      }
+      
+      // Mark staging as APPROVED
+      await updateDoc(doc(db, 'staging_queue', stagingId), { status: 'APPROVED', approvedAt: new Date().toISOString() });
+    } catch (error) {
+      console.error("Error approving staging data:", error);
+      throw error;
+    }
+  },
+
+  async rejectStagingData(stagingId: string) {
+    try {
+      await updateDoc(doc(db, 'staging_queue', stagingId), { status: 'REJECTED', rejectedAt: new Date().toISOString() });
+    } catch (error) {
+      console.error("Error rejecting staging data:", error);
+      throw error;
+    }
+  },
+
+  async updateStagingTags(stagingId: string, tags: string[]) {
+    try {
+      await updateDoc(doc(db, 'staging_queue', stagingId), { tags });
+    } catch (error) {
+      console.error("Error updating staging tags:", error);
+      throw error;
+    }
+  },
+
+  async submitRpkReport(hostId: string, fromDate: string, toDate: string, data: any) {
+    const docId = generateSubmissionId(data.reporter_id, data.reporter_role, data.reporter_name);
+    const finalData = { ...data, poppo_id: hostId, timestamp: new Date().toISOString() };
+    await this.submitToStaging('pk_reports', docId, finalData);
+  },
+
+  async submitFanbaseReport(hostId: string, fromDate: string, toDate: string, data: any) {
+    const docId = generateSubmissionId(data.reporter_id, data.reporter_role, data.reporter_name);
+    const finalData = { ...data, poppo_id: hostId, timestamp: new Date().toISOString() };
+    await this.submitToStaging('fanbase_reports', docId, finalData);
   },
 
   // Hosts management
@@ -663,6 +765,19 @@ export const FirebaseService = {
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, path);
     }
+  },
+
+  async saveAgentCommissions(commissions: CommissionEntry[], agentId: string, isWeekly: boolean = false, submitterName: string = 'Agent') {
+    const uploadId = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 15);
+    
+    // Tag data with Agent identifiers
+    const taggedCommissions = commissions.map(c => ({
+      ...c,
+      isAgentData: true,
+      uploadedById: agentId
+    }));
+    
+    await this.submitBulkToStaging('performance_reports', uploadId, taggedCommissions, submitterName);
   },
 
   async updateManagerHostFields(managerId: string, hostIdToAdd: string | null, hostIdToRemove: string | null, forceHosts?: string[]): Promise<void> {
@@ -892,19 +1007,9 @@ export const FirebaseService = {
   },
 
   // Performance Reports Management
-  async saveCommissions(commissions: CommissionEntry[]) {
-    const path = 'performance_reports';
-    try {
-      const batch = writeBatch(db);
-      commissions.forEach(c => {
-        const id = `${c.poppo_id}_${c.month}`;
-        const docRef = doc(db, path, id);
-        batch.set(docRef, c);
-      });
-      await batch.commit();
-    } catch (error) {
-      handleFirestoreError(error, OperationType.WRITE, path);
-    }
+  async saveCommissions(commissions: CommissionEntry[], submitterName: string = 'Admin') {
+    const uploadId = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 15);
+    await this.submitBulkToStaging('performance_reports', uploadId, commissions, submitterName);
   },
 
   async getCommissionsByMonth(month: string): Promise<CommissionEntry[]> {
@@ -912,7 +1017,9 @@ export const FirebaseService = {
     try {
       const q = query(collection(db, path), where('month', '==', month));
       const snapshot = await getDocs(q);
-      return snapshot.docs.map(d => d.data() as CommissionEntry);
+      const all = snapshot.docs.map(d => d.data() as CommissionEntry);
+      // Filter out agent data for directors
+      return all.filter(c => !c.isAgentData);
     } catch (error) {
       handleFirestoreError(error, OperationType.LIST, path);
       return [];
@@ -923,7 +1030,27 @@ export const FirebaseService = {
     const path = 'performance_reports';
     try {
       const snapshot = await getDocs(collection(db, path));
-      return snapshot.docs.map(d => d.data() as CommissionEntry);
+      const all = snapshot.docs.map(d => d.data() as CommissionEntry);
+      // Filter out agent data so the agency total is not mixed
+      return all.filter(c => !c.isAgentData);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.LIST, path);
+      return [];
+    }
+  },
+
+  async getAgentCommissions(agentId: string, isWeekly: boolean = false): Promise<CommissionEntry[]> {
+    const path = 'performance_reports';
+    try {
+      // Fetch all reports and filter client-side to avoid requiring complex compound indexes for now
+      const snapshot = await getDocs(collection(db, path));
+      const all = snapshot.docs.map(d => d.data() as CommissionEntry);
+      
+      return all.filter(c => 
+        c.isAgentData === true && 
+        c.uploadedById === agentId && 
+        (isWeekly ? (c.from_date && c.to_date) : c.month)
+      );
     } catch (error) {
       handleFirestoreError(error, OperationType.LIST, path);
       return [];
@@ -949,6 +1076,26 @@ export const FirebaseService = {
     const path = `performance_reports/${poppoId}_${month}`;
     try {
       await deleteDoc(doc(db, 'performance_reports', `${poppoId}_${month}`));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, path);
+    }
+  },
+
+  async deleteAgentCommission(poppoId: string, monthOrRange: string, agentId: string, isWeekly: boolean = false) {
+    const path = `performance_reports/${poppoId}_${monthOrRange}`;
+    try {
+      // In a real robust system, we would verify the document actually belongs to the agent
+      // before deletion. For now, since they pass the exact key, we delete it.
+      const docRef = doc(db, 'performance_reports', `${poppoId}_${monthOrRange}`);
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        if (data.isAgentData && data.uploadedById === agentId) {
+          await deleteDoc(docRef);
+        } else {
+          console.error("Agent tried to delete a non-agent or unauthorized commission row.");
+        }
+      }
     } catch (error) {
       handleFirestoreError(error, OperationType.DELETE, path);
     }
@@ -1264,66 +1411,70 @@ export const FirebaseService = {
         }
       };
       
-      // 1. Clear existing Livehouse schedule
+      // 1. Clear existing Livehouse schedule but keep in memory for diffing
       const snap = await getDocs(collection(db, path));
+      const oldSchedule = new Map<string, any>();
       for (const d of snap.docs) {
+        oldSchedule.set(d.id, d.data());
         batch.delete(d.ref);
         batchCount++;
         await commitBatchIfNeeded();
       }
 
-      // 2. Set new Livehouse schedule & generate calendar events
+      // 2. Set new Livehouse schedule & generate calendar events and logs
       const validCalendarEventIds: string[] = [];
+      const logsRef = collection(db, 'livehouse_logs');
 
       for (const r of scheduleRows) {
+        if (!r.date || !r.timeslot) continue;
         const docId = `${r.date}_${r.timeslot}`.replace(/[^a-zA-Z0-9_-]/g, '_');
+        
+        const oldRow = oldSchedule.get(docId);
+        
+        const newSlot1 = String(r.slot_1?.poppo_id || '').trim();
+        const oldSlot1 = String(oldRow?.slot_1?.poppo_id || '').trim();
+        
+        if (newSlot1 && newSlot1 !== oldSlot1) {
+          const logDocRef = doc(logsRef);
+          batch.set(logDocRef, {
+            poppo_id: newSlot1,
+            date: r.date,
+            timeslot: r.timeslot,
+            timestamp: new Date().toISOString(),
+            source: 'manual-sync'
+          });
+          batchCount++;
+          await commitBatchIfNeeded();
+        }
+        
+        const newSlot2 = String(r.slot_2?.poppo_id || '').trim();
+        const oldSlot2 = String(oldRow?.slot_2?.poppo_id || '').trim();
+        
+        if (newSlot2 && newSlot2 !== oldSlot2) {
+          const logDocRef = doc(logsRef);
+          batch.set(logDocRef, {
+            poppo_id: newSlot2,
+            date: r.date,
+            timeslot: r.timeslot,
+            timestamp: new Date().toISOString(),
+            source: 'manual-sync'
+          });
+          batchCount++;
+          await commitBatchIfNeeded();
+        }
+
         const docRef = doc(db, path, docId);
         batch.set(docRef, r);
         batchCount++;
         await commitBatchIfNeeded();
-        
-        // Auto-generate calendar event for timeslots that have users booked
-        const participants = [];
-        if (r.slot_1 && r.slot_1.poppo_id) participants.push(r.slot_1.poppo_id);
-        if (r.slot_2 && r.slot_2.poppo_id) participants.push(r.slot_2.poppo_id);
-        
-        if (participants.length > 0) {
-          const calEventId = `auto_lh_${docId}`;
-          validCalendarEventIds.push(calEventId);
-          
-          const calDocRef = doc(db, 'calendar', calEventId);
-          batch.set(calDocRef, {
-            id: calEventId,
-            event_id: calEventId,
-            title: 'Livehouse Event',
-            type_of_event: 'Livehouse',
-            type: 'Livehouse',
-            event_date: r.date,
-            date: r.date,
-            time: r.timeslot,
-            description: 'Automated Livehouse Event. Edits to participants will be overwritten by spreadsheet syncs.',
-            participants_id: participants,
-            participants: participants,
-            is_automated: true,
-            created_by_id: 'system',
-            created_by_name: 'Livehouse Sync',
-            created_by_role: 'system',
-            timestamp: new Date().toISOString()
-          }, { merge: true });
-          batchCount++;
-          await commitBatchIfNeeded();
-        }
       }
       
-      // 3. Clear stale automated calendar events
-      const calSnap = await getDocs(query(collection(db, 'calendar'), where('is_automated', '==', true)));
-      for (const d of calSnap.docs) {
-        if (!validCalendarEventIds.includes(d.id)) {
-          batch.delete(d.ref);
-          batchCount++;
-          await commitBatchIfNeeded();
-        }
-      }
+      const syncStatusRef = doc(db, 'system', 'livehouse_sync');
+      batch.set(syncStatusRef, {
+        last_synced_iso: new Date().toISOString()
+      }, { merge: true });
+      batchCount++;
+      await commitBatchIfNeeded();
 
       if (batchCount > 0) {
         await batch.commit();
@@ -1343,6 +1494,71 @@ export const FirebaseService = {
       return [];
     }
   },
+
+  async getLivehouseLogs(limitCount: number = 50, startAfterDoc?: any): Promise<{ logs: any[], lastVisible: any }> {
+    try {
+      let q = query(
+        collection(db, 'livehouse_logs'),
+        orderBy('timestamp', 'desc'),
+        limit(limitCount)
+      );
+      if (startAfterDoc) {
+        const { startAfter } = await import('firebase/firestore');
+        q = query(q, startAfter(startAfterDoc));
+      }
+      const snapshot = await getDocs(q);
+      const logs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const lastVisible = snapshot.docs[snapshot.docs.length - 1];
+      return { logs, lastVisible };
+    } catch (error) {
+      console.warn('[FirebaseService] getLivehouseLogs failed', error);
+      return { logs: [], lastVisible: null };
+    }
+  },
+
+  async getLivehouseSyncStatus(): Promise<string | null> {
+    try {
+      const docRef = doc(db, 'system', 'livehouse_sync');
+      const snap = await getDoc(docRef);
+      if (snap.exists()) {
+        return snap.data().last_synced_iso || null;
+      }
+      return null;
+    } catch (error) {
+      console.warn('[FirebaseService] getLivehouseSyncStatus failed', error);
+      return null;
+    }
+  },
+
+  async getAllCalendarEvents(): Promise<any[]> {
+    try {
+      const snap = await getDocs(collection(db, 'calendar'));
+      return snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    } catch (error) {
+      console.warn('[FirebaseService] getAllCalendarEvents failed', error);
+      return [];
+    }
+  },
+
+  async deleteOldLivehouseLogs(count: number): Promise<void> {
+    try {
+      const q = query(
+        collection(db, 'livehouse_logs'),
+        orderBy('timestamp', 'asc'),
+        limit(count)
+      );
+      const snapshot = await getDocs(q);
+      const batch = writeBatch(db);
+      snapshot.docs.forEach((doc) => {
+        batch.delete(doc.ref);
+      });
+      await batch.commit();
+    } catch (error) {
+      console.warn('[FirebaseService] deleteOldLivehouseLogs failed', error);
+      throw error;
+    }
+  },
+
 
 
   async saveLivehouseRequests(requests: LivehouseRequest[]) {

@@ -99,42 +99,26 @@ service cloud.firestore {
 
     // 2. performance_reports Collection Rules
     match /performance_reports/{reportId} {
-      allow read: if isStaff() || (isSignedIn() && resource.data.poppoId == request.auth.uid);
+      allow read: if isSignedIn();
       allow write: if isLeadership() || isAdmin();
     }
 
     // 3. fanbase_reports Collection Rules
     match /fanbase_reports/{reportId} {
-      allow read: if isStaff() || (isSignedIn() && resource.data.poppoId == request.auth.uid);
-      
-      // Leadership & Admins can write any report
-      // Hosts can create (submit) their own fanbase reports
-      allow create: if isLeadership() || isAdmin() || (
-        isHost() && 
-        request.resource.data.poppoId == request.auth.uid &&
-        request.resource.data.reporterId == request.auth.uid
-      );
-      allow update, delete: if isLeadership() || isAdmin();
+      allow read: if isSignedIn();
+      allow write: if isSignedIn();
     }
 
     // 4. pk_reports Collection Rules
     match /pk_reports/{reportId} {
-      allow read: if isStaff() || (isSignedIn() && resource.data.poppoId == request.auth.uid);
-      
-      // Leadership & Admins can write any report
-      // Hosts can create (submit) their own PK reports
-      allow create: if isLeadership() || isAdmin() || (
-        isHost() && 
-        request.resource.data.poppoId == request.auth.uid &&
-        request.resource.data.reporterId == request.auth.uid
-      );
-      allow update, delete: if isLeadership() || isAdmin();
+      allow read: if isSignedIn();
+      allow write: if isSignedIn();
     }
 
     // 5. attendance Collection Rules
     match /attendance/{attendanceId} {
       allow read: if isSignedIn();
-      allow write: if isDirector() || isHeadAdmin() || isAdmin();
+      allow write: if isSignedIn();
     }
 
     // announcements Collection Rules
@@ -146,6 +130,19 @@ service cloud.firestore {
     // calendar Collection Rules
     match /calendar/{eventId} {
       allow read: if true;
+      allow write: if isSignedIn();
+    }
+
+    // 5. events Collection Rules
+    match /events/{eventId} {
+      // Hidden events (marked as Director Only) can only be read by Directors
+      allow read: if isDirector() || (
+        isSignedIn() && 
+        (!resource.data.keys().hasAll(['visibility']) || resource.data.visibility != 'Director Only') &&
+        (!resource.data.keys().hasAll(['eventType']) || resource.data.eventType != 'Director Only')
+      );
+      
+      // All signed-in users can write events (hosts can add their own)
       allow write: if isSignedIn();
     }
 
@@ -226,7 +223,30 @@ service cloud.firestore {
     // 11. Livehouse Schedule
     match /livehouse_schedule/{scheduleId} {
       allow read: if isSignedIn();
-      allow write: if isLeadership() || isAdmin();
+      allow write: if isStaff();
+    }
+
+    match /livehouse_requests/{requestId} {
+      allow read: if isSignedIn();
+      allow write: if isStaff() || (isSignedIn() && request.resource.data.poppoId == request.auth.uid);
+    }
+
+    // 12. Livehouse Logs & System config
+    match /livehouse_logs/{logId} {
+      allow read: if isSignedIn();
+      allow write: if isStaff();
+    }
+    match /system/{docId} {
+      allow read: if isSignedIn();
+      allow write: if isStaff();
+    }
+
+    // 13. Agent Financials
+    match /agent_financials_monthly/{docId} {
+      allow read, write: if isStaff();
+    }
+    match /agent_financials_weekly/{docId} {
+      allow read, write: if isStaff();
     }
 
     // Default Deny: block all other access by default

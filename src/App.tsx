@@ -25,6 +25,10 @@ import { PublicLanding } from './pages/PublicLanding';
 import { BlogManagement } from './pages/cms/BlogManagement';
 import { PageAssetsCMS } from './pages/cms/PageAssetsCMS';
 import { LivehouseData } from './pages/cms/LivehouseData';
+import { DataVault } from './pages/DataVault';
+
+import { ReportingPages } from './pages/ReportingPages';
+import { CollectionsLog } from './pages/CollectionsLog';
 import { AgencyPolicy } from './pages/AgencyPolicy';
 import { OnboardingProcess } from './pages/OnboardingProcess';
 import { LoginSetup } from './pages/public/LoginSetup';
@@ -140,6 +144,16 @@ export default function App() {
             }
           />
 
+          {/* Data Vault */}
+          <Route
+            path="data-vault"
+            element={
+              <RoleGuard roles={['director', 'head admin', 'head_admin']}>
+                <DataVault />
+              </RoleGuard>
+            }
+          />
+
           {/* System Logs */}
           <Route
             path="system-logs"
@@ -194,12 +208,55 @@ export default function App() {
           <Route
             path="financial-data"
             element={
-              <RoleGuard roles={['director']}>
+              <RoleGuard roles={['director', 'head admin', 'head_admin']}>
                 <FinancialData />
               </RoleGuard>
             }
           />
 
+          {/* Team Financials (Agents/Managers) */}
+          <Route
+            path="team-financials"
+            element={
+              <RoleGuard roles={['manager', 'agent']}>
+                <FinancialData isAgentMode={true} />
+              </RoleGuard>
+            }
+          />
+
+          {/* Reporting Pages (Director and Head Admin) */}
+          <Route path="reporting/events" element={
+            <RoleGuard roles={['director', 'head admin', 'head_admin']}>
+              <ReportingPages collectionName="calendar" reportType="Events Log" />
+            </RoleGuard>
+          } />
+          <Route path="reporting/attendance" element={
+            <RoleGuard roles={['director', 'head admin', 'head_admin']}>
+              <ReportingPages collectionName="attendance" reportType="Attendance Log" />
+            </RoleGuard>
+          } />
+          <Route path="reporting/pk-performance" element={
+            <RoleGuard roles={['director', 'head admin', 'head_admin']}>
+              <ReportingPages collectionName="pk_reports" reportType="PK Performance" />
+            </RoleGuard>
+          } />
+          <Route path="reporting/fanbase-health" element={
+            <RoleGuard roles={['director', 'head admin', 'head_admin']}>
+              <ReportingPages collectionName="fanbase_reports" reportType="Fanbase Health" />
+            </RoleGuard>
+          } />
+          <Route path="reporting/assigned-badges" element={
+            <RoleGuard roles={['director', 'head admin', 'head_admin']}>
+              <ReportingPages collectionName="users" filterField="badges" reportType="Assigned Badges" />
+            </RoleGuard>
+          } />
+
+          {/* Collections Log (Director Only) */}
+          <Route path="collections-log" element={
+            <RoleGuard roles={['director']}>
+              <CollectionsLog />
+            </RoleGuard>
+          } />
 
           {/* Error pages */}
           <Route

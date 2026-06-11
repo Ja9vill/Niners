@@ -10,6 +10,7 @@ import { google } from "googleapis";
 import { initFirebaseSecrets } from "./src/server/secrets";
 import { logSystemEvent } from "./src/server/Logger";
 import net from "net";
+import { startCronJobs } from "./src/server/cron";
 
 dotenv.config();
 
@@ -29,6 +30,9 @@ async function startServer() {
   await initFirebaseSecrets();
   const app = express();
   const PORT = Number(process.env.PORT || 3000);
+  
+  // Start background tasks
+  startCronJobs();
 
   app.use(express.json({ limit: "100mb" }));
   app.use(express.urlencoded({ limit: "100mb", extended: true }));

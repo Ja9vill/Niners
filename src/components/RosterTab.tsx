@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { Search, Filter, Loader2, Star, Users, LayoutGrid, Medal } from 'lucide-react';
 import { FirebaseService } from '../lib/firebaseService';
 import { cn } from '../lib/utils';
@@ -598,7 +599,7 @@ export const RosterTab: React.FC<RosterTabProps> = ({ isReadOnly = false }) => {
       )}
 
       {/* SPOTLIGHT MODAL */}
-      {selectedHost && (
+      {selectedHost && createPortal(
         <div className="fixed inset-0 z-[100]">
           <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={closeSpotlight}></div>
           <div className="absolute inset-0 overflow-y-auto p-4 py-10 pointer-events-none">
@@ -611,7 +612,8 @@ export const RosterTab: React.FC<RosterTabProps> = ({ isReadOnly = false }) => {
               />
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

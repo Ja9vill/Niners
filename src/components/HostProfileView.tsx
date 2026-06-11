@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { X, Calendar, ChevronLeft, Edit2, Loader2, Save, Instagram, Twitter, Facebook, TrendingUp, TrendingDown, Minus, ArrowUpDown, Award, MessageSquare, Star, Users, Send, ClipboardList, Trash2, Clock, Plus, CheckCircle2, AlertCircle, Briefcase, ListTodo, Activity } from 'lucide-react';
 import { Host, CommissionEntry, CalendarEvent, Task, AwardBadge, AwardAssignment } from '../types';
-import { FirebaseService } from '../lib/firebaseService';
+import { FirebaseService, generateSubmissionId } from '../lib/firebaseService';
 import { Storage } from '../lib/storage';
 import { cn, formatNumber } from '../lib/utils';
 import { MANAGERS, BASE_SALARY_POLICIES } from '../lib/constants';
@@ -1172,11 +1172,13 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
         timestamp: new Date().toISOString()
       };
 
-      const docRef = await addDoc(collection(db, 'notes'), newNote);
+      const noteId = generateSubmissionId(managerId, rootAuth?.role || 'Manager', managerName);
+      const docRef = doc(db, 'notes', noteId);
+      await setDoc(docRef, newNote);
       await FirebaseService.logSystemActivity(`Manager/Agent ${managerName} added coaching feedback note for host "${hostNickname}" (Poppo ID: ${noteHostId})`, 'Info');
       setNoteSuccess('Note successfully saved!');
       setNoteContent('');
-      setNotesHistory(prev => [{ id: docRef.id, ...newNote }, ...prev]);
+      setNotesHistory(prev => [{ id: noteId, ...newNote }, ...prev]);
       setActiveTab('history');
     } catch (err: any) {
       console.error('Error adding note:', err);
@@ -1238,11 +1240,13 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
           timestamp: new Date().toISOString()
         };
 
-        const docRef = await addDoc(collection(db, 'notes'), completionNote);
+        const noteId = generateSubmissionId(String(managerPoppoId), rootAuth?.role || 'Manager', managerName);
+        const docRef = doc(db, 'notes', noteId);
+        await setDoc(docRef, completionNote);
         await FirebaseService.logSystemActivity(`Manager/Agent ${managerName} completed task "${todo.title}" for host "${hostNickname}"`, 'Info');
 
         if (todo.hostId === noteHostId) {
-          setNotesHistory(prev => [{ id: docRef.id, ...completionNote }, ...prev]);
+          setNotesHistory(prev => [{ id: noteId, ...completionNote }, ...prev]);
         }
       }
 

@@ -3,6 +3,12 @@ import { onSchedule } from "firebase-functions/v2/scheduler";
 import { getAuth } from "firebase-admin/auth";
 import { initializeApp } from "firebase-admin/app";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
+import { setGlobalOptions } from "firebase-functions/v2";
+
+// Use the explicit service account instead of the missing default compute service account
+setGlobalOptions({ 
+  serviceAccount: "nine-dashboard-sa@gen-lang-client-0222945352.iam.gserviceaccount.com" 
+});
 
 // Initialize Firebase Admin SDK
 initializeApp();
@@ -35,6 +41,9 @@ async function verifyPoppoCredentials(poppoId: string, password: string): Promis
  * 2nd-Gen HTTPS Callable Cloud Function for custom Poppo ID authentication.
  */
 export const authenticatePoppoUser = onCall(
+  {
+    serviceAccount: "nine-dashboard-sa@gen-lang-client-0222945352.iam.gserviceaccount.com"
+  },
   async (request: CallableRequest<AuthenticatePoppoRequest>): Promise<AuthenticatePoppoResponse> => {
     const { data } = request;
 
@@ -96,8 +105,13 @@ export const authenticatePoppoUser = onCall(
  * Scheduled function to automatically delete system_logs older than 30 days.
  * Runs every day at midnight (UTC).
  */
-export const cleanupOldSystemLogs = onSchedule("every day 00:00", async (event) => {
-  const db = getFirestore();
+export const cleanupOldSystemLogs = onSchedule(
+  {
+    schedule: "every day 00:00",
+    serviceAccount: "nine-dashboard-sa@gen-lang-client-0222945352.iam.gserviceaccount.com"
+  }, 
+  async (event) => {
+    const db = getFirestore();
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
   const cutoffTimestamp = thirtyDaysAgo.toISOString();
@@ -159,8 +173,13 @@ function parseManilaTimeToUTC(dateStr: string, timeStr: string): number {
  * Scheduled function to check upcoming events and post announcements.
  * Runs every 5 minutes.
  */
-export const checkUpcomingEvents = onSchedule("every 5 minutes", async (event) => {
-  const db = getFirestore();
+export const checkUpcomingEvents = onSchedule(
+  {
+    schedule: "every 5 minutes",
+    serviceAccount: "nine-dashboard-sa@gen-lang-client-0222945352.iam.gserviceaccount.com"
+  }, 
+  async (event) => {
+    const db = getFirestore();
   const now = Date.now();
   
   try {
@@ -234,8 +253,13 @@ export const checkUpcomingEvents = onSchedule("every 5 minutes", async (event) =
  * Scheduled function to automatically sync Livehouse Spreadsheet data.
  * Runs every 15 minutes.
  */
-export const autoSyncLivehouseData = onSchedule("every 15 minutes", async (event) => {
-  const API_URL = "https://script.google.com/macros/s/AKfycbxM3XxkT30dpaNbVSsUFVlLhSCejbcZcIizqEE1StZpj4nKGGMmMSzN0xn0tmYHQuuwaQ/exec";
+export const autoSyncLivehouseData = onSchedule(
+  {
+    schedule: "every 15 minutes",
+    serviceAccount: "nine-dashboard-sa@gen-lang-client-0222945352.iam.gserviceaccount.com"
+  }, 
+  async (event) => {
+    const API_URL = "https://script.google.com/macros/s/AKfycbxM3XxkT30dpaNbVSsUFVlLhSCejbcZcIizqEE1StZpj4nKGGMmMSzN0xn0tmYHQuuwaQ/exec";
   const db = getFirestore();
   
   try {

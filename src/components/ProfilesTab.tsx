@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { Search, Filter, Loader2, Star, Users, LayoutGrid } from 'lucide-react';
 import { FirebaseService } from '../lib/firebaseService';
 import { Host } from '../types';
@@ -276,20 +277,21 @@ export const ProfilesTab: React.FC<ProfilesTabProps> = ({ isReadOnly = false }) 
       )}
 
       {/* SPOTLIGHT MODAL */}
-      {selectedHost && (
+      {selectedHost && createPortal(
         <div className="fixed inset-0 z-[100]">
           <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={closeSpotlight}></div>
-          <div className="absolute inset-0 p-4 overflow-y-auto pointer-events-none flex items-start justify-center py-10">
-            <div className="pointer-events-auto w-full flex justify-center">
+          <div className="absolute inset-0 overflow-y-auto p-4 py-10 pointer-events-none">
+            <div className="pointer-events-auto w-full mx-auto flex justify-center min-h-full">
               <HostProfileView 
                 host={selectedHost} 
                 isReadOnly={isReadOnly} 
                 onClose={closeSpotlight} 
-                onProfileUpdated={handleProfileUpdated}
+                hidePerformanceStats={false}
               />
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

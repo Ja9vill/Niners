@@ -1,0 +1,115 @@
+{
+  "nodes": [
+    { 
+      "id": "ProvisionUser", 
+      "type": "form", 
+      "label": "Provision User Form", 
+      "description": "Admin form for registering new users", 
+      "fields": [
+        {"label": "Poppo ID", "key": "poppo_id"},
+        {"label": "Nickname", "key": "nickname"},
+        {"label": "Real Name", "key": "name"},
+        {"label": "Agency Code", "key": "agency"},
+        {"label": "Account Role", "key": "role"},
+        {"label": "Assigned Manager", "key": "manager_assigned"},
+        {"label": "Team / Guild", "key": "anchor_team"},
+        {"label": "Contact Number", "key": "phone_number"},
+        {"label": "Status", "key": "status"},
+        {"label": "Points Target", "key": "target_points"},
+        {"label": "Password", "key": "password"}
+      ] 
+    },
+    { 
+      "id": "LivehouseBookingModal", 
+      "type": "form", 
+      "label": "Livehouse Booking Form", 
+      "description": "Form for booking a livehouse event timeslot", 
+      "fields": [
+        {"label": "User Poppo ID", "key": "poppoId"},
+        {"label": "Host Name", "key": "name"},
+        {"label": "Host Role", "key": "role"},
+        {"label": "Event Date", "key": "date"},
+        {"label": "Timeslot", "key": "timeslot"},
+        {"label": "Livehouse Type", "key": "livehouseType"},
+        {"label": "Event Notes", "key": "notes"},
+        {"label": "Status", "key": "status"}
+      ] 
+    },
+    { 
+      "id": "HostProfileEditor", 
+      "type": "form", 
+      "label": "Profile Editor", 
+      "description": "User profile settings editor", 
+      "fields": [
+        {"label": "Display Nickname", "key": "nickname"},
+        {"label": "Real Name", "key": "name"},
+        {"label": "Phone Number", "key": "phone_number"},
+        {"label": "WhatsApp", "key": "whatsapp_number"},
+        {"label": "Profile Photo URL", "key": "profile_photo"},
+        {"label": "Cover Photo URL", "key": "cover_photo"}
+      ] 
+    },
+    { 
+      "id": "PKSubmitForm", 
+      "type": "form", 
+      "label": "PK Report Form", 
+      "description": "Form for submitting PK battle reports", 
+      "fields": [
+        {"label": "Host ID", "key": "hostId"},
+        {"label": "Host Name", "key": "hostName"},
+        {"label": "Opponent ID", "key": "opponentId"},
+        {"label": "Opponent Name", "key": "opponentName"},
+        {"label": "Battle Result", "key": "result"},
+        {"label": "Total Points", "key": "points"},
+        {"label": "Screenshot", "key": "screenshotUrl"}
+      ] 
+    },
+    { 
+      "id": "FanbaseSubmitForm", 
+      "type": "form", 
+      "label": "Fanbase Growth Form", 
+      "description": "Form for tracking fanbase growth", 
+      "fields": [
+        {"label": "Host ID", "key": "hostId"},
+        {"label": "Host Name", "key": "hostName"},
+        {"label": "Current Followers", "key": "currentFollowers"},
+        {"label": "Target Followers", "key": "targetFollowers"},
+        {"label": "Screenshot", "key": "screenshotUrl"}
+      ] 
+    },
+    { 
+      "id": "FinancialData", 
+      "type": "form", 
+      "label": "Financial CSV Upload", 
+      "description": "Bulk uploads tabular performance data from Excel", 
+      "fields": [
+        {"label": "Poppo ID", "key": "poppo_id"},
+        {"label": "Nickname", "key": "nickname"},
+        {"label": "Month", "key": "month"},
+        {"label": "Year", "key": "year"},
+        {"label": "Total Points", "key": "total_earnings_of_points"},
+        {"label": "Agent Commission", "key": "agent_commission"},
+        {"label": "Live Earnings", "key": "live_earnings"},
+        {"label": "Party Earnings", "key": "party_earnings"},
+        {"label": "Private Chat", "key": "private_chat"},
+        {"label": "Tips", "key": "tips"}
+      ] 
+    },
+    
+    { "id": "users", "type": "collection", "label": "users", "description": "Core identity and profiles. Managed by ProvisionUser and HostProfileEditor." },
+    { "id": "livehouse_requests", "type": "collection", "label": "livehouse_requests", "description": "Pending and approved livehouse bookings." },
+    { "id": "pk_reports", "type": "collection", "label": "pk_reports", "description": "Host PK battle records, contains screenshots and points." },
+    { "id": "fanbase_reports", "type": "collection", "label": "fanbase_reports", "description": "Host fanbase growth tracking records." },
+    { "id": "commissions", "type": "collection", "label": "commissions", "description": "Master financial ledgers for directors." },
+    { "id": "agent_financials", "type": "collection", "label": "agent_financials", "description": "Isolated team financial ledgers for agents." }
+  ],
+  "edges": [
+    { "source": "ProvisionUser", "target": "users", "action": "setDoc", "description": "Creates new user profile" },
+    { "source": "HostProfileEditor", "target": "users", "action": "updateDoc", "description": "Updates profile details and photos" },
+    { "source": "LivehouseBookingModal", "target": "livehouse_requests", "action": "setDoc", "description": "Creates pending timeslot request" },
+    { "source": "PKSubmitForm", "target": "pk_reports", "action": "setDoc", "description": "Logs PK battle result" },
+    { "source": "FanbaseSubmitForm", "target": "fanbase_reports", "action": "setDoc", "description": "Logs Fanbase metrics" },
+    { "source": "FinancialData", "target": "commissions", "action": "batch.set", "description": "Bulk creates master monthly/weekly performance records" },
+    { "source": "FinancialData", "target": "agent_financials", "action": "batch.set", "description": "Bulk creates isolated agent team records" }
+  ]
+}

@@ -315,3 +315,12 @@ body {
 [class*="bg-[#0A0A0F]"] {
   background-color: #0F0A06 !important;
 }
+
+/* Purge all deep blue (#0A0B0E) backgrounds and apply fiery gold glassmorphism globally */
+[class*="bg-[#0A0B0E]"] {
+  background-color: rgba(15, 8, 0, 0.85) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+  backdrop-filter: blur(16px) !important;
+  border-color: rgba(212, 175, 55, 0.2) !important;
+  box-shadow: 0 4px 30px rgba(212, 175, 55, 0.05) !important;
+}

@@ -9,6 +9,7 @@ import { body, validationResult } from "express-validator";
 import { getStaticHosts } from "../lib/staticHosts";
 import { logAuthEvent } from "./auditLogger";
 import { initFirebaseSecrets } from "./secrets";
+import { runAutoSyncLivehouseData } from "./cron";
 
 const router = Router();
 const JWT_SECRET = process.env.JWT_SECRET || "nine-dashboard-secret-key-12345";
@@ -787,6 +788,35 @@ router.post("/verify", async (req, res) => {
 // ─────────────────────────────────────────────
 // ADMIN ROUTES (require JWT with level >= 3)
 // ─────────────────────────────────────────────
+
+/**
+ * POST /api/admin/livehouse/sync
+ * Manually trigger the Livehouse sync from Google Sheets
+ */
+router.post("/livehouse/sync", requireAuth(3), async (req: any, res) => {
+  try {
+    await runAutoSyncLivehouseData(true); // ignoreLock = true
+    res.json({ success: true, message: "Sync triggered successfully. The UI will update automatically." });
+  } catch (error: any) {
+    console.error("Manual Livehouse Sync Error:", error);
+    res.status(500).json({ error: error?.message || "Failed to sync Livehouse data." });
+  }
+});
+
+/**
+ * POST /api/public/livehouse/sync
+ * Public trigger to sync Livehouse data (used when anyone opens the calendar tab)
+ */
+router.post("/public/livehouse/sync", async (req, res) => {
+  try {
+    // We don't ignore lock here, so if it's already running within the interval, it skips safely
+    await runAutoSyncLivehouseData(false);
+    res.json({ success: true, message: "Sync triggered" });
+  } catch (error) {
+    console.error("Public Livehouse Sync Error:", error);
+    res.status(500).json({ error: "Failed to sync" });
+  }
+});
 
 /**
  * POST /api/admin/reset-password

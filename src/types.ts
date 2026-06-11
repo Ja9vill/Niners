@@ -129,6 +129,9 @@ export interface PerformanceReportEntry {
   super_rank: number;
   agentweb_commission_rate: number;
   _isUnknownHost?: boolean;
+  owner_id?: string;
+  owner_role?: string;
+  report_type?: 'monthly' | 'weekly';
 
   // legacy fallbacks
   total_points?: number;

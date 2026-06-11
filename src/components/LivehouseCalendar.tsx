@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { FirebaseService } from '../lib/firebaseService';
 import { LivehouseDataRow, LivehouseSlot } from '../types/livehouse';
 import { Storage } from '../lib/storage';
@@ -16,25 +17,17 @@ interface LivehouseCalendarProps {
 const LivehouseSlotButton = ({ slot, timeslotStr, activeDateStr, dataLength, allUsers, onOpenBookingModal, onOpenSpotlight }: { slot: LivehouseSlot, timeslotStr: string, activeDateStr: string, dataLength: number, allUsers: any[], onOpenBookingModal: (date: string, time: string) => void, onOpenSpotlight?: (user: any, time: string, date: string) => void }) => {
   const [isFlipped, setIsFlipped] = useState(false);
 
-  if (dataLength === 0) {
+  if (dataLength === 0 || slot.available) {
+    // GREEN GLASSMORPHISM
     return (
-      <div className="w-[95%] mr-auto py-1.5 sm:py-2 flex items-center justify-center rounded-full border border-white/5 bg-transparent opacity-30 cursor-not-allowed">
-        <span className="text-white/30 font-bold text-[10px] sm:text-xs uppercase tracking-wider truncate">LOCKED</span>
+      <div 
+        onClick={() => onOpenBookingModal(activeDateStr, timeslotStr)}
+        className="w-[95%] mr-auto py-1.5 sm:py-2 flex items-center justify-center rounded-full border border-[#008F39] bg-[#031508]/80 hover:bg-[#031508] backdrop-blur-md transition-all duration-300 cursor-pointer shadow-[0_0_10px_rgba(0,255,136,0.1)] hover:shadow-[0_0_20px_rgba(0,255,136,0.3)] hover:scale-105"
+      >
+        <span className="text-[#00FF88] font-bold text-[10px] sm:text-xs uppercase tracking-wider truncate">AVAILABLE</span>
       </div>
     );
   }
-
-    if (slot.available) {
-      // GREEN GLASSMORPHISM
-      return (
-        <div 
-          onClick={() => onOpenBookingModal(activeDateStr, timeslotStr)}
-          className="w-[95%] mr-auto py-1.5 sm:py-2 flex items-center justify-center rounded-full border border-emerald-500/40 hover:border-emerald-400 bg-emerald-500/5 hover:bg-emerald-500/15 transition-all duration-300 cursor-pointer shadow-[0_0_10px_rgba(16,185,129,0.05)] hover:shadow-[0_0_20px_rgba(16,185,129,0.3)] hover:scale-105"
-        >
-          <span className="text-emerald-400 font-bold text-[10px] sm:text-xs uppercase tracking-wider truncate">AVAILABLE</span>
-        </div>
-      );
-    }
 
   const rawId = slot.poppo_id?.trim();
   if (!rawId) {
@@ -129,6 +122,14 @@ export const LivehouseCalendar: React.FC<LivehouseCalendarProps> = ({ allUsers, 
 
   useEffect(() => {
     setIsLoading(true);
+    
+    // Background auto-trigger for sync when anyone opens the tab (Throttled to 5 mins)
+    const lastSync = sessionStorage.getItem('last_livehouse_sync_trigger');
+    if (!lastSync || Date.now() - Number(lastSync) > 5 * 60 * 1000) {
+      fetch('/api/public/livehouse/sync', { method: 'POST' }).catch(console.error);
+      sessionStorage.setItem('last_livehouse_sync_trigger', Date.now().toString());
+    }
+
     // Listen to Firebase real-time updates
     const q = query(collection(db, 'livehouse_schedule'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -410,13 +411,11 @@ export const LivehouseCalendar: React.FC<LivehouseCalendarProps> = ({ allUsers, 
                <div className="text-xs sm:text-[13px] font-black tracking-[0.15em] uppercase text-transparent bg-clip-text bg-gradient-to-r from-[#FFF0B3] via-[#D4AF37] to-[#FF8C00] text-center px-4">
                   {(() => {
                     if (!activeDateStr) return "";
+                    const localAgnosticDate = parse(activeDateStr, 'yyyy-MM-dd', new Date());
                     if (timezoneMode === 'UTC+8') {
-                      const localAgnosticDate = parse(activeDateStr, 'yyyy-MM-dd', new Date());
                       return `${format(localAgnosticDate, 'MMMM dd, yyyy')} | UTC+8 Manila, PH`;
                     } else {
-                      // Anchor to the START of the Manila day, since that represents the bulk of the day for western timezones
-                      const manilaStart = new Date(`${activeDateStr}T00:00:00+08:00`); 
-                      return `${format(manilaStart, 'MMMM dd, yyyy')} | ${localTzAbbr}`;
+                      return `${format(localAgnosticDate, 'MMMM dd, yyyy')} | ${localTzAbbr}`;
                     }
                   })()}
                </div>
@@ -439,10 +438,7 @@ export const LivehouseCalendar: React.FC<LivehouseCalendarProps> = ({ allUsers, 
               if (startPart.includes('AM') && hour === 12) hour = 0;
 
               // Apply beautiful zebra striping and day/night fiery accents
-              const isEvening = hour >= 18 || hour < 6;
-              const bgClass = isEvening 
-                ? "bg-gradient-to-r from-[#0a0806]/90 via-[#140c06]/90 to-[#0a0806]/90 border-[#FF8C00]/10 shadow-[inset_0_0_20px_rgba(255,140,0,0.02)]" 
-                : "bg-gradient-to-r from-[#14100c]/80 via-[#1a140d]/80 to-[#14100c]/80 border-[#D4AF37]/10 shadow-[inset_0_0_20px_rgba(212,175,55,0.02)]";
+              const bgClass = "bg-[#0A0500]/80 backdrop-blur-xl border-[#D4AF37]/30 shadow-[0_0_15px_rgba(0,0,0,0.5)]";
 
               // Compute localized time display if necessary
               let displayTimeslot = row.timeslot;
@@ -464,17 +460,16 @@ export const LivehouseCalendar: React.FC<LivehouseCalendarProps> = ({ allUsers, 
                  
                  displayTimeslot = `${format12Hour(localStartHour)} - ${format12Hour(localEndHour)}`;
                  
-                 // Get the banner's local calendar day to compare against
-                 const manilaStart = new Date(`${activeDateStr}T00:00:00+08:00`); 
-                 if (dateObj.getDate() !== manilaStart.getDate()) {
-                   // If this specific timeslot spills over into a different local calendar date than the banner, explicitly show that date!
+                 // If this specific timeslot falls on a different local calendar date than the selected Manila date, explicitly show it!
+                 const localDateStr = format(dateObj, 'yyyy-MM-dd');
+                 if (localDateStr !== activeDateStr) {
                    dayOffsetStr = format(dateObj, 'MMM d');
                  }
               }
 
               return (
-              <div key={idx} className={cn("grid grid-cols-3 gap-2 sm:gap-4 items-center py-2.5 sm:py-3 transition-all border rounded-2xl mb-2 backdrop-blur-md hover:shadow-[0_0_15px_rgba(212,175,55,0.05)]", bgClass)}>
-                <div className="font-black text-sm sm:text-base text-center text-transparent bg-clip-text bg-gradient-to-r from-[#D4AF37] to-[#FF8C00] tracking-tight sm:tracking-normal pl-1 flex flex-col items-center justify-center">
+              <div key={idx} className={cn("grid grid-cols-3 gap-2 sm:gap-4 items-center py-2.5 sm:py-3 transition-all border rounded-2xl mb-2 backdrop-blur-md hover:shadow-[0_0_20px_rgba(212,175,55,0.15)] group", bgClass)}>
+                <div className="font-black text-sm sm:text-base text-center text-[#D4AF37] tracking-tight sm:tracking-normal pl-1 flex flex-col items-center justify-center">
                   <span>{displayTimeslot}</span>
                   {dayOffsetStr && <span className="text-[9px] text-white/50 uppercase tracking-widest mt-0.5 bg-white/5 px-1.5 py-0.5 rounded-md">({dayOffsetStr})</span>}
                 </div>
@@ -497,7 +492,7 @@ export const LivehouseCalendar: React.FC<LivehouseCalendarProps> = ({ allUsers, 
       </div>
 
       {/* Spotlight Modal */}
-      {spotlightHost && (
+      {spotlightHost && createPortal(
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-black/80 backdrop-blur-md animate-fade-in" onClick={() => setSpotlightHost(null)}>
           <div 
             className="w-full max-w-md bg-[#050301] border border-[#D4AF37]/30 shadow-[0_0_50px_rgba(255,140,0,0.2),inset_0_0_20px_rgba(212,175,55,0.1)] p-6 sm:p-8 rounded-3xl flex flex-col gap-6"
@@ -568,7 +563,8 @@ export const LivehouseCalendar: React.FC<LivehouseCalendarProps> = ({ allUsers, 
               Close Spotlight
             </button>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

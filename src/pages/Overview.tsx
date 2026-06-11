@@ -173,6 +173,7 @@ export const Overview = () => {
   // Filtered reports
   const filteredReports = useMemo(() => {
     return reports.filter(r => {
+      if (r.report_type === 'weekly') return false; // Prevent duplicating weekly into monthly totals
       if (selectedYear !== 'all' && String(r.year) !== selectedYear) return false;
       if (selectedMonth !== 'all' && r.monthName !== selectedMonth) return false;
       return true;
@@ -182,6 +183,7 @@ export const Overview = () => {
   // Leaderboard specific filtered reports
   const lbReports = useMemo(() => {
     return reports.filter(r => {
+      if (r.report_type === 'weekly') return false; // Prevent duplicating weekly into monthly totals
       if (lbYear !== 'all' && String(r.year) !== lbYear) return false;
       if (lbMonth !== 'all' && r.monthName !== lbMonth) return false;
       return true;
@@ -226,14 +228,28 @@ export const Overview = () => {
       byHost[id].points += getPoints(r);
       byHost[id].liveHrs += getLiveDuration(r);
       byHost[id].months += 1;
+      
+      // Only include top-level commission for leaderboard? Or all commission? 
+      // User says: "that commission was theirs (the agent) and not to the agency"
+      // Wait, if it's the *host's* commission leaderboard, we should show whatever agent commission they generated, regardless of who owns it, OR we only show Nine Agency.
+      // Let's just include all commission here for the host's performance, but split the totals.
       byHost[id].commission += getAgentComm(r);
     });
     return Object.values(byHost).sort((a, b) => b.commission - a.commission);
   }, [lbReports, hostLookup]);
 
   const lbTotalPeriodCommission = useMemo(() => {
-    return lbReports.reduce((sum, r) => sum + getAgentComm(r), 0);
+    return lbReports.reduce((sum, r) => sum + (r.owner_role !== 'Agent' ? getAgentComm(r) : 0), 0);
   }, [lbReports]);
+
+  // Splits for top KPI row
+  const totalAgencyCommission = useMemo(() => {
+    return filteredReports.reduce((sum, r) => sum + (r.owner_role !== 'Agent' ? getAgentComm(r) : 0), 0);
+  }, [filteredReports]);
+
+  const totalAgentCommission = useMemo(() => {
+    return filteredReports.reduce((sum, r) => sum + (r.owner_role === 'Agent' ? getAgentComm(r) : 0), 0);
+  }, [filteredReports]);
 
   // Monthly trend data
   const monthlyTrend = useMemo(() => {
@@ -583,10 +599,21 @@ export const Overview = () => {
             <div className="global-block-1 relative overflow-hidden rounded-xl p-2.5 sm:p-4 flex flex-col justify-between min-h-[84px] sm:min-h-[104px] transition-all duration-300 group hover:-translate-y-0.5 shadow-lg border">
               <Award className="absolute top-2 right-2 w-4 h-4 opacity-[0.07] pointer-events-none" style={{ color: '#FFB800' }} />
               <p className="text-[8px] sm:text-[10px] font-black uppercase tracking-wider text-[#A09E9A] leading-tight pr-4">
-                Agency Commission
+                Nine Agency Commission
               </p>
               <p className="text-sm sm:text-2xl md:text-3xl font-black leading-none mt-2 truncate" style={{ color: '#FFB800' }}>
-                {formatPts(sum(getAgentComm))}
+                {formatPts(totalAgencyCommission)}
+              </p>
+            </div>
+
+            {/* Row 3 Block 1: Sub-Agent Commission */}
+            <div className="global-block-1 relative overflow-hidden rounded-xl p-2.5 sm:p-4 flex flex-col justify-between min-h-[84px] sm:min-h-[104px] transition-all duration-300 group hover:-translate-y-0.5 shadow-lg border">
+              <Award className="absolute top-2 right-2 w-4 h-4 opacity-[0.07] pointer-events-none" style={{ color: '#FFB800' }} />
+              <p className="text-[8px] sm:text-[10px] font-black uppercase tracking-wider text-[#A09E9A] leading-tight pr-4">
+                Sub-Agent Commission
+              </p>
+              <p className="text-sm sm:text-2xl md:text-3xl font-black leading-none mt-2 truncate text-[#A09E9A]/80">
+                {formatPts(totalAgentCommission)}
               </p>
             </div>
           </div>
@@ -764,7 +791,9 @@ export const Overview = () => {
         <div className="flex items-center justify-between flex-wrap gap-4 border-b border-[#D4AF37]/10 pb-4">
           <div className="flex items-center gap-2">
             <Award size={16} className="text-[#D4AF37]" />
-            <h3 className="font-bold text-[#F0EFE8] text-sm uppercase tracking-widest whitespace-nowrap">Host Leaderboard & Contribution</h3>
+            <h3 className="font-bold text-[#F0EFE8] text-sm uppercase tracking-widest whitespace-nowrap">
+              Host Leaderboard & Contribution
+            </h3>
           </div>
           <div className="flex items-center gap-2 relative z-10">
             <select
@@ -1001,15 +1030,17 @@ export const Overview = () => {
 
       {/* SPOTLIGHT MODAL */}
       {spotlightHost && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm overflow-y-auto">
-          <HostProfileView 
-            host={spotlightHost} 
+        <div className="fixed inset-0 z-[100] flex items-start justify-center p-4 sm:p-10 bg-black/80 backdrop-blur-sm overflow-y-auto">
+          <div className="w-full max-w-7xl relative my-auto">
+            <HostProfileView 
+              host={spotlightHost} 
             isReadOnly={false} 
             onClose={() => setSpotlightHost(null)} 
             onProfileUpdated={() => {}}
             isSpotlight={true}
             hidePerformanceStats={true}
           />
+          </div>
         </div>
       )}
     </div>
