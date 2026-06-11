@@ -2,7 +2,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Outlet, useNavigate, useLocation, Link } from 'react-router-dom';
 import { 
   Menu, X, LogOut, LayoutDashboard, Users, User, Shield, Calendar, DollarSign, Activity, FileText,
-  Bell, Trash2, Plus, Clock, ChevronDown, Monitor, Smartphone, TrendingUp, Edit3, Image as ImageIcon
+  Bell, Trash2, Plus, Clock, ChevronDown, Monitor, Smartphone, TrendingUp, Edit3, Image as ImageIcon,
+  Settings, Database, BarChart, ClipboardList, Award, Network
 } from 'lucide-react';
 import { useViewMode } from '../hooks/useViewMode';
 import { Storage } from '../lib/storage';
@@ -587,12 +588,35 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
       links.push({
         id: 'dropdown-cms',
         isDropdown: true,
-        label: 'Content Management',
+        label: 'Blog Posts',
         icon: Edit3,
         subLinks: [
           { path: '/cms/blogs', label: 'Blog Management', icon: Edit3 },
-          { path: '/cms/assets', label: 'Page Assets', icon: ImageIcon },
+          { path: '/cms/assets', label: 'Page Assets', icon: ImageIcon }
+        ]
+      });
+
+      links.push({
+        id: 'dropdown-operations',
+        isDropdown: true,
+        label: 'Operations',
+        icon: Settings,
+        subLinks: [
           { path: '/cms/livehouse', label: 'Livehouse Data', icon: Calendar }
+        ]
+      });
+
+      links.push({
+        id: 'dropdown-reporting',
+        isDropdown: true,
+        label: 'Reporting',
+        icon: BarChart,
+        subLinks: [
+          { path: '/reporting/events', label: 'Events Log', icon: Calendar },
+          { path: '/reporting/attendance', label: 'Attendance Log', icon: ClipboardList },
+          { path: '/reporting/pk-performance', label: 'PK Performance', icon: Activity },
+          { path: '/reporting/fanbase-health', label: 'Fanbase Health', icon: Users },
+          { path: '/reporting/assigned-badges', label: 'Assigned Badges', icon: Award }
         ]
       });
       
@@ -600,11 +624,14 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
         links.push({ isDivider: true, id: 'div-2' });
         links.push({ isTitle: true, label: "Directors Access", id: 'title-access' });
         links.push({ path: '/provision-user', label: 'Provision User', icon: Plus });
-        links.push({ path: '/financial-data', label: 'Reporting', icon: DollarSign });
+        links.push({ path: '/financial-data', label: 'Financial Data', icon: DollarSign });
+        links.push({ path: '/collections-log', label: 'Collections Log', icon: Database });
+        links.push({ path: '/data-vault', label: 'Data Vault', icon: Shield });
       }
     } else if (role === 'manager' || role === 'agent') {
       links.push({ isDivider: true, id: 'div-manager' });
       links.push({ path: '/analytics', label: 'Team Analytics', icon: TrendingUp });
+      links.push({ path: '/team-financials', label: 'Team Financials', icon: DollarSign });
     }
 
     return links;
