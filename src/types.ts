@@ -230,6 +230,7 @@ export interface CalendarEvent {
   location?: string;
   participants?: string[];
   participantIds?: string[];
+  is_automated?: boolean;
 }
 
 export type ExposureEntry = CalendarEvent;

@@ -277,13 +277,18 @@ export const ProfilesTab: React.FC<ProfilesTabProps> = ({ isReadOnly = false }) 
 
       {/* SPOTLIGHT MODAL */}
       {selectedHost && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm overflow-y-auto">
-          <HostProfileView 
-            host={selectedHost} 
-            isReadOnly={isReadOnly} 
-            onClose={closeSpotlight} 
-            onProfileUpdated={handleProfileUpdated}
-          />
+        <div className="fixed inset-0 z-[100]">
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={closeSpotlight}></div>
+          <div className="absolute inset-0 p-4 overflow-y-auto pointer-events-none flex items-start justify-center py-10">
+            <div className="pointer-events-auto w-full flex justify-center">
+              <HostProfileView 
+                host={selectedHost} 
+                isReadOnly={isReadOnly} 
+                onClose={closeSpotlight} 
+                onProfileUpdated={handleProfileUpdated}
+              />
+            </div>
+          </div>
         </div>
       )}
     </div>

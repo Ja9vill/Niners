@@ -601,8 +601,8 @@ export const RosterTab: React.FC<RosterTabProps> = ({ isReadOnly = false }) => {
       {selectedHost && (
         <div className="fixed inset-0 z-[100]">
           <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={closeSpotlight}></div>
-          <div className="absolute inset-0 p-4 overflow-y-auto pointer-events-none flex flex-col items-center py-10">
-            <div className="pointer-events-auto w-full h-full flex justify-center">
+          <div className="absolute inset-0 overflow-y-auto p-4 py-10 pointer-events-none">
+            <div className="pointer-events-auto w-full mx-auto flex justify-center min-h-full">
               <HostProfileView 
                 host={selectedHost} 
                 isReadOnly={isReadOnly} 

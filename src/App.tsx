@@ -24,6 +24,7 @@ import { FinancialData } from './pages/FinancialData';
 import { PublicLanding } from './pages/PublicLanding';
 import { BlogManagement } from './pages/cms/BlogManagement';
 import { PageAssetsCMS } from './pages/cms/PageAssetsCMS';
+import { LivehouseData } from './pages/cms/LivehouseData';
 import { AgencyPolicy } from './pages/AgencyPolicy';
 import { OnboardingProcess } from './pages/OnboardingProcess';
 import { LoginSetup } from './pages/public/LoginSetup';
@@ -165,6 +166,16 @@ export default function App() {
             element={
               <RoleGuard roles={['director', 'head admin', 'head_admin']}>
                 <PageAssetsCMS />
+              </RoleGuard>
+            }
+          />
+
+          {/* CMS: Livehouse Data */}
+          <Route
+            path="cms/livehouse"
+            element={
+              <RoleGuard roles={['director', 'head admin', 'head_admin']}>
+                <LivehouseData />
               </RoleGuard>
             }
           />

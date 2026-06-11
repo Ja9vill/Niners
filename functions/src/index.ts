@@ -229,3 +229,110 @@ export const checkUpcomingEvents = onSchedule("every 5 minutes", async (event) =
     console.error("Failed to check upcoming events:", err);
   }
 });
+
+/**
+ * Scheduled function to automatically sync Livehouse Spreadsheet data.
+ * Runs every 15 minutes.
+ */
+export const autoSyncLivehouseData = onSchedule("every 15 minutes", async (event) => {
+  const API_URL = "https://script.google.com/macros/s/AKfycbxM3XxkT30dpaNbVSsUFVlLhSCejbcZcIizqEE1StZpj4nKGGMmMSzN0xn0tmYHQuuwaQ/exec";
+  const db = getFirestore();
+  
+  try {
+    const response = await fetch(API_URL);
+    const data = await response.json();
+
+    if (!data || data.status === "error" || !Array.isArray(data)) {
+      console.warn("Livehouse auto-sync aborted: Invalid or error data returned from Apps Script.", data);
+      return;
+    }
+
+    const scheduleRows = data as any[];
+    
+    // Chunk batches because of Firestore's 500 operation limit per batch
+    const maxBatchSize = 400;
+    let batch = db.batch();
+    let batchCount = 0;
+    
+    const commitBatchIfNeeded = async () => {
+      if (batchCount >= maxBatchSize) {
+        await batch.commit();
+        batch = db.batch();
+        batchCount = 0;
+      }
+    };
+    
+    // 1. Clear existing Livehouse schedule
+    const path = "livehouse_schedule";
+    const snap = await db.collection(path).get();
+    for (const d of snap.docs) {
+      batch.delete(d.ref);
+      batchCount++;
+      await commitBatchIfNeeded();
+    }
+
+    // 2. Set new Livehouse schedule & generate calendar events
+    const validCalendarEventIds: string[] = [];
+
+    for (const r of scheduleRows) {
+      if (!r.date || !r.timeslot) continue;
+      
+      const docId = `${r.date}_${r.timeslot}`.replace(/[^a-zA-Z0-9_-]/g, "_");
+      const docRef = db.collection(path).doc(docId);
+      batch.set(docRef, r);
+      batchCount++;
+      await commitBatchIfNeeded();
+      
+      // Auto-generate calendar event for timeslots that have users booked
+      const participants = [];
+      if (r.slot_1 && r.slot_1.poppo_id) participants.push(String(r.slot_1.poppo_id));
+      if (r.slot_2 && r.slot_2.poppo_id) participants.push(String(r.slot_2.poppo_id));
+      
+      if (participants.length > 0) {
+        const calEventId = `auto_lh_${docId}`;
+        validCalendarEventIds.push(calEventId);
+        
+        const calDocRef = db.collection("calendar").doc(calEventId);
+        batch.set(calDocRef, {
+          id: calEventId,
+          event_id: calEventId,
+          title: "Livehouse Event",
+          type_of_event: "Livehouse",
+          type: "Livehouse",
+          event_date: r.date,
+          date: r.date,
+          time: r.timeslot,
+          description: "Automated Livehouse Event. Edits to participants will be overwritten by spreadsheet syncs.",
+          participants_id: participants,
+          participants: participants,
+          is_automated: true,
+          created_by_id: "system",
+          created_by_name: "Auto Sync",
+          created_by_role: "system",
+          timestamp: new Date().toISOString()
+        }, { merge: true });
+        batchCount++;
+        await commitBatchIfNeeded();
+      }
+    }
+    
+    // 3. Clear stale automated calendar events
+    const calSnap = await db.collection("calendar").where("is_automated", "==", true).get();
+    for (const d of calSnap.docs) {
+      if (!validCalendarEventIds.includes(d.id)) {
+        batch.delete(d.ref);
+        batchCount++;
+        await commitBatchIfNeeded();
+      }
+    }
+
+    if (batchCount > 0) {
+      await batch.commit();
+    }
+    
+    console.log(`Successfully completed automated Livehouse sync! Extracted ${scheduleRows.length} timeslots.`);
+    
+  } catch (err) {
+    console.error("Failed to execute autoSyncLivehouseData:", err);
+  }
+});

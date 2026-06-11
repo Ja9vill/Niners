@@ -591,7 +591,8 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
         icon: Edit3,
         subLinks: [
           { path: '/cms/blogs', label: 'Blog Management', icon: Edit3 },
-          { path: '/cms/assets', label: 'Page Assets', icon: ImageIcon }
+          { path: '/cms/assets', label: 'Page Assets', icon: ImageIcon },
+          { path: '/cms/livehouse', label: 'Livehouse Data', icon: Calendar }
         ]
       });
       

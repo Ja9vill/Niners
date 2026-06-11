@@ -7323,11 +7323,11 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
         </div>
       ) : (
         <div className={cn(
-          (isSpotlight && !hidePerformanceStats)
-            ? "space-y-4 py-1"
+          isSpotlight
+            ? "mx-auto w-full pt-1 space-y-4 max-w-xl"
             : "grid grid-cols-1 lg:grid-cols-3 gap-6 pt-1"
         )}>
-          {(isSpotlight && !hidePerformanceStats) ? (
+          {isSpotlight ? (
             <>
               {renderIdentityCard()}
               {renderFanbaseBlock()}
@@ -7336,12 +7336,16 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                 {renderExposuresAndAttendance()}
               </div>
               {renderRecognitionsCard()}
-              {renderMonthlyTrend()}
-              {renderPerformanceMetricsAndDiversity()}
-              {renderTrendBadge()}
-              {renderWeeklyLiveStats()}
-              {renderAgentNotes()}
-              {renderAIAnalysis()}
+              {!hidePerformanceStats && (
+                <>
+                  {renderMonthlyTrend()}
+                  {renderPerformanceMetricsAndDiversity()}
+                  {renderTrendBadge()}
+                  {renderWeeklyLiveStats()}
+                  {renderAgentNotes()}
+                  {renderAIAnalysis()}
+                </>
+              )}
               {onClose && (
                 <button
                   onClick={onClose}
@@ -7377,14 +7381,6 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                     {renderAIAnalysis()}
                   </>
                 )}
-                {isSpotlight && onClose && (
-                  <button
-                    onClick={onClose}
-                    className={cn("w-full mt-4 py-3 border-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all cursor-pointer text-center backdrop-blur-md", styles.gradientBg, styles.borderColor, styles.shadow, styles.badgeText)}
-                  >
-                    Close Profile Spotlight
-                  </button>
-                )}
               </div>
             </>
           )}
@@ -7402,8 +7398,8 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
       {spotlightHost && (
         <div className="fixed inset-0 z-[100]">
           <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setSpotlightHost(null)}></div>
-          <div className="absolute inset-0 p-4 overflow-y-auto pointer-events-none flex flex-col items-center py-10">
-            <div className="pointer-events-auto w-full h-full flex justify-center">
+          <div className="absolute inset-0 overflow-y-auto p-4 py-10 pointer-events-none">
+            <div className="pointer-events-auto w-full mx-auto flex justify-center min-h-full">
               <HostProfileView
                 host={spotlightHost}
                 isReadOnly={true}

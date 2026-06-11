@@ -3,6 +3,7 @@ import { ref, uploadString, getBytes, uploadBytes, getDownloadURL } from 'fireba
 import { Storage } from './storage';
 import { doc, setDoc, getDoc, collection, query, where, getDocs, deleteDoc, writeBatch, Timestamp, onSnapshot, updateDoc, arrayUnion, arrayRemove, deleteField } from 'firebase/firestore';
 import { CommissionEntry, Host, PKEntry, ExposureEntry, FanbaseHealthEntry, WeeklyLiveDataEntry, MonthlyLiveDataEntry, TopNinersEarningsSummary, EventsCalendarPublic, Task, ActivityAuditLog, CalendarEvent, LivehouseRequest, AwardBadge, AwardAssignment, ManagerNote } from '../types';
+import { LivehouseDataRow } from '../types/livehouse';
 
 export enum OperationType {
   CREATE = 'create',
@@ -1243,6 +1244,102 @@ export const FirebaseService = {
       return snap.docs.map(d => d.data() as ExposureEntry);
     } catch (error) {
       console.warn('[FirebaseService] getExposures failed for', hostId, error);
+      return [];
+    }
+  },
+
+  async saveLivehouseSchedule(scheduleRows: LivehouseDataRow[]) {
+    const path = 'livehouse_schedule';
+    try {
+      // Chunk batches because of Firestore's 500 operation limit per batch
+      const maxBatchSize = 400;
+      let batch = writeBatch(db);
+      let batchCount = 0;
+      
+      const commitBatchIfNeeded = async () => {
+        if (batchCount >= maxBatchSize) {
+          await batch.commit();
+          batch = writeBatch(db);
+          batchCount = 0;
+        }
+      };
+      
+      // 1. Clear existing Livehouse schedule
+      const snap = await getDocs(collection(db, path));
+      for (const d of snap.docs) {
+        batch.delete(d.ref);
+        batchCount++;
+        await commitBatchIfNeeded();
+      }
+
+      // 2. Set new Livehouse schedule & generate calendar events
+      const validCalendarEventIds: string[] = [];
+
+      for (const r of scheduleRows) {
+        const docId = `${r.date}_${r.timeslot}`.replace(/[^a-zA-Z0-9_-]/g, '_');
+        const docRef = doc(db, path, docId);
+        batch.set(docRef, r);
+        batchCount++;
+        await commitBatchIfNeeded();
+        
+        // Auto-generate calendar event for timeslots that have users booked
+        const participants = [];
+        if (r.slot_1 && r.slot_1.poppo_id) participants.push(r.slot_1.poppo_id);
+        if (r.slot_2 && r.slot_2.poppo_id) participants.push(r.slot_2.poppo_id);
+        
+        if (participants.length > 0) {
+          const calEventId = `auto_lh_${docId}`;
+          validCalendarEventIds.push(calEventId);
+          
+          const calDocRef = doc(db, 'calendar', calEventId);
+          batch.set(calDocRef, {
+            id: calEventId,
+            event_id: calEventId,
+            title: 'Livehouse Event',
+            type_of_event: 'Livehouse',
+            type: 'Livehouse',
+            event_date: r.date,
+            date: r.date,
+            time: r.timeslot,
+            description: 'Automated Livehouse Event. Edits to participants will be overwritten by spreadsheet syncs.',
+            participants_id: participants,
+            participants: participants,
+            is_automated: true,
+            created_by_id: 'system',
+            created_by_name: 'Livehouse Sync',
+            created_by_role: 'system',
+            timestamp: new Date().toISOString()
+          }, { merge: true });
+          batchCount++;
+          await commitBatchIfNeeded();
+        }
+      }
+      
+      // 3. Clear stale automated calendar events
+      const calSnap = await getDocs(query(collection(db, 'calendar'), where('is_automated', '==', true)));
+      for (const d of calSnap.docs) {
+        if (!validCalendarEventIds.includes(d.id)) {
+          batch.delete(d.ref);
+          batchCount++;
+          await commitBatchIfNeeded();
+        }
+      }
+
+      if (batchCount > 0) {
+        await batch.commit();
+      }
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, path);
+    }
+  },
+
+  async getLivehouseSchedule(): Promise<LivehouseDataRow[]> {
+    const path = 'livehouse_schedule';
+    try {
+      const snap = await getDocs(collection(db, path));
+      return snap.docs.map(d => d.data() as LivehouseDataRow);
+    } catch (error) {
+      console.warn('[FirebaseService] getLivehouseSchedule failed', error);
       return [];
     }
   },

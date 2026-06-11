@@ -223,6 +223,12 @@ service cloud.firestore {
       allow update, delete: if isLeadership();
     }
 
+    // 11. Livehouse Schedule
+    match /livehouse_schedule/{scheduleId} {
+      allow read: if isSignedIn();
+      allow write: if isLeadership() || isAdmin();
+    }
+
     // Default Deny: block all other access by default
     match /{document=**} {
       allow read, write: if false;

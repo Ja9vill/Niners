@@ -9,8 +9,9 @@ import { motion, AnimatePresence } from 'motion/react';
 import { SingleDatePicker } from './InteractiveDatePicker';
 import { AddEventForm } from './AddEventForm';
 import { EVENT_COLORS, TIMESLOTS } from '../lib/constants';
-import { collection, getDocs, doc, setDoc, Timestamp } from 'firebase/firestore';
+import { collection, getDocs, getDoc, doc, setDoc, Timestamp, query, where } from 'firebase/firestore';
 import { db } from '../lib/firebase';
+import { LivehouseCalendar } from './LivehouseCalendar';
 
 
 
@@ -18,27 +19,27 @@ const TIMESLOT_BLOCKS = [
   {
     name: 'Morning',
     slots: [
-      '09:00 AM - 10:00 AM (Manila Time)',
-      '10:00 AM - 11:00 AM (Manila Time)',
-      '11:00 AM - 12:00 PM (Manila Time)'
+      '9AM - 10AM',
+      '10AM - 11AM',
+      '11AM - 12PM'
     ]
   },
   {
     name: 'Afternoon',
     slots: [
-      '02:00 PM - 03:00 PM (Manila Time)',
-      '03:00 PM - 04:00 PM (Manila Time)',
-      '04:00 PM - 05:00 PM (Manila Time)',
-      '05:00 PM - 06:00 PM (Manila Time)'
+      '2PM - 3PM',
+      '3PM - 4PM',
+      '4PM - 5PM',
+      '5PM - 6PM'
     ]
   },
   {
     name: 'Evening',
     slots: [
-      '07:00 PM - 08:00 PM (Manila Time)',
-      '08:00 PM - 09:00 PM (Manila Time)',
-      '09:00 PM - 10:00 PM (Manila Time)',
-      '10:00 PM - 11:00 PM (Manila Time)'
+      '7PM - 8PM',
+      '8PM - 9PM',
+      '9PM - 10PM',
+      '10PM - 11PM'
     ]
   }
 ];
@@ -57,6 +58,21 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
   const [events, setEvents] = useState<CalendarEvent[]>(Storage.getEvents());
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [timeDisplayMode, setTimeDisplayMode] = useState<'Manila' | 'Local'>('Manila');
+  
+  const localTzAbbr = useMemo(() => {
+    try {
+      const shortCode = new Intl.DateTimeFormat('en-US', { timeZoneName: 'short' })
+        .formatToParts(new Date())
+        .find(p => p.type === 'timeZoneName')?.value;
+        
+      if (shortCode) {
+        return shortCode;
+      }
+      return 'LOCAL';
+    } catch {
+      return 'LOCAL';
+    }
+  }, []);
   
   // Modals States
   const [isAdding, setIsAdding] = useState(false);
@@ -79,6 +95,213 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
   const [proposalDate, setProposalDate] = useState(() => format(new Date(), 'yyyy-MM-dd'));
   const [proposalTimeslot, setProposalTimeslot] = useState('');
   const [eventDate, setEventDate] = useState(() => format(new Date(), 'yyyy-MM-dd'));
+
+  // Dual-Tab State
+  const [activeTab, setActiveTab] = useState<'AGENCY' | 'LIVEHOUSE'>('AGENCY');
+
+  // Spotlight State
+  const [spotlightEvent, setSpotlightEvent] = useState<CalendarEvent | null>(null);
+
+  // Expandable Modal States
+  const [isAttendanceExpanded, setIsAttendanceExpanded] = useState(false);
+  const [isEditExpanded, setIsEditExpanded] = useState(false);
+  const [editEventDesc, setEditEventDesc] = useState('');
+  const [editEventParticipants, setEditEventParticipants] = useState<string[]>([]);
+
+  // Attendance Modal States
+  // (Moved further down to group with other attendance states)
+
+  // Attendance Reporting States
+  const [attendanceRecord, setAttendanceRecord] = useState<any>(null);
+
+  const handleSpotlightClick = async (event: CalendarEvent) => {
+    setSpotlightEvent(event);
+    setIsAttendanceExpanded(false);
+    setIsEditExpanded(false);
+    setAttendanceRecord(null);
+    setAttErrors([]);
+    setAttSuccessMsg('');
+    setAttSearch('');
+    setAttRoleFilter('All Roles');
+
+    try {
+      let data = null;
+      const docRef = doc(db, 'attendance', event.event_id);
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        data = docSnap.data();
+      } else {
+        const q = query(collection(db, 'attendance'), where('eventId', '==', event.event_id));
+        const qs = await getDocs(q);
+        if (!qs.empty) {
+          data = qs.docs[0].data();
+        }
+      }
+
+      if (data) {
+        setAttendanceRecord(data);
+        
+        // Map any available schema to the attAttendees format
+        let rawAttendees = data.attendees || [];
+        if (rawAttendees.length === 0) {
+          const ids = data.attendeeIds || data.actualParticipants || [];
+          rawAttendees = ids.map((pid: string) => ({ poppoId: pid }));
+        }
+
+        if (rawAttendees.length > 0) {
+           const initialParticipants = rawAttendees.map((att: any) => {
+             const pid = att.poppoId || att.poppo_id || att.id;
+             const u = allUsers.find(user => (user.poppo_id || user.poppoId || user.id) === pid);
+             return {
+               id: pid,
+               poppo_id: pid,
+               nickname: u ? (u.nickname || u.name) : (att.nickname || pid),
+               role: u ? u.role : (att.role || '')
+             };
+           });
+           setAttAttendees(initialParticipants);
+        } else {
+           setAttAttendees([]);
+        }
+        setAttFeedback(data.eventFeedback || data.adminFeedback || '');
+      } else {
+        // It's a new attendance report. Supporters default to empty.
+        setAttAttendees([]);
+        setAttFeedback('');
+      }
+    } catch (e) {
+      console.error("Failed to fetch attendance record:", e);
+    }
+  };
+  const handleOpenAttendanceModal = async (e: React.MouseEvent, event: CalendarEvent) => {
+    e.stopPropagation();
+    setAttendanceModalEvent(event);
+    setAttendanceModalOpen(true);
+    setAttErrors([]);
+    setAttSuccessMsg('');
+    setAttSearch('');
+    setAttRoleFilter('All Roles');
+
+    try {
+      let data = null;
+      const docRef = doc(db, 'attendance', event.event_id);
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        data = docSnap.data();
+      } else {
+        const q = query(collection(db, 'attendance'), where('eventId', '==', event.event_id));
+        const qs = await getDocs(q);
+        if (!qs.empty) {
+          data = qs.docs[0].data();
+        }
+      }
+
+      if (data) {
+        
+        let rawAttendees = data.attendees || [];
+        if (rawAttendees.length === 0) {
+          const ids = data.attendeeIds || data.actualParticipants || [];
+          rawAttendees = ids.map((pid: string) => ({ poppoId: pid }));
+        }
+
+        if (rawAttendees.length > 0) {
+           const initialParticipants = rawAttendees.map((att: any) => {
+             const pid = att.poppoId || att.poppo_id || att.id;
+             const u = allUsers.find(user => (user.poppo_id || user.poppoId || user.id) === pid);
+             return {
+               id: pid,
+               poppo_id: pid,
+               nickname: u ? (u.nickname || u.name) : (att.nickname || pid),
+               role: u ? u.role : (att.role || '')
+             };
+           });
+           setAttAttendees(initialParticipants);
+        } else {
+           setAttAttendees([]);
+        }
+        setAttFeedback(data.eventFeedback || data.adminFeedback || '');
+      } else {
+        setAttAttendees([]);
+        setAttFeedback('');
+      }
+    } catch (err) {
+      console.error("Failed to fetch attendance:", err);
+    }
+  };
+  const handleSubmitAttendance = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    setAttErrors([]);
+    setAttSuccessMsg('');
+
+    if (!attendanceModalEvent) return;
+    if (attAttendees.length === 0) {
+      setAttErrors(['Please add at least one attendee.']);
+      return;
+    }
+
+    setIsAttProcessing(true);
+    try {
+      const currentAuth = Storage.getAuthState();
+      const existing = attendanceRecords.find(r => r.eventId === attendanceModalEvent.event_id);
+      const attendanceId = existing?.attendanceId || (crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 15));
+
+      const payload = {
+        attendanceId,
+        eventId: attendanceModalEvent.event_id,
+        eventTitle: attendanceModalEvent.title || 'Unknown Event',
+        eventDate: attendanceModalEvent.date,
+        timeslot: attendanceModalEvent.time,
+        eventType: attendanceModalEvent.type || 'Event',
+        description: attendanceModalEvent.description || '',
+        participantIds: attendanceModalEvent.participants || [],
+        participants: attendanceModalEvent.participants || [],
+        status: 'Approved',
+        attendeeIds: attAttendees.map(p => p.poppoId || p.poppo_id || p.id), // For backward compatibility
+        attendees: attAttendees.map(a => ({
+          poppoId: a.poppo_id || a.id,
+          nickname: a.nickname || a.name || 'Unknown',
+          role: a.role || 'Unknown'
+        })),
+        adminFeedback: attFeedback, // For backward compatibility
+        eventFeedback: attFeedback,
+        createdBy: spotlightEvent.createdBy || currentAuth?.name || 'Admin',
+        attendanceSubmittedBy: {
+          poppoId: currentAuth?.poppo_id || '',
+          name: currentAuth?.name || currentAuth?.nickname || '',
+          role: currentAuth?.role || ''
+        },
+        timestamp: new Date().toISOString()
+      };
+
+      await setDoc(doc(db, 'attendance', attendanceModalEvent.event_id), payload, { merge: true });
+      
+      // Update local state and trigger UI changes
+      setAttendanceRecord(payload);
+      setAttSuccessMsg('Attendance saved successfully!');
+      
+      // Update the attendanceRecords array locally so it reflects immediately
+      setAttendanceRecords(prev => {
+        const idx = prev.findIndex(r => r.eventId === attendanceModalEvent.event_id);
+        if (idx >= 0) {
+          const newArr = [...prev];
+          newArr[idx] = payload;
+          return newArr;
+        }
+        return [...prev, payload];
+      });
+
+      // Give them a moment to read the success message before collapsing
+      setTimeout(() => {
+        setAttendanceModalOpen(false);
+      }, 1500);
+
+    } catch (err) {
+      console.error("Failed to save attendance:", err);
+      setAttErrors(['Error saving attendance. Please check console.']);
+    } finally {
+      setIsAttProcessing(false);
+    }
+  };
 
   // Reset selected participants when modal closes/opens
   useEffect(() => {
@@ -1092,159 +1315,304 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
         }
       `}</style>
 
+      {/* Combined Calendar Block */}
+      <div className="bg-black/20 backdrop-blur-xl p-5 rounded-3xl border border-[#D4AF37]/20 shadow-[0_0_30px_rgba(212,175,55,0.05)] animate-fade-in space-y-6">
+        {/* Dual-Tab Navigation */}
+        <div className="flex items-center gap-1 bg-[#0e0a08]/90 p-1 rounded-lg border border-[#D4AF37]/20 w-max mx-auto">
+          <button
+            onClick={() => setActiveTab('AGENCY')}
+            className={cn(
+              "px-5 py-1.5 rounded-md text-[10px] font-black tracking-widest uppercase transition-all duration-300",
+              activeTab === 'AGENCY'
+                ? "bg-[#D4AF37]/20 text-[#D4AF37] shadow-[0_0_15px_rgba(212,175,55,0.2)]"
+                : "text-[#F0EFE8]/40 hover:text-[#D4AF37]/70 hover:bg-[#D4AF37]/5"
+            )}
+          >
+            AGENCY CALENDAR
+          </button>
+          <button
+            onClick={() => setActiveTab('LIVEHOUSE')}
+            className={cn(
+              "px-5 py-1.5 rounded-md text-[10px] font-black tracking-widest uppercase transition-all duration-300",
+              activeTab === 'LIVEHOUSE'
+                ? "bg-[#D4AF37]/20 text-[#D4AF37] shadow-[0_0_15px_rgba(212,175,55,0.2)]"
+                : "text-[#F0EFE8]/40 hover:text-[#D4AF37]/70 hover:bg-[#D4AF37]/5"
+            )}
+          >
+            LIVEHOUSE CALENDAR
+          </button>
+        </div>
 
-      <div className="space-y-6">
-        {/* Main Calendar Section */}
+      {activeTab === 'LIVEHOUSE' ? (
+        <LivehouseCalendar 
+          allUsers={allUsers}
+          onOpenBookingModal={(date, timeslot) => {
+            // Adapt the existing state
+            setReserveDate(new Date(date));
+            setReserveTimeslot(timeslot);
+            setIsReservingLivehouse(true);
+          }}
+        />
+      ) : (
         <div className="space-y-6">
           {/* Monthly Grid View */}
-          <div className="bg-black/20 backdrop-blur-xl p-5 rounded-3xl border border-[#D4AF37]/20 shadow-[0_0_30px_rgba(212,175,55,0.05)] animate-fade-in space-y-4">
+          <div className="animate-fade-in space-y-4 bg-gradient-to-b from-[#0a0806]/90 to-[#050403]/90 backdrop-blur-2xl border border-[#D4AF37]/20 rounded-3xl p-4 sm:p-5 shadow-[0_0_40px_rgba(212,175,55,0.08)] relative overflow-hidden">
+            {/* Subtle Fiery Glow Background accents */}
+            <div className="absolute top-0 left-1/4 w-1/2 h-32 bg-[#FF8C00]/5 blur-[80px] pointer-events-none" />
+            <div className="absolute bottom-0 right-1/4 w-1/2 h-32 bg-[#D4AF37]/5 blur-[80px] pointer-events-none" />
+
             {/* Header with Navigation & Month/Year */}
-            <div className="flex items-center justify-between border-b border-[#D4AF37]/10 pb-3">
-              <div className="flex items-center gap-2">
-                <CalendarIcon className="text-[#D4AF37] w-4.5 h-4.5" />
-                <h2 className="text-sm font-black text-[#F0EFE8] tracking-widest uppercase">
-                  {format(currentDate, 'MMMM yyyy')}
-                </h2>
-              </div>
-              <div className="flex items-center gap-2">
+            <div className="grid grid-cols-2 items-center justify-between border-b border-[#D4AF37]/10 pb-2 gap-2 sm:gap-4 w-full">
+              {/* Month Navigation (Left Col) */}
+              <div className="flex items-center justify-center sm:justify-start gap-1.5 sm:gap-2 bg-[#14100c]/60 p-1 rounded-2xl border border-[#D4AF37]/10 backdrop-blur-md justify-self-start max-w-full overflow-hidden">
                 <button 
                   title="Previous Month"
                   onClick={goToPreviousMonth} 
-                  className="p-2 bg-[#0e0a08]/90 border border-[#D4AF37]/20 hover:border-[#D4AF37]/50 hover:bg-[#D4AF37]/10 rounded-xl transition-all cursor-pointer"
+                  className="p-1 sm:p-1.5 hover:bg-[#D4AF37]/20 rounded-xl transition-all text-[#D4AF37] cursor-pointer"
                 >
-                  <ChevronLeft size={14} className="text-[#D4AF37]" />
+                  <ChevronLeft size={18} className="sm:w-5 sm:h-5" />
                 </button>
+                
+                <div className="flex items-center gap-1 sm:gap-2 px-1 overflow-hidden">
+                  <h2 className="text-[11px] sm:text-sm font-black text-transparent bg-clip-text bg-gradient-to-r from-[#FFF0B3] to-[#D4AF37] tracking-widest uppercase truncate">
+                    {format(currentDate, 'MMM yyyy')}
+                  </h2>
+                </div>
+                
                 <button 
                   title="Next Month"
                   onClick={goToNextMonth} 
-                  className="p-2 bg-[#0e0a08]/90 border border-[#D4AF37]/20 hover:border-[#D4AF37]/50 hover:bg-[#D4AF37]/10 rounded-xl transition-all cursor-pointer"
+                  className="p-1 sm:p-1.5 hover:bg-[#D4AF37]/20 rounded-xl transition-all text-[#D4AF37] cursor-pointer"
                 >
-                  <ChevronRight size={14} className="text-[#D4AF37]" />
+                  <ChevronRight size={18} className="sm:w-5 sm:h-5" />
+                </button>
+              </div>
+  
+              {/* Timezone Toggle (Right Col) */}
+              <div className="flex w-full sm:w-auto bg-[#0a0806]/80 p-1.5 sm:p-2 rounded-2xl border border-white/5 backdrop-blur-xl shadow-[inset_0_0_20px_rgba(255,255,255,0.02)] justify-self-center sm:justify-self-end">
+                <button 
+                  onClick={() => setTimeDisplayMode('Manila')}
+                  className={cn(
+                    "flex-1 text-center px-4 sm:px-8 py-2 sm:py-2.5 text-[10px] sm:text-xs font-black uppercase tracking-[0.25em] rounded-xl transition-all duration-300 truncate",
+                    timeDisplayMode === 'Manila'
+                      ? "bg-gradient-to-br from-[#D4AF37]/25 to-[#FF8C00]/10 border border-[#D4AF37]/40 shadow-[0_0_15px_rgba(255,140,0,0.15),inset_0_0_10px_rgba(212,175,55,0.2)] text-transparent bg-clip-text bg-gradient-to-b from-[#FFF0B3] to-[#D4AF37]"
+                      : "bg-transparent border border-transparent text-white/40 hover:text-[#D4AF37]/80 hover:bg-white/5 cursor-pointer"
+                  )}
+                >
+                  UTC+8
+                </button>
+                <button 
+                  onClick={() => setTimeDisplayMode('Local')}
+                  className={cn(
+                    "flex-1 text-center px-4 sm:px-8 py-2 sm:py-2.5 text-[10px] sm:text-xs font-black uppercase tracking-[0.25em] rounded-xl transition-all duration-300 truncate",
+                    timeDisplayMode === 'Local'
+                      ? "bg-gradient-to-br from-[#D4AF37]/25 to-[#FF8C00]/10 border border-[#D4AF37]/40 shadow-[0_0_15px_rgba(255,140,0,0.15),inset_0_0_10px_rgba(212,175,55,0.2)] text-transparent bg-clip-text bg-gradient-to-b from-[#FFF0B3] to-[#D4AF37]"
+                      : "bg-transparent border border-transparent text-white/40 hover:text-[#D4AF37]/80 hover:bg-white/5 cursor-pointer"
+                  )}
+                >
+                  {localTzAbbr}
                 </button>
               </div>
             </div>
 
-            {/* Days of Week Header */}
-            <div className="grid grid-cols-7 gap-1 mb-2">
-              {['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'].map(day => (
-                <div key={day} className="text-center text-[9px] font-black uppercase tracking-widest text-[#D4AF37]/60 py-2">
-                  {day}
-                </div>
+            {/* Days of week header */}
+            <div className="grid grid-cols-7 gap-1 sm:gap-2 mb-2 mt-4">
+              {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(d => (
+                <div key={d} className="text-center text-[9px] sm:text-[10px] font-black text-[#D4AF37]/60 uppercase tracking-widest">{d}</div>
               ))}
             </div>
-            <div className="grid grid-cols-7 gap-1 sm:gap-2">
-                {monthDays.map((day, idx) => {
-                  const isCurrentMonth = isSameMonth(day, currentDate);
-                  const isSelected = isSameDay(day, selectedDate);
-                  const dayEvents = getEventsForDay(day);
-                  const isToday = isSameDay(day, new Date());
 
-                  return (
-                    <button
-                      key={idx}
-                      onClick={() => handleDateClick(day)}
-                      className={cn(
-                        "aspect-square p-1 sm:p-2 rounded-xl border flex flex-col items-center justify-start gap-1 transition-all cursor-pointer relative group bg-gradient-to-br",
-                        !isCurrentMonth ? "border-white/5 hover:border-[#D4AF37]/20" : "border-[#D4AF37]/10 hover:border-[#D4AF37]/50",
-                        isSelected ? "from-[#2d1c0c] to-[#1a120e] ring-1 ring-[#D4AF37] shadow-[0_0_15px_rgba(212,175,55,0.3)] border-transparent" : "from-black/60 to-black/30 hover:from-[#2d1c0c]/80 hover:to-[#1a120e]/80 text-[#F0EFE8]",
-                        isToday && !isSelected && "ring-1 ring-[#FF6B00] border-transparent"
-                      )}
-                    >
-                      <span className={cn(
-                        "text-xs sm:text-sm font-black tracking-tight mt-1",
-                        isSelected ? "text-white" : isToday ? "text-[#FF6B00]" : !isCurrentMonth ? "text-white/40" : "text-white"
-                      )}>
-                        {format(day, 'd')}
-                      </span>
-                      {dayEvents.length > 0 && (
-                        <div className="flex flex-wrap justify-center gap-0.5 sm:gap-1 mt-auto w-full px-1">
-                          {dayEvents.slice(0, 3).map((e, i) => {
-                            const config = EVENT_COLORS[e.type || ''] || { gradient: 'from-[#D4AF37] to-[#b8960c]' };
-                            return <div key={i} className={cn("w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-gradient-to-br shadow-sm", config.gradient)} />;
-                          })}
-                          {dayEvents.length > 3 && <span className="text-[8px] text-[#A09E9A] font-bold leading-none pl-0.5">+{dayEvents.length - 3}</span>}
-                        </div>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
+            {/* Calendar Grid */}
+            <div className="grid grid-cols-7 gap-1 sm:gap-2 mb-2">
+              {monthDays.map((day, idx) => {
+                const dayStr = format(day, 'yyyy-MM-dd');
+                const dayNum = parseInt(dayStr.split('-')[2], 10);
+                const isToday = isSameDay(day, new Date());
+                const isSelected = isSameDay(day, selectedDate);
+                const isCurrentMonth = day.getMonth() === currentDate.getMonth();
+                
+                let borderClass = "border-white/10";
+                let bgClass = "bg-gradient-to-br from-[#2a221b]/90 to-[#1a140f]/90 backdrop-blur-md shadow-[0_2px_10px_rgba(0,0,0,0.4),inset_0_0_15px_rgba(255,255,255,0.03)]";
+                let textClass = isCurrentMonth ? "text-white/90" : "text-white/30";
+                
+                if (isToday) {
+                   borderClass = "border-[#FFD700]/50"; 
+                   bgClass = "bg-gradient-to-br from-[#D4AF37]/15 via-[#1a1208]/80 to-[#FF8C00]/15 backdrop-blur-xl shadow-[0_0_20px_rgba(212,175,55,0.15),inset_0_0_15px_rgba(212,175,55,0.1)]";
+                   textClass = "text-transparent bg-clip-text bg-gradient-to-b from-[#FFF0B3] to-[#D4AF37]";     
+                } else if (isSelected) {
+                   borderClass = "border-[#FF8C00]/50"; 
+                   bgClass = "bg-gradient-to-br from-[#FF8C00]/15 via-[#1a0f08]/80 to-[#FF4500]/15 backdrop-blur-xl shadow-[0_0_20px_rgba(255,140,0,0.15),inset_0_0_15px_rgba(255,140,0,0.1)]";
+                   textClass = "text-transparent bg-clip-text bg-gradient-to-b from-[#FFD700] to-[#FF8C00]";         
+                }
+
+                const dayEvents = getEventsForDay(day);
+
+                return (
+                  <button
+                    key={idx}
+                    onClick={() => handleDateClick(day)}
+                    className={cn(
+                      "aspect-square rounded-xl sm:rounded-2xl flex flex-col items-center justify-center border transition-all cursor-pointer relative group hover:border-[#D4AF37]/30",
+                      bgClass, borderClass
+                    )}
+                  >
+                    <span className={cn(
+                      "text-sm sm:text-xl font-black drop-shadow-md leading-none transition-transform group-hover:scale-105",
+                      textClass
+                    )}>
+                      {dayNum}
+                    </span>
+                    {dayEvents.length > 0 && (
+                      <div className="absolute bottom-1.5 flex gap-0.5">
+                         {dayEvents.slice(0,3).map((e,i) => {
+                           const config = EVENT_COLORS[e.type || ''] || { gradient: 'from-[#D4AF37] to-[#b8960c]' };
+                           return <div key={i} className={cn("w-1 h-1 sm:w-1.5 sm:h-1.5 rounded-full bg-gradient-to-br", config.gradient)} />
+                         })}
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
             </div>
+          </div>
+
+          {/* Selected Date Header Banner */}
+          <div className="mb-4 sticky top-0 z-10 flex flex-col gap-1">
+            <div className="flex items-center justify-center bg-gradient-to-r from-[#0a0806]/95 via-[#1a1208]/95 to-[#0a0806]/95 backdrop-blur-xl py-3 rounded-2xl border border-[#D4AF37]/30 shadow-[0_5px_15px_rgba(0,0,0,0.6),inset_0_0_15px_rgba(212,175,55,0.05)]">
+               <div className="text-xs sm:text-[13px] font-black tracking-[0.15em] uppercase text-transparent bg-clip-text bg-gradient-to-r from-[#FFF0B3] via-[#D4AF37] to-[#FF8C00] text-center px-4">
+                  {(() => {
+                    const activeDateStr = format(selectedDate, 'yyyy-MM-dd');
+                    if (timeDisplayMode === 'Manila') {
+                      const localAgnosticDate = parseISO(activeDateStr);
+                      return `${format(localAgnosticDate, 'MMMM dd, yyyy')} | UTC+8 Manila, PH`;
+                    } else {
+                      // Anchor to the START of the Manila day, since that represents the bulk of the day for western timezones
+                      const manilaStart = new Date(`${activeDateStr}T00:00:00+08:00`); 
+                      return `${format(manilaStart, 'MMMM dd, yyyy')} | ${localTzAbbr}`;
+                    }
+                  })()}
+               </div>
+            </div>
+          </div>
 
           {/* Scheduled Events Panel */}
           <div className="bg-black/20 backdrop-blur-xl rounded-3xl border border-[#D4AF37]/25 p-5 space-y-4 shadow-[0_0_30px_rgba(212,175,55,0.05)] relative overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-tr from-[#D4AF37]/5 via-transparent to-orange-500/5 pointer-events-none" />
-            
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-[#D4AF37]/15 pb-4 gap-4">
-              <div className="flex items-center gap-3">
-                <div className="w-2.5 h-2.5 rounded-full bg-[#D4AF37] shadow-[0_0_8px_rgba(212,175,55,0.8)]" />
-                <h3 className="text-xs font-black uppercase tracking-widest text-[#F0EFE8]">
-                  Scheduled Events
-                </h3>
-              </div>
-              
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setTimeDisplayMode('Manila')}
-                  className={cn("btn-capsule-gold", timeDisplayMode === 'Manila' && "active")}
-                >
-                  Manila Time
-                </button>
-                <button
-                  onClick={() => setTimeDisplayMode('Local')}
-                  className={cn("btn-capsule-gold", timeDisplayMode === 'Local' && "active")}
-                >
-                  Local Time
-                </button>
-              </div>
-            </div>
 
             <div className="space-y-3 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
               {selectedDayEvents.length > 0 ? (
                 selectedDayEvents
                   .sort((a, b) => a.time.localeCompare(b.time))
                   .map(e => {
-                  const colorConfig = EVENT_COLORS[e.type || ''] || { text: 'text-[#D4AF37]', bg: 'bg-[#D4AF37]/10', gradient: 'from-[#D4AF37] to-[#b8960c]' };
-                  
-                  // For the timezone display mock
-                  const displayTime = timeDisplayMode === 'Manila' 
-                    ? e.time 
-                    : formatTimeRangeToLocal(e.date || e.event_date || '', e.time || '');
+                    const colorConfig = EVENT_COLORS[e.type || ''] || { gradient: 'from-[#D4AF37] to-[#b8960c]', text: 'text-[#D4AF37]' };
+                    const displayTime = e.time === '00:00' ? 'TBD' : e.time;
+                    
+                    const parseTimeStringToHourMin = (timeStr: string) => {
+                      const match = timeStr.match(/(\d+)(?::(\d+))?\s*(AM|PM)?/i);
+                      if (!match) return null;
+                      let h = parseInt(match[1], 10);
+                      let m = match[2] ? parseInt(match[2], 10) : 0;
+                      const isPM = match[3] && match[3].toUpperCase() === 'PM';
+                      const isAM = match[3] && match[3].toUpperCase() === 'AM';
+                      if (isPM && h < 12) h += 12;
+                      if ((isAM || (!isAM && !isPM && h === 12)) && h === 12) h = 0;
+                      return { h, m };
+                    };
+                    
+                    let eventDateObj = new Date();
+                    const firstTimePart = e.time === '00:00' ? '00:00' : e.time.split('-')[0].trim();
+                    const parsedStart = parseTimeStringToHourMin(firstTimePart);
+                    if (parsedStart) {
+                       eventDateObj = new Date(`${e.date}T${parsedStart.h.toString().padStart(2, '0')}:${parsedStart.m.toString().padStart(2, '0')}:00+08:00`);
+                    } else {
+                       eventDateObj = new Date(`${e.date}T00:00:00+08:00`);
+                    }
 
-                  const startTimeParsed = getEventTimeParsed(e.date || e.event_date || '', e.time || '', true);
-                  const isOngoingOrPast = new Date() >= startTimeParsed;
+                    // Determine if the event is "upcoming" or "past/ongoing"
+                    const isUpcoming = eventDateObj > new Date();
+                    
+                    // Find host profile data
+                    const hostPoppoId = e.poppo_id || e.host_poppo_id || e.createdBy;
+                    const hostUser = allUsers.find(u => (u.poppo_id || u.poppoId || u.id) === hostPoppoId);
+                    const hostName = hostUser ? (hostUser.nickname || hostUser.name) : (e.createdByName || 'Niner');
+                    const hostPhoto = hostUser ? (hostUser.photoUrl || hostUser.profilePhotoUrl || hostUser.photoURL) : null;
+                    const avatarUrl = hostPhoto || `https://ui-avatars.com/api/?name=${encodeURIComponent(hostName)}&background=0a0806&color=D4AF37`;
+                    
+                    const eventAttendance = attendanceRecords.find(r => r.eventId === e.event_id);
+                    const displayAttendees = eventAttendance ? (eventAttendance.attendees || eventAttendance.attendeeIds || eventAttendance.actualParticipants || []) : [];
 
-                  return (
-                    <div
-                      key={e.event_id}
-                      onClick={() => setSelectedEventId(e.event_id)}
-                      className="w-full text-left p-4 rounded-xl bg-gradient-to-r from-black/90 to-black/80 border border-[#D4AF37]/15 hover:border-[#D4AF37]/50 transition-all flex gap-4 group items-center cursor-pointer shadow-lg hover:shadow-[#D4AF37]/5"
-                    >
-                      <div className={cn("w-1 h-10 rounded-full shrink-0 bg-gradient-to-b", colorConfig.gradient)} />
-                      <div className="flex-1 min-w-0 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                        <div>
-                          <h4 className="text-sm font-black text-white truncate group-hover:text-[#D4AF37] transition-colors">{e.title}</h4>
-                          <p className="text-[10px] text-slate-300 mt-0.5 line-clamp-1">{e.description || 'No description provided.'}</p>
+                    return (
+                      <div
+                        key={e.event_id}
+                        onClick={() => handleSpotlightClick(e)}
+                        className={cn(
+                          "w-full flex gap-4 items-center p-3 sm:p-4 rounded-2xl border transition-all cursor-pointer backdrop-blur-md hover:shadow-[0_0_15px_rgba(212,175,55,0.05)]",
+                          isUpcoming ? "bg-gradient-to-r from-[#1a1208]/90 to-[#0a0806]/90 border-[#D4AF37]/20 hover:border-[#D4AF37]/40" 
+                                     : "bg-gradient-to-r from-black/80 to-black/60 border-white/5 hover:border-[#D4AF37]/20"
+                        )}
+                      >
+                        {/* Profile Column */}
+                        <div className="flex flex-col items-center gap-1.5 shrink-0">
+                          <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full border border-[#D4AF37]/50 p-0.5 bg-[#0a0806]">
+                            <img src={avatarUrl} alt="Profile" className="w-full h-full rounded-full object-cover" />
+                          </div>
+                          <span className="text-[8px] sm:text-[9px] text-white/50 uppercase tracking-widest bg-white/5 px-1 py-0.5 rounded border border-white/5 whitespace-nowrap">
+                            ID: {hostPoppoId || 'N/A'}
+                          </span>
                         </div>
-                        <div className="flex items-center gap-3 shrink-0">
-                          <span className="text-xs font-black text-[#D4AF37] tracking-wider bg-[#0e0a08]/90 border border-[#D4AF37]/20 px-2 py-1 rounded-md">{displayTime}</span>
-                          {isOngoingOrPast && (
-                            <button
-                              type="button"
-                              onClick={(ev) => {
-                                ev.stopPropagation();
-                                handleAttendanceClick(e);
-                              }}
-                              className="btn-capsule-gold z-10 shrink-0"
-                            >
-                              Attendance
-                            </button>
-                          )}
+
+                        {/* Details Column */}
+                        <div className="flex flex-col min-w-0 flex-1 justify-center">
+                          <div className="flex items-start justify-between w-full">
+                            <h4 className="text-sm sm:text-base font-black text-transparent bg-clip-text bg-gradient-to-r from-[#FFF0B3] to-[#FFD700] uppercase tracking-widest truncate mb-1">
+                              {hostName}
+                            </h4>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className={cn("text-[8px] sm:text-[9px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded border whitespace-nowrap", colorConfig.text, "border-current/20 bg-current/5")}>
+                              {e.type || 'Event'}
+                            </span>
+                            <span className="text-[9px] sm:text-[10px] font-black text-[#FF8C00] tracking-widest bg-[#FF8C00]/10 border border-[#FF8C00]/20 px-1.5 py-0.5 rounded-md flex items-center gap-1">
+                              {timeDisplayMode === 'Local' ? (() => {
+                                if (displayTime === 'TBD' || !displayTime) return displayTime;
+                                try {
+                                  const manilaStart = new Date(`${e.date}T00:00:00+08:00`); 
+                                  const formatLocal = (timeStr: string) => {
+                                    const parsed = parseTimeStringToHourMin(timeStr);
+                                    if (!parsed) return timeStr;
+                                    const isoString = `${e.date}T${parsed.h.toString().padStart(2, '0')}:${parsed.m.toString().padStart(2, '0')}:00+08:00`;
+                                    const dateObj = new Date(isoString);
+                                    let localH = dateObj.getHours();
+                                    const localM = dateObj.getMinutes();
+                                    const mStr = localM > 0 ? `:${localM.toString().padStart(2, '0')}` : '';
+                                    let result = '';
+                                    if (localH === 0) result = `12${mStr}AM`;
+                                    else if (localH === 12) result = `12${mStr}PM`;
+                                    else result = localH < 12 ? `${localH}${mStr}AM` : `${localH - 12}${mStr}PM`;
+
+                                    if (dateObj.getDate() !== manilaStart.getDate()) {
+                                      result += ` (${format(dateObj, 'MMM d')})`;
+                                    }
+                                    return result;
+                                  };
+
+                                  const parts = displayTime.split('-').map(s => s.trim());
+                                  if (parts.length === 1) {
+                                    return formatLocal(parts[0]);
+                                  } else if (parts.length === 2) {
+                                    return `${formatLocal(parts[0])} - ${formatLocal(parts[1])}`;
+                                  }
+                                  return displayTime;
+                                } catch {
+                                  return displayTime;
+                                }
+                              })() : displayTime}
+                            </span>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  )
-                })
+                    )
+                  })
               ) : (
                 <div className="flex flex-col items-center justify-center py-12 gap-3">
                   <div className="w-12 h-12 rounded-full bg-[#0e0a08]/90 border border-white/5 flex items-center justify-center">
@@ -1280,8 +1648,300 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
               </div>
             )}
           </div>
+        </div>
+      )}
       </div>
-      </div>
+
+      {/* Spotlight Modal */}
+      <AnimatePresence>
+      {spotlightEvent && (
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 sm:p-6" onClick={() => {
+           setSpotlightEvent(null);
+           setIsAttendanceExpanded(false);
+           setIsEditExpanded(false);
+        }}>
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-black/80 backdrop-blur-sm" />
+          
+          <motion.div 
+            initial={{ scale: 0.95, opacity: 0, y: 10 }} 
+            animate={{ scale: 1, opacity: 1, y: 0 }} 
+            exit={{ scale: 0.95, opacity: 0, y: 10 }} 
+            className="w-full max-w-md bg-[#050301] border border-[#D4AF37]/30 shadow-[0_0_50px_rgba(255,140,0,0.2),inset_0_0_20px_rgba(212,175,55,0.1)] rounded-3xl flex flex-col relative z-10 max-h-[90vh] overflow-hidden"
+            onClick={e => e.stopPropagation()}
+          >
+            {(() => {
+              const hostPoppoId = spotlightEvent.poppo_id || spotlightEvent.host_poppo_id || spotlightEvent.createdBy;
+              const hostUser = allUsers.find(u => (u.poppo_id || u.poppoId || u.id) === hostPoppoId);
+              const hostName = hostUser ? (hostUser.nickname || hostUser.name) : (spotlightEvent.createdByName || 'Niner');
+              const hostPhoto = hostUser ? (hostUser.photoUrl || hostUser.profilePhotoUrl || hostUser.photoURL) : null;
+              const avatarUrl = hostPhoto || `https://ui-avatars.com/api/?name=${encodeURIComponent(hostName)}&background=0a0806&color=D4AF37`;
+              const eventDateObj = new Date(`${spotlightEvent.date}T${spotlightEvent.time === '00:00' ? '00:00' : spotlightEvent.time.split(' - ')[0]}`);
+              const isUpcoming = eventDateObj > new Date();
+              
+              const loggedInUserRole = String(auth?.role || '').toLowerCase();
+              const isStrictDirectorOrHeadAdmin = loggedInUserRole === 'director' || loggedInUserRole === 'head admin' || loggedInUserRole === 'head_admin';
+              const isDirectorOrHeadAdmin = isStrictDirectorOrHeadAdmin || loggedInUserRole === 'admin';
+              const isCreator = String(auth?.poppo_id || auth?.id) === String(spotlightEvent.createdBy || hostPoppoId);
+              
+              let canEdit = isUpcoming && (isDirectorOrHeadAdmin || isCreator);
+              if (spotlightEvent.is_automated) {
+                // Automated events can ONLY be edited by the Director or Head Admin
+                canEdit = isStrictDirectorOrHeadAdmin;
+              }
+
+              return (
+                <div className="p-6 sm:p-8 flex flex-col gap-6 overflow-y-auto custom-scrollbar">
+                  {/* Header/Close */}
+                  <div className="w-full flex flex-col items-end gap-2 absolute top-4 right-4 z-20">
+                    <button onClick={() => {
+                      setSpotlightEvent(null);
+                      setIsAttendanceExpanded(false);
+                      setIsEditExpanded(false);
+                    }} className="text-white/30 hover:text-[#D4AF37] transition-colors p-1 bg-white/5 hover:bg-white/10 rounded-full">
+                      <X size={20} />
+                    </button>
+                    
+                    {(!isUpcoming || eventDateObj <= new Date()) && isDirectorOrHeadAdmin && (
+                      <button
+                        onClick={(clickEvent) => handleOpenAttendanceModal(clickEvent, spotlightEvent)}
+                        className="px-3 py-1.5 bg-gradient-to-r from-[#FF8C00]/20 to-[#D4AF37]/20 hover:from-[#FF8C00]/30 hover:to-[#D4AF37]/30 border border-[#D4AF37]/50 text-[#FFD700] font-black text-[10px] uppercase tracking-wider rounded-lg transition-all shadow-[0_0_15px_rgba(255,140,0,0.2)] flex items-center gap-1.5 mt-1"
+                      >
+                        <CheckCircle2 size={12} />
+                        Attendance
+                      </button>
+                    )}
+                  </div>
+                  
+                  <>
+                    {/* Top Right Edit Button (if applicable) */}
+                    {canEdit && !isEditExpanded && (
+                      <div className="absolute top-4 right-14 z-20">
+                         <button 
+                           onClick={() => {
+                             setEditEventDesc(spotlightEvent.description || '');
+                             setEditEventParticipants(spotlightEvent.participants || []);
+                             setIsEditExpanded(true);
+                           }} 
+                           className="text-white/30 hover:text-[#D4AF37] transition-colors p-1 bg-white/5 hover:bg-white/10 rounded-full"
+                         >
+                           <Edit2 size={16} />
+                         </button>
+                      </div>
+                    )}
+
+                    {/* Profile Info Row */}
+                    <div className="flex flex-row items-center w-full gap-5 sm:gap-6 mt-[-10px]">
+                      {/* Photo */}
+                      <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full border-2 border-[#D4AF37]/80 p-1 shadow-[0_0_20px_rgba(212,175,55,0.3)] shrink-0 bg-[#0a0806]">
+                        <img 
+                          src={avatarUrl} 
+                          alt="Profile"
+                          className="w-full h-full rounded-full object-cover"
+                        />
+                      </div>
+
+                      {/* Name & ID */}
+                      <div className="flex flex-col">
+                        <h3 className="text-xl sm:text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-[#FFF0B3] to-[#FFD700] uppercase tracking-widest leading-tight drop-shadow-md">
+                          {hostName}
+                        </h3>
+                        <div className="text-[#A09E9A] font-medium tracking-widest text-[10px] sm:text-xs mt-1.5 bg-black/40 px-2 py-1 rounded-full border border-white/5 inline-flex w-max">
+                          ID: <span className="text-white ml-1">{hostPoppoId || 'N/A'}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Divider */}
+                    <div className="w-full h-px bg-gradient-to-r from-transparent via-[#D4AF37]/30 to-transparent my-1" />
+
+                    {/* Event Details */}
+                    <div className="w-full bg-[#0a0806]/60 rounded-2xl border border-[#D4AF37]/10 p-5 flex flex-col gap-4 shadow-[inset_0_0_20px_rgba(0,0,0,0.5)]">
+                      <div className="flex items-center gap-4">
+                        <div className="p-2.5 bg-[#D4AF37]/10 rounded-xl text-[#D4AF37] border border-[#D4AF37]/20">
+                          <CalendarIcon size={18} />
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-[10px] uppercase tracking-[0.2em] text-[#D4AF37]/60 font-black mb-1">Event Type</span>
+                          <span className="text-sm font-black text-white/90 uppercase tracking-widest">{spotlightEvent.type || 'Event'}</span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-4">
+                        <div className="p-2.5 bg-gradient-to-br from-[#FF8C00]/10 to-[#FF4500]/10 rounded-xl text-[#FF8C00] border border-[#FF8C00]/20">
+                          <Clock size={18} />
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-[10px] uppercase tracking-[0.2em] text-[#FF8C00]/60 font-black mb-1">Date & Time</span>
+                          <div className="flex flex-col gap-0.5">
+                            <span className="text-xs font-black text-[#FF8C00] uppercase tracking-widest">{format(new Date(spotlightEvent.date), 'MMM dd, yyyy')}</span>
+                            <span className="text-sm font-black text-transparent bg-clip-text bg-gradient-to-r from-[#FFD700] to-[#FF8C00] flex items-center gap-1">
+                              {timeDisplayMode === 'Local' ? (() => {
+                                const displayTime = spotlightEvent.time;
+                                if (displayTime === 'TBD' || !displayTime) return displayTime;
+                                try {
+                                  const parseTimeStringToHourMin = (timeStr: string) => {
+                                    const match = timeStr.match(/(\d+)(?::(\d+))?\s*(AM|PM)?/i);
+                                    if (!match) return null;
+                                    let h = parseInt(match[1], 10);
+                                    let m = match[2] ? parseInt(match[2], 10) : 0;
+                                    const isPM = match[3] && match[3].toUpperCase() === 'PM';
+                                    const isAM = match[3] && match[3].toUpperCase() === 'AM';
+                                    if (isPM && h < 12) h += 12;
+                                    if ((isAM || (!isAM && !isPM && h === 12)) && h === 12) h = 0;
+                                    return { h, m };
+                                  };
+
+                                  const manilaStart = new Date(`${spotlightEvent.date}T00:00:00+08:00`); 
+                                  const formatLocal = (timeStr: string) => {
+                                    const parsed = parseTimeStringToHourMin(timeStr);
+                                    if (!parsed) return timeStr;
+                                    const isoString = `${spotlightEvent.date}T${parsed.h.toString().padStart(2, '0')}:${parsed.m.toString().padStart(2, '0')}:00+08:00`;
+                                    const dateObj = new Date(isoString);
+                                    let localH = dateObj.getHours();
+                                    const localM = dateObj.getMinutes();
+                                    const mStr = localM > 0 ? `:${localM.toString().padStart(2, '0')}` : '';
+                                    let result = '';
+                                    if (localH === 0) result = `12${mStr}AM`;
+                                    else if (localH === 12) result = `12${mStr}PM`;
+                                    else result = localH < 12 ? `${localH}${mStr}AM` : `${localH - 12}${mStr}PM`;
+
+                                    if (dateObj.getDate() !== manilaStart.getDate()) {
+                                      result += ` (${format(dateObj, 'MMM d')})`;
+                                    }
+                                    return result;
+                                  };
+
+                                  const parts = displayTime.split('-').map(s => s.trim());
+                                  if (parts.length === 1) {
+                                    return formatLocal(parts[0]);
+                                  } else if (parts.length === 2) {
+                                    return `${formatLocal(parts[0])} - ${formatLocal(parts[1])}`;
+                                  }
+                                  return displayTime;
+                                } catch {
+                                  return displayTime;
+                                }
+                              })() : spotlightEvent.time}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* Expandable Edit Section */}
+                    {isEditExpanded && (
+                       <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} className="flex flex-col gap-4 mt-2">
+                          <div className="bg-[#1a1208]/50 border border-[#D4AF37]/20 rounded-xl p-4">
+                            <h4 className="text-[10px] uppercase tracking-widest text-[#D4AF37] font-black mb-2">Edit Event Description</h4>
+                            <textarea
+                              value={editEventDesc}
+                              onChange={(e) => setEditEventDesc(e.target.value)}
+                              className="w-full bg-black/50 border border-[#D4AF37]/20 rounded-lg p-2 text-white text-xs min-h-[60px] focus:outline-none focus:border-[#D4AF37]/50"
+                              placeholder="Update description..."
+                            />
+                            {/* Note: Update logic mapped to standard FirebaseService updates if required */}
+                            <button 
+                              onClick={() => {
+                                // Simulate Save
+                                setIsEditExpanded(false);
+                                setSpotlightEvent({ ...spotlightEvent, description: editEventDesc });
+                              }}
+                              className="w-full mt-3 py-2 bg-[#D4AF37]/20 hover:bg-[#D4AF37]/30 border border-[#D4AF37]/50 text-[#D4AF37] text-[10px] uppercase tracking-widest font-black rounded-lg transition-colors"
+                            >
+                              Save Changes
+                            </button>
+                          </div>
+                          <button 
+                            onClick={() => {
+                              // Simulate Delete
+                              setSpotlightEvent(null);
+                              setIsEditExpanded(false);
+                            }}
+                            className="w-full py-2 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-500 text-[10px] uppercase tracking-widest font-black rounded-lg transition-colors flex items-center justify-center gap-2"
+                          >
+                             <Trash2 size={14} /> Delete Event
+                          </button>
+                       </motion.div>
+                    )}
+
+                    {/* Participants Section */}
+                    {spotlightEvent.participants && spotlightEvent.participants.length > 0 && (
+                      <div className="mt-2">
+                        <h5 className="text-[9px] font-black text-[#D4AF37] uppercase tracking-widest mb-3 border-b border-white/5 pb-2">Performers / Hosts</h5>
+                        <div className={`grid gap-3 ${spotlightEvent.participants.length <= 4 ? 'grid-cols-4' : 'grid-cols-4 sm:grid-cols-6'}`}>
+                          {spotlightEvent.participants.map((pid, idx) => {
+                            const pUser = allUsers.find(u => String(u.poppo_id || u.poppoId || u.id) === String(pid));
+                            const pName = pUser ? (pUser.nickname || pUser.name) : pid;
+                            const pPhoto = pUser ? (pUser.photoUrl || pUser.profilePhotoUrl || pUser.photoURL) : null;
+                            const avatar = pPhoto || `https://ui-avatars.com/api/?name=${encodeURIComponent(pName)}&background=0a0806&color=D4AF37`;
+                            const isLarge = spotlightEvent.participants.length <= 4;
+                            return (
+                              <div key={idx} className="flex flex-col items-center justify-start gap-1.5 p-1 transition-transform hover:scale-105">
+                                <img src={avatar} alt={pName} className={`${isLarge ? 'w-14 h-14 sm:w-16 sm:h-16' : 'w-10 h-10'} rounded-full border border-[#D4AF37]/30 object-cover shadow-[0_0_10px_rgba(212,175,55,0.1)]`} />
+                                <span className={`${isLarge ? 'text-[10px] sm:text-xs' : 'text-[9px]'} font-bold text-white/80 text-center leading-tight line-clamp-1 w-full`} title={pName}>{pName}</span>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Attendance Section */}
+                    {(attendanceRecord || isUpcoming === false) && (
+                      <div className="mt-4">
+                        <h5 className="text-[9px] font-black text-[#D4AF37] uppercase tracking-widest mb-3 border-b border-white/5 pb-2">Attendance</h5>
+                        <div className="flex flex-col gap-2">
+                          {(() => {
+                            const displayAttendees = attendanceRecord ? (
+                              attendanceRecord.attendees || 
+                              attendanceRecord.attendeeIds || 
+                              attendanceRecord.actualParticipants || 
+                              attendanceRecord.participants || 
+                              attendanceRecord.participantIds || 
+                              []
+                            ) : [];
+                              
+                            if (displayAttendees && displayAttendees.length > 0) {
+                              const isLarge = displayAttendees.length <= 4;
+                              return (
+                                <div className={`grid gap-3 ${isLarge ? 'grid-cols-4' : 'grid-cols-4 sm:grid-cols-6'}`}>
+                                  {displayAttendees.map((att: any, idx: number) => {
+                                    const pid = typeof att === 'string' ? att : (att.poppoId || att.poppo_id || att.id || att.participantId);
+                                    const pUser = allUsers.find(u => String(u.poppo_id || u.poppoId || u.id) === String(pid));
+                                    const pName = pUser ? (pUser.nickname || pUser.name) : pid;
+                                    const pPhoto = pUser ? (pUser.photoUrl || pUser.profilePhotoUrl || pUser.photoURL) : null;
+                                    const avatar = pPhoto || `https://ui-avatars.com/api/?name=${encodeURIComponent(pName)}&background=0a0806&color=D4AF37`;
+                                    
+                                    return (
+                                      <div key={idx} className="flex flex-col items-center justify-start gap-1.5 p-1 transition-transform hover:scale-105">
+                                        <img src={avatar} alt={pName} className={`${isLarge ? 'w-14 h-14 sm:w-16 sm:h-16' : 'w-10 h-10'} rounded-full border border-[#D4AF37]/30 object-cover shadow-[0_0_10px_rgba(212,175,55,0.1)]`} />
+                                        <span className={`${isLarge ? 'text-[10px] sm:text-xs' : 'text-[9px]'} font-bold text-white/80 text-center leading-tight line-clamp-1 w-full`} title={pName}>{pName}</span>
+                                      </div>
+                                    )
+                                  })}
+                                </div>
+                              );
+                            } else {
+                              return <div className="text-center text-[10px] text-white/30 italic p-4 bg-white/5 rounded-xl border border-white/5">No attendance records yet.</div>;
+                            }
+                          })()}
+                        </div>
+                      </div>
+                    )}
+
+                     <div className="w-full flex justify-center mt-4 pt-3 border-t border-white/5">
+                        <span className="text-[8px] sm:text-[9px] font-mono text-white/20 uppercase tracking-widest">
+                           Event ID: {spotlightEvent.event_id}
+                        </span>
+                     </div>
+                  </>
+                </div>
+                );
+              })()}
+          </motion.div>
+        </div>
+      )}
+      </AnimatePresence>
 
       {/* Create Event Modal */}
       <AnimatePresence>
@@ -1351,13 +2011,21 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                   </div>
                   <div className="space-y-1.5">
                     <label htmlFor="reserve-date" className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">Date Selector</label>
-                    <SingleDatePicker 
-                      id="reserve-date" 
-                      name="reserveDate"
-                      value={reserveDate} 
-                      onChange={(val) => setReserveDate(val)} 
-                      required 
-                    />
+                    {activeTab === 'LIVEHOUSE' ? (
+                      <input 
+                        disabled
+                        value={reserveDate ? format(reserveDate, 'yyyy-MM-dd') : ''}
+                        className="w-full glass-input text-xs cursor-not-allowed opacity-50"
+                      />
+                    ) : (
+                      <SingleDatePicker 
+                        id="reserve-date" 
+                        name="reserveDate"
+                        value={reserveDate} 
+                        onChange={(val) => setReserveDate(val)} 
+                        required 
+                      />
+                    )}
                   </div>
                 </div>
 
@@ -1370,11 +2038,21 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                     All times are in Manila Time (PHT)
                   </div>
 
-                  <div className="space-y-4 max-h-[300px] overflow-y-auto pr-1 custom-scrollbar">
-                    {TIMESLOT_BLOCKS.map(block => {
-                      const blockSlots = getTimeslotAvailability(reserveDate).filter(t => block.slots.includes(t.slot));
-                      
-                      return (
+                  {activeTab === 'LIVEHOUSE' ? (
+                    <div className="p-3.5 rounded-xl border border-[#D4AF37]/50 bg-[#181B24] shadow-[0_0_12px_rgba(212,175,55,0.15)] text-white">
+                      <div className="flex items-center justify-between">
+                         <span className="font-mono text-xs font-black tracking-tight">{reserveTimeslot}</span>
+                         <span className="px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider border text-[#D4AF37] bg-[#D4AF37]/10 border-[#D4AF37]/20">
+                           Selected
+                         </span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-4 max-h-[300px] overflow-y-auto pr-1 custom-scrollbar">
+                      {TIMESLOT_BLOCKS.map(block => {
+                        const blockSlots = getTimeslotAvailability(reserveDate).filter(t => block.slots.includes(t.slot));
+                        
+                        return (
                         <div key={block.name} className="space-y-2">
                           <h4 className="text-[9px] font-black text-[#D4AF37]/75 uppercase tracking-widest border-b border-[#D4AF37]/10 pb-1 flex items-center gap-1.5">
                             <span className="w-1.5 h-1.5 rounded-full bg-[#D4AF37]/40" />
@@ -1382,7 +2060,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                           </h4>
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                             {blockSlots.map(t => {
-                              const displaySlot = t.slot.replace(' (Manila Time)', '');
+                              const displaySlot = t.slot;
                               const isSelected = reserveTimeslot === t.slot;
                               
                               let statusText = '2 Available';
@@ -1441,6 +2119,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                       );
                     })}
                   </div>
+                  )}
                 </div>
 
                 <div className="space-y-1.5">
@@ -1831,249 +2510,187 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
       {/* Attendance Modal */}
       <AnimatePresence>
         {attendanceModalOpen && attendanceModalEvent && (
-          <div className="fixed inset-0 z-[1200] flex items-center justify-center p-4 sm:p-6">
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setAttendanceModalOpen(false)}
-              className="absolute inset-0 bg-[#0A0B0E]/90 backdrop-blur-md cursor-pointer"
+          <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 sm:p-6">
+            <motion.div 
+              initial={{ opacity: 0 }} 
+              animate={{ opacity: 1 }} 
+              exit={{ opacity: 0 }} 
+              onClick={() => setAttendanceModalOpen(false)} 
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm" 
             />
-            
-            <motion.div
-              initial={{ scale: 0.95, opacity: 0, y: 20 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.95, opacity: 0, y: 20 }}
-              className="relative w-full max-w-2xl glass-card z-10 max-h-[90vh] overflow-hidden flex flex-col p-0"
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0, y: 20 }} 
+              animate={{ scale: 1, opacity: 1, y: 0 }} 
+              exit={{ scale: 0.95, opacity: 0, y: 20 }} 
+              className="relative w-full max-w-xl bg-gradient-to-b from-[#0e0a08]/95 to-[#050403]/95 border border-[#D4AF37]/20 rounded-3xl overflow-hidden z-10 max-h-[90vh] flex flex-col shadow-[0_0_50px_rgba(212,175,55,0.1)]"
             >
-              <div className="absolute inset-0 bg-gradient-to-tr from-[#D4AF37]/5 via-transparent to-orange-500/5 pointer-events-none" />
-              
-              <div className="p-5 sm:p-6 border-b border-[#D4AF37]/10 flex items-center justify-between bg-black/20 backdrop-blur-sm shrink-0">
-                <div className="flex items-center gap-3">
-                  <CheckCircle2 size={20} className="text-[#D4AF37]" />
-                  <span className="font-black text-white uppercase tracking-widest text-xs sm:text-sm">
-                    {isAdminOrDirector ? 'Record Event Attendance' : 'Attendance Logs'}
-                  </span>
+              <div className="p-5 border-b border-[#D4AF37]/10 flex items-center justify-between bg-black/40">
+                <div className="flex flex-col">
+                  <h4 className="text-[12px] uppercase tracking-widest text-[#D4AF37] font-black">{attendanceRecord ? 'Update' : 'Report'} Attendance</h4>
+                  <span className="text-[10px] font-bold text-white/50">{attendanceModalEvent.title || 'Event'} • {attendanceModalEvent.time}</span>
                 </div>
-                <button
-                  title="Close"
-                  onClick={() => setAttendanceModalOpen(false)}
-                  className="p-2 hover:bg-white/10 rounded-full transition-colors text-white/60 hover:text-white cursor-pointer"
-                >
-                  <X size={20} />
-                </button>
+                <button type="button" onClick={() => setAttendanceModalOpen(false)} className="w-8 h-8 flex items-center justify-center rounded-full bg-white/5 text-white/40 hover:text-white hover:bg-white/10 transition-colors"><X size={16} /></button>
               </div>
+              
+              <div className="p-5 sm:p-6 overflow-y-auto custom-scrollbar flex-1">
+                <form onSubmit={handleSubmitAttendance} className="space-y-6">
+                  {attErrors.length > 0 && (
+                    <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-2xl text-red-400 text-xs font-medium">
+                      {attErrors.map((err, i) => <div key={i}>• {err}</div>)}
+                    </div>
+                  )}
+                  {attSuccessMsg && (
+                    <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl text-emerald-400 text-xs font-medium flex items-center gap-2">
+                      <CheckCircle2 size={16} /> {attSuccessMsg}
+                    </div>
+                  )}
 
-              <div className="p-5 sm:p-8 overflow-y-auto custom-scrollbar flex-1 relative z-10 space-y-6">
-                <div className="p-4 bg-[#0A0B0E]/60 border border-[#D4AF37]/10 rounded-2xl">
-                  <span className="block text-[9px] font-black uppercase tracking-wider text-[#D4AF37] mb-1">Event Details</span>
-                  <h3 className="text-base font-black text-white uppercase">{attendanceModalEvent.title}</h3>
-                  <p className="text-xs text-white/60 font-mono mt-1">
-                    {attendanceModalEvent.date} | {attendanceModalEvent.time}
-                  </p>
-                </div>
+                  {/* Member search and filter grid */}
+                  <div className="space-y-3">
+                    <span className="block text-[10px] font-black uppercase tracking-widest text-white/40">
+                      Add Attendees
+                    </span>
+                    
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={attSearch}
+                        onChange={(e) => setAttSearch(e.target.value)}
+                        placeholder="Search nickname or poppoId..."
+                        className="flex-1 bg-black/50 border border-white/10 focus:border-[#D4AF37]/50 focus:ring-1 focus:ring-[#D4AF37]/50 rounded-xl text-sm px-4 py-3 text-white placeholder-white/20 outline-none transition-all"
+                      />
+                      <select
+                        title="Attendance Role Filter"
+                        value={attRoleFilter}
+                        onChange={(e) => setAttRoleFilter(e.target.value)}
+                        className="bg-black/50 border border-white/10 focus:border-[#D4AF37]/50 rounded-xl text-sm px-4 py-3 text-white outline-none transition-all cursor-pointer appearance-none min-w-[120px]"
+                      >
+                        <option value="All Roles">All Roles</option>
+                        <option value="hosts">Hosts</option>
+                        <option value="managers">Managers</option>
+                        <option value="agents">Agents</option>
+                        <option value="admins">Admins</option>
+                      </select>
+                    </div>
 
-                {isAdminOrDirector ? (
-                  /* Admin/Director logging form */
-                  <form onSubmit={handleAttendanceSubmit} className="space-y-4 text-left">
-                    {attErrors.length > 0 && (
-                      <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-xs">
-                        {attErrors.join(', ')}
-                      </div>
-                    )}
-                    {attSuccessMsg && (
-                      <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-400 text-xs">
-                        {attSuccessMsg}
-                      </div>
-                    )}
-
-                    {/* Member search and filter grid (replicated from Admin Hub) */}
-                    <div>
-                      <span className="block text-[10px] font-black uppercase tracking-widest text-[#D4AF37] mb-3">
-                        ADD PARTICIPANTS
-                      </span>
-                      
-                      <div className="flex gap-2 mb-3">
-                        <input
-                          type="text"
-                          value={attSearch}
-                          onChange={(e) => setAttSearch(e.target.value)}
-                          placeholder="Search nickname or poppoId..."
-                          className="flex-1 glass-input text-xs px-3 py-2"
-                        />
-                        <select
-                          title="Attendance Role Filter"
-                          value={attRoleFilter}
-                          onChange={(e) => setAttRoleFilter(e.target.value)}
-                          className="glass-input text-xs px-3 py-2 appearance-none cursor-pointer"
-                        >
-                          <option value="All Roles">All Roles</option>
-                          <option value="hosts">Hosts</option>
-                          <option value="managers">Managers</option>
-                          <option value="agents">Agents</option>
-                          <option value="admins">Admins</option>
-                        </select>
-                      </div>
-
-                      {/* Member list grid scrollable */}
-                      <div className="bg-[#0A0B0E]/60 border border-white/5 rounded-xl max-h-[150px] overflow-y-auto custom-scrollbar p-2 space-y-1">
-                        {attFilteredUsers.slice(0, 10).map((u: any) => {
+                    {/* Member list grid scrollable */}
+                    <div className="bg-[#0A0B0E]/60 border border-white/5 rounded-2xl max-h-[180px] overflow-y-auto custom-scrollbar p-2 space-y-1">
+                      {attFilteredUsers.length === 0 ? (
+                         <div className="p-4 text-center text-xs text-white/30 italic">No users found</div>
+                      ) : (
+                        attFilteredUsers.slice(0, 15).map((u: any) => {
                           const poppoId = String(u.poppo_id || u.poppoId || u.id);
                           const isSelected = attAttendees.some(a => String(a.poppo_id || a.id) === poppoId);
                           return (
-                            <div key={u.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-white/5 transition-colors">
-                              <div className="flex items-center gap-2 min-w-0">
+                            <div key={u.id} className="flex items-center justify-between p-2 rounded-xl hover:bg-white/5 transition-colors border border-transparent hover:border-white/5 group">
+                              <div className="flex items-center gap-3 min-w-0">
                                 {u.photoUrl ? (
-                                  <img src={u.photoUrl} alt="" className="w-6 h-6 rounded-full object-cover shrink-0 border border-white/10" />
+                                  <img src={u.photoUrl} alt="" className="w-8 h-8 rounded-full object-cover shrink-0 border border-white/10" />
                                 ) : (
-                                  <div className="w-6 h-6 rounded-full bg-purple-500/20 border border-purple-500/30 flex items-center justify-center shrink-0">
+                                  <div className="w-8 h-8 rounded-full bg-purple-500/20 border border-purple-500/30 flex items-center justify-center shrink-0">
                                     <span className="text-[10px] font-bold text-purple-300">{(u.nickname || u.name || '?')[0].toUpperCase()}</span>
                                   </div>
                                 )}
                                 <div className="min-w-0">
-                                  <p className="text-xs font-bold text-white truncate">{u.nickname || u.name}</p>
-                                  <p className="text-[9px] text-white/40 font-mono">ID: {poppoId} | <span className="uppercase">{u.role}</span></p>
+                                  <p className="text-sm font-bold text-white truncate">{u.nickname || u.name}</p>
+                                  <p className="text-[10px] text-white/40 font-mono">ID: {poppoId} | <span className="uppercase">{u.role}</span></p>
                                 </div>
                               </div>
                               <button
                                 type="button"
-                                onClick={() => isSelected ? handleRemoveAttAttendee(poppoId) : handleAddAttAttendee(u)}
+                                onClick={() => {
+                                  if (isSelected) {
+                                    setAttAttendees(attAttendees.filter(a => String(a.poppo_id || a.id) !== poppoId));
+                                  } else {
+                                    setAttAttendees([...attAttendees, u]);
+                                  }
+                                }}
                                 className={cn(
-                                  "p-1.5 rounded-lg transition-colors cursor-pointer",
+                                  "w-8 h-8 rounded-xl flex items-center justify-center transition-all cursor-pointer border",
                                   isSelected 
-                                    ? "bg-red-500/20 text-red-400 hover:bg-red-500/30" 
-                                    : "bg-[#D4AF37]/20 text-[#D4AF37] hover:bg-[#D4AF37]/30"
+                                    ? "bg-red-500/20 text-red-400 border-red-500/30 hover:bg-red-500/30" 
+                                    : "bg-[#D4AF37]/10 text-[#D4AF37] border-[#D4AF37]/30 hover:bg-[#D4AF37]/20 group-hover:bg-[#D4AF37]/20"
                                 )}
                               >
-                                {isSelected ? '-' : '+'}
+                                {isSelected ? <X size={14} /> : <Plus size={14} />}
                               </button>
                             </div>
                           );
-                        })}
-                      </div>
+                        })
+                      )}
+                    </div>
 
-                      {/* Selected Participants Block */}
-                      <div className="mt-3 bg-[#0A0B0E] border border-white/10 rounded-xl p-3">
-                        <span className="block text-[9px] font-black uppercase tracking-wider text-white/40 mb-2">
-                          SELECTED PARTICIPANTS ({attAttendees.length})
+                    {/* Selected Participants Block */}
+                    {attAttendees.length > 0 && (
+                      <div className="mt-4 bg-[#0A0B0E] border border-white/5 rounded-2xl p-4">
+                        <span className="block text-[10px] font-black uppercase tracking-wider text-[#D4AF37] mb-3 flex items-center justify-between">
+                          <span>Selected ({attAttendees.length})</span>
+                          <button type="button" onClick={() => setAttAttendees([])} className="text-white/30 hover:text-red-400 normal-case tracking-normal text-[10px] transition-colors">Clear All</button>
                         </span>
-                        <div className="flex flex-wrap gap-1.5">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                           {attAttendees.map(a => {
-                            const pId = a.poppo_id || a.id;
-                            const dispName = a.nickname || a.name || `User #${pId}`;
+                            const pId = a.poppo_id || a.id || a.poppoId;
+                            const u = allUsers.find(user => (user.poppo_id || user.poppoId || user.id) === pId) || a;
+                            const dispName = u.nickname || u.name || `User #${pId}`;
+                            const pPhoto = u.photoUrl || u.profilePhotoUrl || u.photoURL;
+                            const avatar = pPhoto || `https://ui-avatars.com/api/?name=${encodeURIComponent(dispName)}&background=0a0806&color=D4AF37`;
+                            
                             return (
-                              <div key={pId} className="flex items-center gap-1.5 bg-[#0c0806] border border-[#D4AF37]/20 rounded-lg px-2 py-1">
-                                <span className="text-[10px] font-bold text-white truncate max-w-[120px]">{dispName}</span>
+                              <div key={pId} className="flex items-center justify-between bg-gradient-to-r from-[#D4AF37]/10 to-transparent border border-[#D4AF37]/20 rounded-xl p-2 group">
+                                <div className="flex items-center gap-3 min-w-0">
+                                  <img src={avatar} alt={dispName} className="w-8 h-8 rounded-full border border-[#D4AF37]/30 object-cover shrink-0" />
+                                  <span className="text-xs font-bold text-[#D4AF37] truncate">{dispName}</span>
+                                </div>
                                 <button
                                   type="button"
-                                  onClick={() => handleRemoveAttAttendee(pId)}
-                                  className="text-white/40 hover:text-red-400 font-bold text-xs shrink-0 cursor-pointer"
+                                  onClick={() => setAttAttendees(attAttendees.filter(user => String(user.poppo_id || user.id || user.poppoId) !== String(pId)))}
+                                  className="w-6 h-6 flex items-center justify-center rounded-lg bg-black/50 text-white/40 hover:text-red-400 hover:bg-red-500/10 font-bold transition-all shrink-0 cursor-pointer opacity-0 group-hover:opacity-100"
                                 >
-                                  ×
+                                  <X size={14} />
                                 </button>
                               </div>
                             );
                           })}
                         </div>
                       </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-[10px] font-black uppercase tracking-widest text-[#D4AF37] mb-2">Event Feedback / Notes</label>
-                      <textarea
-                        value={attFeedback}
-                        onChange={(e) => setAttFeedback(e.target.value)}
-                        className="w-full bg-[#0A0B0E] border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] outline-none min-h-[80px]"
-                        placeholder="Add notes about event completion, issues, or details..."
-                      />
-                    </div>
-
-                    <div className="flex gap-3 justify-end pt-4">
-                      <button
-                        type="button"
-                        onClick={() => setAttendanceModalOpen(false)}
-                        className="px-4 py-2 bg-white/5 border border-white/10 hover:bg-white/10 text-white font-bold text-xs uppercase tracking-wider rounded-xl transition-all cursor-pointer"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        type="submit"
-                        disabled={isAttProcessing}
-                        className="px-4 py-2 btn-gold disabled:opacity-50 text-xs font-black uppercase tracking-widest transition-all cursor-pointer flex items-center gap-2"
-                      >
-                        {isAttProcessing 
-                          ? 'Processing...' 
-                          : (attendanceModalEvent && attendanceRecords.some(r => r.eventId === attendanceModalEvent.event_id)
-                              ? 'Update Attendance' 
-                              : 'Submit Attendance')}
-                      </button>
-                    </div>
-                  </form>
-                ) : (
-                  /* Viewer Read-Only Logs */
-                  <div className="space-y-4 text-left">
-                    <span className="block text-[10px] font-black uppercase tracking-widest text-[#D4AF37]">
-                      Attended Members
-                    </span>
-                    {(() => {
-                      const record = attendanceRecords.find(r => r.eventId === attendanceModalEvent.event_id);
-                      if (record && record.attendees && record.attendees.length > 0) {
-                        return (
-                          <div className="space-y-3">
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                              {record.attendees.map((att: any) => {
-                                const pHost = (hosts || []).find(h => String(h.id) === String(att.poppoId) || String(h.poppo_id) === String(att.poppoId));
-                                return (
-                                  <div key={att.poppoId} className="flex items-center gap-3 p-3 bg-[#0A0B0E]/60 border border-white/5 rounded-xl">
-                                    {pHost?.photoUrl ? (
-                                      <img src={pHost.photoUrl} alt="" className="w-8 h-8 rounded-full object-cover shrink-0 border border-white/10" />
-                                    ) : (
-                                      <div className="w-8 h-8 rounded-full bg-purple-500/20 border border-purple-500/30 flex items-center justify-center shrink-0">
-                                        <span className="text-xs font-bold text-purple-300">{(att.nickname || '?')[0].toUpperCase()}</span>
-                                      </div>
-                                    )}
-                                    <div className="min-w-0">
-                                      <p className="text-xs font-black text-white truncate">{att.nickname}</p>
-                                      <p className="text-[9px] text-white/40 font-mono">ID: {att.poppoId} | <span className="uppercase">{att.role}</span></p>
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                            
-                            {record.eventFeedback && (
-                              <div className="mt-4 p-4 bg-[#0A0B0E]/40 border border-white/5 rounded-2xl">
-                                <span className="block text-[9px] font-black uppercase tracking-wider text-white/40 mb-1">Event Notes</span>
-                                <p className="text-xs text-white/70 leading-relaxed italic">"{record.eventFeedback}"</p>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      } else {
-                        return (
-                          <div className="p-8 bg-[#0A0B0E]/40 border border-white/5 rounded-2xl text-center">
-                            <p className="text-xs text-white/30 uppercase tracking-widest font-black">No attendance logs recorded for this event yet.</p>
-                          </div>
-                        );
-                      }
-                    })()}
-                    
-                    <div className="flex justify-end pt-4">
-                      <button
-                        type="button"
-                        onClick={() => setAttendanceModalOpen(false)}
-                        className="px-4 py-2 bg-white/5 border border-white/10 hover:bg-white/10 text-white font-bold text-xs uppercase tracking-wider rounded-xl transition-all cursor-pointer"
-                      >
-                        Close
-                      </button>
-                    </div>
+                    )}
                   </div>
-                )}
+
+                  <div className="space-y-2">
+                    <label className="block text-[10px] font-black uppercase tracking-widest text-white/40">Event Feedback / Notes</label>
+                    <textarea
+                      value={attFeedback}
+                      onChange={(e) => setAttFeedback(e.target.value)}
+                      className="w-full bg-black/50 border border-white/10 rounded-2xl p-4 text-sm text-white focus:border-[#D4AF37]/50 focus:ring-1 focus:ring-[#D4AF37]/50 outline-none min-h-[100px] transition-all"
+                      placeholder="Add notes about event completion, issues, or details..."
+                    />
+                  </div>
+
+                  <div className="flex justify-end pt-4 border-t border-white/5">
+                    <button
+                      type="button"
+                      onClick={() => setAttendanceModalOpen(false)}
+                      className="px-6 py-3 mr-3 rounded-xl text-xs font-bold uppercase tracking-widest text-white/50 hover:text-white hover:bg-white/5 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isAttProcessing || attAttendees.length === 0}
+                      className="px-8 py-3 bg-gradient-to-r from-[#D4AF37] to-[#b8960c] hover:brightness-110 text-black text-xs uppercase tracking-widest font-black rounded-xl transition-all shadow-[0_0_15px_rgba(212,175,55,0.4)] flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {isAttProcessing 
+                        ? <><Loader2 size={16} className="animate-spin" /> Processing</> 
+                        : (attendanceRecord ? 'Update Attendance' : 'Submit Attendance')}
+                    </button>
+                  </div>
+                </form>
               </div>
             </motion.div>
           </div>
         )}
       </AnimatePresence>
+
     </div>
   );
 };
