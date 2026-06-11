@@ -51,17 +51,17 @@ const getTierFilterStyle = (tierInput: string, isSelected: boolean) => {
   
   const lower = String(tierInput || '').toLowerCase();
   
-  // star host - gold to yellow gold
-  if (lower.includes('star')) return "bg-yellow-500/20 text-yellow-300 border-yellow-500/50 shadow-[0_0_10px_rgba(234,179,8,0.2)]";
+  // star host - yellow to gold
+  if (lower.includes('star')) return "bg-gradient-to-br from-yellow-400 to-amber-600 text-white border-yellow-400 shadow-[0_0_15px_rgba(250,204,21,0.6)]";
   
-  // rocket host- blue to dark blue
-  if (lower.includes('rocket')) return "bg-blue-600/20 text-blue-300 border-blue-600/50 shadow-[0_0_10px_rgba(37,99,235,0.2)]";
+  // rocket host- dark sky blue to blue
+  if (lower.includes('rocket')) return "bg-gradient-to-br from-sky-500 to-blue-700 text-white border-sky-400 shadow-[0_0_15px_rgba(14,165,233,0.6)]";
   
   // s idol- pink to dark pink
-  if (lower.includes('idol')) return "bg-pink-600/20 text-pink-300 border-pink-600/50 shadow-[0_0_10px_rgba(219,39,119,0.2)]";
+  if (lower.includes('idol')) return "bg-gradient-to-br from-pink-400 to-pink-700 text-white border-pink-400 shadow-[0_0_15px_rgba(244,114,182,0.6)]";
   
-  // esports- purple to violet
-  if (lower.includes('esport')) return "bg-purple-600/20 text-purple-300 border-purple-600/50 shadow-[0_0_10px_rgba(147,51,234,0.2)]";
+  // esports- violet to purple
+  if (lower.includes('esport')) return "bg-gradient-to-br from-violet-500 to-purple-700 text-white border-violet-400 shadow-[0_0_15px_rgba(139,92,246,0.6)]";
   
   // regular host - green
   if (lower.includes('regular')) return "bg-green-600/20 text-green-300 border-green-600/50 shadow-[0_0_10px_rgba(22,163,74,0.2)]";

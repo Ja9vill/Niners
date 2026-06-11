@@ -265,6 +265,73 @@ body {
     border-color: rgba(245, 158, 11, 0.2);
     border-top-color: #FACC15;
   }
+
+  /* Footer / Dashboard Blocks Global Style */
+  .global-block-1 {
+    transform: perspective(1000px) translateZ(0);
+    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    background: 
+      radial-gradient(circle at 10% 10%, rgba(250,204,21,0.1) 0%, transparent 50%),
+      linear-gradient(135deg, rgba(212, 175, 55, 0.15) 0%, rgba(10, 5, 5, 0.8) 100%);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(212, 175, 55, 0.2);
+    border-top: 1px solid rgba(212, 175, 55, 0.4);
+    border-left: 1px solid rgba(212, 175, 55, 0.3);
+    box-shadow: 
+      inset 0 1px 1px rgba(250, 204, 21, 0.1),
+      0 10px 20px rgba(0,0,0,0.5);
+    position: relative;
+    overflow: hidden;
+  }
+  .global-block-1:hover, .global-block-1.active-tab {
+    transform: perspective(1000px) translateY(-2px) rotateX(2deg);
+    border-color: rgba(212, 175, 55, 0.5);
+    box-shadow: 
+      inset 0 1px 1px rgba(250, 204, 21, 0.2),
+      0 15px 30px rgba(0,0,0,0.7),
+      0 0 20px rgba(212, 175, 55, 0.2);
+  }
+  .global-block-1::after {
+    content: '';
+    position: absolute;
+    top: 0; left: -100%;
+    width: 50%; height: 100%;
+    background: linear-gradient(to right, transparent, rgba(255,255,255,0.4), transparent);
+    transform: skewX(-20deg);
+    transition: 0.5s ease-out;
+    pointer-events: none;
+  }
+  .global-block-1:hover::after, .global-block-1.active-tab::after {
+    left: 200%;
+  }
+
+  .global-placeholder {
+    transform: perspective(1000px) translateZ(0);
+    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  }
+  .global-placeholder:hover {
+    transform: perspective(1000px) translateY(-4px) scale(1.01) rotateX(2deg);
+    border-top-color: rgba(255, 184, 0, 0.8);
+    box-shadow: 
+      inset 0 0 30px rgba(255, 184, 0, 0.2),
+      inset 0 4px 10px rgba(255, 184, 0, 0.4),
+      0 15px 40px rgba(0, 0, 0, 0.8),
+      0 0 40px rgba(255, 184, 0, 0.4);
+  }
+  .global-placeholder::after {
+    content: '';
+    position: absolute;
+    top: 0; left: -100%;
+    width: 50%; height: 100%;
+    background: linear-gradient(to right, transparent, rgba(255,255,255,0.3), transparent);
+    transform: skewX(-20deg);
+    transition: 0.5s ease-out;
+    pointer-events: none;
+  }
+  .global-placeholder:hover::after {
+    left: 200%;
+  }
 }
 
 /* ---- Scrollbar ---- */

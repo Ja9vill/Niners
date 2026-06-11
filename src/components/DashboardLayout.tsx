@@ -262,7 +262,7 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
       <div className="relative">
         <button
           onClick={toggleNotifications}
-          className="relative p-2.5 text-[#D4AF37] hover:text-[#F0EFE8] rounded-full bg-[#140e0a]/90 hover:bg-[#1c1511] transition-all cursor-pointer border border-[#D4AF37]/20 hover:border-[#D4AF37]/45 active:scale-95 flex items-center justify-center shrink-0 shadow-md"
+          className="relative global-block-1 p-2.5 text-[#A09E9A] hover:text-[#D4AF37] hover:scale-105 rounded-xl transition-all cursor-pointer flex items-center justify-center shrink-0"
           title="Notifications"
           type="button"
         >
@@ -639,7 +639,7 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
 
   const getBottomNavLinks = () => {
     return [
-      { path: '/dashboard', label: 'Overview', icon: LayoutDashboard },
+      { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
       { path: '/roster', label: 'Roster', icon: Users },
       { path: '/calendar', label: 'Calendar', icon: Calendar },
       { path: '/my-profile', label: 'My Profile', icon: User },
@@ -675,7 +675,7 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
           </button>
         </div>
       )}
-      <header className="md:hidden flex items-center justify-between p-4 bg-[#0F0A06]/95 border-b border-[#D4AF37]/20 backdrop-blur-md shrink-0 z-20 shadow-[0_4px_20px_rgba(212,175,55,0.08)]">
+      <header className="global-block-1 md:hidden flex items-center justify-between p-4 shrink-0 z-20">
         <div className="flex items-center gap-3">
           <img src={appLogo} alt="Nine Dashboard" className="w-8 h-8 rounded-md border border-white/10 shrink-0 object-cover" />
           <div className="flex flex-col">
@@ -689,7 +689,7 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
           {renderNotificationCenter()}
           <button 
             onClick={() => setIsSidebarOpen(!isSidebarOpen)} 
-            className="p-2.5 text-[#D4AF37] hover:text-[#F0EFE8] rounded-full bg-[#140e0a]/90 hover:bg-[#1c1511] transition-all cursor-pointer border border-[#D4AF37]/20 hover:border-[#D4AF37]/45 active:scale-95 flex items-center justify-center shrink-0 shadow-md"
+            className="global-block-1 p-2.5 text-[#A09E9A] hover:text-[#D4AF37] hover:scale-105 rounded-xl transition-all cursor-pointer flex items-center justify-center shrink-0"
             title="Toggle Menu"
             type="button"
           >
@@ -699,12 +699,18 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
       </header>
 
       <div className="flex flex-1 overflow-hidden relative">
-        {/* Sidebar */}
         <aside className={cn(
-          "absolute md:static inset-y-0 left-0 w-64 bg-[#140E0A] border-r border-[#D4AF37]/10 z-30 transition-transform duration-300 ease-in-out flex flex-col",
+          "absolute md:static inset-y-0 left-0 w-64 glass-card z-30 transition-all duration-500 ease-in-out flex flex-col",
           !isSidebarOpen && "-translate-x-full md:translate-x-0"
-        )}>
-          <div className="p-6 hidden md:flex items-center gap-3 border-b border-white/5">
+        )} style={{
+          background: 'linear-gradient(to bottom right, rgba(20, 10, 5, 0.4), rgba(40, 10, 15, 0.5))',
+          backdropFilter: 'blur(30px)',
+          borderRight: '1px solid rgba(250, 204, 21, 0.3)',
+          borderTop: '1px solid rgba(250, 204, 21, 0.1)',
+          borderColor: 'rgba(234, 179, 8, 0.2)',
+          boxShadow: 'inset -1px 0 1px rgba(250, 204, 21, 0.1), inset 1px 1px 1px rgba(250, 204, 21, 0.2), 10px 0 30px rgba(0,0,0,0.7), 0 0 20px rgba(250, 204, 21, 0.05)'
+        }}>
+          <div className="p-6 hidden md:flex items-center gap-3 border-b border-[rgba(250,204,21,0.2)] bg-black/10 shadow-[0_10px_20px_rgba(0,0,0,0.3)]">
             <img src={appLogo} alt="Nine Dashboard" className="w-10 h-10 rounded-md border border-[#D4AF37]/30 shrink-0 object-cover" />
             <div className="flex flex-col">
               <h1 className="text-[11px] font-black uppercase tracking-widest text-[#D4AF37] leading-tight mt-1">NINE TALENT MANAGEMENT</h1>
@@ -717,14 +723,14 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
                 <div className="text-sm font-bold truncate pr-2">{authState.name}</div>
                 <div className="text-xs text-[#A09E9A] capitalize">{authState.role}</div>
               </div>
-              <div className="flex items-center bg-black/20 rounded-full p-1 border border-white/5 shadow-inner shrink-0">
+              <div className="flex items-center gap-2 shrink-0">
                 <button
                   onClick={() => setViewMode('desktop')}
                   className={cn(
-                    "p-1.5 rounded-full transition-all duration-300",
+                    "global-block-1 p-2 rounded-xl transition-all duration-300 flex items-center justify-center",
                     currentViewMode === 'desktop' 
-                      ? "bg-[#D4AF37] text-black shadow-[0_0_10px_rgba(212,175,55,0.4)]" 
-                      : "text-[#A09E9A] hover:text-white"
+                      ? "active-tab border-[#D4AF37]/80 text-[#D4AF37] shadow-[0_0_15px_rgba(212,175,55,0.4)] scale-105" 
+                      : "text-[#A09E9A] hover:text-[#D4AF37] hover:scale-105"
                   )}
                   title="Desktop View"
                 >
@@ -733,10 +739,10 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
                 <button
                   onClick={() => setViewMode('mobile')}
                   className={cn(
-                    "p-1.5 rounded-full transition-all duration-300",
+                    "global-block-1 p-2 rounded-xl transition-all duration-300 flex items-center justify-center",
                     currentViewMode === 'mobile' 
-                      ? "bg-[#D4AF37] text-black shadow-[0_0_10px_rgba(212,175,55,0.4)]" 
-                      : "text-[#A09E9A] hover:text-white"
+                      ? "active-tab border-[#D4AF37]/80 text-[#D4AF37] shadow-[0_0_15px_rgba(212,175,55,0.4)] scale-105" 
+                      : "text-[#A09E9A] hover:text-[#D4AF37] hover:scale-105"
                   )}
                   title="Mobile View"
                 >
@@ -858,29 +864,32 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
       </div>
 
       {/* Mobile Bottom Nav */}
-      <div className="md:hidden fixed bottom-4 left-0 right-0 flex items-center justify-center gap-2 px-4 pb-safe z-50 pointer-events-none">
-        {bottomNavLinks.map(tab => {
-          const Icon = tab.icon;
-          const isActive = location.pathname.startsWith(tab.path);
-          return (
-            <Link
-              key={tab.path}
-              to={tab.path}
-              className={cn(
-                "pointer-events-auto flex flex-col items-center justify-center flex-1 py-2 rounded-xl transition-all duration-300 backdrop-blur-md border",
-                isActive
-                  ? "bg-[#1C120C]/90 border-[#D4AF37] text-[#D4AF37] shadow-[0_0_15px_rgba(212,175,55,0.25)] scale-105"
-                  : "bg-[#0F0A06]/75 border-[#D4AF37]/20 text-[#A09E9A] hover:border-[#D4AF37]/50"
-              )}
-            >
-              <Icon size={16} className={isActive ? "text-[#D4AF37]" : "text-[#A09E9A]"} />
-              <span className={cn(
-                "text-[8px] font-black uppercase tracking-wider mt-0.5",
-                isActive ? "text-[#D4AF37]" : "text-[#A09E9A]"
-              )}>{tab.label}</span>
-            </Link>
-          );
-        })}
+      <div className="md:hidden fixed bottom-4 left-4 right-4 pb-safe z-50 pointer-events-none">
+        <div className="global-block-1 rounded-2xl pointer-events-auto flex w-full items-center justify-between gap-2 p-2 transition-all duration-500 relative overflow-hidden">
+          <div className="absolute inset-0 bg-black/60 pointer-events-none z-0"></div>
+          {bottomNavLinks.map(tab => {
+            const Icon = tab.icon;
+            const isActive = location.pathname.startsWith(tab.path);
+            return (
+              <Link
+                key={tab.path}
+                to={tab.path}
+                className={cn(
+                  "global-block-1 flex flex-col items-center justify-center flex-1 py-2 rounded-xl transition-all duration-300 relative z-10",
+                  isActive
+                    ? "active-tab border-[#D4AF37]/80 text-[#D4AF37] shadow-[0_0_15px_rgba(212,175,55,0.4)] scale-[1.03]"
+                    : "text-[#A09E9A]"
+                )}
+              >
+                <Icon size={16} className={isActive ? "text-[#D4AF37]" : "text-[#A09E9A]"} />
+                <span className={cn(
+                  "text-[8px] font-black uppercase tracking-wider mt-0.5",
+                  isActive ? "text-[#D4AF37]" : "text-[#A09E9A]"
+                )}>{tab.label}</span>
+              </Link>
+            );
+          })}
+        </div>
       </div>
     </div>
   );

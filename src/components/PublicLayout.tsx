@@ -15,7 +15,7 @@ export const PublicLayout = ({ children }: { children?: React.ReactNode }) => {
   return (
     <div className="fixed inset-0 w-full h-[100dvh] flex flex-col overflow-hidden bg-[#0A0A0F] text-[#F0EFE8] font-sans selection:bg-[#D4AF37]/30 selection:text-white">
       {/* Native App Top Bar */}
-      <header className="w-full flex items-center justify-between p-4 bg-[#0F0A06]/95 border-b border-[#D4AF37]/20 backdrop-blur-md shrink-0 z-50 shadow-[0_4px_20px_rgba(212,175,55,0.08)]">
+      <header className="global-block-1 w-full flex items-center justify-between p-4 shrink-0 z-50 transition-all duration-500">
         <div className="flex items-center gap-2 md:gap-3">
           <Link to="/" className="flex items-center gap-2 md:gap-3">
           <img 
@@ -34,7 +34,7 @@ export const PublicLayout = ({ children }: { children?: React.ReactNode }) => {
         {!isLoggedIn && (
           <Link 
             to="/login"
-            className="px-4 py-1.5 rounded-full bg-[#D4AF37]/10 text-[#D4AF37] border border-[#D4AF37]/20 text-[10px] font-bold uppercase tracking-widest hover:bg-[#D4AF37]/20 transition-colors"
+            className="global-block-1 px-4 py-1.5 rounded-xl text-[#D4AF37] hover:text-[#D4AF37] hover:scale-105 text-[10px] font-bold uppercase tracking-widest transition-all"
           >
             Login
           </Link>
@@ -63,35 +63,38 @@ export const PublicLayout = ({ children }: { children?: React.ReactNode }) => {
       </main>
 
       {/* Floating Glassmorphism Bottom Nav */}
-      <div className="fixed bottom-4 left-0 right-0 flex items-center justify-center gap-2 px-4 pb-safe z-50 pointer-events-none">
-        {[
-          { to: '/', icon: Home, label: 'Home' },
-          { to: '/roster', icon: Trophy, label: 'Roster' },
-          { to: '/calendar', icon: Calendar, label: 'Calendar' },
-          { to: '/poppo-live', icon: PlayCircle, label: 'Poppo' },
-        ].map(({ to, icon: Icon, label }) => {
-          const isActive = to === '/' ? location.pathname === '/' : location.pathname.startsWith(to);
-          return (
-            <Link
-              key={to}
-              to={to}
-              className={cn(
-                "pointer-events-auto flex flex-col items-center justify-center flex-1 py-2 rounded-xl transition-all duration-300 backdrop-blur-md border",
-                isActive
-                  ? "bg-[#1C120C]/90 border-[#D4AF37] text-[#D4AF37] shadow-[0_0_15px_rgba(212,175,55,0.25)] scale-105"
-                  : "bg-[#0F0A06]/75 border-[#D4AF37]/20 text-[#A09E9A] hover:border-[#D4AF37]/50"
-              )}
-            >
-              <Icon size={16} className={isActive ? "text-[#D4AF37]" : "text-[#A09E9A]"} />
-              <span className={cn(
-                "text-[8px] font-black uppercase tracking-wider mt-0.5",
-                isActive ? "text-[#D4AF37]" : "text-[#A09E9A]"
-              )}>
-                {label}
-              </span>
-            </Link>
-          );
-        })}
+      <div className="fixed bottom-4 left-4 right-4 pb-safe z-50 pointer-events-none">
+        <div className="global-block-1 rounded-2xl pointer-events-auto flex w-full items-center justify-between gap-2 p-2 transition-all duration-500 relative overflow-hidden">
+          <div className="absolute inset-0 bg-black/60 pointer-events-none z-0"></div>
+          {[
+            { to: '/', icon: Home, label: 'Home' },
+            { to: '/roster', icon: Trophy, label: 'Roster' },
+            { to: '/calendar', icon: Calendar, label: 'Calendar' },
+            { to: '/poppo-live', icon: PlayCircle, label: 'Poppo' },
+          ].map(({ to, icon: Icon, label }) => {
+            const isActive = to === '/' ? location.pathname === '/' : location.pathname.startsWith(to);
+            return (
+              <Link
+                key={to}
+                to={to}
+                className={cn(
+                  "global-block-1 flex flex-col items-center justify-center flex-1 py-2 rounded-xl transition-all duration-300 relative z-10",
+                  isActive
+                    ? "active-tab border-[#D4AF37]/80 text-[#D4AF37] shadow-[0_0_15px_rgba(212,175,55,0.4)] scale-[1.03]"
+                    : "text-[#A09E9A] hover:text-[#D4AF37]"
+                )}
+              >
+                <Icon size={16} className={isActive ? "text-[#D4AF37]" : "text-[#A09E9A]"} />
+                <span className={cn(
+                  "text-[8px] font-black uppercase tracking-wider mt-0.5",
+                  isActive ? "text-[#D4AF37]" : "text-[#A09E9A]"
+                )}>
+                  {label}
+                </span>
+              </Link>
+            );
+          })}
+        </div>
       </div>
     </div>
   );
