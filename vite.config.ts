@@ -1,9 +1,19 @@
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
+import fs from 'fs';
 import {defineConfig, loadEnv} from 'vite';
 
-export default defineConfig(({mode}) => {
+// Automatically ensure logo is in public folder for PWA manifest
+try {
+  const srcLogo = path.resolve(__dirname, 'src/logo.jpg');
+  const destLogo = path.resolve(__dirname, 'public/logo.jpg');
+  if (fs.existsSync(srcLogo)) {
+    fs.copyFileSync(srcLogo, destLogo);
+  }
+} catch (e) {
+  console.warn('Could not copy logo to public folder', e);
+}export default defineConfig(({mode}) => {
   const env = loadEnv(mode, '.', '');
   return {
     plugins: [react(), tailwindcss()],

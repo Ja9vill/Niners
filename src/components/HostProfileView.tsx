@@ -2574,19 +2574,19 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
         };
       }
       if (norm === 'star host') {
-        return { borderColor: 'border-[#D4AF37]/50', badgeText: 'text-[#D4AF37]', bgStyle: 'bg-black/40 shadow-[0_0_12px_rgba(212,175,55,0.25)]' };
+        return { borderColor: 'border-[#FFEA00]/50', badgeText: 'text-[#FFEA00]', bgStyle: 'bg-[#FFEA00]/20 shadow-[0_0_12px_rgba(255,234,0,0.5)]' };
       }
       if (norm === 's idol') {
-        return { borderColor: 'border-[#ec4899]/50', badgeText: 'text-[#ec4899]', bgStyle: 'bg-black/40 shadow-[0_0_12px_rgba(236,72,153,0.25)]' };
+        return { borderColor: 'border-[#FF007F]/50', badgeText: 'text-[#FF007F]', bgStyle: 'bg-[#FF007F]/20 shadow-[0_0_12px_rgba(255,0,127,0.5)]' };
       }
       if (norm === 'rocket host') {
-        return { borderColor: 'border-[#3b82f6]/50', badgeText: 'text-[#3b82f6]', bgStyle: 'bg-black/40 shadow-[0_0_12px_rgba(59,130,246,0.25)]' };
+        return { borderColor: 'border-[#60A5FA]/60', badgeText: 'text-[#60A5FA]', bgStyle: 'bg-[#1E3A8A]/60 shadow-[0_0_12px_rgba(96,165,250,0.5)]' };
       }
       if (norm === 'esport host' || norm.includes('esport')) {
-        return { borderColor: 'border-[#a855f7]/50', badgeText: 'text-[#a855f7]', bgStyle: 'bg-black/40 shadow-[0_0_12px_rgba(168,85,247,0.25)]' };
+        return { borderColor: 'border-[#B026FF]/50', badgeText: 'text-[#B026FF]', bgStyle: 'bg-[#B026FF]/20 shadow-[0_0_12px_rgba(176,38,255,0.5)]' };
       }
       // Regular Host
-      return { borderColor: 'border-white/20', badgeText: 'text-[#F0EFE8]', bgStyle: 'bg-black/40 shadow-sm' };
+      return { borderColor: 'border-emerald-400/45', badgeText: 'text-emerald-400', bgStyle: 'bg-emerald-400/20 shadow-[0_0_12px_rgba(52,211,153,0.3)]' };
     };
     return getTierPayStyles(host.tier_pay || '');
   }, [host.tier_pay]);

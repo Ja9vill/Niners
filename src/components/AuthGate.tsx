@@ -9,7 +9,7 @@ import { FirebaseService } from '../lib/firebaseService';
 import appLogo from '../logo.jpg';
 
 const TEXT = {
-  title: 'NINERS APP',
+  title: 'NINERS',
   memberLogin: 'MEMBER LOGIN',
   loginDescription: 'Login to access your full agency roster and account features.',
   poppoId: 'Poppo ID',
@@ -278,10 +278,14 @@ export const AuthGate: React.FC<AuthGateProps> = ({ children, onAuthChange }) =>
 
       <div className="w-full max-w-sm border border-[#D4AF37]/20 rounded-[24px] p-6 space-y-6 bg-[#120D0A]/75 backdrop-blur-xl shadow-[0_0_50px_rgba(212,175,55,0.12)] relative z-10 flex flex-col justify-between">
         
-        {/* Top Header Grid line style */}
-        <div className="border-b border-t border-white/5 py-3 flex items-center justify-center gap-2 shrink-0">
-          <img src={appLogo} alt="Niners App Logo" className="h-6 w-6 rounded-md border border-[#D4AF37]/20 object-cover select-none pointer-events-none" />
-          <span className="text-xs font-black tracking-[0.25em] text-[#D4AF37]">{TEXT.title}</span>
+        {/* Top Header */}
+        <div className="border-b border-t border-white/5 py-4 flex flex-col items-center justify-center gap-1 shrink-0">
+          <div className="flex items-center gap-3 mb-1">
+            <img src={appLogo} alt="Niners Logo" className="h-8 w-8 rounded-lg border border-[#D4AF37]/30 shadow-[0_0_15px_rgba(212,175,55,0.2)] object-cover select-none pointer-events-none" />
+            <h1 className="text-xl font-black tracking-[0.2em] text-[#D4AF37] leading-tight">{TEXT.title}</h1>
+          </div>
+          <h2 className="text-[10px] font-black text-[#F0EFE8] uppercase tracking-[0.15em]">NINE Talent Management</h2>
+          <p className="text-[9px] font-bold text-[#A09E9A]/70 italic tracking-wider mt-0.5">"The home of quality livestreamers."</p>
         </div>
 
         {/* Member Login Title Area */}

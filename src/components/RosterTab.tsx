@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { Search, Filter, Loader2, Star, Users, LayoutGrid, Medal } from 'lucide-react';
+import { Search, Filter, Loader2, Star, Users, LayoutGrid, Medal, Ribbon, Gamepad2, Rocket } from 'lucide-react';
 import { FirebaseService } from '../lib/firebaseService';
 import { cn } from '../lib/utils';
 import { Host } from '../types';
@@ -9,68 +9,42 @@ import { HostProfileView } from './HostProfileView';
 const getTierBlockStyles = (tierInput: string) => {
   const norm = String(tierInput || '').toLowerCase();
   if (norm.includes('star')) {
-    return {
-      border: 'border-[#D4AF37]/20 hover:border-[#D4AF37]/50',
-      bg: 'bg-gradient-to-br from-[#D4AF37]/8 via-transparent to-transparent'
-    };
+    return "global-tier-3";
   }
   if (norm.includes('s idol') || norm.includes('idol')) {
-    return {
-      border: 'border-[#ec4899]/20 hover:border-[#ec4899]/50',
-      bg: 'bg-gradient-to-br from-[#ec4899]/8 via-transparent to-transparent'
-    };
+    return "global-tier-1";
   }
   if (norm.includes('rocket')) {
-    return {
-      border: 'border-[#3b82f6]/20 hover:border-[#3b82f6]/50',
-      bg: 'bg-gradient-to-br from-[#3b82f6]/8 via-transparent to-transparent'
-    };
+    return "global-tier-4";
   }
   if (norm.includes('esports') || norm.includes('esport')) {
-    return {
-      border: 'border-[#a855f7]/20 hover:border-[#a855f7]/50',
-      bg: 'bg-gradient-to-br from-[#a855f7]/8 via-transparent to-transparent'
-    };
+    return "global-tier-2";
   }
   if (norm.includes('regular')) {
-    return {
-      border: 'border-[#10b981]/20 hover:border-[#10b981]/50',
-      bg: 'bg-gradient-to-br from-[#10b981]/8 via-transparent to-transparent'
-    };
+    return "bg-green-600/20 text-green-300 border border-green-600/50 shadow-[0_0_10px_rgba(22,163,74,0.2)]";
   }
-  return {
-    border: 'border-white/5 hover:border-indigo-500/30',
-    bg: 'bg-[#1A1A28]'
-  };
+  return "bg-[#1A1A28] border border-white/5 hover:border-indigo-500/30";
 };
 
 const getTierFilterStyle = (tierInput: string, isSelected: boolean) => {
-  if (!isSelected) {
-    return "bg-black/20 text-[#A09E9A] border-white/10 hover:border-white/30 hover:text-[#F0EFE8]";
-  }
-  
   const lower = String(tierInput || '').toLowerCase();
   
-  // star host - yellow to gold
-  if (lower.includes('star')) return "bg-gradient-to-br from-yellow-400 to-amber-600 text-white border-yellow-400 shadow-[0_0_15px_rgba(250,204,21,0.6)]";
-  
-  // rocket host- dark sky blue to blue
-  if (lower.includes('rocket')) return "bg-gradient-to-br from-sky-500 to-blue-700 text-white border-sky-400 shadow-[0_0_15px_rgba(14,165,233,0.6)]";
-  
-  // s idol- pink to dark pink
-  if (lower.includes('idol')) return "bg-gradient-to-br from-pink-400 to-pink-700 text-white border-pink-400 shadow-[0_0_15px_rgba(244,114,182,0.6)]";
-  
-  // esports- violet to purple
-  if (lower.includes('esport')) return "bg-gradient-to-br from-violet-500 to-purple-700 text-white border-violet-400 shadow-[0_0_15px_rgba(139,92,246,0.6)]";
-  
-  // regular host - green
-  if (lower.includes('regular')) return "bg-green-600/20 text-green-300 border-green-600/50 shadow-[0_0_10px_rgba(22,163,74,0.2)]";
-  
-  // influencer is light yellow and white
-  if (lower.includes('influencer')) return "bg-yellow-100/20 text-yellow-100 border-yellow-100/50 shadow-[0_0_10px_rgba(254,240,138,0.2)]";
+  let baseClass = "";
+  if (lower.includes('star')) baseClass = "text-[#FFEA00] bg-[#FFEA00]/20 border-[#FFEA00]/50 shadow-[0_0_12px_rgba(255,234,0,0.5)]";
+  else if (lower.includes('s idol') || lower.includes('idol')) baseClass = "text-[#FF007F] bg-[#FF007F]/20 border-[#FF007F]/50 shadow-[0_0_12px_rgba(255,0,127,0.5)]";
+  else if (lower.includes('rocket')) baseClass = "text-[#60A5FA] bg-[#1E3A8A]/60 border-[#60A5FA]/60 shadow-[0_0_12px_rgba(96,165,250,0.5)]";
+  else if (lower.includes('esports') || lower.includes('esport')) baseClass = "text-[#B026FF] bg-[#B026FF]/20 border-[#B026FF]/50 shadow-[0_0_12px_rgba(176,38,255,0.5)]";
+  else if (lower.includes('regular')) baseClass = "text-[#34D399] bg-[#34D399]/20 border-[#34D399]/50 shadow-[0_0_12px_rgba(52,211,153,0.5)]";
+  else baseClass = "text-white bg-white/10 border-white/20";
 
-  // Default fallback
-  return "bg-indigo-500/20 text-indigo-300 border-indigo-500/50 shadow-[0_0_10px_rgba(99,102,241,0.2)]";
+  if (!isSelected) {
+    const unselectedClass = baseClass
+      .replace(/shadow-\[.*?\]/, 'shadow-none')
+      .replace(/border-\[.*?\]\/\d+/, 'border-transparent');
+    return `${unselectedClass} opacity-50 hover:opacity-80 cursor-pointer`;
+  }
+  
+  return `${baseClass} opacity-100 ring-1 ring-white/30`;
 };
 
 const formatBadgeTitle = (title: string) => {
@@ -328,43 +302,51 @@ export const RosterTab: React.FC<RosterTabProps> = ({ isReadOnly = false }) => {
   return (
     <div className="space-y-6 relative">
       {/* FILTER MENU BLOCKS */}
-      <div className="glass-card relative z-10 flex flex-col gap-4 overflow-hidden p-5">
+      <div className="global-block-1 relative z-10 flex flex-col gap-2.5 overflow-hidden p-4">
         {/* Subtle background glow for the filter section */}
         <div className="absolute -top-24 -left-24 w-48 h-48 bg-indigo-500/10 blur-3xl rounded-full pointer-events-none"></div>
         <div className="absolute -bottom-24 -right-24 w-48 h-48 bg-[#D4AF37]/5 blur-3xl rounded-full pointer-events-none"></div>
 
         {/* Search & Role Filter Row */}
-        <div className="flex flex-row gap-3 items-center z-10 w-full">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-indigo-400/50" size={16} />
+        <div className="global-placeholder flex w-full items-center justify-between gap-2 bg-gradient-to-br from-[#FFB800]/10 to-transparent border border-[#FFB800]/20 border-t-[#FFB800]/40 rounded-xl px-4 py-2 backdrop-blur-xl shadow-[0_8px_32px_rgba(0,0,0,0.5),inset_0_1px_1px_rgba(255,184,0,0.3)] relative z-10 overflow-hidden">
+          <div className="relative flex-1 flex items-center">
+            <Search className="text-[#FFB700] drop-shadow-[0_0_8px_rgba(255,184,0,0.5)] mr-3 shrink-0" size={18} />
             <input
               type="text"
               placeholder="Search Host ID or Nickname..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-9 pr-4 py-3 bg-black/30 border border-white/10 rounded-xl text-xs text-[#F0EFE8] focus:outline-none focus:border-indigo-500/50 focus:bg-black/50 transition-all w-full shadow-inner"
+              className="w-full bg-transparent border-none text-sm text-[#F0EFE8] placeholder:text-[#A09E9A]/60 focus:outline-none focus:ring-0"
             />
           </div>
           
-          <div className="w-32 sm:w-48 shrink-0">
+          <div className="w-32 sm:w-48 shrink-0 flex items-center justify-end border-l border-[#FFB800]/20 pl-4">
             <select
               value={roleFilter}
               onChange={(e) => setRoleFilter(e.target.value as any)}
               title="Filter by Role"
-              className="w-full py-3 px-4 bg-[#0D0D14] border border-white/10 rounded-xl text-xs text-[#F0EFE8] focus:outline-none focus:border-indigo-500/50 focus:bg-black/50 transition-all cursor-pointer shadow-inner font-bold"
+              className="w-full bg-transparent border-none text-xs text-[#FFB700] font-bold focus:outline-none cursor-pointer uppercase tracking-wider text-right appearance-none"
+              style={{ textAlignLast: 'right' }}
             >
-              <option value="all" className="bg-[#1A1A28] text-[#F0EFE8]">All Members</option>
-              <option value="hosts" className="bg-[#1A1A28] text-[#F0EFE8]">Hosts</option>
-              <option value="team_leaders" className="bg-[#1A1A28] text-[#F0EFE8]">Team Leaders</option>
+              <option value="all" className="bg-black text-[#FFB700]">All Members</option>
+              <option value="hosts" className="bg-black text-[#FFB700]">Hosts</option>
+              <option value="team_leaders" className="bg-black text-[#FFB700]">Team Leaders</option>
             </select>
           </div>
         </div>
 
         {/* Tier Pay Category & Top Niners */}
         <div className="w-full z-10">
-          <h3 className="text-[10px] font-black uppercase tracking-widest text-[#A09E9A]/50 mb-2 flex items-center gap-1.5"><Star size={12}/> Tier Pay Category</h3>
-          <div className="flex flex-wrap gap-2 items-center">
-            {['Star Host', 'Rocket Host', 'S idol', 'Esports', 'Regular Host'].map(tier => {
+          <div className="flex flex-wrap gap-1.5 items-center">
+            {[
+              { name: 'S idol', icon: Ribbon },
+              { name: 'Esports', icon: Gamepad2 },
+              { name: 'Star Host', icon: Star },
+              { name: 'Rocket Host', icon: Rocket },
+              { name: 'Regular Host', icon: Users }
+            ].map(tierObj => {
+              const tier = tierObj.name;
+              const Icon = tierObj.icon;
               const isSelected = selectedTiers.includes(tier);
               return (
                 <button
@@ -374,11 +356,12 @@ export const RosterTab: React.FC<RosterTabProps> = ({ isReadOnly = false }) => {
                     else setSelectedTiers(prev => [...prev, tier]);
                   }}
                   className={cn(
-                    "px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all border",
+                    "relative flex items-center justify-between min-w-[110px] px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border overflow-hidden shadow-md",
                     getTierFilterStyle(tier, isSelected)
                   )}
                 >
-                  {tier}
+                  <span className="relative z-10 text-left w-full">{tier}</span>
+                  <Icon size={16} className="absolute right-2 top-1/2 -translate-y-1/2 opacity-20 pointer-events-none" />
                 </button>
               );
             })}
@@ -400,14 +383,14 @@ export const RosterTab: React.FC<RosterTabProps> = ({ isReadOnly = false }) => {
                 }
               }}
               className={cn(
-                "px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all border flex items-center gap-1.5",
+                "relative flex items-center justify-between min-w-[110px] px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border overflow-hidden",
                 showTopNiners
-                  ? "bg-[#D4AF37]/20 text-[#D4AF37] border-[#D4AF37]/50 shadow-[0_0_10px_rgba(212,175,55,0.3)]"
-                  : "bg-black/20 text-[#A09E9A] border-white/10 hover:border-white/30 hover:text-[#F0EFE8]"
+                  ? "text-[#D4AF37] bg-[#D4AF37]/20 border-[#D4AF37]/50 shadow-[0_0_12px_rgba(212,175,55,0.5)] opacity-100 ring-1 ring-white/30"
+                  : "text-[#D4AF37] bg-[#D4AF37]/20 border-transparent shadow-none opacity-50 hover:opacity-80 cursor-pointer"
               )}
             >
-              <Medal size={12} className={showTopNiners ? "fill-[#D4AF37]" : ""} />
-              TOP NINERS
+              <span className="relative z-10 text-left w-full">TOP NINERS</span>
+              <Medal size={16} className="absolute right-2 top-1/2 -translate-y-1/2 opacity-20 pointer-events-none" />
             </button>
           </div>
         </div>
@@ -434,15 +417,16 @@ export const RosterTab: React.FC<RosterTabProps> = ({ isReadOnly = false }) => {
         <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
           {filteredHosts.map(host => {
             const tierPay = String(host.tier_pay || 'N/A');
-            const blockStyles = getTierBlockStyles(tierPay);
+            const getTierStyle = () => {
+              return 'border-[#D4AF37]/40 bg-gradient-to-br from-[#FF6B00]/20 via-[#D4AF37]/10 to-transparent shadow-[0_4px_15px_rgba(0,0,0,0.5),0_0_15px_rgba(212,175,55,0.2)]';
+            };
             return (
               <div
                 key={host.id}
                 onClick={() => openSpotlight(host)}
                 className={cn(
-                  "aspect-square relative rounded-2xl overflow-hidden cursor-pointer hover:-translate-y-1 transition-all duration-300 shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] border backdrop-blur-md bg-white/[0.01] hover:bg-white/[0.03] group flex flex-col justify-between",
-                  blockStyles.border,
-                  blockStyles.bg
+                  "aspect-square relative rounded-xl overflow-hidden cursor-pointer transition-all duration-300 group flex flex-col justify-between border",
+                  getTierStyle()
                 )}
               >
                 {/* Background Photo */}
@@ -474,13 +458,13 @@ export const RosterTab: React.FC<RosterTabProps> = ({ isReadOnly = false }) => {
                       const dynamicTopNiner = top9NinerData.find(d => String(d.id) === String(host.id));
                       if (dynamicTopNiner) {
                         const rank = dynamicTopNiner.rank;
-                        let badgeColorStyle = 'border-amber-500 text-amber-200 bg-amber-500/30 shadow-[0_0_8px_rgba(245,158,11,0.6)]';
-                        if (rank >= 4 && rank <= 6) badgeColorStyle = 'border-orange-500 text-orange-200 bg-orange-500/30 shadow-[0_0_8px_rgba(249,115,22,0.6)]';
-                        else if (rank >= 7) badgeColorStyle = 'border-red-500 text-red-200 bg-red-500/30 shadow-[0_0_8px_rgba(239,68,68,0.6)]';
+                        let badgeColorStyle = 'text-[#D4AF37] bg-[#D4AF37]/20 border-[#D4AF37]/50 shadow-[0_0_12px_rgba(212,175,55,0.5)]'; // Gold for Top 1-3
+                        if (rank >= 4 && rank <= 6) badgeColorStyle = 'text-[#F97316] bg-[#F97316]/20 border-[#F97316]/50 shadow-[0_0_12px_rgba(249,115,22,0.5)]'; // Orange for Top 4-6
+                        else if (rank >= 7) badgeColorStyle = 'text-[#EF4444] bg-[#EF4444]/20 border-[#EF4444]/50 shadow-[0_0_12px_rgba(239,68,68,0.5)]'; // Red for Top 7-9
 
                         return (
-                          <div className={cn("px-1.5 py-0.5 rounded text-[7.5px] font-black uppercase tracking-wider border backdrop-blur-sm flex items-center gap-1", badgeColorStyle)}>
-                            <Star size={8} className="drop-shadow-md" />
+                          <div className={cn("px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider border backdrop-blur-sm shadow-sm flex items-center gap-1", badgeColorStyle)}>
+                            <Medal size={8} />
                             Top {rank} Niner
                           </div>
                         );
@@ -552,16 +536,16 @@ export const RosterTab: React.FC<RosterTabProps> = ({ isReadOnly = false }) => {
                     )}
                   </div>
 
-                  {/* Tier Pay badge top right (excluding Regular Host) */}
-                  {host.tier_pay && host.tier_pay !== 'Regular Host' && (() => {
+                  {/* Tier Pay badge top right */}
+                  {host.tier_pay && (() => {
                     const tier = String(host.tier_pay);
                     const getTierStyle = (t: string) => {
                       const lower = t.toLowerCase();
-                      if (lower.includes('star')) return 'text-yellow-400 bg-yellow-400/20 border-yellow-400/45';
-                      if (lower.includes('rocket')) return 'text-cyan-400 bg-cyan-400/20 border-cyan-400/45';
-                      if (lower.includes('s idol')) return 'text-pink-300 bg-pink-500/20 border-pink-500/45';
-                      if (lower.includes('esports')) return 'text-[#00f2fe] bg-[#00f2fe]/20 border-[#00f2fe]/45 shadow-[0_0_8px_rgba(0,242,254,0.4)]';
-                      if (lower.includes('regular')) return 'text-emerald-400 bg-emerald-400/20 border-emerald-400/45';
+                      if (lower.includes('star')) return 'text-[#FFEA00] bg-[#FFEA00]/20 border-[#FFEA00]/50 shadow-[0_0_12px_rgba(255,234,0,0.5)]';
+                      if (lower.includes('rocket')) return 'text-[#60A5FA] bg-[#1E3A8A]/60 border-[#60A5FA]/60 shadow-[0_0_12px_rgba(96,165,250,0.5)]';
+                      if (lower.includes('s idol')) return 'text-[#FF007F] bg-[#FF007F]/20 border-[#FF007F]/50 shadow-[0_0_12px_rgba(255,0,127,0.5)]';
+                      if (lower.includes('esports')) return 'text-[#B026FF] bg-[#B026FF]/20 border-[#B026FF]/50 shadow-[0_0_12px_rgba(176,38,255,0.5)]';
+                      if (lower.includes('regular')) return 'text-[#34D399] bg-[#34D399]/20 border-[#34D399]/50 shadow-[0_0_12px_rgba(52,211,153,0.5)]';
                       return 'text-white bg-white/10 border-white/20';
                     };
 
@@ -600,10 +584,10 @@ export const RosterTab: React.FC<RosterTabProps> = ({ isReadOnly = false }) => {
 
       {/* SPOTLIGHT MODAL */}
       {selectedHost && createPortal(
-        <div className="fixed inset-0 z-[100]">
-          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={closeSpotlight}></div>
-          <div className="absolute inset-0 overflow-y-auto p-4 py-10 pointer-events-none">
-            <div className="pointer-events-auto w-full mx-auto flex justify-center min-h-full">
+        <div className="fixed inset-0 z-[9999]">
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={closeSpotlight}></div>
+          <div className="absolute inset-0 overflow-y-auto p-4 py-10 pb-24">
+            <div className="w-full mx-auto flex justify-center min-h-full relative z-10">
               <HostProfileView 
                 host={selectedHost} 
                 isReadOnly={isReadOnly} 

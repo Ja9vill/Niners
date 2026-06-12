@@ -339,7 +339,7 @@ export const Analytics = () => {
       <div className="flex items-center justify-between pb-4 border-b border-white/5 shrink-0">
         <div className="flex flex-col">
           <span className="text-lg font-black text-[#F0EFE8] leading-tight tracking-[0.05em]">TEAM PERFORMANCE ANALYTICS</span>
-          <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#D4AF37]">Niners App Portal</span>
+          <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#D4AF37]">Niners Portal</span>
         </div>
       </div>
 

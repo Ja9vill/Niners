@@ -14,6 +14,17 @@ import { collection, query, onSnapshot, setDoc, doc, deleteDoc, where } from 'fi
 import appLogo from '../logo.jpg';
 import { FirebaseService } from '../lib/firebaseService';
 
+const formatStrictDate = (dateString: string | undefined | null) => {
+  if (!dateString) return '';
+  try {
+    const d = new Date(dateString.includes('T') ? dateString : `${dateString}T12:00:00Z`);
+    if (isNaN(d.getTime())) return dateString;
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  } catch(e) {
+    return dateString;
+  }
+};
+
 export const DashboardLayout = ({ children }: { children?: React.ReactNode }) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [openDropdowns, setOpenDropdowns] = useState<Record<string, boolean>>({});
@@ -30,6 +41,7 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
   const [announcements, setAnnouncements] = useState<any[]>([]);
   const [livehouseRequests, setLivehouseRequests] = useState<any[]>([]);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
+  const [spotlightNotification, setSpotlightNotification] = useState<any>(null);
   const [isPostingAnnouncement, setIsPostingAnnouncement] = useState(false);
   const [announcementTitle, setAnnouncementTitle] = useState('');
   const [announcementContent, setAnnouncementContent] = useState('');
@@ -275,7 +287,7 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
         </button>
 
         {isNotificationOpen && (
-          <div className="absolute right-0 mt-3 w-80 md:w-[380px] bg-[#120D0A]/95 border border-[#D4AF37]/20 backdrop-blur-md rounded-2xl shadow-2xl z-50 p-4 space-y-4 max-h-[480px] overflow-y-auto custom-scrollbar">
+          <div className="absolute right-0 mt-3 w-80 md:w-[380px] bg-[#0A0604] border border-[#D4AF37]/30 rounded-2xl z-50 p-4 space-y-4 max-h-[480px] overflow-y-auto custom-scrollbar shadow-[0_20px_50px_rgba(0,0,0,1)]">
             {isPostingAnnouncement ? (
               <form onSubmit={handlePublishAnnouncement} className="space-y-4 text-left">
                 <div className="flex items-center justify-between border-b border-white/5 pb-2">
@@ -283,7 +295,7 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
                   <button 
                     type="button" 
                     onClick={() => setIsPostingAnnouncement(false)}
-                    className="text-[9px] font-black uppercase text-[#A09E9A] hover:text-white cursor-pointer"
+                    className="text-[9px] font-black uppercase text-[#A09E9A] hover:text-white cursor-pointer transition-colors"
                   >
                     Cancel
                   </button>
@@ -291,32 +303,36 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
                 
                 <div className="space-y-1.5">
                   <label className="text-[8px] font-black text-white/40 uppercase tracking-widest block">Announcement Title</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Server Maintenance or Livehouse Rules Update"
-                    value={announcementTitle}
-                    onChange={(e) => setAnnouncementTitle(e.target.value)}
-                    className="w-full bg-[#0A0B0E] border border-white/10 rounded-xl px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
-                  />
+                  <div className="global-placeholder rounded-xl relative">
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. Server Maintenance or Livehouse Rules Update"
+                      value={announcementTitle}
+                      onChange={(e) => setAnnouncementTitle(e.target.value)}
+                      className="w-full bg-transparent border-none px-3 py-2 text-xs text-[#F0EFE8] outline-none placeholder:text-white/20 relative z-10"
+                    />
+                  </div>
                 </div>
 
                 <div className="space-y-1.5">
                   <label className="text-[8px] font-black text-white/40 uppercase tracking-widest block">Announcement Details</label>
-                  <textarea
-                    required
-                    rows={4}
-                    placeholder="Type details of the announcement..."
-                    value={announcementContent}
-                    onChange={(e) => setAnnouncementContent(e.target.value)}
-                    className="w-full bg-[#0A0B0E] border border-white/10 rounded-xl p-3 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37] resize-none"
-                  />
+                  <div className="global-placeholder rounded-xl relative">
+                    <textarea
+                      required
+                      rows={4}
+                      placeholder="Type details of the announcement..."
+                      value={announcementContent}
+                      onChange={(e) => setAnnouncementContent(e.target.value)}
+                      className="w-full bg-transparent border-none p-3 text-xs text-[#F0EFE8] outline-none placeholder:text-white/20 resize-none relative z-10"
+                    />
+                  </div>
                 </div>
 
                 <button
                   type="submit"
                   disabled={isSubmittingAnnouncement}
-                  className="w-full py-2 bg-[#D4AF37] hover:bg-[#D4AF37]/90 text-black font-black uppercase tracking-wider text-[10px] rounded-xl transition-all cursor-pointer"
+                  className="w-full py-2 bg-gradient-to-r from-[#D4AF37] to-[#F3E5AB] text-black font-black uppercase tracking-wider text-[10px] rounded-xl transition-all cursor-pointer shadow-[0_0_15px_rgba(212,175,55,0.4)] hover:shadow-[0_0_25px_rgba(212,175,55,0.6)] hover:scale-[1.02]"
                 >
                   {isSubmittingAnnouncement ? 'Publishing...' : 'Publish Announcement'}
                 </button>
@@ -339,22 +355,25 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
                   {/* Announcements List */}
                   {announcements.length > 0 && (
                     <div className="space-y-2">
-                      <p className="text-[7px] font-black uppercase tracking-wider text-white/20 select-none border-b border-white/5 pb-1">ANNOUNCEMENTS</p>
+                      <p className="text-[7px] font-black uppercase tracking-wider text-[#D4AF37] select-none border-b border-[#D4AF37]/20 pb-1">ANNOUNCEMENTS</p>
                       {announcements.slice(0, 3).map((ann) => (
-                        <div key={ann.id} className="relative group bg-indigo-500/5 border-l-2 border-indigo-500/50 p-3 rounded-r-xl space-y-1 text-left">
+                        <div 
+                          key={ann.id} 
+                          onClick={() => setSpotlightNotification({ type: 'announcement', data: ann })}
+                          className="relative group global-block-1 border-l-[3px] border-[#D4AF37] p-3 rounded-xl space-y-1 text-left overflow-hidden cursor-pointer hover:scale-[1.01] transition-all"
+                        >
                           {canPostAnn && (
                             <button
-                              onClick={() => handleDeleteAnnouncement(ann.id)}
-                              className="absolute top-2 right-2 p-1 text-white/20 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                              onClick={(e) => { e.stopPropagation(); handleDeleteAnnouncement(ann.id); }}
+                              className="absolute top-2 right-2 p-1 text-white/20 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer z-20"
                               title="Delete Announcement"
                             >
                               <Trash2 size={10} />
                             </button>
                           )}
-                          <p className="text-[10px] font-bold text-indigo-300 leading-snug">{ann.title}</p>
-                          <p className="text-[9px] text-[#A09E9A] leading-relaxed whitespace-pre-wrap">{ann.content}</p>
-                          <p className="text-[7px] text-white/30 font-bold uppercase tracking-wider mt-1">
-                            By {ann.authorName} ({ann.authorRole}) • {new Date(ann.timestamp).toLocaleDateString()}
+                          <p className="text-[10px] font-bold text-[#D4AF37] leading-snug relative z-10">{ann.title}</p>
+                          <p className="text-[8px] text-white/40 font-black uppercase tracking-wider mt-1 relative z-10">
+                            From {ann.authorRole} {ann.authorName} - {formatStrictDate(ann.timestamp)}
                           </p>
                         </div>
                       ))}
@@ -364,22 +383,18 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
                   {/* System Activity Logs (For Director and Head Admin) */}
                   {['director', 'head admin', 'head_admin'].includes(roleLower) && systemLogs.length > 0 && (
                     <div className="space-y-2">
-                      <p className="text-[7px] font-black uppercase tracking-wider text-white/20 select-none border-b border-white/5 pb-1">SYSTEM ACTIVITY LOGS</p>
+                      <p className="text-[7px] font-black uppercase tracking-wider text-[#D4AF37] select-none border-b border-[#D4AF37]/20 pb-1">SYSTEM ACTIVITY LOGS</p>
                       {systemLogs.slice(0, 5).map((log) => (
-                        <div key={log.id} className="bg-indigo-500/5 border-l-2 border-[#D4AF37] p-3 rounded-r-xl space-y-1 text-left">
-                          <div className="flex items-center justify-between">
-                            <span className={`text-[7px] font-black uppercase px-1.5 py-0.5 rounded ${
-                              log.severity === 'Error' ? 'bg-red-500/10 text-red-400 border border-red-500/20' :
-                              log.severity === 'Warning' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
-                              'bg-indigo-500/10 text-[#D4AF37] border border-[#D4AF37]/20'
-                            }`}>
-                              {log.severity}
-                            </span>
-                            <span className="text-[7px] font-mono text-slate-500">{new Date(log.timestamp).toLocaleTimeString()}</span>
+                        <div 
+                          key={log.id} 
+                          onClick={() => setSpotlightNotification({ type: 'log', data: log })}
+                          className="global-block-1 border-l-[3px] border-[#D4AF37] p-3 rounded-xl space-y-1 text-left relative overflow-hidden cursor-pointer hover:scale-[1.01] transition-all"
+                        >
+                          <div className="flex items-center justify-between relative z-10">
+                            <p className="text-[10px] font-bold text-[#D4AF37] leading-snug">System Activity: {log.severity}</p>
                           </div>
-                          <p className="text-[9px] text-slate-300 font-medium leading-relaxed">{log.actionDescription}</p>
-                          <p className="text-[7px] text-slate-500 font-bold uppercase mt-0.5">
-                            By {String(log.userRole || 'System').replace('_', ' ')} ({log.userId || 'System'})
+                          <p className="text-[8px] text-white/40 font-black uppercase tracking-wider mt-1 relative z-10">
+                            From {String(log.userRole || 'System').replace('_', ' ')} {log.userId || 'System'} - {formatStrictDate(log.timestamp)}
                           </p>
                         </div>
                       ))}
@@ -388,118 +403,35 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
 
                   {/* Requests requiring action */}
                   <div className="space-y-2">
-                    <p className="text-[7px] font-black uppercase tracking-wider text-white/20 select-none border-b border-white/5 pb-1">MESSAGES & ACTION ITEMS</p>                    {(filteredRequests.length > 0 || pendingEditRequests.length > 0) ? (
+                    <p className="text-[7px] font-black uppercase tracking-wider text-[#D4AF37] select-none border-b border-[#D4AF37]/20 pb-1">MESSAGES & ACTION ITEMS</p>
+                    {(filteredRequests.length > 0 || pendingEditRequests.length > 0) ? (
                       <>
                         {filteredRequests.map((req) => {
                           const isOwnReq = req.poppoId === authState.poppo_id;
+                          const canApprove = ['director', 'head admin', 'head_admin'].includes(roleLower);
                           
                           return (
-                            <div key={req.id} className="bg-slate-900/60 border border-white/5 p-3 rounded-xl space-y-2 text-left">
-                              <div>
+                            <div key={req.id} className="global-block-1 border-l-[3px] border-indigo-500 p-3 rounded-xl space-y-2 text-left relative overflow-hidden">
+                              <div 
+                                className="relative z-10 cursor-pointer"
+                                onClick={() => {
+                                  setIsNotificationOpen(false);
+                                  setSpotlightNotification({ type: 'request', data: req, isOwnReq, canApprove });
+                                }}
+                              >
                                 <p className="text-[10px] font-bold text-[#F0EFE8] leading-tight">
                                   {isOwnReq ? `Your Livehouse Request (${req.livehouseType || 'SOLO LIVEHOUSE'})` : `Request: ${req.name}`}
                                 </p>
-                                <p className="text-[8px] text-[#A09E9A] mt-0.5">
-                                  Date: {req.date} • Time: {req.timeslot.replace(" (Manila Time)", "")}
+                                <p className="text-[8px] text-white/40 font-black uppercase tracking-wider mt-1 relative z-10">
+                                  From {isOwnReq ? authState.role : 'Host'} {isOwnReq ? authState.nickname : req.name} - {formatStrictDate(req.date)}
                                 </p>
-                                {req.notes && (
-                                  <p className="text-[8px] text-[#A09E9A]/70 italic mt-1 leading-relaxed">
-                                    Notes: {req.notes}
-                                  </p>
-                                )}
                               </div>
-
-                              {/* Status Indicator */}
-                              <div className="flex items-center gap-1.5">
-                                {req.status === 'Pending Approval' && (
-                                  <span className="text-[7px] font-black uppercase tracking-wider bg-yellow-500/10 text-yellow-400 px-2 py-0.5 rounded border border-yellow-500/20">
-                                    Pending Approval
-                                  </span>
-                                )}
-                                {req.status === 'Host Accepted Proposal' && (
-                                  <span className="text-[7px] font-black uppercase tracking-wider bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded border border-emerald-500/20">
-                                    Proposal Accepted
-                                  </span>
-                                )}
-                                {req.status === 'New Timeslot Proposed' && (
-                                  <span className="text-[7px] font-black uppercase tracking-wider bg-indigo-500/10 text-indigo-400 px-2 py-0.5 rounded border border-indigo-500/20">
-                                    Alternative Slot Proposed
-                                  </span>
-                                )}
-                                {req.status === 'Approved' && (
-                                  <span className="text-[7px] font-black uppercase tracking-wider bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded border border-emerald-500/20 animate-pulse">
-                                    Approved
-                                  </span>
-                                )}
-                                {req.status === 'Closed' && (
-                                  <span className="text-[7px] font-black uppercase tracking-wider bg-red-500/10 text-red-400 px-2 py-0.5 rounded border border-red-500/20">
-                                    Closed / Denied
-                                  </span>
-                                )}
-                              </div>
-
-                              {/* Alternative slot description */}
-                              {req.status === 'New Timeslot Proposed' && (
-                                <div className="bg-indigo-500/5 border border-indigo-500/10 rounded-lg p-2 space-y-1">
-                                  <p className="text-[7px] font-black text-indigo-300 uppercase tracking-wider">Proposed Alternative:</p>
-                                  <p className="text-[8px] text-[#F0EFE8]">Date: {req.proposedDate}</p>
-                                  <p className="text-[8px] text-[#F0EFE8]">Time: {req.proposedTimeslot?.replace(" (Manila Time)", "")}</p>
-                                </div>
-                              )}
-
-                              {/* Action Buttons */}
-                              {/* Host accepts/declines alternative slot */}
-                              {req.status === 'New Timeslot Proposed' && isOwnReq && (
-                                <div className="flex items-center gap-2 pt-1">
-                                  <button
-                                    onClick={() => handleHostAccept(req)}
-                                    className="flex-1 py-1.5 bg-indigo-500 hover:bg-indigo-600 text-white text-[8px] font-black uppercase tracking-wider rounded-lg cursor-pointer transition-colors"
-                                  >
-                                    Accept
-                                  </button>
-                                  <button
-                                    onClick={() => handleHostDeny(req)}
-                                    className="flex-1 py-1.5 bg-slate-800 hover:bg-red-500/15 border border-white/10 hover:border-red-500/30 text-slate-400 hover:text-red-400 text-[8px] font-black uppercase tracking-wider rounded-lg cursor-pointer transition-colors"
-                                  >
-                                    Decline
-                                  </button>
-                                </div>
-                              )}
-
-                              {/* Host dismisses completed logs */}
-                              {(req.status === 'Approved' || req.status === 'Closed') && isOwnReq && (
-                                <button
-                                  onClick={() => handleDismissRequest(req.id)}
-                                  className="w-full py-1.5 bg-slate-800 hover:bg-slate-700 text-[#A09E9A] hover:text-white text-[8px] font-black uppercase tracking-wider rounded-lg cursor-pointer transition-colors"
-                                >
-                                  Dismiss
-                                </button>
-                              )}
-
-                              {/* Admin/Director approval controls */}
-                              {(req.status === 'Pending Approval' || req.status === 'Host Accepted Proposal') && 
-                               ['director', 'head admin', 'head_admin'].includes(roleLower) && (
-                                <div className="flex items-center gap-2 pt-1">
-                                  <button
-                                    onClick={() => handleApprove(req)}
-                                    className="flex-1 py-1.5 bg-emerald-550 hover:bg-emerald-600 text-white text-[8px] font-black uppercase tracking-wider rounded-lg cursor-pointer transition-colors"
-                                  >
-                                    Approve
-                                  </button>
-                                  <button
-                                    onClick={() => handleDeny(req)}
-                                    className="flex-1 py-1.5 bg-slate-800 hover:bg-red-500/15 border border-white/10 hover:border-red-500/30 text-slate-400 hover:text-red-400 text-[8px] font-black uppercase tracking-wider rounded-lg cursor-pointer transition-colors"
-                                  >
-                                    Deny
-                                  </button>
-                                </div>
-                              )}
                             </div>
                           );
                         })}
 
                         {pendingEditRequests.map((req) => (
-                          <div key={req.id} className="bg-slate-900/60 border border-yellow-500/20 p-3 rounded-xl space-y-2 text-left">
+                          <div key={req.id} className="bg-slate-900/60 border border-yellow-500/20 p-3 rounded-xl space-y-2 text-left cursor-pointer" onClick={() => setSpotlightNotification({ type: 'edit_request', data: req })}>
                             <div>
                               <p className="text-[10px] font-bold text-[#F0EFE8] leading-tight">
                                 Edit Request: {req.requesterName}
@@ -675,14 +607,11 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
           </button>
         </div>
       )}
-      <header className="global-block-1 md:hidden flex items-center justify-between p-4 shrink-0 z-20">
+      <header className="global-block-1 !overflow-visible md:hidden flex items-center justify-between p-4 shrink-0 z-50">
         <div className="flex items-center gap-3">
           <img src={appLogo} alt="Nine Dashboard" className="w-8 h-8 rounded-md border border-white/10 shrink-0 object-cover" />
           <div className="flex flex-col">
-            <h1 className="text-[11px] font-black uppercase tracking-widest text-[#D4AF37] leading-tight">NINE TALENT MANAGEMENT</h1>
-            <div className="text-[10px] text-[#A09E9A] flex items-center gap-2">
-              <span className="capitalize">{authState.name} ({authState.role || 'Guest'})</span>
-            </div>
+            <h1 className="text-sm font-black uppercase tracking-widest text-[#D4AF37] leading-tight">NINE TALENT MANAGEMENT</h1>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -713,7 +642,7 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
           <div className="p-6 hidden md:flex items-center gap-3 border-b border-[rgba(250,204,21,0.2)] bg-black/10 shadow-[0_10px_20px_rgba(0,0,0,0.3)]">
             <img src={appLogo} alt="Nine Dashboard" className="w-10 h-10 rounded-md border border-[#D4AF37]/30 shrink-0 object-cover" />
             <div className="flex flex-col">
-              <h1 className="text-[11px] font-black uppercase tracking-widest text-[#D4AF37] leading-tight mt-1">NINE TALENT MANAGEMENT</h1>
+              <h1 className="text-[13px] font-black uppercase tracking-widest text-[#D4AF37] leading-tight mt-1">NINE TALENT MANAGEMENT</h1>
             </div>
           </div>
 
@@ -864,8 +793,8 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
       </div>
 
       {/* Mobile Bottom Nav */}
-      <div className="md:hidden fixed bottom-4 left-4 right-4 pb-safe z-50 pointer-events-none">
-        <div className="global-block-1 rounded-2xl pointer-events-auto flex w-full items-center justify-between gap-2 p-2 transition-all duration-500 relative overflow-hidden">
+      <div className="md:hidden fixed bottom-1 left-1.5 right-1.5 pb-safe z-50 pointer-events-none">
+        <div className="global-block-1 rounded-2xl pointer-events-auto flex w-full items-center justify-between gap-1.5 p-2 transition-all duration-500 relative overflow-hidden">
           <div className="absolute inset-0 bg-black/60 pointer-events-none z-0"></div>
           {bottomNavLinks.map(tab => {
             const Icon = tab.icon;
@@ -891,6 +820,134 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
           })}
         </div>
       </div>
+      
+      {spotlightNotification && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+          <div className="global-block-1 bg-[#0A0604] border border-[#D4AF37]/30 rounded-2xl p-6 w-full max-w-md shadow-[0_20px_50px_rgba(0,0,0,1)] relative flex flex-col">
+            <button 
+              onClick={() => setSpotlightNotification(null)}
+              className="absolute top-4 right-4 text-white/40 hover:text-white cursor-pointer z-10"
+            >
+              <X size={20} />
+            </button>
+            
+            {(() => {
+              const { type, data, isOwnReq, canApprove } = spotlightNotification;
+              let photoUrl = '';
+              let role = '';
+              let nickname = '';
+              let poppoId = '';
+              let title = '';
+              let body = '';
+              let timestamp = '';
+              let dateStr = '';
+
+              if (type === 'announcement') {
+                role = data.authorRole || 'Management';
+                nickname = data.authorName || 'Admin';
+                poppoId = 'System';
+                title = data.title;
+                body = data.content;
+                timestamp = data.timestamp;
+                dateStr = formatStrictDate(data.timestamp);
+              } else if (type === 'log') {
+                role = String(data.userRole || 'System').replace('_', ' ');
+                nickname = 'System Action';
+                poppoId = data.userId || 'System';
+                title = `System Activity: ${data.severity}`;
+                body = data.actionDescription;
+                timestamp = data.timestamp;
+                dateStr = formatStrictDate(data.timestamp);
+              } else if (type === 'request') {
+                role = isOwnReq ? authState.role || 'Host' : 'Host';
+                nickname = isOwnReq ? authState.nickname || 'Unknown' : data.name;
+                poppoId = data.poppoId || 'Unknown';
+                title = isOwnReq ? `Your Livehouse Request (${data.livehouseType || 'SOLO'})` : `Request: ${data.name}`;
+                body = data.notes || 'No additional notes provided.';
+                timestamp = data.date;
+                dateStr = formatStrictDate(data.date);
+              }
+
+              return (
+                <>
+                  <div className="flex items-center gap-4 mb-4 border-b border-white/10 pb-4">
+                    <div className="w-14 h-14 rounded-xl overflow-hidden bg-white/5 flex items-center justify-center shrink-0 border border-white/10">
+                      {photoUrl ? (
+                        <img src={photoUrl} alt={nickname} className="w-full h-full object-cover" />
+                      ) : (
+                        <Users size={24} className="text-[#A09E9A]/30" />
+                      )}
+                    </div>
+                    <div className="flex flex-col">
+                      <p className="text-[12px] font-black text-white">{nickname}</p>
+                      <p className="text-[10px] text-[#A09E9A] uppercase tracking-widest">{role}</p>
+                      <p className="text-[9px] text-[#D4AF37] font-mono mt-0.5">ID: {poppoId}</p>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-2 mb-6">
+                    <h3 className="text-lg font-black text-[#F0EFE8]">{title}</h3>
+                    <p className="text-sm text-[#A09E9A] leading-relaxed whitespace-pre-wrap">{body}</p>
+                    <p className="text-[10px] text-white/40 font-mono mt-2 pt-2 border-t border-white/5">
+                      {dateStr} {new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </p>
+                  </div>
+
+                  {type === 'request' && (
+                    <div className="flex flex-col gap-2 mt-auto">
+                      {/* Admin/Director approval controls */}
+                      {(data.status === 'Pending Approval' || data.status === 'Host Accepted Proposal') && canApprove && (
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => { handleApprove(data); setSpotlightNotification(null); }}
+                            className="global-tier-approve flex-1 py-2 text-[10px] font-black uppercase tracking-wider rounded-xl cursor-pointer"
+                          >
+                            Approve
+                          </button>
+                          <button
+                            onClick={() => { handleDeny(data); setSpotlightNotification(null); }}
+                            className="global-tier-deny flex-1 py-2 text-[10px] font-black uppercase tracking-wider rounded-xl cursor-pointer"
+                          >
+                            Deny
+                          </button>
+                        </div>
+                      )}
+                      
+                      {/* Host accepts/declines alternative slot */}
+                      {data.status === 'New Timeslot Proposed' && isOwnReq && (
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => { handleHostAccept(data); setSpotlightNotification(null); }}
+                            className="flex-1 py-2 bg-indigo-500 hover:bg-indigo-600 text-white text-[10px] font-black uppercase tracking-wider rounded-xl cursor-pointer"
+                          >
+                            Accept
+                          </button>
+                          <button
+                            onClick={() => { handleHostDeny(data); setSpotlightNotification(null); }}
+                            className="flex-1 py-2 bg-slate-800 border border-white/10 text-slate-400 hover:text-red-400 text-[10px] font-black uppercase tracking-wider rounded-xl cursor-pointer"
+                          >
+                            Decline
+                          </button>
+                        </div>
+                      )}
+                      
+                      {/* Host dismisses completed requests */}
+                      {(data.status === 'Approved' || data.status === 'Closed') && isOwnReq && (
+                        <button
+                          onClick={() => { handleDismissRequest(data.id); setSpotlightNotification(null); }}
+                          className="w-full py-2 bg-slate-800 text-[#A09E9A] hover:text-white text-[10px] font-black uppercase tracking-wider rounded-xl cursor-pointer"
+                        >
+                          Dismiss
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </>
+              );
+            })()}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

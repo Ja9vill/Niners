@@ -629,27 +629,27 @@ export const Overview = () => {
 
         .global-tier-4 {
           background: 
-            radial-gradient(circle at 10% 10%, rgba(14,165,233,0.2) 0%, transparent 50%),
-            linear-gradient(135deg, rgba(56, 189, 248, 0.2) 0%, rgba(3, 105, 161, 0.4) 100%);
+            radial-gradient(circle at 10% 10%, rgba(59, 130, 246, 0.3) 0%, transparent 50%),
+            linear-gradient(135deg, rgba(96, 165, 250, 0.2) 0%, rgba(30, 58, 138, 0.5) 100%);
           backdrop-filter: blur(40px) saturate(200%);
           -webkit-backdrop-filter: blur(40px) saturate(200%);
-          border: 1px solid rgba(14, 165, 233, 0.1);
-          border-top: 1px solid rgba(14, 165, 233, 0.6);
-          border-left: 1px solid rgba(14, 165, 233, 0.4);
+          border: 1px solid rgba(59, 130, 246, 0.2);
+          border-top: 1px solid rgba(59, 130, 246, 0.7);
+          border-left: 1px solid rgba(59, 130, 246, 0.5);
           box-shadow: 
-            inset 0 0 20px rgba(14, 165, 233, 0.15),
-            inset 0 2px 6px rgba(14, 165, 233, 0.4),
+            inset 0 0 20px rgba(59, 130, 246, 0.2),
+            inset 0 2px 6px rgba(59, 130, 246, 0.5),
             0 15px 35px rgba(0, 0, 0, 0.7),
-            0 0 30px rgba(14, 165, 233, 0.4);
+            0 0 30px rgba(59, 130, 246, 0.5);
         }
         .global-tier-4:hover, .global-tier-4.active-tier {
           transform: perspective(1000px) translateY(-6px) scale(1.02) rotateX(4deg);
-          border-top-color: rgba(14, 165, 233, 0.9);
+          border-top-color: rgba(59, 130, 246, 1);
           box-shadow: 
-            inset 0 0 30px rgba(14, 165, 233, 0.3),
-            inset 0 4px 10px rgba(14, 165, 233, 0.6),
+            inset 0 0 30px rgba(59, 130, 246, 0.4),
+            inset 0 4px 10px rgba(59, 130, 246, 0.7),
             0 25px 50px rgba(0, 0, 0, 0.9),
-            0 0 50px rgba(14, 165, 233, 0.8);
+            0 0 50px rgba(59, 130, 246, 0.9);
         }
 
         /* 4D Sheen Effect */
@@ -682,7 +682,7 @@ export const Overview = () => {
         <div className="absolute -bottom-24 -right-24 w-48 h-48 bg-indigo-500/5 blur-3xl rounded-full pointer-events-none"></div>
         
         <div className="global-placeholder flex w-full items-center justify-center gap-2 bg-gradient-to-br from-[#FFB800]/10 to-transparent border border-[#FFB800]/20 border-t-[#FFB800]/40 rounded-xl px-4 py-3 backdrop-blur-xl shadow-[0_8px_32px_rgba(0,0,0,0.5),inset_0_1px_1px_rgba(255,184,0,0.3)] mb-4 relative z-10 overflow-hidden cursor-pointer">
-          <p className="font-['Lexend'] text-lg sm:text-xl font-bold text-[#FFB700] drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)] [-webkit-text-stroke:0.3px_black] uppercase tracking-[0.2em] flex items-center gap-2 m-0">
+          <p className="w-full text-center font-['Lexend'] text-xs sm:text-sm md:text-base font-bold text-[#FFB700] drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)] [-webkit-text-stroke:0.3px_black] uppercase tracking-[0.1em] sm:tracking-[0.15em] flex justify-center items-center gap-2 m-0 whitespace-nowrap">
             AGENCY DASHBOARD OVERVIEW
           </p>
         </div>
@@ -692,7 +692,7 @@ export const Overview = () => {
             { label: 'S idol', key: 'S idol', class: 'global-tier-1', color: '#F50057', Icon: Award },
             { label: 'Esports', key: 'Esports', class: 'global-tier-2', color: '#D500F9', Icon: Zap },
             { label: 'Star Host', key: 'Star Host', class: 'global-tier-3', color: '#FFEA00', Icon: Star },
-            { label: 'Rocket Host', key: 'Rocket Host', class: 'global-tier-4', color: '#00E5FF', Icon: TrendingUp }
+            { label: 'Rocket Host', key: 'Rocket Host', class: 'global-tier-4', color: '#3B82F6', Icon: TrendingUp }
           ].map((item, idx) => {
             const dataVal = baseSalaryTiersData[item.key];
             const isActive = selectedTierForList === item.key;
