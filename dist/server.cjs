@@ -2831,8 +2831,15 @@ var import_firebase_admin2 = __toESM(require("firebase-admin"), 1);
 var import_jsonwebtoken2 = __toESM(require("jsonwebtoken"), 1);
 var import_url = require("url");
 var import_meta = {};
-var __filename = (0, import_url.fileURLToPath)(import_meta.url);
-var __dirname = import_path.default.dirname(__filename);
+var getDirname = () => {
+  if (typeof __dirname !== "undefined") return __dirname;
+  try {
+    return import_path.default.dirname((0, import_url.fileURLToPath)(import_meta.url));
+  } catch (e) {
+    return process.cwd();
+  }
+};
+var __dirname = getDirname();
 import_dotenv.default.config();
 var JWT_SECRET2 = process.env.JWT_SECRET || "nine-dashboard-secret-key-12345";
 function findFreePort(start) {
