@@ -1639,14 +1639,22 @@ router.delete("/delete-user/:poppoId", verifyAdminRole, async (req, res) => {
       }
     }
     await db.collection("users").doc(cleanPoppoId).delete();
-    const reportsQuery = await db.collection("performance_reports").where("poppo_id", "==", cleanPoppoId).get();
+    const [reportsQuery, weeklyQuery] = await Promise.all([
+      db.collection("performance_reports").where("poppo_id", "==", cleanPoppoId).get(),
+      db.collection("performance_weekly_reports").where("poppo_id", "==", cleanPoppoId).get()
+    ]);
+    const batch = db.batch();
     if (!reportsQuery.empty) {
-      const batch = db.batch();
       reportsQuery.forEach((doc) => {
         batch.delete(doc.ref);
       });
-      await batch.commit();
     }
+    if (!weeklyQuery.empty) {
+      weeklyQuery.forEach((doc) => {
+        batch.delete(doc.ref);
+      });
+    }
+    await batch.commit();
     try {
       const authInstance = (0, import_auth2.getAuth)(getFirebaseAdminApp());
       await authInstance.deleteUser(cleanPoppoId);

@@ -19,8 +19,16 @@ import admin from "firebase-admin";
 import jwt from "jsonwebtoken";
 import { fileURLToPath } from "url";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+// Safely define __dirname for both ESM (tsx dev server) and CommonJS (production bundle)
+const getDirname = () => {
+  if (typeof __dirname !== "undefined") return __dirname;
+  try {
+    return path.dirname(fileURLToPath(import.meta.url));
+  } catch (e) {
+    return process.cwd();
+  }
+};
+const __dirname = getDirname();
 
 dotenv.config();
 
