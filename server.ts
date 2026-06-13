@@ -7,6 +7,7 @@ import { getMessaging } from "firebase-admin/messaging";
 import authRouter, { getAdminFirestore, getFirebaseAdminApp, syncCustomClaims } from "./src/server/auth";
 import auditRouter from "./src/server/auditRouter";
 import { google } from "googleapis";
+import { getStaticHosts } from "./src/lib/staticHosts";
 import { initFirebaseSecrets } from "./src/server/secrets";
 import { logSystemEvent } from "./src/server/Logger";
 import net from "net";
@@ -16,6 +17,10 @@ import fs from "fs";
 import { getAuth } from "firebase-admin/auth";
 import admin from "firebase-admin";
 import jwt from "jsonwebtoken";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 dotenv.config();
 
@@ -31,6 +36,15 @@ function findFreePort(start: number): Promise<number> {
     });
     server.on("error", () => resolve(findFreePort(start + 1)));
   });
+}
+
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error("Database lookup timed out")), timeoutMs)
+    )
+  ]);
 }
 
 async function startServer() {
@@ -75,20 +89,20 @@ async function startServer() {
   async function updateManagerHostFieldsBackend(managerId: string, hostIdToAdd: string | null, hostIdToRemove: string | null) {
     const db = getAdminFirestore();
     let managerRef = db.collection('manager').doc(managerId);
-    let managerSnap = await managerRef.get();
+    let managerSnap = await withTimeout(managerRef.get(), 3000);
     let currentRole = 'manager';
     
     if (!managerSnap.exists) {
       managerRef = db.collection('agent').doc(managerId);
-      managerSnap = await managerRef.get();
+      managerSnap = await withTimeout(managerRef.get(), 3000);
       currentRole = 'agent';
       if (!managerSnap.exists) {
-        const userSnap = await db.collection('users').doc(managerId).get();
+        const userSnap = await withTimeout(db.collection('users').doc(managerId).get(), 3000);
         if (!userSnap.exists) return;
         const uRole = String(userSnap.data()?.role || '').toLowerCase();
         currentRole = uRole === 'agent' ? 'agent' : 'manager';
         managerRef = db.collection(currentRole).doc(managerId);
-        managerSnap = await managerRef.get();
+        managerSnap = await withTimeout(managerRef.get(), 3000);
       }
     }
     
@@ -121,14 +135,14 @@ async function startServer() {
     const batch = db.batch();
     batch.set(managerRef, updateData, { merge: true });
     batch.set(db.collection('users').doc(managerId), { updated_at: new Date().toISOString() }, { merge: true });
-    await batch.commit();
+    await withTimeout(batch.commit(), 4000);
   }
 
   async function syncHostManagerRelationshipBackend(hostId: string, newManagerId: string | null) {
     const db = getAdminFirestore();
     
     let oldManagerId: string | null = null;
-    const hostSnap = await db.collection('host').doc(hostId).get();
+    const hostSnap = await withTimeout(db.collection('host').doc(hostId).get(), 3000);
     if (hostSnap.exists) {
       const hostData = hostSnap.data()!;
       oldManagerId = hostData.assignedManagerId || hostData.assigned_manager_poppo_id || null;
@@ -136,7 +150,7 @@ async function startServer() {
     
     let newManagerName = '';
     if (newManagerId) {
-      const newManagerSnap = await db.collection('users').doc(newManagerId).get();
+      const newManagerSnap = await withTimeout(db.collection('users').doc(newManagerId).get(), 3000);
       if (newManagerSnap.exists) {
         const mgrData = newManagerSnap.data()!;
         newManagerName = mgrData.nickname || mgrData.name || '';
@@ -155,7 +169,7 @@ async function startServer() {
     const batch = db.batch();
     batch.set(db.collection('users').doc(hostId), { updated_at: hostFieldsToUpdate.updated_at }, { merge: true });
     batch.set(db.collection('host').doc(hostId), hostFieldsToUpdate, { merge: true });
-    await batch.commit();
+    await withTimeout(batch.commit(), 4000);
     
     if (newManagerId) {
       await updateManagerHostFieldsBackend(newManagerId, hostId, null);
@@ -177,11 +191,15 @@ async function startServer() {
       
       const db = getAdminFirestore();
       const poppoId = decodedToken.poppo_id || decodedToken.uid;
-      const userDoc = await db.collection("users").doc(poppoId).get();
       let role = String(decodedToken.role || "").toLowerCase();
       
-      if (userDoc.exists) {
-        role = String(userDoc.data()?.role || "").toLowerCase();
+      try {
+        const userDoc = await withTimeout(db.collection("users").doc(poppoId).get(), 3000);
+        if (userDoc.exists) {
+          role = String(userDoc.data()?.role || "").toLowerCase();
+        }
+      } catch (dbErr: any) {
+        console.warn("verifyHeadAdminOrDirector Firestore lookup failed, falling back to token claims:", dbErr.message || dbErr);
       }
       
       const isDirector = role === "director" || decodedToken.isSuperAdmin === true;
@@ -206,34 +224,64 @@ async function startServer() {
       const queryStr = String(req.query.query || "").toLowerCase().trim();
       const db = getAdminFirestore();
       
-      const snapshot = await db.collection("users").get();
-      const users: any[] = [];
-      
-      for (const doc of snapshot.docs) {
-        const data = doc.data();
-        const role = String(data.role || "host").toLowerCase();
-        
-        // Exclude Director role
-        if (role === "director") continue;
-        
-        const poppoId = doc.id;
-        const nickname = String(data.nickname || data.name || "");
-        const name = String(data.name || "");
-        
-        if (queryStr) {
-          const match = poppoId.includes(queryStr) || 
-                        nickname.toLowerCase().includes(queryStr) || 
-                        name.toLowerCase().includes(queryStr);
-          if (!match) continue;
+      let users: any[] = [];
+      try {
+        const snapshot = await withTimeout(db.collection("users").get(), 1500);
+        for (const doc of snapshot.docs) {
+          const data = doc.data();
+          const role = String(data.role || "host").toLowerCase();
+          
+          // Exclude Director role
+          if (role === "director") continue;
+          
+          const poppoId = doc.id;
+          const nickname = String(data.nickname || data.name || "");
+          const name = String(data.name || "");
+          
+          if (queryStr) {
+            const match = poppoId.includes(queryStr) || 
+                          nickname.toLowerCase().includes(queryStr) || 
+                          name.toLowerCase().includes(queryStr);
+            if (!match) continue;
+          }
+          
+          users.push({
+            poppo_id: poppoId,
+            nickname: nickname || name || "Unknown",
+            name: name || nickname || "Unknown",
+            role: data.role || "host",
+            photoUrl: data.photoUrl || data.profile_photo || ""
+          });
         }
-        
-        users.push({
-          poppo_id: poppoId,
-          nickname: nickname || name || "Unknown",
-          name: name || nickname || "Unknown",
-          role: data.role || "host",
-          photoUrl: data.photoUrl || data.profile_photo || ""
-        });
+      } catch (dbErr) {
+        console.warn("Firestore collection query failed, using static fallback:", dbErr);
+      }
+      
+      if (users.length === 0) {
+        const staticHosts = getStaticHosts();
+        for (const host of staticHosts) {
+          const role = String(host.role || "host").toLowerCase();
+          if (role === "director") continue;
+          
+          const poppoId = host.id;
+          const nickname = String(host.nickname || host.name || "");
+          const name = String(host.name || "");
+          
+          if (queryStr) {
+            const match = poppoId.includes(queryStr) || 
+                          nickname.toLowerCase().includes(queryStr) || 
+                          name.toLowerCase().includes(queryStr);
+            if (!match) continue;
+          }
+          
+          users.push({
+            poppo_id: poppoId,
+            nickname: nickname || name || "Unknown",
+            name: name || nickname || "Unknown",
+            role: host.role || "host",
+            photoUrl: host.photoUrl || ""
+          });
+        }
       }
       
       return res.json(users);
@@ -249,12 +297,36 @@ async function startServer() {
       const { poppoId } = req.params;
       const db = getAdminFirestore();
       
-      const userDoc = await db.collection("users").doc(poppoId).get();
-      if (!userDoc.exists) {
-        return res.status(404).json({ error: "User not found" });
+      let userData: any = null;
+      let userDocExists = false;
+      try {
+        const userDoc = await withTimeout(db.collection("users").doc(poppoId).get(), 3000);
+        if (userDoc.exists) {
+          userData = userDoc.data()!;
+          userDocExists = true;
+        }
+      } catch (dbErr) {
+        console.warn("Firestore lookup failed for details, using static fallback:", dbErr);
       }
       
-      const userData = userDoc.data()!;
+      if (!userData) {
+        const staticHosts = getStaticHosts();
+        const staticHost = staticHosts.find(h => String(h.id) === String(poppoId));
+        if (!staticHost) {
+          return res.status(404).json({ error: "User not found" });
+        }
+        userData = {
+          role: staticHost.role,
+          name: staticHost.name,
+          nickname: staticHost.nickname,
+          poppo_id: staticHost.id,
+          level: staticHost.level,
+          status: staticHost.status,
+          manager: staticHost.manager,
+          team: staticHost.team
+        };
+      }
+      
       const role = String(userData.role || "host").toLowerCase();
       
       if (role === "director" && req.userRole !== "director") {
@@ -267,8 +339,15 @@ async function startServer() {
       else if (role === "agent") collectionName = "agent";
       else if (role === "head admin" || role === "head_admin") collectionName = "head_admin";
       
-      const roleDoc = await db.collection(collectionName).doc(poppoId).get();
-      const roleData = roleDoc.exists ? roleDoc.data() : {};
+      let roleData: any = {};
+      if (userDocExists) {
+        try {
+          const roleDoc = await withTimeout(db.collection(collectionName).doc(poppoId).get(), 3000);
+          roleData = roleDoc.exists ? roleDoc.data() : {};
+        } catch (roleErr) {
+          console.warn("Firestore lookup failed for role document:", roleErr);
+        }
+      }
       
       const mergedData = {
         ...roleData,
@@ -356,7 +435,7 @@ async function startServer() {
       const userDocRef = db.collection("users").doc(cleanId);
       batch.set(userDocRef, userUpdate, { merge: true });
       
-      await batch.commit();
+      await withTimeout(batch.commit(), 4000);
       
       if (roleLower === "host" && managerId !== undefined) {
         await syncHostManagerRelationshipBackend(cleanId, managerId || null);
@@ -419,25 +498,25 @@ async function startServer() {
       let docData: any = {};
       if (oldRoleCol !== newRoleCol) {
         const oldDocRef = db.collection(oldRoleCol).doc(cleanId);
-        const oldDocSnap = await oldDocRef.get();
+        const oldDocSnap = await withTimeout(oldDocRef.get(), 3000);
         if (oldDocSnap.exists) {
           docData = oldDocSnap.data()!;
-          await oldDocRef.delete();
+          await withTimeout(oldDocRef.delete(), 3000);
         }
         
         docData.role = newNormRole;
         docData.updated_at = new Date().toISOString();
 
         const newDocRef = db.collection(newRoleCol).doc(cleanId);
-        await newDocRef.set(docData, { merge: true });
+        await withTimeout(newDocRef.set(docData, { merge: true }), 3000);
       }
 
-      await db.collection("users").doc(cleanId).update({
+      await withTimeout(db.collection("users").doc(cleanId).update({
         role: newNormRole,
         updated_at: new Date().toISOString()
-      });
+      }), 3000);
 
-      const userSnap = await db.collection("users").doc(cleanId).get();
+      const userSnap = await withTimeout(db.collection("users").doc(cleanId).get(), 3000);
       const tempPasswordRequired = userSnap.exists ? (userSnap.data()?.is_temp_password || false) : false;
       await syncCustomClaims(cleanId, newNormRole, tempPasswordRequired);
 
@@ -463,15 +542,15 @@ async function startServer() {
       const cleanId = String(poppo_id).trim();
       
       const userDocRef = db.collection("users").doc(cleanId);
-      const userDocSnap = await userDocRef.get();
+      const userDocSnap = await withTimeout(userDocRef.get(), 3000);
       if (!userDocSnap.exists) {
         return res.status(404).json({ error: "User not found." });
       }
 
-      await userDocRef.update({
+      await withTimeout(userDocRef.update({
         is_first_time: true,
         updated_at: new Date().toISOString()
-      });
+      }), 4000);
 
       console.log(`🔄 Reset login state for Poppo ID: ${cleanId}`);
       return res.json({ success: true, message: "Reset login state successful." });
@@ -895,14 +974,12 @@ Rules:
   // --- WEB PUSH NOTIFICATION SYSTEM CONFIGURATION & ENDPOINTS ---
   
   const DEFAULT_NOTIFICATION_TYPES = [
-    { id: 'form_submission', label: 'Form Submission', description: 'When a new booking form or request is submitted.', active: false },
-    { id: 'roster_update', label: 'Roster Update', description: 'When a host is added, removed, or updated on the roster.', active: false },
-    { id: 'pk_update', label: 'PK Performance Update', description: 'When PK battle data or performance scores are updated.', active: false },
-    { id: 'event_added', label: 'Event Added', description: 'When a new livehouse event or schedule is added to the calendar.', active: false },
-    { id: 'commission_uploaded', label: 'Commission Uploaded', description: 'When a new commission sheet or financial record is uploaded.', active: false },
-    { id: 'host_sos', label: 'Host SOS Alert', description: 'When a host triggers an emergency SOS or support alert.', active: false },
-    { id: 'whatsapp_auto_reply', label: 'WhatsApp Auto Reply', description: 'When the automated WhatsApp assistant auto-replies to a customer.', active: false },
-    { id: 'lark_message_received', label: 'Lark GC Message Received', description: 'When a new message notification is received from Lark GC webhook.', active: false }
+    { id: 'booking_request', label: 'Booking Requests', description: 'When a new Livehouse booking request is submitted.', targets: ['director', 'manager'], when: 'immediately', active: true },
+    { id: 'pk_report', label: 'PK Reports', description: 'When a host submits a PK battle performance report.', targets: ['director', 'admin'], when: 'immediately', active: true },
+    { id: 'fanbase_report', label: 'Fanbase Health Reports', description: 'When a fanbase health status report is submitted.', targets: ['director', 'manager'], when: 'immediately', active: true },
+    { id: 'host_sos', label: 'Host SOS Emergency Alerts', description: 'Critical SOS or emergency alerts triggered by hosts.', targets: ['director', 'admin', 'manager'], when: 'immediately', active: true },
+    { id: 'roster_update', label: 'Roster Updates', description: 'When a host profile is updated, provisioned, or terminated.', targets: ['director', 'admin'], when: 'immediately', active: true },
+    { id: 'commission_upload', label: 'Commission Sheet Uploads', description: 'When new monthly commission sheets are processed and uploaded.', targets: ['host'], when: 'immediately', active: true }
   ];
 
   const VAPID_KEYS_FILE = path.join(__dirname, "vapid_keys_fallback.json");
@@ -967,7 +1044,12 @@ Rules:
       const loaded = JSON.parse(fs.readFileSync(NOTIFICATION_TYPES_FILE, "utf8"));
       notificationTypes = DEFAULT_NOTIFICATION_TYPES.map(def => {
         const found = loaded.find((l: any) => l.id === def.id);
-        return found ? { ...def, active: found.active } : def;
+        return found ? {
+          ...def,
+          active: found.active !== undefined ? found.active : def.active,
+          targets: found.targets || def.targets,
+          when: found.when || def.when
+        } : def;
       });
     } catch (e) {
       console.error("Failed to read notification types file:", e);
@@ -996,7 +1078,7 @@ Rules:
   });
 
   // 2) POST /api/push/subscribe
-  app.post("/api/push/subscribe", (req, res) => {
+  app.post("/api/push/subscribe", async (req, res) => {
     const { subscription, poppo_id } = req.body;
     const subObj = subscription || req.body;
     const poppoId = poppo_id || null;
@@ -1017,6 +1099,16 @@ Rules:
         poppo_id: poppoId
       });
       saveSubscriptions();
+    }
+    
+    // Clear director request if registered
+    if (poppoId) {
+      const db = getAdminFirestore();
+      try {
+        await db.collection("users").doc(poppoId).update({ notificationRequestedByDirector: false });
+      } catch (err: any) {
+        console.warn(`Failed to clear notificationRequestedByDirector for user ${poppoId}:`, err.message);
+      }
     }
     
     res.status(201).json({ status: "success", message: "Subscription registered." });
@@ -1066,33 +1158,87 @@ Rules:
     });
   });
 
-  // 4) PATCH /api/notifications/activate
-  app.patch("/api/notifications/activate", (req, res) => {
-    const { id } = req.body;
-    const item = notificationTypes.find(t => t.id === id);
-    if (!item) {
+  // 4) PATCH /api/notifications/update-rule
+  app.patch("/api/notifications/update-rule", verifyHeadAdminOrDirector, (req, res) => {
+    const { id, active, targets, when } = req.body;
+    if (!id) {
+      return res.status(400).json({ error: "Missing rule ID" });
+    }
+    
+    const rule = notificationTypes.find(t => t.id === id);
+    if (!rule) {
       return res.status(404).json({ error: "Notification type not found" });
     }
-    item.active = true;
+    
+    if (active !== undefined) rule.active = active;
+    if (targets !== undefined) rule.targets = targets;
+    if (when !== undefined) rule.when = when;
+    
     saveNotificationTypes();
-    res.json({ status: "success", item });
+    res.json({ status: "success", item: rule });
   });
 
-  // 5) PATCH /api/notifications/revoke
-  app.patch("/api/notifications/revoke", (req, res) => {
-    const { id } = req.body;
-    const item = notificationTypes.find(t => t.id === id);
-    if (!item) {
-      return res.status(404).json({ error: "Notification type not found" });
-    }
-    item.active = false;
-    saveNotificationTypes();
-    res.json({ status: "success", item });
-  });
-
-  // 6) GET /api/notifications
+  // 5) GET /api/notifications
   app.get("/api/notifications", (req, res) => {
     res.json(notificationTypes);
+  });
+
+  // 6) GET /api/notifications/users
+  app.get("/api/notifications/users", verifyHeadAdminOrDirector, async (req, res) => {
+    try {
+      const db = getAdminFirestore();
+      const snapshot = await withTimeout(db.collection("users").get(), 3000);
+      
+      const usersList = snapshot.docs.map(doc => {
+        const data = doc.data();
+        const poppoId = doc.id;
+        
+        // Check VAPID subscription status
+        const hasWebPush = pushSubscriptions.some(sub => String(sub.poppo_id).trim() === String(poppoId).trim());
+        
+        // Check FCM token status
+        const fcmTokens = data.fcmTokens || [];
+        const hasFcm = Array.isArray(fcmTokens) && fcmTokens.length > 0;
+        
+        return {
+          poppoId,
+          nickname: data.nickname || data.name || "",
+          role: data.role || "host",
+          hasWebPush,
+          hasFcm,
+          hasAllowed: hasWebPush || hasFcm,
+          notificationRequestedByDirector: data.notificationRequestedByDirector === true
+        };
+      });
+      
+      return res.json(usersList);
+    } catch (error: any) {
+      console.error("Failed to get notification users:", error);
+      return res.status(500).json({ error: error?.message || "Internal server error" });
+    }
+  });
+
+  // 7) POST /api/notifications/request-device
+  app.post("/api/notifications/request-device", verifyHeadAdminOrDirector, async (req, res) => {
+    try {
+      const { targetPoppoId } = req.body;
+      if (!targetPoppoId) {
+        return res.status(400).json({ error: "Missing targetPoppoId" });
+      }
+      
+      const db = getAdminFirestore();
+      const userRef = db.collection("users").doc(targetPoppoId);
+      const userSnap = await userRef.get();
+      if (!userSnap.exists) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      await userRef.update({ notificationRequestedByDirector: true });
+      return res.json({ status: "success", message: `Device notification request sent to user ${targetPoppoId}` });
+    } catch (error: any) {
+      console.error("Failed to send notification request:", error);
+      return res.status(500).json({ error: error?.message || "Internal server error" });
+    }
   });
 
   const isDev = process.env.NODE_ENV !== 'production';
@@ -1125,3 +1271,4 @@ Rules:
 }
 
 startServer();
+// Trigger VAPID regeneration check

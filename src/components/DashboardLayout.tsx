@@ -7,10 +7,10 @@ import {
 } from 'lucide-react';
 import { useViewMode } from '../hooks/useViewMode';
 import { Storage } from '../lib/storage';
-import { auth, db } from '../lib/firebase';
+import { auth, db, requestNotificationPermission } from '../lib/firebase';
 import { signOut } from 'firebase/auth';
 import { cn } from '../lib/utils';
-import { collection, query, onSnapshot, setDoc, doc, deleteDoc, where } from 'firebase/firestore';
+import { collection, query, onSnapshot, setDoc, doc, deleteDoc, where, updateDoc, arrayUnion } from 'firebase/firestore';
 import appLogo from '../logo.jpg';
 import { FirebaseService } from '../lib/firebaseService';
 
@@ -55,6 +55,97 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
   const [systemLogs, setSystemLogs] = useState<any[]>([]);
   const [pendingEditRequests, setPendingEditRequests] = useState<any[]>([]);
 
+  const [browserNotificationPerm, setBrowserNotificationPerm] = useState<NotificationPermission>('default');
+  const [streamNotifications, setStreamNotifications] = useState<any[]>([]);
+  const [isPostingStream, setIsPostingStream] = useState(false);
+  const [streamLink, setStreamLink] = useState('');
+  const [isSubmittingStream, setIsSubmittingStream] = useState(false);
+  const [streamError, setStreamError] = useState<string | null>(null);
+  const [isDeviceRegistered, setIsDeviceRegistered] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('nine_notifications_registered') === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  useEffect(() => {
+    if ('Notification' in window) {
+      setBrowserNotificationPerm(Notification.permission);
+    }
+  }, []);
+
+  const urlB64ToUint8Array = (base64String: string) => {
+    const padding = '='.repeat((4 - base64String.length % 4) % 4);
+    const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+    const rawData = window.atob(base64);
+    const outputArray = new Uint8Array(rawData.length);
+    for (let i = 0; i < rawData.length; ++i) {
+      outputArray[i] = rawData.charCodeAt(i);
+    }
+    return outputArray;
+  };
+
+  const handleRequestBrowserNotification = async () => {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+      alert("This browser does not support desktop push notifications.");
+      return;
+    }
+    try {
+      // 1. Request notification permission via browser
+      const permission = await Notification.requestPermission();
+      setBrowserNotificationPerm(permission);
+      if (permission !== 'granted') {
+        alert("Notification permission was denied or blocked in browser settings.");
+        return;
+      }
+
+      // 2. Register service worker
+      const reg = await navigator.serviceWorker.register('/sw.js');
+
+      // 3. Fetch VAPID public key from backend
+      const keyRes = await fetch('/api/push/public-key');
+      if (!keyRes.ok) throw new Error('Failed to retrieve VAPID public key from backend');
+      const { publicKey } = await keyRes.json();
+
+      // 4. Subscribe with PushManager
+      const sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlB64ToUint8Array(publicKey)
+      });
+
+      // 5. Save subscription to backend
+      const token = authState.token || '';
+      const saveRes = await fetch('/api/push/subscribe', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({
+          subscription: sub,
+          poppo_id: authState.poppo_id
+        })
+      });
+
+      if (!saveRes.ok) {
+        throw new Error('Failed to save subscription payload to backend database');
+      }
+
+      // 6. Set success states
+      localStorage.setItem('nine_notifications_registered', 'true');
+      setIsDeviceRegistered(true);
+
+      new Notification("Success!", {
+        body: "Browser notifications are now enabled.",
+        icon: appLogo
+      });
+    } catch (err: any) {
+      console.error("Failed to request notification permission:", err);
+      alert("Failed to activate notifications: " + (err?.message || String(err)));
+    }
+  };
+
   // Real-time Firestore listeners for announcements, livehouse requests, and system logs
   useEffect(() => {
     if (!db) return;
@@ -93,11 +184,20 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
       });
     }
 
+    const unsubStreams = onSnapshot(collection(db, 'stream_notifications'), (snapshot) => {
+      const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      list.sort((a: any, b: any) => (b.timestamp || '').localeCompare(a.timestamp || ''));
+      const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+      const activeStreams = list.filter((item: any) => (item.timestamp || '') >= twoHoursAgo);
+      setStreamNotifications(activeStreams);
+    });
+
     return () => {
       unsubAnn();
       unsubReq();
       unsubLogs();
       unsubEditReqs();
+      unsubStreams();
     };
   }, [authState.role, authState?.poppo_id]);
 
@@ -105,6 +205,41 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
     const updated = [...dismissedRequests, reqId];
     setDismissedRequests(updated);
     localStorage.setItem('dismissed_livehouse_reqs', JSON.stringify(updated));
+  };
+
+  const handlePublishStreamNotification = async () => {
+    if (isSubmittingStream) return;
+    setIsSubmittingStream(true);
+    setStreamError(null);
+    try {
+      const streamId = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 15);
+      const newStream = {
+        id: streamId,
+        poppoId: authState.poppo_id || 'unknown',
+        nickname: authState.nickname || authState.name || 'A Talent',
+        streamLink: streamLink.trim(),
+        timestamp: new Date().toISOString()
+      };
+      
+      // Attempt stream notification publication
+      await setDoc(doc(db, 'stream_notifications', streamId), newStream);
+      setStreamLink('');
+      setIsPostingStream(false);
+      
+      // Attempt system log, catch silently if role permissions prevent writing to logs
+      try {
+        await FirebaseService.logSystemActivity(`Stream notification posted: ${newStream.nickname} is streaming`, 'Info');
+      } catch (logErr) {
+        console.warn("Log write ignored:", logErr);
+      }
+    } catch (err: any) {
+      console.error("Failed to publish stream notification:", err);
+      const errMsg = err?.message || String(err);
+      setStreamError(errMsg);
+      alert("Failed to send stream notification: " + errMsg);
+    } finally {
+      setIsSubmittingStream(false);
+    }
   };
 
   const handleHostAccept = async (req: any) => {
@@ -257,7 +392,7 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
     return systemLogs.filter(log => log.timestamp > lastReadTimestamp).length;
   }, [systemLogs, lastReadTimestamp, authState.role]);
 
-  const totalUnreadCount = filteredRequests.length + unreadAnnouncementsCount + unreadLogsCount + pendingEditRequests.length;
+  const totalUnreadCount = filteredRequests.length + unreadAnnouncementsCount + unreadLogsCount + pendingEditRequests.length + streamNotifications.length;
   const toggleNotifications = () => {
     if (!isNotificationOpen) {
       const now = new Date().toISOString();
@@ -270,6 +405,15 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
   const renderNotificationCenter = () => {
     const roleLower = String(authState.role || '').toLowerCase();
     const canPostAnn = ['director', 'head admin', 'head_admin'].includes(roleLower);
+    
+    const formatExternalLink = (url: string) => {
+      if (!url) return '';
+      const trimmed = url.trim();
+      if (/^https?:\/\//i.test(trimmed)) {
+        return trimmed;
+      }
+      return `https://${trimmed}`;
+    };
     
     return (
       <div className="relative">
@@ -289,6 +433,28 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
 
         {isNotificationOpen && (
           <div className="absolute right-0 mt-3 w-80 md:w-[380px] bg-[#0A0604] border border-[#D4AF37]/30 rounded-2xl z-50 p-4 space-y-4 max-h-[480px] overflow-y-auto custom-scrollbar shadow-[0_20px_50px_rgba(0,0,0,1)]">
+            {/* Device Notification Status Indicator Inside Dropdown */}
+            <div className="flex items-center justify-between border-b border-white/5 pb-2 text-left shrink-0">
+              <div className="flex items-center gap-1.5">
+                <span className={cn(
+                  "w-1.5 h-1.5 rounded-full inline-block",
+                  (browserNotificationPerm === 'granted' && isDeviceRegistered) ? "bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]" : "bg-rose-400 shadow-[0_0_8px_rgba(248,113,113,0.8)] animate-pulse"
+                )} />
+                <span className="text-[9px] font-black uppercase tracking-wider text-white/50">
+                  Device Notifications: {(browserNotificationPerm === 'granted' && isDeviceRegistered) ? 'Active' : 'Inactive'}
+                </span>
+              </div>
+              {!(browserNotificationPerm === 'granted' && isDeviceRegistered) && (
+                <button
+                  type="button"
+                  onClick={handleRequestBrowserNotification}
+                  className="px-2 py-0.5 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-400 rounded-lg text-[8px] font-black uppercase tracking-wider transition-all cursor-pointer"
+                >
+                  Activate
+                </button>
+              )}
+            </div>
+
             {isPostingAnnouncement ? (
               <form onSubmit={handlePublishAnnouncement} className="space-y-4 text-left">
                 <div className="flex items-center justify-between border-b border-white/5 pb-2">
@@ -340,6 +506,104 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
               </form>
             ) : (
               <div className="space-y-4">
+                {/* Live Stream Sharing Control Block */}
+                <div className="border-b border-white/5 pb-3">
+                  {!isPostingStream ? (
+                    <button
+                      type="button"
+                      onClick={() => setIsPostingStream(true)}
+                      className="w-full py-1.5 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-400 rounded-xl text-[8px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <span>📢 Go Live Announcement</span>
+                    </button>
+                  ) : (
+                    <div className="space-y-3 p-3 bg-white/[0.02] border border-white/5 rounded-xl text-left">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[8px] font-black uppercase tracking-widest text-amber-400">Stream Notification</span>
+                        <button
+                          type="button"
+                          onClick={() => setIsPostingStream(false)}
+                          className="text-[8px] text-white/40 hover:text-white uppercase font-black cursor-pointer"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[7px] font-black text-white/40 uppercase tracking-wider block">Optional Stream Link</label>
+                        <input
+                          type="url"
+                          placeholder="https://invite=poppo.com/..."
+                          value={streamLink}
+                          onChange={(e) => setStreamLink(e.target.value)}
+                          className="w-full bg-[#0A0604] border border-white/10 rounded-lg px-2 py-1 text-[10px] text-[#F0EFE8] outline-none placeholder:text-white/20"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handlePublishStreamNotification}
+                        disabled={isSubmittingStream}
+                        className="w-full py-1.5 bg-gradient-to-r from-amber-500 to-amber-300 text-black font-black uppercase tracking-wider text-[8px] rounded-lg transition-all hover:scale-[1.02] cursor-pointer"
+                      >
+                        {isSubmittingStream ? 'Sending...' : 'Notify Everyone'}
+                      </button>
+                      {streamError && (
+                        <p className="text-[8px] text-red-400 font-bold leading-normal mt-1.5 text-center bg-red-950/20 border border-red-500/20 rounded-md p-1.5">
+                          ⚠️ {streamError}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Live Streams List */}
+                {streamNotifications.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-[7px] font-black uppercase tracking-wider text-amber-400 select-none border-b border-amber-400/20 pb-1 text-left">LIVE STREAMS</p>
+                    {streamNotifications.map((stream) => (
+                      <div 
+                        key={stream.id} 
+                        className="global-block-1 border-l-[3px] border-amber-500 p-3 rounded-xl space-y-1 text-left relative overflow-hidden group"
+                      >
+                        {(stream.poppoId === authState.poppo_id || ['director', 'head admin', 'head_admin', 'admin'].includes(roleLower)) && (
+                          <button
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              if (confirm("Are you sure you want to erase this stream notification?")) {
+                                try {
+                                  await deleteDoc(doc(db, 'stream_notifications', stream.id));
+                                } catch (err: any) {
+                                  alert("Failed to delete notification: " + err.message);
+                                }
+                              }
+                            }}
+                            className="absolute top-2 right-2 p-1 text-white/25 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer z-20"
+                            title="Delete Notification"
+                          >
+                            <Trash2 size={10} />
+                          </button>
+                        )}
+                        <p className="text-[10px] font-bold text-[#F0EFE8] leading-tight pr-6">
+                          📢 {stream.nickname} is streaming
+                        </p>
+                        <p className="text-[8px] text-white/40 font-black uppercase tracking-wider">
+                          Started: {formatStrictDate(stream.timestamp)}
+                        </p>
+                        {stream.streamLink && (
+                          <a
+                            href={formatExternalLink(stream.streamLink)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="mt-2 inline-flex items-center gap-1.5 px-3 py-1 bg-amber-500 hover:bg-amber-400 text-black font-black uppercase tracking-wider text-[8px] rounded-lg transition-all"
+                          >
+                            Visit Stream
+                          </a>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
                 <div className="flex items-center justify-between border-b border-white/5 pb-2">
                   <h4 className="text-[10px] font-black uppercase tracking-widest text-white/50">Announcements & Requests</h4>
                   {canPostAnn && (
@@ -507,7 +771,6 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
     links.push({ path: '/roster', label: 'Roster', icon: Users });
     links.push({ path: '/calendar', label: 'Calendar', icon: Calendar });
     links.push({ path: '/my-profile', label: 'My Profile', icon: User });
-    links.push({ path: '/notifications-control', label: 'Notification Center', icon: Bell });
 
     const role = (authState.role || '').toLowerCase();
     
@@ -515,10 +778,6 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
       links.push({ isDivider: true, id: 'div-1' });
       links.push({ isTitle: true, label: "Director's Hub", id: 'title-director' });
       
-      links.push({ path: '/profiles', label: 'Roster Management', icon: Users });
-
-
-
       links.push({
         id: 'dropdown-cms',
         isDropdown: true,
@@ -531,12 +790,15 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
       });
 
       links.push({
-        id: 'dropdown-operations',
+        id: 'dropdown-reporting',
         isDropdown: true,
-        label: 'Operations',
-        icon: Settings,
+        label: 'Reporting',
+        icon: BarChart,
         subLinks: [
-          { path: '/cms/livehouse', label: 'Livehouse Data', icon: Calendar }
+          { path: '/reporting/events', label: 'Events Log', icon: Calendar },
+          { path: '/reporting/attendance', label: 'Attendance Log', icon: ClipboardList },
+          { path: '/reporting/pk-performance', label: 'PK Performance', icon: Activity },
+          { path: '/reporting/fanbase-health', label: 'Fanbase Health', icon: Users }
         ]
       });
 
@@ -544,20 +806,19 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
         links.push({ isDivider: true, id: 'div-2' });
         links.push({ isTitle: true, label: "Directors Access", id: 'title-access' });
         links.push({ path: '/provision-user', label: 'Provision User', icon: Plus });
-        links.push({ path: '/financial-data', label: 'Financial Data', icon: DollarSign });
         links.push({ path: '/collections-log', label: 'Collections Log', icon: Database });
         links.push({ path: '/data-vault', label: 'Data Vault', icon: Shield });
+        links.push({ path: '/notifications-control', label: 'Notification Center', icon: Bell });
 
         links.push({
-          id: 'dropdown-reporting',
+          id: 'dropdown-database',
           isDropdown: true,
-          label: 'Reporting',
-          icon: BarChart,
+          label: 'Database',
+          icon: Database,
           subLinks: [
-            { path: '/reporting/events', label: 'Events Log', icon: Calendar },
-            { path: '/reporting/attendance', label: 'Attendance Log', icon: ClipboardList },
-            { path: '/reporting/pk-performance', label: 'PK Performance', icon: Activity },
-            { path: '/reporting/fanbase-health', label: 'Fanbase Health', icon: Users }
+            { path: '/profiles', label: 'Roster Management', icon: Users },
+            { path: '/financial-data', label: 'Financial Data', icon: DollarSign },
+            { path: '/cms/livehouse', label: 'Livehouse Data', icon: Calendar }
           ]
         });
       }

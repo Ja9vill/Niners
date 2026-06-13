@@ -71,23 +71,41 @@ self.addEventListener('notificationclick', (event) => {
 
   const targetUrl = event.notification.data?.url || '/dashboard';
 
+  // Resolve relative URLs to absolute URLs
+  let absoluteTargetUrl = targetUrl;
+  if (!targetUrl.startsWith('http://') && !targetUrl.startsWith('https://')) {
+    absoluteTargetUrl = new URL(targetUrl, self.location.origin).href;
+  }
+
+  const isExternal = !absoluteTargetUrl.startsWith(self.location.origin);
+
+  if (isExternal) {
+    if (clients.openWindow) {
+      event.waitUntil(clients.openWindow(absoluteTargetUrl));
+    }
+    return;
+  }
+
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
-      // Check if there is already a window/tab open with the same target URL
+      // Check if there is already a window/tab open on this origin
       for (let i = 0; i < windowClients.length; i++) {
         const client = windowClients[i];
-        // Focus client if matches, or navigate to page
         if (client.url.includes(self.location.origin) && 'focus' in client) {
           return client.focus().then((focusedClient) => {
-            if (focusedClient.url !== targetUrl && 'navigate' in focusedClient) {
-              return focusedClient.navigate(targetUrl);
+            if (focusedClient && focusedClient.url !== absoluteTargetUrl && 'navigate' in focusedClient) {
+              try {
+                return focusedClient.navigate(absoluteTargetUrl);
+              } catch (err) {
+                console.error("Navigation failed:", err);
+                if (clients.openWindow) return clients.openWindow(absoluteTargetUrl);
+              }
             }
           });
         }
       }
-      // If no open client exists, open a new window
       if (clients.openWindow) {
-        return clients.openWindow(targetUrl);
+        return clients.openWindow(absoluteTargetUrl);
       }
     })
   );

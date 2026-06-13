@@ -94,6 +94,14 @@ export default function App() {
   const [logs, setLogs] = useState(Storage.getLogs());
   const [notifications, setNotifications] = useState(Storage.getNotifications());
   const [showNotifications, setShowNotifications] = useState(false);
+  const [browserNotificationPerm, setBrowserNotificationPerm] = useState<NotificationPermission>('default');
+
+  useEffect(() => {
+    if ('Notification' in window) {
+      setBrowserNotificationPerm(Notification.permission);
+    }
+  }, []);
+
   const [showNotificationPrompt, setShowNotificationPrompt] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [firebaseUser, setFirebaseUser] = useState(auth.currentUser);
@@ -202,6 +210,7 @@ export default function App() {
           const currentAuth = Storage.getAuthState();
           if (currentAuth.role?.toLowerCase() !== 'director' || currentAuth.level < 5) {
             const newState = {
+              ...currentAuth,
               level: 5,
               role: 'director',
               name: user.displayName || 'Director Miss Nine',
@@ -400,6 +409,25 @@ export default function App() {
     setCommission(firebaseCommissions);
     setLogs(Storage.getLogs());
     setNotifications(Storage.getNotifications());
+  };
+
+  const handleRequestBrowserNotification = async () => {
+    if (!('Notification' in window)) {
+      alert("This browser does not support desktop notifications.");
+      return;
+    }
+    try {
+      const permission = await Notification.requestPermission();
+      setBrowserNotificationPerm(permission);
+      if (permission === 'granted') {
+        new Notification("Success!", {
+          body: "Browser notifications are now enabled.",
+          icon: appLogo
+        });
+      }
+    } catch (err) {
+      console.error("Failed to request notification permission:", err);
+    }
   };
 
   const markAllRead = () => {
@@ -742,6 +770,29 @@ export default function App() {
                             </div>
                           </div>
                           <div className="max-h-80 overflow-y-auto custom-scrollbar">
+                            {/* Browser Push Alerts Banner Row */}
+                            {browserNotificationPerm === 'granted' ? (
+                              <div className="px-4 py-2 border-b border-white/5 bg-[#D4AF37]/05 flex items-center justify-center">
+                                <span className="text-[9px] text-[#A09E9A]/60 font-black uppercase tracking-wider">🟢 Browser Push Alerts: Enabled</span>
+                              </div>
+                            ) : (
+                              <div className="p-3 mx-3 mt-3 mb-2 bg-amber-500/05 border border-amber-500/20 rounded-xl flex items-center justify-between">
+                                <span className="text-amber-400 font-bold text-[10px] uppercase tracking-wider">⚠️ Browser Notifications: Inactive</span>
+                                <button
+                                  onClick={() => {
+                                    if (browserNotificationPerm === 'default') {
+                                      handleRequestBrowserNotification();
+                                    } else {
+                                      alert("Notifications are blocked by your browser settings. Please click the lock/settings icon next to the URL in your browser address bar to allow permissions manually.");
+                                    }
+                                  }}
+                                  className="px-3 py-1 bg-[#D4AF37]/10 hover:bg-[#D4AF37]/20 border border-[#D4AF37]/30 text-[#D4AF37] hover:text-white rounded-lg text-[9px] font-black uppercase tracking-widest transition-all cursor-pointer"
+                                >
+                                  {browserNotificationPerm === 'denied' ? 'How to Fix' : 'Activate'}
+                                </button>
+                              </div>
+                            )}
+
                             {notifications.length > 0 ? (
                               notifications.map((n) => (
                                 <div key={n.id} className={cn(

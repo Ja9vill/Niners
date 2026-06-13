@@ -1,7 +1,7 @@
 /* eslint-disable */
 /* eslint-disable */
 import React, { useState, useEffect, useMemo } from 'react';
-import { X, Calendar, ChevronLeft, Edit2, Loader2, Save, Instagram, Twitter, Facebook, TrendingUp, TrendingDown, Minus, ArrowUpDown, Award, MessageSquare, Star, Users, Send, ClipboardList, Trash2, Clock, Plus, CheckCircle2, AlertCircle, Briefcase, ListTodo, Activity, Search } from 'lucide-react';
+import { X, Calendar, ChevronLeft, Edit2, Loader2, Save, Instagram, Twitter, Facebook, TrendingUp, TrendingDown, Minus, ArrowUpDown, Award, MessageSquare, Star, Users, Send, ClipboardList, Trash2, Clock, Plus, CheckCircle2, AlertCircle, Briefcase, ListTodo, Activity, Search, RefreshCw } from 'lucide-react';
 import { Host, CommissionEntry, CalendarEvent, Task, AwardBadge, AwardAssignment } from '../types';
 import { FirebaseService, generateSubmissionId } from '../lib/firebaseService';
 import { Storage } from '../lib/storage';
@@ -547,6 +547,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
   const [assignedHostsList, setAssignedHostsList] = useState<any[]>([]);
   const [isLoadingAssignedHosts, setIsLoadingAssignedHosts] = useState(false);
   const [spotlightHost, setSpotlightHost] = useState<Host | null>(null);
+  const [adminLogsPage, setAdminLogsPage] = useState(1);
 
   // States for Badge & Task Assignment
   const [opsHosts, setOpsHosts] = useState<Host[]>([]);
@@ -1120,59 +1121,47 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
     return fetch(url, { ...options, headers });
   };
 
-  const handleRosterSearch = async (queryVal: string) => {
+  const rosterSearchTimeoutRef = React.useRef<any>(null);
+  const rosterSearchAbortControllerRef = React.useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (rosterSearchTimeoutRef.current) clearTimeout(rosterSearchTimeoutRef.current);
+      if (rosterSearchAbortControllerRef.current) rosterSearchAbortControllerRef.current.abort();
+    };
+  }, []);
+
+  const handleRosterSearch = (queryVal: string) => {
     setRosterSearchQuery(queryVal);
-    if (!queryVal.trim()) {
-      setRosterSearchResults([]);
-      return;
-    }
-    setIsSearchingRoster(true);
-    try {
-      const res = await fetchWithAuth(`/api/roster-management/search?query=${encodeURIComponent(queryVal)}`);
-      if (res.ok) {
-        const data = await res.json();
-        setRosterSearchResults(data);
-      } else {
-        const errData = await res.json();
-        showToast('error', errData.error || 'Failed to search roster.');
-      }
-    } catch (err: any) {
-      console.error(err);
-      showToast('error', 'Network error during search.');
-    } finally {
-      setIsSearchingRoster(false);
-    }
   };
 
-  const handleSelectRosterUser = async (user: any) => {
+  const handleSelectRosterUser = async (user: any, usersList: any[] = allUsers) => {
     setIsRosterLoading(true);
     try {
-      const poppoId = user.poppo_id || user.id;
-      const res = await fetchWithAuth(`/api/roster-management/user/${poppoId}`);
-      if (res.ok) {
-        const data = await res.json();
-        setSelectedRosterUser(data);
+      const poppoId = String(user.poppo_id || user.id);
+      const matchedUser = usersList.find(u => String(u.poppo_id || u.id) === poppoId);
+      if (matchedUser) {
+        setSelectedRosterUser(matchedUser);
         setRosterEditableFields({
-          ...data,
-          nickname: data.nickname || data.name || '',
-          role: data.role || 'Host',
-          teamAnchor: data.teamAnchor || data.team || data.team_anchor || '',
-          tier_pay: data.tier_pay || '',
-          status: data.status || 'Active',
-          photoUrl: data.photoUrl || data.profile_photo || '',
-          assignedManagerId: data.assignedManagerId || data.assigned_manager_poppo_id || '',
-          assignedManagerName: data.manager || data.assigned_manager || ''
+          ...matchedUser,
+          nickname: matchedUser.nickname || matchedUser.name || '',
+          role: matchedUser.role || 'Host',
+          teamAnchor: matchedUser.teamAnchor || matchedUser.team || matchedUser.team_anchor || '',
+          tier_pay: matchedUser.tier_pay || matchedUser.tierPay || '',
+          status: matchedUser.status || 'Active',
+          photoUrl: matchedUser.photoUrl || matchedUser.profile_photo || '',
+          assignedManagerId: matchedUser.assignedManagerId || matchedUser.assigned_manager_poppo_id || '',
+          assignedManagerName: matchedUser.manager || matchedUser.assigned_manager || ''
         });
         // Clear host search state
         setRosterHostSearchQuery('');
         setRosterHostSearchResults([]);
       } else {
-        const errData = await res.json();
-        showToast('error', errData.error || 'Failed to fetch user details.');
+        showToast('error', 'User not found in roster list.');
       }
     } catch (err) {
       console.error(err);
-      showToast('error', 'Network error fetching user details.');
+      showToast('error', 'Error selecting user.');
     } finally {
       setIsRosterLoading(false);
     }
@@ -1203,7 +1192,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
           return;
         }
       }
-
+ 
       // 2. Call update for the fields
       const updateRes = await fetchWithAuth('/api/roster-management/update', {
         method: 'PATCH',
@@ -1220,16 +1209,29 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
           manager: rosterEditableFields.assignedManagerName
         })
       });
-
+ 
       if (updateRes.ok) {
         showToast('success', 'Roster changes saved successfully.');
         
-        // Refresh users list
-        const list = await FirebaseService.getAllRoleMetadata();
-        setAllUsers(list || []);
+        // Update local allUsers array instead of refetching from Firestore
+        setAllUsers(prev => prev.map(u => {
+          if (String(u.poppo_id || u.id) === String(poppoId)) {
+            return {
+              ...u,
+              ...rosterEditableFields,
+              role: newRole,
+              nickname: rosterEditableFields.nickname,
+              teamAnchor: rosterEditableFields.teamAnchor,
+              tier_pay: rosterEditableFields.tier_pay,
+              status: rosterEditableFields.status,
+              photoUrl: rosterEditableFields.photoUrl
+            };
+          }
+          return u;
+        }));
         
-        // Reload details
-        await handleSelectRosterUser({ poppo_id: poppoId });
+        // Auto-clear selection
+        setSelectedRosterUser(null);
       } else {
         const errData = await updateRes.json();
         showToast('error', errData.error || 'Failed to update user.');
@@ -1241,7 +1243,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
       setIsSavingRoster(false);
     }
   };
-
+ 
   const handleResetLoginState = async () => {
     if (!selectedRosterUser) return;
     if (!confirm(`Are you sure you want to reset the login state for ${selectedRosterUser.nickname || selectedRosterUser.name || 'this user'}? This will force them to set a new password on their next login.`)) return;
@@ -1257,8 +1259,21 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
       });
       if (res.ok) {
         showToast('success', 'Login state reset successful. User must set a new password on next login.');
-        // Reload details
-        await handleSelectRosterUser({ poppo_id: poppoId });
+        
+        // Update local allUsers array
+        setAllUsers(prev => prev.map(u => {
+          if (String(u.poppo_id || u.id) === String(poppoId)) {
+            return {
+              ...u,
+              is_first_time: true,
+              is_temp_password: true
+            };
+          }
+          return u;
+        }));
+ 
+        // Auto-clear selection
+        setSelectedRosterUser(null);
       } else {
         const errData = await res.json();
         showToast('error', errData.error || 'Failed to reset login state.');
@@ -1276,13 +1291,20 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
     setIsSendingRosterPush(true);
     try {
       const poppoId = selectedRosterUser.poppo_id;
+      
+      // Auto-prepend https:// to external links if they don't have it
+      let finalUrl = rosterPushUrl ? rosterPushUrl.trim() : '';
+      if (finalUrl && !finalUrl.startsWith('/') && !finalUrl.startsWith('http://') && !finalUrl.startsWith('https://')) {
+        finalUrl = 'https://' + finalUrl;
+      }
+
       const res = await fetchWithAuth('/api/push/send-to-user', {
         method: 'POST',
         body: JSON.stringify({
           poppo_id: poppoId,
           title: rosterPushTitle,
           body: rosterPushBody,
-          url: rosterPushUrl || undefined
+          url: finalUrl || undefined
         })
       });
       if (res.ok) {
@@ -1338,12 +1360,20 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
       if (res.ok) {
         showToast('success', 'Host successfully assigned.');
         
-        // Refresh users list
-        const list = await FirebaseService.getAllRoleMetadata();
-        setAllUsers(list || []);
-        
-        // Reload details
-        await handleSelectRosterUser({ poppo_id: selectedRosterUser.poppo_id });
+        // Update the host locally in allUsers
+        setAllUsers(prev => prev.map(u => {
+          if (String(u.poppo_id || u.id) === String(hostId)) {
+            return {
+              ...u,
+              assignedManagerId: selectedRosterUser.poppo_id,
+              assigned_manager_poppo_id: selectedRosterUser.poppo_id,
+              manager: selectedRosterUser.nickname || selectedRosterUser.name,
+              assigned_manager: selectedRosterUser.nickname || selectedRosterUser.name,
+              assigned_manager_nickname: selectedRosterUser.nickname || selectedRosterUser.name
+            };
+          }
+          return u;
+        }));
       } else {
         const errData = await res.json();
         showToast('error', errData.error || 'Failed to assign host.');
@@ -1353,7 +1383,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
       showToast('error', 'Network error assigning host.');
     }
   };
-
+ 
   const handleUnassignHostFromManager = async (hostId: string) => {
     if (!selectedRosterUser) return;
     if (!confirm('Are you sure you want to unassign this host?')) return;
@@ -1369,12 +1399,20 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
       if (res.ok) {
         showToast('success', 'Host successfully unassigned.');
         
-        // Refresh users list
-        const list = await FirebaseService.getAllRoleMetadata();
-        setAllUsers(list || []);
-        
-        // Reload details
-        await handleSelectRosterUser({ poppo_id: selectedRosterUser.poppo_id });
+        // Update the host locally in allUsers
+        setAllUsers(prev => prev.map(u => {
+          if (String(u.poppo_id || u.id) === String(hostId)) {
+            return {
+              ...u,
+              assignedManagerId: '',
+              assigned_manager_poppo_id: '',
+              manager: 'Unassigned',
+              assigned_manager: 'Unassigned',
+              assigned_manager_nickname: 'Unassigned'
+            };
+          }
+          return u;
+        }));
       } else {
         const errData = await res.json();
         showToast('error', errData.error || 'Failed to unassign host.');
@@ -1464,17 +1502,12 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
                 value={rosterSearchQuery}
                 onChange={(e) => handleRosterSearch(e.target.value)}
               />
-              {isSearchingRoster && (
-                <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                  <Loader2 className="w-4 h-4 animate-spin text-[#D4AF37]" />
-                </div>
-              )}
             </div>
 
             {/* Search Results */}
-            {rosterSearchResults.length > 0 ? (
+            {filteredRosterSearchResults.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[300px] overflow-y-auto custom-scrollbar pr-1">
-                {rosterSearchResults.map((usr) => (
+                {filteredRosterSearchResults.map((usr) => (
                   <div
                     key={usr.poppo_id}
                     onClick={() => handleSelectRosterUser(usr)}
@@ -2179,6 +2212,28 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
     });
   }, [allUsers, impersonationSearch]);
 
+  const filteredRosterSearchResults = useMemo(() => {
+    if (!rosterSearchQuery.trim()) return [];
+    const q = rosterSearchQuery.toLowerCase().trim();
+    return allUsers
+      .filter(u => {
+        const role = String(u.role || 'host').toLowerCase();
+        if (role === 'director') return false;
+        
+        const id = String(u.poppo_id || u.id || '');
+        const name = String(u.name || '').toLowerCase();
+        const nickname = String(u.nickname || '').toLowerCase();
+        return id.includes(q) || name.includes(q) || nickname.includes(q);
+      })
+      .map(u => ({
+        poppo_id: u.poppo_id || u.id,
+        nickname: u.nickname || u.name || 'Unknown',
+        name: u.name || u.nickname || 'Unknown',
+        role: u.role || 'Host',
+        photoUrl: u.photoUrl || u.profile_photo || ''
+      }));
+  }, [allUsers, rosterSearchQuery]);
+
   const handleImpersonate = async () => {
     if (!selectedImpersonationUser) return;
     try {
@@ -2553,6 +2608,10 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
     return combined;
   }, [rawFanbase, rawAttendance, rawCalendar]);
 
+  useEffect(() => {
+    setAdminLogsPage(1);
+  }, [combinedAdminLogs.length]);
+
   const adminLogBadgeStyles = useMemo(() => ({
     base: "px-2 py-0.5 rounded border text-[9px] font-black uppercase tracking-wider",
     gold: "bg-[#D4AF37]/10 text-[#D4AF37] border-[#D4AF37]/20",
@@ -2854,87 +2913,114 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
         </div>
 
         {combinedAdminLogs.length > 0 ? (
-          <div className="overflow-x-auto no-scrollbar rounded-2xl border border-white/5">
-            <table className="w-full text-left text-xs divide-y divide-white/5">
-              <thead className="bg-black/30 text-[#A09E9A] text-[9px] font-black uppercase tracking-wider">
-                <tr>
-                  <th className="px-4 py-3">Type</th>
-                  <th className="px-4 py-3">Subject / Target</th>
-                  <th className="px-4 py-3 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/5 bg-black/10 font-medium">
-                {combinedAdminLogs.map((item) => {
-                  let badgeStyles = adminLogBadgeStyles.base;
-                  let typeLabel = '';
-                  let titleStr = '';
-                  let subtitleStr = '';
-                  let dateAndTimeStr = '';
+          <div className="space-y-4">
+            <div className="overflow-x-auto no-scrollbar rounded-2xl border border-white/5">
+              <table className="w-full text-left text-xs divide-y divide-white/5">
+                <thead className="bg-black/30 text-[#A09E9A] text-[9px] font-black uppercase tracking-wider">
+                  <tr>
+                    <th className="px-4 py-3">Type</th>
+                    <th className="px-4 py-3">Subject / Target</th>
+                    <th className="px-4 py-3 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5 bg-black/10 font-medium">
+                  {combinedAdminLogs.slice((adminLogsPage - 1) * 10, adminLogsPage * 10).map((item) => {
+                    let badgeStyles = adminLogBadgeStyles.base;
+                    let typeLabel = '';
+                    let titleStr = '';
+                    let subtitleStr = '';
+                    let dateAndTimeStr = '';
 
-                  if (item.logType === 'fanbase') {
-                    badgeStyles = cn(badgeStyles, adminLogBadgeStyles.gold);
-                    typeLabel = 'Fanbase';
-                    titleStr = item.nickname || 'Unknown Host';
-                    subtitleStr = `Poppo: ${item.poppoId || item.poppo_id}`;
+                    if (item.logType === 'fanbase') {
+                      badgeStyles = cn(badgeStyles, adminLogBadgeStyles.gold);
+                      typeLabel = 'Fanbase';
+                      titleStr = item.nickname || 'Unknown Host';
+                      subtitleStr = `Poppo: ${item.poppoId || item.poppo_id}`;
 
-                    const start = formatLogDateAndTime(item.fromDate || item.from_date, '');
-                    const end = formatLogDateAndTime(item.toDate || item.to_date, '');
-                    dateAndTimeStr = `${start} - ${end}`;
-                  } else if (item.logType === 'attendance') {
-                    badgeStyles = cn(badgeStyles, adminLogBadgeStyles.indigo);
-                    typeLabel = 'Attendance';
-                    titleStr = item.eventTitle || 'Unknown Event';
-                    subtitleStr = `Poppo IDs: ${(item.attendeeIds || []).length} logged`;
-                    dateAndTimeStr = formatLogDateAndTime(item.eventDate, item.timeslot || '');
-                  } else if (item.logType === 'calendar') {
-                    badgeStyles = cn(badgeStyles, adminLogBadgeStyles.pink);
-                    typeLabel = 'Event';
-                    titleStr = item.title || 'Untitled Event';
-                    subtitleStr = `Type: ${item.type || 'solo'}`;
-                    dateAndTimeStr = formatLogDateAndTime(item.date, item.time || '');
-                  }
+                      const start = formatLogDateAndTime(item.fromDate || item.from_date, '');
+                      const end = formatLogDateAndTime(item.toDate || item.to_date, '');
+                      dateAndTimeStr = `${start} - ${end}`;
+                    } else if (item.logType === 'attendance') {
+                      badgeStyles = cn(badgeStyles, adminLogBadgeStyles.indigo);
+                      typeLabel = 'Attendance';
+                      titleStr = item.eventTitle || 'Unknown Event';
+                      subtitleStr = `Poppo IDs: ${(item.attendeeIds || []).length} logged`;
+                      dateAndTimeStr = formatLogDateAndTime(item.eventDate, item.timeslot || '');
+                    } else if (item.logType === 'calendar') {
+                      badgeStyles = cn(badgeStyles, adminLogBadgeStyles.pink);
+                      typeLabel = 'Event';
+                      titleStr = item.title || 'Untitled Event';
+                      subtitleStr = `Type: ${item.type || 'solo'}`;
+                      dateAndTimeStr = formatLogDateAndTime(item.date, item.time || '');
+                    }
 
-                  const isAuthor = isOriginalAuthor(item);
+                    const isAuthor = isOriginalAuthor(item);
 
-                  return (
-                    <tr key={item.id} className="hover:bg-white/[0.01] transition-colors">
-                      <td className="px-4 py-3.5 whitespace-nowrap">
-                        <span className={badgeStyles}>
-                          {typeLabel}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3.5">
-                        <div className="font-bold text-[#F0EFE8]">{titleStr}</div>
-                        <div className="text-[10px] text-[#D4AF37] font-mono mt-0.5">{dateAndTimeStr}</div>
-                        <div className="text-[9px] font-mono text-[#A09E9A] mt-0.5">{subtitleStr}</div>
-                      </td>
-                      <td className="px-4 py-3.5 text-right whitespace-nowrap">
-                        {isAuthor ? (
-                          <div className="flex items-center gap-1.5 justify-end">
-                            <button
-                              type="button"
-                              onClick={() => handleOpenLogEditModal(item)}
-                              className="px-2 py-1 bg-white/5 hover:bg-white/10 text-[#F0EFE8] border border-white/10 rounded-lg text-[9px] font-black uppercase tracking-wider flex items-center gap-1 cursor-pointer transition-all"
-                            >
-                              <Edit2 size={9} /> Edit
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteLogItem(item)}
-                              className="px-2 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 rounded-lg text-[9px] font-black uppercase tracking-wider flex items-center gap-1 cursor-pointer transition-all"
-                            >
-                              <Trash2 size={9} /> Delete
-                            </button>
-                          </div>
-                        ) : (
-                          <span className="text-[9px] text-slate-500 italic select-none">ReadOnly</span>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                    return (
+                      <tr key={item.id} className="hover:bg-white/[0.01] transition-colors">
+                        <td className="px-4 py-3.5 whitespace-nowrap">
+                          <span className={badgeStyles}>
+                            {typeLabel}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3.5">
+                          <div className="font-bold text-[#F0EFE8]">{titleStr}</div>
+                          <div className="text-[10px] text-[#D4AF37] font-mono mt-0.5">{dateAndTimeStr}</div>
+                          <div className="text-[9px] font-mono text-[#A09E9A] mt-0.5">{subtitleStr}</div>
+                        </td>
+                        <td className="px-4 py-3.5 text-right whitespace-nowrap">
+                          {isAuthor ? (
+                            <div className="flex items-center gap-1.5 justify-end">
+                              <button
+                                type="button"
+                                onClick={() => handleOpenLogEditModal(item)}
+                                className="px-2 py-1 bg-white/5 hover:bg-white/10 text-[#F0EFE8] border border-white/10 rounded-lg text-[9px] font-black uppercase tracking-wider flex items-center gap-1 cursor-pointer transition-all"
+                              >
+                                <Edit2 size={9} /> Edit
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteLogItem(item)}
+                                className="px-2 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 rounded-lg text-[9px] font-black uppercase tracking-wider flex items-center gap-1 cursor-pointer transition-all"
+                              >
+                                <Trash2 size={9} /> Delete
+                              </button>
+                            </div>
+                          ) : (
+                            <span className="text-[9px] text-slate-500 italic select-none">ReadOnly</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination Controls */}
+            {combinedAdminLogs.length > 10 && (
+              <div className="flex items-center justify-between border-t border-white/5 pt-3">
+                <button
+                  type="button"
+                  disabled={adminLogsPage === 1}
+                  onClick={() => setAdminLogsPage(p => Math.max(1, p - 1))}
+                  className="px-3 py-1.5 bg-white/5 hover:bg-white/10 disabled:opacity-30 disabled:hover:bg-white/5 border border-white/10 rounded-lg text-[10px] font-black uppercase tracking-wider text-[#F0EFE8] transition-all cursor-pointer"
+                >
+                  ← Previous
+                </button>
+                <span className="text-[10px] font-black uppercase text-[#A09E9A]">
+                  Page {adminLogsPage} of {Math.ceil(combinedAdminLogs.length / 10)}
+                </span>
+                <button
+                  type="button"
+                  disabled={adminLogsPage >= Math.ceil(combinedAdminLogs.length / 10)}
+                  onClick={() => setAdminLogsPage(p => p + 1)}
+                  className="px-3 py-1.5 bg-white/5 hover:bg-white/10 disabled:opacity-30 disabled:hover:bg-white/5 border border-white/10 rounded-lg text-[10px] font-black uppercase tracking-wider text-[#F0EFE8] transition-all cursor-pointer"
+                >
+                  Next →
+                </button>
+              </div>
+            )}
           </div>
         ) : (
           <div className="p-12 text-center text-[#A09E9A]/30 italic text-xs bg-black/20 rounded-2xl border border-white/5">
@@ -6008,13 +6094,61 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                   else glowStyle = 'bg-amber-500/10 text-amber-300 border-amber-500/30 opacity-100';
                 }
 
+                const getCustomBadgeStyle = (colorStr: string, active: boolean) => {
+                  const isGradient = colorStr?.includes('gradient');
+                  const isHex = colorStr?.startsWith('#');
+                  if (!isGradient && !isHex) return null;
+
+                  if (active) {
+                    if (isGradient) {
+                      return {
+                        className: "border-transparent text-white opacity-100 z-10 font-bold",
+                        style: {
+                          background: colorStr,
+                          boxShadow: "0 0 20px rgba(255,255,255,0.4)"
+                        }
+                      };
+                    } else {
+                      return {
+                        className: "text-white opacity-100 z-10 font-bold",
+                        style: {
+                          backgroundColor: `${colorStr}4D`,
+                          borderColor: colorStr,
+                          boxShadow: `0 0 20px ${colorStr}CC`
+                        }
+                      };
+                    }
+                  } else {
+                    if (isGradient) {
+                      return {
+                        className: "text-white/70 border-transparent opacity-60",
+                        style: {
+                          background: colorStr
+                        }
+                      };
+                    } else {
+                      return {
+                        className: "opacity-100",
+                        style: {
+                          backgroundColor: `${colorStr}1A`,
+                          borderColor: `${colorStr}40`,
+                          color: colorStr
+                        }
+                      };
+                    }
+                  }
+                };
+
+                const customStyle = getCustomBadgeStyle(a.awardColor, isActive);
+
                 return (
                   <div
                     key={a.id}
                     className={cn(
                       "flex flex-col justify-center items-center border rounded-xl px-3 py-1.5 transition-all duration-300 hover:scale-[1.02] hover:border-amber-500/50 shadow-md cursor-help relative group/badge w-full min-w-0 text-center",
-                      glowStyle
+                      customStyle ? customStyle.className : glowStyle
                     )}
+                    style={customStyle ? customStyle.style : undefined}
                     title={`Award: ${a.awardName}\nDuration: ${a.startDate} to ${a.endDate}\nStatus: ${isActive ? 'Active Badge' : 'Past Award'}`}
                   >
                     <div className="flex flex-col min-w-0 items-center justify-center">
@@ -8112,29 +8246,29 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
         <div className={cn("mx-auto w-full pt-1 space-y-4", (!onClose && (loggedInUserRole === 'director' || loggedInUserRole === 'head admin' || loggedInUserRole === 'head_admin')) ? "max-w-4xl" : "max-w-xl")}>
           {renderIdentityCard()}
           {isSpotlight && renderDirectorPosition()}
-          {isSpotlight && renderDirectorRoleSupervision()}
           {!isSpotlight && String(rootAuth?.role || '').toLowerCase() === 'director' && renderImpersonationBlock()}
           {!onClose && (loggedInUserRole === 'director' || loggedInUserRole === 'head admin' || loggedInUserRole === 'head_admin') && renderRosterManagementPanel()}
           {!onClose && (loggedInUserRole === 'director' || loggedInUserRole === 'head admin' || loggedInUserRole === 'head_admin') && renderBadgeAndTaskAssignment()}
+          {isSpotlight && renderDirectorRoleSupervision()}
         </div>
       ) : (profileOwnerRole === 'head admin' || profileOwnerRole === 'head_admin') ? (
         <div className={cn("mx-auto w-full pt-1 space-y-4", (!onClose && (loggedInUserRole === 'director' || loggedInUserRole === 'head admin' || loggedInUserRole === 'head_admin')) ? "max-w-4xl" : "max-w-xl")}>
           {renderIdentityCard()}
           {renderHeadAdminReportsTo()}
-          {renderRoleSupervision()}
           {!isSpotlight && String(rootAuth?.role || '').toLowerCase() === 'director' && renderImpersonationBlock()}
           {!onClose && (loggedInUserRole === 'director' || loggedInUserRole === 'head admin' || loggedInUserRole === 'head_admin') && renderRosterManagementPanel()}
           {!onClose && (loggedInUserRole === 'director' || loggedInUserRole === 'head admin' || loggedInUserRole === 'head_admin') && renderBadgeAndTaskAssignment()}
+          {renderRoleSupervision()}
         </div>
       ) : profileOwnerRole === 'admin' ? (
         <div className={cn("mx-auto w-full pt-1 space-y-4", (String(rootAuth?.role || '').toLowerCase() === 'admin' || (!onClose && (loggedInUserRole === 'director' || loggedInUserRole === 'head admin' || loggedInUserRole === 'head_admin'))) ? "max-w-4xl" : "max-w-xl")}>
           {renderIdentityCard()}
           {renderAdminReportsTo()}
-          {renderAdminRoleSupervision()}
           {String(rootAuth?.role || '').toLowerCase() === 'admin' && renderAdminFanbaseReportSection()}
           {String(rootAuth?.role || '').toLowerCase() === 'admin' && renderAdminsLogSection()}
           {!isSpotlight && String(rootAuth?.role || '').toLowerCase() === 'director' && renderImpersonationBlock()}
           {!onClose && (loggedInUserRole === 'director' || loggedInUserRole === 'head admin' || loggedInUserRole === 'head_admin') && renderBadgeAndTaskAssignment()}
+          {renderAdminRoleSupervision()}
         </div>
       ) : isNonHostRole ? (
         <div className={cn("mx-auto w-full pt-1 space-y-4", (String(rootAuth?.role || '').toLowerCase() === 'admin' || (!onClose && (loggedInUserRole === 'director' || loggedInUserRole === 'head admin' || loggedInUserRole === 'head_admin'))) ? "max-w-4xl" : "max-w-xl")}>
@@ -8240,7 +8374,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
 
 
       {/* Floating Toast Notification Container */}
-      <div className="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none">
+      <div className="fixed top-5 right-5 z-[9999] flex flex-col gap-2 pointer-events-none">
         {toasts.map(toast => (
           <div
             key={toast.id}

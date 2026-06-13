@@ -57,7 +57,13 @@ export function getAdminStorage() {
 
 export function getAdminFirestore() {
   const app = getFirebaseAdminApp();
-  return getFirestore(app, "ai-studio-f578d03a-99b3-4c41-84dd-9901137e8386");
+  const db = getFirestore(app, "ai-studio-f578d03a-99b3-4c41-84dd-9901137e8386");
+  try {
+    db.settings({ preferRest: true });
+  } catch (err) {
+    // Ignore settings initialized warnings
+  }
+  return db;
 }
 
 export async function getCallerPoppoId(uid: string): Promise<string> {
@@ -98,8 +104,8 @@ setTimeout(async () => {
   try {
     await initFirebaseSecrets();
     const db = getAdminFirestore();
-    const snapshot = await db.collection("users").limit(5).get();
-    if (snapshot.size < 5) {
+    const snapshot = await db.collection("users").limit(50).get();
+    if (snapshot.size < 50) {
       console.log("Database has few hosts. Auto-seeding all hosts from staticHosts...");
       const staticHosts = getStaticHosts();
       const batch = db.batch();
@@ -1364,18 +1370,24 @@ router.delete("/delete-user/:poppoId", verifyAdminRole, async (req: any, res: an
     }
     await db.collection("users").doc(cleanPoppoId).delete();
 
-    // Delete all performance reports for this user
-    const reportsQuery = await db.collection("performance_reports")
-      .where("poppo_id", "==", cleanPoppoId)
-      .get();
+    // Delete all performance reports (monthly and weekly) for this user
+    const [reportsQuery, weeklyQuery] = await Promise.all([
+      db.collection("performance_reports").where("poppo_id", "==", cleanPoppoId).get(),
+      db.collection("performance_weekly_reports").where("poppo_id", "==", cleanPoppoId).get()
+    ]);
     
+    const batch = db.batch();
     if (!reportsQuery.empty) {
-      const batch = db.batch();
       reportsQuery.forEach(doc => {
         batch.delete(doc.ref);
       });
-      await batch.commit();
     }
+    if (!weeklyQuery.empty) {
+      weeklyQuery.forEach(doc => {
+        batch.delete(doc.ref);
+      });
+    }
+    await batch.commit();
 
     // Step B: Delete from Firebase Auth, catching errors if user doesn't exist
     try {

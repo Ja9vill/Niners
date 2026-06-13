@@ -131,7 +131,7 @@ export const FinancialData = ({ isAgentMode = false }: { isAgentMode?: boolean }
         if (isAgentMode) {
           await FirebaseService.saveAgentCommissions(validData, localAuth.poppo_id, financialTab === 'weekly');
         } else {
-          await FirebaseService.saveCommissions(validData);
+          await FirebaseService.saveCommissions(validData, 'Admin', financialTab === 'weekly');
         }
         showSuccess(`Saved ${validData.length} records successfully.`);
       }
@@ -585,25 +585,36 @@ export const FinancialData = ({ isAgentMode = false }: { isAgentMode?: boolean }
                  
                  return filtered.map(({ row, idx }) => {
                     const isChecked = !!selectedRows[`${financialTab}_${idx}`];
+                    const existsInUsers = hosts.some(h => String(h.id || h.poppo_id || h.poppoId).trim() === String(row.poppo_id).trim());
+                    const isHighlight = row.poppo_id && !existsInUsers;
                     return (
                       <tr key={idx} className={cn(
                         "transition-colors group",
-                        (row as any)._isDuplicate ? "bg-red-500/10 hover:bg-red-500/20" : "hover:bg-white/[0.01]"
+                        (row as any)._isDuplicate ? "bg-red-500/10 hover:bg-red-500/20" : 
+                        isHighlight ? "bg-amber-500/10 hover:bg-amber-500/20 border-l-2 border-amber-500" :
+                        "hover:bg-white/[0.01]"
                       )}>
                         <td className={cn(
                           "px-3 py-2 text-center sticky left-0 z-10 border-r border-white/5 transition-colors",
-                          (row as any)._isDuplicate ? "bg-[#251010] group-hover:bg-[#301515]" : "bg-[#13131E] group-hover:bg-[#1A1A28]"
+                          (row as any)._isDuplicate ? "bg-[#251010] group-hover:bg-[#301515]" : 
+                          isHighlight ? "bg-[#282010] group-hover:bg-[#352a15]" :
+                          "bg-[#13131E] group-hover:bg-[#1A1A28]"
                         )}>
                           <input type="checkbox" checked={isChecked} onChange={e => setSelectedRows(prev => ({...prev, [`${financialTab}_${idx}`]: e.target.checked}))} className="rounded border-white/10 text-[#D4AF37] focus:ring-[#D4AF37] cursor-pointer" />
                           {(row as any)._isDuplicate && (
                             <div className="absolute top-1/2 -translate-y-1/2 left-8 text-xs cursor-help" title="Duplicate Entry Detected">⚠️</div>
                           )}
+                          {!(row as any)._isDuplicate && isHighlight && (
+                            <div className="absolute top-1/2 -translate-y-1/2 left-8 text-xs cursor-help" title="Poppo ID not found in Users collection">⚠️</div>
+                          )}
                         </td>
                         <td className={cn(
                           "px-4 py-2 sticky left-[48px] border-r border-white/5 z-10 font-mono font-bold transition-colors",
-                          (row as any)._isDuplicate ? "bg-[#251010] text-red-400 group-hover:bg-[#301515]" : "bg-[#13131E] text-indigo-400 group-hover:bg-[#1A1A28]"
+                          (row as any)._isDuplicate ? "bg-[#251010] text-red-400 group-hover:bg-[#301515]" : 
+                          isHighlight ? "bg-[#282010] text-amber-400 group-hover:bg-[#352a15]" :
+                          "bg-[#13131E] text-indigo-400 group-hover:bg-[#1A1A28]"
                         )}>
-                          <input type="text" value={row.poppo_id} onChange={e => handleCellChange(idx, 'poppo_id', e.target.value)} className={cn("bg-transparent border-none w-full outline-none", (row as any)._isDuplicate ? "text-red-400" : "text-indigo-400")} title="Poppo ID" />
+                          <input type="text" value={row.poppo_id} onChange={e => handleCellChange(idx, 'poppo_id', e.target.value)} className={cn("bg-transparent border-none w-full outline-none", (row as any)._isDuplicate ? "text-red-400" : isHighlight ? "text-amber-400" : "text-indigo-400")} title="Poppo ID" />
                         </td>
                         <td className="px-3 py-2 w-32 min-w-[120px]"><input type="text" value={row.nickname || ''} onChange={e => handleCellChange(idx, 'nickname', e.target.value)} className="bg-transparent w-full text-white outline-none" title="Nickname" aria-label="Nickname" /></td>
                         {financialTab === 'monthly' ? (

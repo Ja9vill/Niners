@@ -103,7 +103,14 @@ export default function App() {
         >
           {/* Shared tabs (all authenticated roles) */}
           <Route path="dashboard" element={<Overview />} />
-          <Route path="notifications-control" element={<NotificationControlCenter />} />
+          <Route
+            path="notifications-control"
+            element={
+              <RoleGuard roles={['director']}>
+                <NotificationControlCenter />
+              </RoleGuard>
+            }
+          />
 
           {/* My Profile — accessible to hosts and admin/manager/agent/head admin roles */}
           <Route
@@ -115,11 +122,11 @@ export default function App() {
             }
           />
 
-          {/* All-member profile browser — restricted to director and head admin */}
+          {/* All-member profile browser — restricted to director */}
           <Route
             path="profiles"
             element={
-              <RoleGuard roles={['director', 'head admin', 'head_admin']}>
+              <RoleGuard roles={['director']}>
                 <ProfilesTab />
               </RoleGuard>
             }
@@ -140,7 +147,7 @@ export default function App() {
           <Route
             path="director-operations"
             element={
-              <RoleGuard roles={['director', 'head admin', 'head_admin']}>
+              <RoleGuard roles={['director']}>
                 <DirectorOperations />
               </RoleGuard>
             }
@@ -190,7 +197,7 @@ export default function App() {
           <Route
             path="cms/livehouse"
             element={
-              <RoleGuard roles={['director', 'head admin', 'head_admin']}>
+              <RoleGuard roles={['director']}>
                 <LivehouseData />
               </RoleGuard>
             }
@@ -210,7 +217,7 @@ export default function App() {
           <Route
             path="financial-data"
             element={
-              <RoleGuard roles={['director', 'head admin', 'head_admin']}>
+              <RoleGuard roles={['director']}>
                 <FinancialData />
               </RoleGuard>
             }
@@ -226,29 +233,29 @@ export default function App() {
             }
           />
 
-          {/* Reporting Pages (Director Only) */}
+          {/* Reporting Pages (Director & Head Admin Access) */}
           <Route path="reporting/events" element={
-            <RoleGuard roles={['director']}>
+            <RoleGuard roles={['director', 'head admin', 'head_admin']}>
               <ReportingPages collectionName="calendar" reportType="Events Log" />
             </RoleGuard>
           } />
           <Route path="reporting/attendance" element={
-            <RoleGuard roles={['director']}>
+            <RoleGuard roles={['director', 'head admin', 'head_admin']}>
               <ReportingPages collectionName="attendance" reportType="Attendance Log" />
             </RoleGuard>
           } />
           <Route path="reporting/pk-performance" element={
-            <RoleGuard roles={['director']}>
+            <RoleGuard roles={['director', 'head admin', 'head_admin']}>
               <ReportingPages collectionName="pk_reports" reportType="PK Performance" />
             </RoleGuard>
           } />
           <Route path="reporting/fanbase-health" element={
-            <RoleGuard roles={['director']}>
+            <RoleGuard roles={['director', 'head admin', 'head_admin']}>
               <ReportingPages collectionName="fanbase_reports" reportType="Fanbase Health" />
             </RoleGuard>
           } />
           <Route path="reporting/assigned-badges" element={
-            <RoleGuard roles={['director']}>
+            <RoleGuard roles={['director', 'head admin', 'head_admin']}>
               <ReportingPages collectionName="users" filterField="badges" reportType="Assigned Badges" />
             </RoleGuard>
           } />

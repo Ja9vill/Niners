@@ -1022,9 +1022,10 @@ export const FirebaseService = {
   },
 
   // Performance Reports Management
-  async saveCommissions(commissions: CommissionEntry[], submitterName: string = 'Admin') {
+  async saveCommissions(commissions: CommissionEntry[], submitterName: string = 'Admin', isWeekly: boolean = false) {
     const uploadId = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 15);
-    await this.submitBulkToStaging('performance_reports', uploadId, commissions, submitterName);
+    const collectionName = isWeekly ? 'performance_weekly_reports' : 'performance_reports';
+    await this.submitBulkToStaging(collectionName, uploadId, commissions, submitterName);
   },
 
   async getCommissionsByMonth(month: string): Promise<CommissionEntry[]> {
@@ -1042,22 +1043,23 @@ export const FirebaseService = {
   },
 
   async getAllCommissions(): Promise<CommissionEntry[]> {
-    const path = 'performance_reports';
     try {
-      const snapshot = await getDocs(collection(db, path));
-      const all = snapshot.docs.map(d => d.data() as CommissionEntry);
-      // Filter out agent data so the agency total is not mixed
-      return all.filter(c => !c.isAgentData);
+      const [monthlySnap, weeklySnap] = await Promise.all([
+        getDocs(collection(db, 'performance_reports')),
+        getDocs(collection(db, 'performance_weekly_reports'))
+      ]);
+      const monthly = monthlySnap.docs.map(d => d.data() as CommissionEntry);
+      const weekly = weeklySnap.docs.map(d => d.data() as CommissionEntry);
+      return [...monthly, ...weekly].filter(c => !c.isAgentData);
     } catch (error) {
-      handleFirestoreError(error, OperationType.LIST, path);
+      console.error("Error getting all commissions:", error);
       return [];
     }
   },
 
   async getAgentCommissions(agentId: string, isWeekly: boolean = false): Promise<CommissionEntry[]> {
-    const path = 'performance_reports';
+    const path = isWeekly ? 'performance_weekly_reports' : 'performance_reports';
     try {
-      // Fetch all reports and filter client-side to avoid requiring complex compound indexes for now
       const snapshot = await getDocs(collection(db, path));
       const all = snapshot.docs.map(d => d.data() as CommissionEntry);
       
@@ -1087,21 +1089,21 @@ export const FirebaseService = {
     }
   },
 
-  async deleteCommission(poppoId: string, month: string) {
-    const path = `performance_reports/${poppoId}_${month}`;
+  async deleteCommission(poppoId: string, monthOrRange: string, isWeekly: boolean = false) {
+    const colName = isWeekly ? 'performance_weekly_reports' : 'performance_reports';
+    const path = `${colName}/${poppoId}_${monthOrRange}`;
     try {
-      await deleteDoc(doc(db, 'performance_reports', `${poppoId}_${month}`));
+      await deleteDoc(doc(db, colName, `${poppoId}_${monthOrRange}`));
     } catch (error) {
       handleFirestoreError(error, OperationType.DELETE, path);
     }
   },
 
   async deleteAgentCommission(poppoId: string, monthOrRange: string, agentId: string, isWeekly: boolean = false) {
-    const path = `performance_reports/${poppoId}_${monthOrRange}`;
+    const colName = isWeekly ? 'performance_weekly_reports' : 'performance_reports';
+    const path = `${colName}/${poppoId}_${monthOrRange}`;
     try {
-      // In a real robust system, we would verify the document actually belongs to the agent
-      // before deletion. For now, since they pass the exact key, we delete it.
-      const docRef = doc(db, 'performance_reports', `${poppoId}_${monthOrRange}`);
+      const docRef = doc(db, colName, `${poppoId}_${monthOrRange}`);
       const docSnap = await getDoc(docRef);
       if (docSnap.exists()) {
         const data = docSnap.data();
@@ -1116,10 +1118,12 @@ export const FirebaseService = {
     }
   },
 
-  async updateCommission(commission: CommissionEntry) {
-    const path = `performance_reports/${commission.poppo_id}_${commission.month}`;
+  async updateCommission(commission: CommissionEntry, isWeekly: boolean = false) {
+    const colName = isWeekly ? 'performance_weekly_reports' : 'performance_reports';
+    const monthOrRange = isWeekly ? `${commission.from_date}_${commission.to_date}` : commission.month;
+    const path = `${colName}/${commission.poppo_id}_${monthOrRange}`;
     try {
-      const docRef = doc(db, 'performance_reports', `${commission.poppo_id}_${commission.month}`);
+      const docRef = doc(db, colName, `${commission.poppo_id}_${monthOrRange}`);
       await setDoc(docRef, commission, { merge: true });
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, path);
@@ -1886,20 +1890,16 @@ export const FirebaseService = {
   },
 
   async saveFinancials(type: 'monthly' | 'weekly', data: any[]): Promise<void> {
+    const colName = type === 'weekly' ? 'performance_weekly_reports' : 'performance_reports';
     try {
-      const authState = Storage.getAuthState();
-      const res = await fetch("/api/admin/financials", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(authState.token ? { Authorization: `Bearer ${authState.token}` } : {}),
-        },
-        body: JSON.stringify({ type, data }),
+      const batch = writeBatch(db);
+      data.forEach(r => {
+        const dateKey = type === 'weekly' ? `${r.from_date || ''}_${r.to_date || ''}` : (r.month || '');
+        const id = `${r.poppo_id}_${dateKey}`;
+        const docRef = doc(db, colName, id);
+        batch.set(docRef, r, { merge: true });
       });
-      if (!res.ok) {
-        const errData = await res.json();
-        throw new Error(errData?.error || "Failed to save financials to backend");
-      }
+      await batch.commit();
     } catch (error) {
       console.error(`[FirebaseService] Error saving financials for ${type}:`, error);
       throw error;
@@ -1907,32 +1907,23 @@ export const FirebaseService = {
   },
 
   async fetchFinancials(type: 'monthly' | 'weekly'): Promise<any[]> {
+    const colName = type === 'weekly' ? 'performance_weekly_reports' : 'performance_reports';
     try {
-      const authState = Storage.getAuthState();
-      const res = await fetch(`/api/admin/financials?type=${type}`, {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-          ...(authState.token ? { Authorization: `Bearer ${authState.token}` } : {}),
-        },
-      });
-      if (!res.ok) {
-        const errData = await res.json();
-        throw new Error(errData?.error || "Failed to fetch financials from backend");
-      }
-      return await res.json();
-    } catch (error: any) {
+      const snapshot = await getDocs(collection(db, colName));
+      return snapshot.docs.map(d => d.data());
+    } catch (error) {
       console.error(`[FirebaseService] Error fetching financials for ${type}:`, error);
       return [];
     }
   },
 
-  async savePerformanceReport(data: any[]): Promise<void> {
-    const path = 'performance_reports';
+  async savePerformanceReport(data: any[], isWeekly: boolean = false): Promise<void> {
+    const path = isWeekly ? 'performance_weekly_reports' : 'performance_reports';
     try {
       const batch = writeBatch(db);
       data.forEach(r => {
-        const id = `${r.poppo_id}_${r.from_date || ''}_${r.to_date || ''}`;
+        const dateKey = isWeekly ? `${r.from_date || ''}_${r.to_date || ''}` : (r.month || '');
+        const id = `${r.poppo_id}_${dateKey}`;
         const docRef = doc(db, path, id);
         batch.set(docRef, r, { merge: true });
       });

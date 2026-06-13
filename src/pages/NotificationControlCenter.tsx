@@ -1,23 +1,77 @@
 import React, { useState, useEffect } from 'react';
-import { Bell, BellOff, Shield, ShieldAlert, Cpu, RefreshCw, Radio, CheckCircle, Wifi, MessageSquare } from 'lucide-react';
+import { 
+  Bell, 
+  BellOff, 
+  Shield, 
+  ShieldAlert, 
+  Cpu, 
+  RefreshCw, 
+  Radio, 
+  CheckCircle, 
+  Wifi, 
+  MessageSquare, 
+  Search, 
+  Send, 
+  Check, 
+  AlertTriangle, 
+  Users, 
+  Settings, 
+  Smartphone, 
+  Clock, 
+  ChevronRight,
+  UserCheck
+} from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Storage } from '../lib/storage';
 
-interface NotificationType {
+interface NotificationRule {
   id: string;
   label: string;
   description: string;
+  targets: string[];
+  when: 'immediately' | 'daily' | 'weekly';
   active: boolean;
 }
 
+interface UserLedgerEntry {
+  poppoId: string;
+  nickname: string;
+  role: string;
+  hasWebPush: boolean;
+  hasFcm: boolean;
+  hasAllowed: boolean;
+  notificationRequestedByDirector: boolean;
+}
+
 export const NotificationControlCenter = () => {
-  const [notifications, setNotifications] = useState<NotificationType[]>([]);
+  const [activeTab, setActiveTab] = useState<'rules' | 'users'>('rules');
+  const [rules, setRules] = useState<NotificationRule[]>([]);
+  const [users, setUsers] = useState<UserLedgerEntry[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  
+  // Web Push Status States
   const [swStatus, setSwStatus] = useState<'unsupported' | 'unregistered' | 'registered'>('unregistered');
   const [pushStatus, setPushStatus] = useState<'unsubscribed' | 'subscribed' | 'blocked' | 'loading'>('loading');
   const [lastNotification, setLastNotification] = useState<any>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isActionLoading, setIsActionLoading] = useState<string | null>(null);
   const [logMessages, setLogMessages] = useState<string[]>([]);
+  
+  // Loading States
+  const [isRulesLoading, setIsRulesLoading] = useState(true);
+  const [isUsersLoading, setIsUsersLoading] = useState(true);
+  const [savingRuleId, setSavingRuleId] = useState<string | null>(null);
+  const [requestingUserId, setRequestingUserId] = useState<string | null>(null);
+  
+  const authState = Storage.getAuthState();
+  const token = authState.token || '';
+
+  const getHeaders = () => ({
+    'Content-Type': 'application/json',
+    ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+  });
+
+  const addLog = (msg: string) => {
+    setLogMessages(prev => [`[${new Date().toLocaleTimeString()}] ${msg}`, ...prev.slice(0, 15)]);
+  };
 
   // Helper function to decode VAPID public key
   const urlB64ToUint8Array = (base64String: string) => {
@@ -31,12 +85,8 @@ export const NotificationControlCenter = () => {
     return outputArray;
   };
 
-  const addLog = (msg: string) => {
-    setLogMessages(prev => [`[${new Date().toLocaleTimeString()}] ${msg}`, ...prev.slice(0, 15)]);
-  };
-
-  // Check registration and subscription status
-  const checkStatus = async () => {
+  // Check registration and subscription status of current browser
+  const checkBrowserStatus = async () => {
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
       setSwStatus('unsupported');
       setPushStatus('unsubscribed');
@@ -67,25 +117,46 @@ export const NotificationControlCenter = () => {
     }
   };
 
-  // Fetch all notification types
-  const fetchNotifications = async () => {
+  // Fetch all notification rules
+  const fetchRules = async () => {
+    setIsRulesLoading(true);
     try {
       const res = await fetch('/api/notifications');
       if (res.ok) {
         const data = await res.json();
-        setNotifications(data);
+        setRules(data);
       }
     } catch (err) {
       console.error('Failed to fetch notifications:', err);
       addLog('Failed to fetch notification types.');
     } finally {
-      setIsLoading(false);
+      setIsRulesLoading(false);
+    }
+  };
+
+  // Fetch all users with device registration status
+  const fetchUsers = async () => {
+    setIsUsersLoading(true);
+    try {
+      const res = await fetch('/api/notifications/users', {
+        headers: getHeaders()
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setUsers(data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch users:', err);
+      addLog('Failed to fetch users ledger.');
+    } finally {
+      setIsUsersLoading(false);
     }
   };
 
   useEffect(() => {
-    checkStatus();
-    fetchNotifications();
+    checkBrowserStatus();
+    fetchRules();
+    fetchUsers();
 
     // Listen to real-time notification messages sent from service worker
     const handleMessage = (event: MessageEvent) => {
@@ -107,7 +178,7 @@ export const NotificationControlCenter = () => {
     };
   }, []);
 
-  // Subscribe to web push
+  // Register current browser to VAPID push
   const subscribePush = async () => {
     setPushStatus('loading');
     addLog('Requesting notification permission...');
@@ -139,7 +210,6 @@ export const NotificationControlCenter = () => {
       });
 
       addLog('Sending subscription to backend...');
-      const authState = Storage.getAuthState();
       const subRes = await fetch('/api/push/subscribe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -152,6 +222,8 @@ export const NotificationControlCenter = () => {
       if (subRes.ok) {
         setPushStatus('subscribed');
         addLog('Web Push Subscription completed and synced successfully!');
+        // Refresh users list since current user's registration status might have changed
+        fetchUsers();
       } else {
         throw new Error('Backend rejected push subscription');
       }
@@ -180,50 +252,59 @@ export const NotificationControlCenter = () => {
     }
   };
 
-  // Activate a notification type
-  const handleActivate = async (id: string) => {
-    setIsActionLoading(id);
+  // Update notification rule properties
+  const updateRule = async (updatedRule: NotificationRule) => {
+    setSavingRuleId(updatedRule.id);
     try {
-      const res = await fetch('/api/notifications/activate', {
+      const res = await fetch('/api/notifications/update-rule', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id })
+        headers: getHeaders(),
+        body: JSON.stringify({
+          id: updatedRule.id,
+          active: updatedRule.active,
+          targets: updatedRule.targets,
+          when: updatedRule.when
+        })
       });
+
       if (res.ok) {
-        setNotifications(prev =>
-          prev.map(n => (n.id === id ? { ...n, active: true } : n))
-        );
-        addLog(`Activated notification type: ${id}`);
+        const data = await res.json();
+        setRules(prev => prev.map(r => r.id === updatedRule.id ? data.item : r));
+        addLog(`Updated configuration for trigger: ${updatedRule.label}`);
+      } else {
+        const errData = await res.json();
+        throw new Error(errData.error || 'Failed to update rule');
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      addLog(`Failed to activate type: ${id}`);
+      addLog(`Failed to update rule ${updatedRule.id}: ${err.message}`);
     } finally {
-      setIsActionLoading(null);
+      setSavingRuleId(null);
     }
   };
 
-  // Revoke a notification type
-  const handleRevoke = async (id: string) => {
-    setIsActionLoading(id);
-    try {
-      const res = await fetch('/api/notifications/revoke', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id })
-      });
-      if (res.ok) {
-        setNotifications(prev =>
-          prev.map(n => (n.id === id ? { ...n, active: false } : n))
-        );
-        addLog(`Revoked notification type: ${id}`);
-      }
-    } catch (err) {
-      console.error(err);
-      addLog(`Failed to revoke type: ${id}`);
-    } finally {
-      setIsActionLoading(null);
-    }
+  // Toggle active state of a rule
+  const handleToggleActive = (rule: NotificationRule) => {
+    const next = { ...rule, active: !rule.active };
+    setRules(prev => prev.map(r => r.id === rule.id ? next : r));
+    updateRule(next);
+  };
+
+  // Toggle target role on a rule
+  const handleToggleTarget = (rule: NotificationRule, role: string) => {
+    const nextTargets = rule.targets.includes(role)
+      ? rule.targets.filter(t => t !== role)
+      : [...rule.targets, role];
+    const next = { ...rule, targets: nextTargets };
+    setRules(prev => prev.map(r => r.id === rule.id ? next : r));
+    updateRule(next);
+  };
+
+  // Handle dropdown changes for when to send
+  const handleWhenChange = (rule: NotificationRule, when: 'immediately' | 'daily' | 'weekly') => {
+    const next = { ...rule, when };
+    setRules(prev => prev.map(r => r.id === rule.id ? next : r));
+    updateRule(next);
   };
 
   // Send a test notification
@@ -235,16 +316,16 @@ export const NotificationControlCenter = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title: 'NINE Test Notification',
-          body: `This is a test notification for the active type: ${label}`,
+          body: `Test broadcast for rule: ${label}. This alerts verified endpoints.`,
           url: '/notifications-control',
           type: type
         })
       });
       const data = await res.json();
       if (data.status === 'success') {
-        addLog(`Test notification successfully sent!`);
+        addLog(`Test push successfully broadcasted!`);
       } else if (data.status === 'ignored') {
-        addLog(`Ignored: ${data.message}`);
+        addLog(`Ignored: ${data.message} (Is it active?)`);
       } else {
         addLog(`Push failed: ${data.error}`);
       }
@@ -253,178 +334,367 @@ export const NotificationControlCenter = () => {
     }
   };
 
-  const activeNotifications = notifications.filter(n => n.active);
-  const recommendedNotifications = notifications.filter(n => !n.active);
+  // Request a user to register their device
+  const handleSendDeviceRequest = async (userPoppoId: string, nickname: string) => {
+    setRequestingUserId(userPoppoId);
+    addLog(`Sending device registration request to ${nickname}...`);
+    try {
+      const res = await fetch('/api/notifications/request-device', {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify({ targetPoppoId: userPoppoId })
+      });
+      
+      if (res.ok) {
+        setUsers(prev => prev.map(u => u.poppoId === userPoppoId ? { ...u, notificationRequestedByDirector: true } : u));
+        addLog(`Requested device enrollment for user ${nickname} (${userPoppoId})`);
+      } else {
+        const errData = await res.json();
+        throw new Error(errData.error || 'Request rejected by server');
+      }
+    } catch (err: any) {
+      console.error(err);
+      addLog(`Request failed: ${err.message}`);
+    } finally {
+      setRequestingUserId(null);
+    }
+  };
 
-  if (isLoading) {
-    return (
-      <div className="flex flex-col items-center justify-center h-64 gap-4">
-        <RefreshCw className="w-8 h-8 animate-spin text-[#D4AF37]" />
-        <p className="text-sm font-bold text-[#A09E9A] uppercase tracking-widest">Loading Control Center...</p>
-      </div>
-    );
-  }
+  // Filtered users list
+  const filteredUsers = users.filter(u => {
+    if (!searchQuery) return true;
+    const query = searchQuery.toLowerCase();
+    return u.poppoId.includes(query) || u.nickname.toLowerCase().includes(query);
+  });
+
+  // Roles to display in trigger setup
+  const SYSTEM_ROLES = ['director', 'admin', 'manager', 'agent', 'host'];
 
   return (
-    <div className="space-y-6 pb-20 text-left">
+    <div className="space-y-6 pb-20 text-left text-[#F0EFE8] max-w-6xl mx-auto select-none">
+      
       {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-white/5 pb-4">
         <div className="space-y-1">
-          <h3 className="font-bold text-xl flex items-center gap-2 text-[#F0EFE8]">
-            <Bell className="text-[#FFB800] drop-shadow-[0_0_8px_rgba(255,184,0,0.5)]" size={24} />
+          <h1 className="font-black text-sm uppercase tracking-[0.2em] flex items-center gap-2">
+            <Bell className="text-[#D4AF37] drop-shadow-[0_0_8px_rgba(212,175,55,0.4)] animate-pulse" size={16} />
             Notification Control Center
-          </h3>
-          <p className="text-[10px] text-[#A09E9A]/40 uppercase tracking-widest font-black">
-            Configure system-wide triggers & manage Web Push subscriptions
+          </h1>
+          <p className="text-[10px] text-[#A09E9A] uppercase tracking-wider font-semibold">
+            Administrative triggers panel & device registration manager
           </p>
+        </div>
+
+        {/* Tab Controls */}
+        <div className="flex bg-[#0D0D14] border border-white/10 rounded-xl p-1 gap-1 self-start">
+          <button
+            onClick={() => setActiveTab('rules')}
+            className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
+              activeTab === 'rules'
+                ? 'bg-[#D4AF37] text-[#0D0D14]'
+                : 'text-[#A09E9A] hover:text-[#F0EFE8] hover:bg-white/5'
+            }`}
+          >
+            <Settings size={12} />
+            Rules Config
+          </button>
+          <button
+            onClick={() => setActiveTab('users')}
+            className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
+              activeTab === 'users'
+                ? 'bg-[#D4AF37] text-[#0D0D14]'
+                : 'text-[#A09E9A] hover:text-[#F0EFE8] hover:bg-white/5'
+            }`}
+          >
+            <Users size={12} />
+            Device Ledger
+          </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left / Center: Notifications Management */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Left Column: Active configs based on tab selection */}
         <div className="lg:col-span-2 space-y-6">
-          {/* SECTION 2 — Active Notifications */}
-          <div className="glass-card p-5 relative overflow-hidden transition-all duration-500" style={{
-            background: 'linear-gradient(to bottom right, rgba(20, 10, 5, 0.4), rgba(40, 10, 15, 0.5))',
-            backdropFilter: 'blur(20px)',
-            borderTop: '1px solid rgba(250, 204, 21, 0.3)',
-            borderLeft: '1px solid rgba(250, 204, 21, 0.1)',
-            borderColor: 'rgba(234, 179, 8, 0.2)',
-            boxShadow: 'inset 0 1px 1px rgba(250, 204, 21, 0.2), 0 10px 30px rgba(0,0,0,0.5), 0 0 15px rgba(250, 204, 21, 0.05)'
-          }}>
-            <div className="flex items-center gap-2 mb-4">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#FFB800] animate-pulse shadow-[0_0_8px_rgba(255,184,0,0.8)]"></span>
-              <h4 className="font-black text-sm uppercase tracking-widest text-[#FFB800] drop-shadow-[0_0_8px_rgba(255,184,0,0.4)]">Active Triggers</h4>
-              <span className="text-[10px] text-[#A09E9A] font-mono ml-2">({activeNotifications.length})</span>
-            </div>
-
-            <div className="space-y-3">
-              <AnimatePresence initial={false}>
-                {activeNotifications.map(n => (
-                  <motion.div
-                    key={n.id}
-                    layout
-                    initial={{ opacity: 0, scale: 0.96 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.96 }}
-                    transition={{ duration: 0.3 }}
-                    className="p-4 rounded-xl flex items-center justify-between gap-4 border transition-all duration-300 bg-gradient-to-r from-[#FFB800]/10 via-[#FFB800]/2 to-[#1A1A28]/40 border-[#FFB800]/30 shadow-md shadow-[#FFB800]/5"
-                  >
-                    <div className="space-y-1">
-                      <p className="text-xs font-black text-[#F0EFE8]">{n.label}</p>
-                      <p className="text-[10px] text-[#A09E9A] leading-relaxed">{n.description}</p>
-                    </div>
-                    <div className="flex items-center gap-3 shrink-0">
-                      <button
-                        onClick={() => handleSendTest(n.id, n.label)}
-                        className="px-2.5 py-1 bg-white/5 hover:bg-[#FFB800]/10 border border-white/10 hover:border-[#FFB800]/30 text-white/60 hover:text-[#FFB800] rounded-lg text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer"
-                        title="Send test push to verified endpoints"
-                      >
-                        Test
-                      </button>
-                      <button
-                        onClick={() => handleRevoke(n.id)}
-                        disabled={isActionLoading === n.id}
-                        className="px-4 py-1.5 bg-red-500/15 hover:bg-red-500/30 border border-red-500/30 text-red-400 font-black uppercase tracking-wider text-[10px] rounded-lg transition-all cursor-pointer shadow-md disabled:opacity-50"
-                      >
-                        {isActionLoading === n.id ? '...' : 'Revoke'}
-                      </button>
-                    </div>
-                  </motion.div>
-                ))}
-              </AnimatePresence>
-
-              {activeNotifications.length === 0 && (
-                <div className="text-center py-8 text-[#A09E9A]/30 italic text-xs">
-                  No active notification types. Activate recommended templates below.
+          <AnimatePresence mode="wait">
+            
+            {/* Rules Tab */}
+            {activeTab === 'rules' && (
+              <motion.div
+                key="rules-tab"
+                initial={{ opacity: 0, y: 15 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -15 }}
+                transition={{ duration: 0.2 }}
+                className="space-y-4"
+              >
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#D4AF37] shadow-[0_0_8px_rgba(212,175,55,0.8)] animate-pulse"></span>
+                  <h3 className="font-black text-xs uppercase tracking-widest text-[#D4AF37]">Feature Notification Triggers</h3>
                 </div>
-              )}
-            </div>
-          </div>
 
-          {/* SECTION 1 — Recommended Notifications */}
-          <div className="glass-card p-5 relative overflow-hidden transition-all duration-500" style={{
-            background: 'linear-gradient(to bottom right, rgba(20, 10, 5, 0.4), rgba(40, 10, 15, 0.5))',
-            backdropFilter: 'blur(20px)',
-            borderTop: '1px solid rgba(250, 204, 21, 0.3)',
-            borderLeft: '1px solid rgba(250, 204, 21, 0.1)',
-            borderColor: 'rgba(234, 179, 8, 0.2)',
-            boxShadow: 'inset 0 1px 1px rgba(250, 204, 21, 0.2), 0 10px 30px rgba(0,0,0,0.5), 0 0 15px rgba(250, 204, 21, 0.05)'
-          }}>
-            <div className="flex items-center gap-2 mb-4">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#A09E9A] shadow-[0_0_8px_rgba(160,158,154,0.8)]"></span>
-              <h4 className="font-black text-sm uppercase tracking-widest text-[#A09E9A]/80">Recommended Templates</h4>
-              <span className="text-[10px] text-[#A09E9A] font-mono ml-2">({recommendedNotifications.length})</span>
-            </div>
+                {isRulesLoading ? (
+                  <div className="flex flex-col items-center justify-center h-48 gap-3 border border-white/5 rounded-2xl bg-[#13131E]/40">
+                    <RefreshCw className="w-6 h-6 animate-spin text-[#D4AF37]" />
+                    <span className="text-[10px] font-bold text-[#A09E9A] uppercase tracking-wider">Synchronizing Rules...</span>
+                  </div>
+                ) : rules.length === 0 ? (
+                  <div className="text-center py-12 text-[#A09E9A]/30 italic text-xs border border-white/5 rounded-2xl bg-[#13131E]/40">
+                    No notification rules loaded.
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {rules.map(rule => (
+                      <div
+                        key={rule.id}
+                        className={`p-5 rounded-2xl border transition-all duration-300 ${
+                          rule.active 
+                            ? 'bg-gradient-to-br from-[#D4AF37]/5 via-[#13131E] to-[#13131E] border-[#D4AF37]/30 shadow-md shadow-[#D4AF37]/2'
+                            : 'bg-[#13131E]/40 border-white/5 opacity-70'
+                        }`}
+                      >
+                        {/* Header: Rule Title + Active Switch */}
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="space-y-1">
+                            <h4 className="text-sm font-bold text-[#F0EFE8] flex items-center gap-2">
+                              {rule.label}
+                              {savingRuleId === rule.id && (
+                                <RefreshCw className="w-3 h-3 animate-spin text-[#D4AF37]" />
+                              )}
+                            </h4>
+                            <p className="text-[11px] text-[#A09E9A] leading-relaxed">{rule.description}</p>
+                          </div>
+                          
+                          <button
+                            onClick={() => handleToggleActive(rule)}
+                            className={`px-3 py-1 border text-[9px] font-black uppercase tracking-widest rounded-lg transition-colors cursor-pointer shrink-0 ${
+                              rule.active 
+                                ? 'bg-[#D4AF37]/15 border-[#D4AF37]/40 text-[#D4AF37] hover:bg-[#D4AF37]/35' 
+                                : 'bg-white/5 border-white/10 text-[#A09E9A] hover:bg-white/10 hover:text-white'
+                            }`}
+                          >
+                            {rule.active ? 'Active' : 'Inactive'}
+                          </button>
+                        </div>
 
-            <div className="space-y-3">
-              <AnimatePresence initial={false}>
-                {recommendedNotifications.map(n => (
-                  <motion.div
-                    key={n.id}
-                    layout
-                    initial={{ opacity: 0, scale: 0.96 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.96 }}
-                    transition={{ duration: 0.3 }}
-                    className="p-4 rounded-xl flex items-center justify-between gap-4 border transition-all duration-300 bg-white/[0.01] hover:bg-white/[0.03] border-white/5 hover:border-white/10"
-                  >
-                    <div className="space-y-1">
-                      <p className="text-xs font-bold text-[#F0EFE8]">{n.label}</p>
-                      <p className="text-[10px] text-[#A09E9A]/70 leading-relaxed">{n.description}</p>
+                        {rule.active && (
+                          <div className="mt-5 pt-4 border-t border-white/5 grid grid-cols-1 md:grid-cols-2 gap-4">
+                            
+                            {/* Notify Targets Block */}
+                            <div className="space-y-2">
+                              <label className="text-[9px] font-black uppercase tracking-wider text-[#A09E9A] block">Who Should Be Notified?</label>
+                              <div className="flex flex-wrap gap-1.5">
+                                {SYSTEM_ROLES.map(role => {
+                                  const isSelected = rule.targets.includes(role);
+                                  return (
+                                    <button
+                                      key={role}
+                                      onClick={() => handleToggleTarget(rule, role)}
+                                      className={`px-2.5 py-1 text-[9px] font-bold uppercase tracking-wider rounded-md border transition-all cursor-pointer ${
+                                        isSelected
+                                          ? 'bg-white/10 border-[#D4AF37]/50 text-[#D4AF37]'
+                                          : 'bg-black/20 border-white/5 text-[#A09E9A] hover:border-white/10'
+                                      }`}
+                                    >
+                                      {role}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+
+                            {/* Notify Frequency Block */}
+                            <div className="space-y-2">
+                              <label className="text-[9px] font-black uppercase tracking-wider text-[#A09E9A] block">When Should It Be Sent?</label>
+                              <div className="flex gap-2">
+                                <div className="relative flex-1">
+                                  <select
+                                    title="Frequency selector"
+                                    value={rule.when}
+                                    onChange={(e) => handleWhenChange(rule, e.target.value as any)}
+                                    className="w-full appearance-none bg-black/30 border border-white/10 hover:border-white/20 rounded-xl px-3 py-2 text-xs font-bold text-[#F0EFE8] outline-none cursor-pointer"
+                                  >
+                                    <option value="immediately" className="bg-[#1A1A28]">Immediately upon event</option>
+                                    <option value="daily" className="bg-[#1A1A28]">Daily Summary (10:00 AM)</option>
+                                    <option value="weekly" className="bg-[#1A1A28]">Weekly digest</option>
+                                  </select>
+                                  <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[#A09E9A]">
+                                    <Clock size={12} />
+                                  </div>
+                                </div>
+                                
+                                <button
+                                  onClick={() => handleSendTest(rule.id, rule.label)}
+                                  className="px-3 py-2 bg-white/5 border border-white/10 hover:border-[#D4AF37]/30 hover:bg-[#D4AF37]/5 text-white/70 hover:text-[#D4AF37] rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-1"
+                                >
+                                  <Send size={10} />
+                                  Test
+                                </button>
+                              </div>
+                            </div>
+
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </motion.div>
+            )}
+
+            {/* Users Tab */}
+            {activeTab === 'users' && (
+              <motion.div
+                key="users-tab"
+                initial={{ opacity: 0, y: 15 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -15 }}
+                transition={{ duration: 0.2 }}
+                className="space-y-4 animate-fade-in"
+              >
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#D4AF37] shadow-[0_0_8px_rgba(212,175,55,0.8)] animate-pulse"></span>
+                    <h3 className="font-black text-xs uppercase tracking-widest text-[#D4AF37]">User Device Ledger</h3>
+                  </div>
+
+                  {/* Search Bar */}
+                  <div className="relative w-full sm:w-64">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-[#A09E9A]">
+                      <Search size={12} />
                     </div>
-                    <button
-                      onClick={() => handleActivate(n.id)}
-                      disabled={isActionLoading === n.id}
-                      className="px-4 py-1.5 bg-[#FFB800] hover:bg-[#FFD700] text-black font-black uppercase tracking-wider text-[10px] rounded-lg transition-all cursor-pointer shadow-md disabled:opacity-50 shrink-0"
-                    >
-                      {isActionLoading === n.id ? '...' : 'Activate'}
-                    </button>
-                  </motion.div>
-                ))}
-              </AnimatePresence>
-
-              {recommendedNotifications.length === 0 && (
-                <div className="text-center py-8 text-[#A09E9A]/30 italic text-xs">
-                  All templates have been activated.
+                    <input
+                      type="text"
+                      placeholder="Search Poppo ID or Nickname..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full bg-[#0D0D14] border border-white/10 focus:border-[#D4AF37]/40 rounded-xl pl-8 pr-4 py-1.5 text-xs text-white outline-none transition-colors"
+                    />
+                  </div>
                 </div>
-              )}
-            </div>
-          </div>
+
+                {isUsersLoading && users.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-48 gap-3 border border-white/5 rounded-2xl bg-[#13131E]/40">
+                    <RefreshCw className="w-6 h-6 animate-spin text-[#D4AF37]" />
+                    <span className="text-[10px] font-bold text-[#A09E9A] uppercase tracking-wider">Loading Device Catalog...</span>
+                  </div>
+                ) : filteredUsers.length === 0 ? (
+                  <div className="text-center py-12 text-[#A09E9A]/30 italic text-xs border border-white/5 rounded-2xl bg-[#13131E]/40">
+                    No users matching the query found.
+                  </div>
+                ) : (
+                  <div className="overflow-hidden rounded-2xl border border-white/5 bg-[#13131E]/40 backdrop-blur-md">
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className="bg-white/[0.02] border-b border-white/5 text-[9px] font-black text-[#A09E9A] uppercase tracking-[0.2em]">
+                          <th className="px-4 py-3">Nickname</th>
+                          <th className="px-4 py-3">Poppo ID</th>
+                          <th className="px-4 py-3">System Role</th>
+                          <th className="px-4 py-3">Platforms</th>
+                          <th className="px-4 py-3 text-right">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-white/5 text-xs font-semibold">
+                        {filteredUsers.map(user => (
+                          <tr key={user.poppoId} className="hover:bg-white/[0.01] transition-colors border-b border-white/5 last:border-0">
+                            <td className="px-4 py-3.5 text-[#F0EFE8] font-bold">
+                              {user.nickname}
+                            </td>
+                            <td className="px-4 py-3.5 font-mono text-[#D4AF37] font-black text-sm">
+                              {user.poppoId}
+                            </td>
+                            <td className="px-4 py-3.5">
+                              <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded border capitalize ${
+                                user.role === 'director' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
+                                user.role === 'admin' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' :
+                                user.role === 'manager' ? 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20' :
+                                user.role === 'agent' ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20' :
+                                'bg-slate-500/10 text-slate-400 border-slate-500/20'
+                              }`}>
+                                {user.role}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3.5">
+                              <div className="flex gap-2">
+                                <span className={`flex items-center gap-1 text-[8px] font-black uppercase px-1.5 py-0.5 rounded border ${
+                                  user.hasWebPush 
+                                    ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' 
+                                    : 'bg-black/20 text-[#A09E9A]/40 border-white/5'
+                                }`}>
+                                  Web Push
+                                </span>
+                                <span className={`flex items-center gap-1 text-[8px] font-black uppercase px-1.5 py-0.5 rounded border ${
+                                  user.hasFcm 
+                                    ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' 
+                                    : 'bg-black/20 text-[#A09E9A]/40 border-white/5'
+                                }`}>
+                                  FCM (App)
+                                </span>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3.5 text-right">
+                              {user.hasAllowed ? (
+                                <span className="inline-flex items-center gap-1.5 text-emerald-400 text-[10px] font-black uppercase tracking-wider bg-emerald-500/10 px-2.5 py-1 rounded-lg border border-emerald-500/20">
+                                  <UserCheck size={10} />
+                                  Allowed
+                                </span>
+                              ) : user.notificationRequestedByDirector ? (
+                                <span className="inline-flex items-center gap-1.5 text-[#D4AF37] text-[10px] font-black uppercase tracking-wider bg-[#D4AF37]/10 px-2.5 py-1 rounded-lg border border-[#D4AF37]/20 animate-pulse">
+                                  <Clock size={10} />
+                                  Pending Check
+                                </span>
+                              ) : (
+                                <button
+                                  onClick={() => handleSendDeviceRequest(user.poppoId, user.nickname)}
+                                  disabled={requestingUserId === user.poppoId}
+                                  className="px-2.5 py-1.5 bg-[#D4AF37] hover:bg-[#bfa032] text-black font-black uppercase tracking-wider text-[10px] rounded-lg transition-colors cursor-pointer flex items-center justify-center gap-1.5 ml-auto shadow-sm"
+                                >
+                                  {requestingUserId === user.poppoId ? (
+                                    <RefreshCw size={10} className="animate-spin" />
+                                  ) : (
+                                    <Smartphone size={10} />
+                                  )}
+                                  Send Request
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </motion.div>
+            )}
+
+          </AnimatePresence>
         </div>
 
-        {/* Right: Web Push Connection Details & Logger */}
+        {/* Right Column: Web Push details for the admin browser & logs */}
         <div className="space-y-6">
-          {/* SECTION 3 — Web Push Status */}
-          <div className="glass-card p-5 relative overflow-hidden transition-all duration-500" style={{
-            background: 'linear-gradient(to bottom right, rgba(20, 10, 5, 0.4), rgba(40, 10, 15, 0.5))',
-            backdropFilter: 'blur(20px)',
-            borderTop: '1px solid rgba(250, 204, 21, 0.3)',
-            borderLeft: '1px solid rgba(250, 204, 21, 0.1)',
-            borderColor: 'rgba(234, 179, 8, 0.2)',
-            boxShadow: 'inset 0 1px 1px rgba(250, 204, 21, 0.2), 0 10px 30px rgba(0,0,0,0.5), 0 0 15px rgba(250, 204, 21, 0.05)'
-          }}>
-            <h4 className="font-black text-sm uppercase tracking-widest text-[#FFB800] drop-shadow-[0_0_8px_rgba(255,184,0,0.4)] mb-4">Web Push Status</h4>
+          
+          {/* Browser Web Push Status */}
+          <div className="glass-card p-5 relative overflow-hidden bg-gradient-to-br from-[#13131E] to-[#0A0B0E] border border-white/5 shadow-2xl">
+            <h4 className="font-black text-xs uppercase tracking-widest text-[#D4AF37] drop-shadow-[0_0_8px_rgba(212,175,55,0.4)] mb-4">My Browser Device</h4>
 
             <div className="space-y-4">
               {/* SW registration status */}
               <div className="flex items-center justify-between border-b border-white/5 pb-2.5">
-                <span className="text-[10px] font-bold text-[#A09E9A] uppercase tracking-wide">Service Worker</span>
+                <span className="text-[10px] font-bold text-[#A09E9A] uppercase tracking-wide">Worker Registration</span>
                 <div className="flex items-center gap-1.5">
                   {swStatus === 'registered' ? (
                     <>
-                      <Cpu size={12} className="text-emerald-400" />
-                      <span className="text-[10px] font-black text-emerald-400 uppercase">Registered</span>
+                      <Cpu size={10} className="text-emerald-400" />
+                      <span className="text-[10px] font-black text-emerald-400 uppercase">Installed</span>
                     </>
                   ) : swStatus === 'unsupported' ? (
                     <>
-                      <ShieldAlert size={12} className="text-red-400" />
+                      <ShieldAlert size={10} className="text-red-400" />
                       <span className="text-[10px] font-black text-red-400 uppercase">Unsupported</span>
                     </>
                   ) : (
                     <>
-                      <Shield size={12} className="text-yellow-400" />
-                      <span className="text-[10px] font-black text-yellow-400 uppercase">Unregistered</span>
+                      <Shield size={10} className="text-yellow-400" />
+                      <span className="text-[10px] font-black text-yellow-400 uppercase">Missing</span>
                     </>
                   )}
                 </div>
@@ -432,27 +702,27 @@ export const NotificationControlCenter = () => {
 
               {/* Push subscription status */}
               <div className="flex items-center justify-between border-b border-white/5 pb-2.5">
-                <span className="text-[10px] font-bold text-[#A09E9A] uppercase tracking-wide">Subscription</span>
+                <span className="text-[10px] font-bold text-[#A09E9A] uppercase tracking-wide">Client Subscription</span>
                 <div className="flex items-center gap-1.5">
                   {pushStatus === 'subscribed' ? (
                     <>
-                      <Wifi size={12} className="text-emerald-400 animate-pulse" />
+                      <Wifi size={10} className="text-emerald-400 animate-pulse" />
                       <span className="text-[10px] font-black text-emerald-400 uppercase">Subscribed</span>
                     </>
                   ) : pushStatus === 'blocked' ? (
                     <>
-                      <BellOff size={12} className="text-red-400" />
+                      <BellOff size={10} className="text-red-400" />
                       <span className="text-[10px] font-black text-red-400 uppercase">Blocked</span>
                     </>
                   ) : pushStatus === 'loading' ? (
                     <>
-                      <RefreshCw size={12} className="text-yellow-400 animate-spin" />
+                      <RefreshCw size={10} className="text-yellow-400 animate-spin" />
                       <span className="text-[10px] font-black text-yellow-400 uppercase">Loading</span>
                     </>
                   ) : (
                     <>
-                      <Radio size={12} className="text-yellow-400" />
-                      <span className="text-[10px] font-black text-yellow-400 uppercase">Not Subscribed</span>
+                      <Radio size={10} className="text-yellow-400" />
+                      <span className="text-[10px] font-black text-yellow-400 uppercase">Offline</span>
                     </>
                   )}
                 </div>
@@ -463,19 +733,19 @@ export const NotificationControlCenter = () => {
                 {pushStatus === 'subscribed' ? (
                   <button
                     onClick={reRegisterPush}
-                    className="w-full py-2 bg-gradient-to-br from-[#FFB800]/10 to-transparent hover:from-[#FFB800]/20 hover:to-transparent border border-[#FFB800]/30 hover:border-[#FFB800]/60 rounded-xl text-xs font-black uppercase text-[#FFB700] transition-all cursor-pointer select-none text-center shadow-[inset_0_0_10px_rgba(255,184,0,0.1)] flex items-center justify-center gap-2"
+                    className="w-full py-2 bg-[#D4AF37]/10 hover:bg-[#D4AF37]/20 border border-[#D4AF37]/30 hover:border-[#D4AF37]/50 rounded-xl text-xs font-black uppercase text-[#D4AF37] transition-all cursor-pointer text-center flex items-center justify-center gap-2"
                   >
                     <RefreshCw size={12} />
-                    Re-register Web Push
+                    Re-register Browser Push
                   </button>
                 ) : (
                   <button
                     onClick={subscribePush}
                     disabled={swStatus === 'unsupported'}
-                    className="w-full py-2 bg-[#FFB800] hover:bg-[#FFD700] text-black font-black uppercase tracking-wider text-xs rounded-xl transition-all cursor-pointer shadow-md flex items-center justify-center gap-2 disabled:opacity-50"
+                    className="w-full py-2 bg-[#D4AF37] hover:bg-[#bfa032] text-black font-black uppercase tracking-wider text-xs rounded-xl transition-all cursor-pointer shadow-md flex items-center justify-center gap-2 disabled:opacity-50"
                   >
                     <CheckCircle size={14} />
-                    Enable Web Push
+                    Enable Web Push Alerting
                   </button>
                 )}
               </div>
@@ -483,19 +753,12 @@ export const NotificationControlCenter = () => {
           </div>
 
           {/* Last Received Notification */}
-          <div className="glass-card p-5 relative overflow-hidden transition-all duration-500" style={{
-            background: 'linear-gradient(to bottom right, rgba(20, 10, 5, 0.4), rgba(40, 10, 15, 0.5))',
-            backdropFilter: 'blur(20px)',
-            borderTop: '1px solid rgba(250, 204, 21, 0.3)',
-            borderLeft: '1px solid rgba(250, 204, 21, 0.1)',
-            borderColor: 'rgba(234, 179, 8, 0.2)',
-            boxShadow: 'inset 0 1px 1px rgba(250, 204, 21, 0.2), 0 10px 30px rgba(0,0,0,0.5), 0 0 15px rgba(250, 204, 21, 0.05)'
-          }}>
-            <h4 className="font-black text-sm uppercase tracking-widest text-[#FFB800] drop-shadow-[0_0_8px_rgba(255,184,0,0.4)] mb-4">Last Push Received</h4>
+          <div className="glass-card p-5 relative overflow-hidden bg-gradient-to-br from-[#13131E] to-[#0A0B0E] border border-white/5 shadow-2xl">
+            <h4 className="font-black text-xs uppercase tracking-widest text-[#D4AF37] drop-shadow-[0_0_8px_rgba(212,175,55,0.4)] mb-4">Last Client Push</h4>
             {lastNotification ? (
               <div className="bg-black/20 border border-white/5 rounded-xl p-4 space-y-2 text-left">
                 <div className="flex items-center gap-2">
-                  <MessageSquare size={14} className="text-[#FFB800]" />
+                  <MessageSquare size={12} className="text-[#D4AF37]" />
                   <p className="text-xs font-black text-[#F0EFE8]">{lastNotification.title}</p>
                 </div>
                 <p className="text-[10px] text-[#A09E9A] leading-relaxed pl-6">{lastNotification.body}</p>
@@ -504,25 +767,18 @@ export const NotificationControlCenter = () => {
                     href={lastNotification.url}
                     className="inline-block text-[9px] font-black uppercase tracking-wider text-cyan-400 hover:underline pl-6"
                   >
-                    Destination Link &rarr;
+                    View Destination Link &rarr;
                   </a>
                 )}
               </div>
             ) : (
-              <p className="text-center py-6 text-[#A09E9A]/30 italic text-xs">No notifications received in this session.</p>
+              <p className="text-center py-6 text-[#A09E9A]/30 italic text-xs">No alerts received this session.</p>
             )}
           </div>
 
-          {/* Activity Logs */}
-          <div className="glass-card p-5 relative overflow-hidden transition-all duration-500" style={{
-            background: 'linear-gradient(to bottom right, rgba(20, 10, 5, 0.4), rgba(40, 10, 15, 0.5))',
-            backdropFilter: 'blur(20px)',
-            borderTop: '1px solid rgba(250, 204, 21, 0.3)',
-            borderLeft: '1px solid rgba(250, 204, 21, 0.1)',
-            borderColor: 'rgba(234, 179, 8, 0.2)',
-            boxShadow: 'inset 0 1px 1px rgba(250, 204, 21, 0.2), 0 10px 30px rgba(0,0,0,0.5), 0 0 15px rgba(250, 204, 21, 0.05)'
-          }}>
-            <h4 className="font-black text-sm uppercase tracking-widest text-[#A09E9A]/60 mb-3">Push Logger</h4>
+          {/* Console Activity Logs */}
+          <div className="glass-card p-5 relative overflow-hidden bg-gradient-to-br from-[#13131E] to-[#0A0B0E] border border-white/5 shadow-2xl">
+            <h4 className="font-black text-xs uppercase tracking-widest text-[#A09E9A]/60 mb-3">Push Logger</h4>
             <div className="h-40 overflow-y-auto pr-1 space-y-1.5 font-mono text-[8px] text-[#A09E9A]/80 custom-scrollbar">
               {logMessages.map((log, i) => (
                 <div key={i} className="py-1 border-b border-white/5 truncate">
@@ -534,6 +790,7 @@ export const NotificationControlCenter = () => {
               )}
             </div>
           </div>
+
         </div>
       </div>
     </div>

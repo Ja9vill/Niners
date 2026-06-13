@@ -180,7 +180,7 @@ export const RosterManagementTab: React.FC<RosterManagementTabProps> = ({ hosts,
       const hostId = String(h.poppo_id || h.poppoId || h.id || '');
       const hostName = String(h.nickname || h.name || '');
       const matchesSearch = (hostName.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                             hostId.includes(searchTerm));
+                             hostId.toLowerCase().includes(searchTerm.toLowerCase()));
       
       const matchesRole = roleFilter === 'All' || (h.role || '').toLowerCase() === roleFilter.toLowerCase();
 

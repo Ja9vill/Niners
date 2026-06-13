@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Bell, X } from 'lucide-react';
 import { requestNotificationPermission, messaging } from '../lib/firebase';
 import { db, auth } from '../lib/firebase';
-import { doc, updateDoc, arrayUnion } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, arrayUnion } from 'firebase/firestore';
 import { Storage } from '../lib/storage';
 
 export const NotificationPrompt: React.FC = () => {
@@ -15,18 +15,36 @@ export const NotificationPrompt: React.FC = () => {
       const hasDismissed = localStorage.getItem('dismissed_fcm_prompt');
       if (!hasDismissed) {
         setShowPrompt(true);
+      } else if (authState.poppo_id) {
+        // If dismissed, check if director explicitly requested device enrollment
+        const checkDirectorRequest = async () => {
+          try {
+            const userRef = doc(db, 'users', authState.poppo_id);
+            const userSnap = await getDoc(userRef);
+            if (userSnap.exists()) {
+              const userData = userSnap.data();
+              if (userData?.notificationRequestedByDirector === true) {
+                setShowPrompt(true);
+              }
+            }
+          } catch (err) {
+            console.error('Failed to query director notification request:', err);
+          }
+        };
+        checkDirectorRequest();
       }
     }
-  }, [authState.level]);
+  }, [authState.level, authState.poppo_id]);
 
   const handleEnable = async () => {
     try {
       const token = await requestNotificationPermission();
       if (token && authState.poppo_id) {
-        // Save to users collection
+        // Save to users collection and clear director request flag
         const userRef = doc(db, 'users', authState.poppo_id);
         await updateDoc(userRef, {
-          fcmTokens: arrayUnion(token)
+          fcmTokens: arrayUnion(token),
+          notificationRequestedByDirector: false
         });
       }
     } catch (err) {
@@ -37,9 +55,19 @@ export const NotificationPrompt: React.FC = () => {
     }
   };
 
-  const handleDismiss = () => {
+  const handleDismiss = async () => {
     setShowPrompt(false);
     localStorage.setItem('dismissed_fcm_prompt', 'true');
+    if (authState.poppo_id) {
+      try {
+        const userRef = doc(db, 'users', authState.poppo_id);
+        await updateDoc(userRef, {
+          notificationRequestedByDirector: false
+        });
+      } catch (err) {
+        console.error('Failed to clear request flag on dismiss:', err);
+      }
+    }
   };
 
   if (!showPrompt) return null;

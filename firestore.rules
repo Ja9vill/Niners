@@ -46,6 +46,13 @@ service cloud.firestore {
       return isLeadership() || isAdmin() || isManager() || isAgent();
     }
 
+    // 0. staging_queue Collection Rules
+    match /staging_queue/{queueId} {
+      allow read: if isStaff();
+      allow create: if isSignedIn();
+      allow update, delete: if isLeadership();
+    }
+
     // 1. users and Role-Based Collections Rules
     match /users/{userId} {
       allow read: if true;
@@ -99,6 +106,10 @@ service cloud.firestore {
 
     // 2. performance_reports Collection Rules
     match /performance_reports/{reportId} {
+      allow read: if isSignedIn();
+      allow write: if isLeadership() || isAdmin();
+    }
+    match /performance_weekly_reports/{reportId} {
       allow read: if isSignedIn();
       allow write: if isLeadership() || isAdmin();
     }
@@ -247,6 +258,12 @@ service cloud.firestore {
     }
     match /agent_financials_weekly/{docId} {
       allow read, write: if isStaff();
+    }
+
+    // 14. Stream Notifications
+    match /stream_notifications/{streamId} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn();
     }
 
     // Default Deny: block all other access by default

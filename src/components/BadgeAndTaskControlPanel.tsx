@@ -7,6 +7,70 @@ import { Host, AwardBadge, AwardAssignment } from '../types';
 import { db } from '../lib/firebase';
 import { doc, deleteDoc, writeBatch } from 'firebase/firestore';
 
+const PRESET_SOLIDS = [
+  { name: 'Gold', value: 'Gold', color: '#D4AF37' },
+  { name: 'Purple', value: 'Purple', color: '#A855F7' },
+  { name: 'Emerald', value: 'Emerald', color: '#10B981' },
+  { name: 'Blue', value: 'Blue', color: '#3B82F6' },
+  { name: 'Red', value: 'Red', color: '#EF4444' },
+  { name: 'Orange', value: 'Orange', color: '#F97316' },
+];
+
+const PRESET_GRADIENTS = [
+  { name: 'Sunset', value: 'linear-gradient(135deg, #FF512F 0%, #DD2476 100%)' },
+  { name: 'Ocean', value: 'linear-gradient(135deg, #2193b0 0%, #6dd5ed 100%)' },
+  { name: 'Neon', value: 'linear-gradient(135deg, #00F2FE 0%, #4FACFE 100%)' },
+  { name: 'Midnight', value: 'linear-gradient(135deg, #3A1C71 0%, #D76D77 50%, #FFAF7B 100%)' },
+  { name: 'Royal', value: 'linear-gradient(135deg, #7F00FF 0%, #E100FF 100%)' },
+];
+
+const getBadgePreviewStyle = (colorStr: string, isSelected: boolean) => {
+  if (isSelected) {
+    return {
+      className: "border-white/10 bg-[#0A0806] text-[#A09E9A] shadow-none",
+      style: {}
+    };
+  }
+
+  const isGradient = colorStr?.includes('gradient');
+  const isHex = colorStr?.startsWith('#');
+
+  if (!isGradient && !isHex) {
+    let classes = "border-[#FFB800] text-[#FFB800] shadow-[0_0_20px_rgba(255,184,0,0.3)] bg-black hover:bg-[#1A140A]";
+    if (colorStr === 'Purple') {
+      classes = "border-purple-500 text-purple-400 shadow-[0_0_20px_rgba(168,85,247,0.3)] bg-black hover:bg-purple-950/20";
+    } else if (colorStr === 'Emerald') {
+      classes = "border-emerald-500 text-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.3)] bg-black hover:bg-emerald-950/20";
+    } else if (colorStr === 'Blue') {
+      classes = "border-blue-500 text-blue-400 shadow-[0_0_20px_rgba(59,130,246,0.3)] bg-black hover:bg-blue-950/20";
+    } else if (colorStr === 'Red') {
+      classes = "border-red-500 text-red-400 shadow-[0_0_20px_rgba(239,68,68,0.3)] bg-black hover:bg-red-950/20";
+    } else if (colorStr === 'Orange') {
+      classes = "border-orange-500 text-orange-400 shadow-[0_0_20px_rgba(249,115,22,0.3)] bg-black hover:bg-orange-950/20";
+    }
+    return { className: classes, style: {} };
+  }
+
+  if (isGradient) {
+    return {
+      className: "border-transparent text-white shadow-[0_0_20px_rgba(255,255,255,0.2)] bg-black hover:opacity-90",
+      style: {
+        background: colorStr,
+        borderColor: 'transparent',
+      }
+    };
+  } else {
+    return {
+      className: "text-white bg-black hover:opacity-90",
+      style: {
+        borderColor: colorStr,
+        color: colorStr,
+        boxShadow: `0 0 20px ${colorStr}4D`,
+      }
+    };
+  }
+};
+
 export const BadgeAndTaskControlPanel = () => {
   const [primaryTab, setPrimaryTab] = useState<'badges' | 'tasks'>('badges');
   const [subTab, setSubTab] = useState<'create' | 'unassigned' | 'assigned'>('create');
@@ -21,10 +85,30 @@ export const BadgeAndTaskControlPanel = () => {
   // Form State - CREATE
   const [badgeName, setBadgeName] = useState('');
   const [badgeColor, setBadgeColor] = useState('Gold');
+  const [customSolidColor, setCustomSolidColor] = useState('#6366F1');
+  const [gradientColorCount, setGradientColorCount] = useState<2 | 3>(2);
+  const [gradColor1, setGradColor1] = useState('#FF512F');
+  const [gradColor2, setGradColor2] = useState('#DD2476');
+  const [gradColor3, setGradColor3] = useState('#FFAF7B');
+  const [colorSelectionType, setColorSelectionType] = useState<'solid' | 'preset-gradient' | 'custom-solid' | 'custom-gradient'>('solid');
+
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [bulkMonth, setBulkMonth] = useState('');
   const [bulkYear, setBulkYear] = useState('');
+
+  // React to custom color input changes
+  useEffect(() => {
+    if (colorSelectionType === 'custom-solid') {
+      setBadgeColor(customSolidColor);
+    } else if (colorSelectionType === 'custom-gradient') {
+      if (gradientColorCount === 2) {
+        setBadgeColor(`linear-gradient(135deg, ${gradColor1} 0%, ${gradColor2} 100%)`);
+      } else {
+        setBadgeColor(`linear-gradient(135deg, ${gradColor1} 0%, ${gradColor2} 50%, ${gradColor3} 100%)`);
+      }
+    }
+  }, [colorSelectionType, customSolidColor, gradientColorCount, gradColor1, gradColor2, gradColor3]);
 
   // Form State - ASSIGN (Modal)
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
@@ -377,28 +461,210 @@ export const BadgeAndTaskControlPanel = () => {
                     />
                   </div>
 
-                  <div className="space-y-1.5">
-                    <label className="text-[9px] font-black uppercase text-[#A09E9A]/60 tracking-wider">Badge Color</label>
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <Trophy size={16} className={cn(
-                          badgeColor === 'Gold' ? "text-[#D4AF37]" : badgeColor === 'Orange' ? "text-orange-400" : "text-red-500"
-                        )} />
-                      </div>
-                      <select 
-                        title="Badge Color"
-                        value={badgeColor}
-                        onChange={(e) => setBadgeColor(e.target.value)}
-                        className="w-full bg-transparent border border-white/10 rounded-xl pl-10 pr-10 py-3 text-sm text-[#F0EFE8] appearance-none focus:border-[#D4AF37] focus:outline-none focus:ring-1 focus:ring-[#D4AF37]/30 transition-colors cursor-pointer"
-                      >
-                        <option value="Gold" className="bg-[#0D0D14]">Gold</option>
-                        <option value="Orange" className="bg-[#0D0D14]">Orange</option>
-                        <option value="Red" className="bg-[#0D0D14]">Red</option>
-                      </select>
-                      <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                        <ChevronDown size={14} className="text-[#A09E9A]/50" />
-                      </div>
+                  <div className="space-y-3">
+                    <label className="text-[9px] font-black uppercase text-[#A09E9A]/60 tracking-wider block">Badge Color Selection</label>
+                    
+                    {/* Color Type Selector Tabs */}
+                    <div className="flex bg-black/40 p-1 rounded-xl border border-white/5 mb-3">
+                      {(['solid', 'preset-gradient', 'custom-solid', 'custom-gradient'] as const).map((type) => (
+                        <button
+                          key={type}
+                          type="button"
+                          onClick={() => {
+                            setColorSelectionType(type);
+                            if (type === 'solid') setBadgeColor('Gold');
+                            else if (type === 'preset-gradient') setBadgeColor(PRESET_GRADIENTS[0].value);
+                          }}
+                          className={cn(
+                            "flex-1 py-1.5 text-[8px] sm:text-[9px] font-black uppercase tracking-wider rounded-lg transition-all cursor-pointer text-center",
+                            colorSelectionType === type 
+                              ? "bg-[#D4AF37]/10 text-[#D4AF37] border border-[#D4AF37]/30" 
+                              : "text-[#A09E9A]/50 hover:text-white"
+                          )}
+                        >
+                          {type === 'solid' ? 'Solid' : type === 'preset-gradient' ? 'Gradients' : type === 'custom-solid' ? 'Custom Hex' : 'Custom Gradient'}
+                        </button>
+                      ))}
                     </div>
+
+                    {/* Solids Presets */}
+                    {colorSelectionType === 'solid' && (
+                      <div className="space-y-1">
+                        <span className="text-[8px] font-bold uppercase text-[#A09E9A]/40 tracking-wider block">Select Preset Solid</span>
+                        <div className="flex flex-wrap gap-2 pt-0.5 animate-in fade-in duration-200">
+                          {PRESET_SOLIDS.map(solid => {
+                            const isSelected = badgeColor === solid.value;
+                            return (
+                              <button
+                                key={solid.name}
+                                type="button"
+                                onClick={() => setBadgeColor(solid.value)}
+                                className={cn(
+                                  "w-7 h-7 rounded-full border transition-all relative flex items-center justify-center cursor-pointer hover:scale-110",
+                                  isSelected ? "border-white scale-105 shadow-[0_0_8px_rgba(255,255,255,0.4)]" : "border-white/10"
+                                )}
+                                style={{ backgroundColor: solid.color }}
+                                title={solid.name}
+                              >
+                                {isSelected && <Check size={12} className="text-white drop-shadow-md" />}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Gradient Presets */}
+                    {colorSelectionType === 'preset-gradient' && (
+                      <div className="space-y-1">
+                        <span className="text-[8px] font-bold uppercase text-[#A09E9A]/40 tracking-wider block">Select Preset Gradient</span>
+                        <div className="flex flex-wrap gap-2 pt-0.5 animate-in fade-in duration-200">
+                          {PRESET_GRADIENTS.map(gradient => {
+                            const isSelected = badgeColor === gradient.value;
+                            return (
+                              <button
+                                key={gradient.name}
+                                type="button"
+                                onClick={() => setBadgeColor(gradient.value)}
+                                className={cn(
+                                  "h-7 px-2.5 rounded-lg border text-[8px] font-bold uppercase tracking-wider transition-all relative flex items-center justify-center cursor-pointer hover:scale-105",
+                                  isSelected ? "border-white text-white shadow-[0_0_8px_rgba(255,255,255,0.4)] font-black" : "border-white/10 text-white/70"
+                                )}
+                                style={{ background: gradient.value }}
+                                title={gradient.name}
+                              >
+                                <span className="drop-shadow-sm">{gradient.name}</span>
+                                {isSelected && <Check size={8} className="ml-1 text-white drop-shadow-md" />}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Custom Solid Picker */}
+                    {colorSelectionType === 'custom-solid' && (
+                      <div className="space-y-1 animate-in fade-in duration-200">
+                        <span className="text-[8px] font-bold uppercase text-[#A09E9A]/40 tracking-wider block">Custom Solid Color Block</span>
+                        <div className="flex items-center gap-3 bg-black/20 p-2 rounded-xl border border-white/5 w-fit">
+                          <div className="relative w-7 h-7 rounded-lg overflow-hidden border border-white/20 hover:scale-105 transition-transform">
+                            <input 
+                              type="color" 
+                              value={customSolidColor} 
+                              onChange={(e) => setCustomSolidColor(e.target.value)}
+                              className="absolute inset-0 w-full h-full p-0 border-0 cursor-pointer scale-150"
+                              title="Choose color"
+                            />
+                          </div>
+                          <div className="flex flex-col gap-0.5">
+                            <input 
+                              type="text" 
+                              value={customSolidColor}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                if (val.startsWith('#') || val === '') {
+                                  setCustomSolidColor(val || '#6366F1');
+                                } else {
+                                  setCustomSolidColor('#' + val);
+                                }
+                              }}
+                              placeholder="#HEX Code"
+                              className="bg-transparent border-0 border-b border-white/10 text-xs font-mono py-0.5 w-24 text-[#F0EFE8] focus:border-[#D4AF37] focus:outline-none placeholder:text-[#A09E9A]/30"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {colorSelectionType === 'custom-gradient' && (
+                      <div className="space-y-3 animate-in fade-in duration-200">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[8px] font-bold uppercase text-[#A09E9A]/40 tracking-wider block">Custom Gradient Designer</span>
+                          
+                          {/* Segmented control for 2 vs 3 colors */}
+                          <div className="flex gap-1 bg-[#0D0D14] p-0.5 rounded-lg border border-white/5">
+                            {([2, 3] as const).map(num => (
+                              <button
+                                key={num}
+                                type="button"
+                                onClick={() => setGradientColorCount(num)}
+                                className={cn("px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider transition-all cursor-pointer",
+                                  gradientColorCount === num ? "bg-indigo-600 text-white shadow-sm font-extrabold" : "text-[#A09E9A] hover:text-[#F0EFE8]")}
+                              >
+                                {num} Colors
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Color Picker Blocks */}
+                        <div className="flex flex-wrap gap-4 items-center bg-black/20 p-2.5 rounded-xl border border-white/5">
+                          {/* Color 1 */}
+                          <div className="flex items-center gap-2">
+                            <div className="relative w-6 h-6 rounded-lg overflow-hidden border border-white/20 hover:scale-105 transition-transform">
+                              <input 
+                                type="color" 
+                                value={gradColor1} 
+                                onChange={(e) => setGradColor1(e.target.value)}
+                                className="absolute inset-0 w-full h-full p-0 border-0 cursor-pointer scale-150"
+                                title="Color 1"
+                              />
+                            </div>
+                            <input 
+                              type="text" 
+                              value={gradColor1}
+                              onChange={(e) => setGradColor1(e.target.value)}
+                              className="bg-transparent border-0 border-b border-white/10 text-[10px] font-mono w-14 text-white focus:outline-none"
+                            />
+                          </div>
+
+                          {/* Color 2 */}
+                          <div className="flex items-center gap-2">
+                            <div className="relative w-6 h-6 rounded-lg overflow-hidden border border-white/20 hover:scale-105 transition-transform">
+                              <input 
+                                type="color" 
+                                value={gradColor2} 
+                                onChange={(e) => setGradColor2(e.target.value)}
+                                className="absolute inset-0 w-full h-full p-0 border-0 cursor-pointer scale-150"
+                                title="Color 2"
+                              />
+                            </div>
+                            <input 
+                              type="text" 
+                              value={gradColor2}
+                              onChange={(e) => setGradColor2(e.target.value)}
+                              className="bg-transparent border-0 border-b border-white/10 text-[10px] font-mono w-14 text-white focus:outline-none"
+                            />
+                          </div>
+
+                          {/* Color 3 */}
+                          {gradientColorCount === 3 && (
+                            <div className="flex items-center gap-2 animate-in fade-in duration-200">
+                              <div className="relative w-6 h-6 rounded-lg overflow-hidden border border-white/20 hover:scale-105 transition-transform">
+                                <input 
+                                  type="color" 
+                                  value={gradColor3} 
+                                  onChange={(e) => setGradColor3(e.target.value)}
+                                  className="absolute inset-0 w-full h-full p-0 border-0 cursor-pointer scale-150"
+                                  title="Color 3"
+                                />
+                              </div>
+                              <input 
+                                type="text" 
+                                value={gradColor3}
+                                onChange={(e) => setGradColor3(e.target.value)}
+                                className="bg-transparent border-0 border-b border-white/10 text-[10px] font-mono w-14 text-white focus:outline-none"
+                              />
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Live Gradient Preview Bar */}
+                        <div className="h-6 rounded-lg border border-white/10 flex items-center justify-center text-[8px] font-black uppercase tracking-widest text-white shadow-inner" style={{ background: badgeColor }}>
+                          <span className="drop-shadow-md">Gradient Preview</span>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   <div className="space-y-1.5">
@@ -494,6 +760,7 @@ export const BadgeAndTaskControlPanel = () => {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 p-4 bg-[#0A0806] rounded-2xl border border-[#1A140A]">
                   {unassignedBadges.map((badge) => {
                     const isSelected = selectedUnassignedIds.includes(badge.id);
+                    const previewStyle = getBadgePreviewStyle(badge.color, isSelected);
                     return (
                       <button
                         key={badge.id}
@@ -508,10 +775,9 @@ export const BadgeAndTaskControlPanel = () => {
                         }}
                         className={cn(
                           "px-4 py-3 sm:py-4 rounded-[1.5rem] border text-[10px] sm:text-xs font-bold uppercase tracking-wider transition-all text-center flex items-center justify-center",
-                          isSelected 
-                            ? "border-white/10 bg-[#0A0806] text-[#A09E9A] shadow-none"
-                            : "border-[#FFB800] text-[#FFB800] shadow-[0_0_20px_rgba(255,184,0,0.3)] bg-black hover:bg-[#1A140A]"
+                          previewStyle.className
                         )}
+                        style={previewStyle.style}
                       >
                         <span className="drop-shadow-md truncate">{badge.name}</span>
                       </button>
@@ -559,6 +825,7 @@ export const BadgeAndTaskControlPanel = () => {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 p-4 bg-[#0A0806] rounded-2xl border border-[#1A140A]">
                   {assignedBadges.map(assignment => {
                     const isSelected = selectedUnassignedIds.includes(assignment.id);
+                    const previewStyle = getBadgePreviewStyle(assignment.awardColor, isSelected);
                     return (
                       <button
                         key={assignment.id}
@@ -570,10 +837,9 @@ export const BadgeAndTaskControlPanel = () => {
                         }}
                         className={cn(
                           "px-4 py-3 sm:py-4 rounded-[1.5rem] border text-[10px] sm:text-xs font-bold uppercase tracking-wider transition-all text-center flex items-center justify-center",
-                          isSelected 
-                            ? "border-white/10 bg-[#0A0806] text-[#A09E9A] shadow-none"
-                            : "border-[#FFB800] text-[#FFB800] shadow-[0_0_20px_rgba(255,184,0,0.3)] bg-black hover:bg-[#1A140A]"
+                          previewStyle.className
                         )}
+                        style={previewStyle.style}
                       >
                         <span className="drop-shadow-md truncate">{assignment.awardName}</span>
                       </button>

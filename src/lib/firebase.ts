@@ -52,19 +52,18 @@ if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
 export const messaging = messagingInstance;
 
 export async function requestNotificationPermission() {
-  if (!messaging) return null;
-  try {
-    const permission = await Notification.requestPermission();
-    if (permission === 'granted') {
-      const token = await getToken(messaging, { 
-        vapidKey: import.meta.env.VITE_FIREBASE_VAPID_KEY || 'BEl62iUYgUivxIkv69yViEuiBIa-Ib9-uU8fF_nO7F_N_f_HhQ0Ue_I0I-_H_I_0' 
-      });
-      return token;
-    }
-  } catch (err) {
-    console.error('Failed to get push token', err);
+  if (!messaging) {
+    throw new Error("Firebase Messaging is not supported or initialized on this device/browser.");
   }
-  return null;
+  const permission = await Notification.requestPermission();
+  if (permission === 'granted') {
+    const token = await getToken(messaging, { 
+      vapidKey: import.meta.env.VITE_FIREBASE_VAPID_KEY || 'BCjsTkey1qLDopcwonZYEUMd0h1NnfAe9bM8CifsZHwuSPjY42l2y6cwqJqKJ2jzYoH6D1r8xfBMdISV8mLR2As' 
+    });
+    return token;
+  } else {
+    throw new Error("Notification permission was denied by the user.");
+  }
 }
 
 export async function signInWithGoogle() {
