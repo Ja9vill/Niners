@@ -1,7 +1,7 @@
 /* eslint-disable */
 /* eslint-disable */
 import React, { useState, useEffect, useMemo } from 'react';
-import { X, Calendar, ChevronLeft, Edit2, Loader2, Save, Instagram, Twitter, Facebook, TrendingUp, TrendingDown, Minus, ArrowUpDown, Award, MessageSquare, Star, Users, Send, ClipboardList, Trash2, Clock, Plus, CheckCircle2, AlertCircle, Briefcase, ListTodo, Activity } from 'lucide-react';
+import { X, Calendar, ChevronLeft, Edit2, Loader2, Save, Instagram, Twitter, Facebook, TrendingUp, TrendingDown, Minus, ArrowUpDown, Award, MessageSquare, Star, Users, Send, ClipboardList, Trash2, Clock, Plus, CheckCircle2, AlertCircle, Briefcase, ListTodo, Activity, Search } from 'lucide-react';
 import { Host, CommissionEntry, CalendarEvent, Task, AwardBadge, AwardAssignment } from '../types';
 import { FirebaseService, generateSubmissionId } from '../lib/firebaseService';
 import { Storage } from '../lib/storage';
@@ -857,6 +857,23 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
   const [selectedImpersonationUser, setSelectedImpersonationUser] = useState<any | null>(null);
   const [isImpersonateDropdownOpen, setIsImpersonateDropdownOpen] = useState(false);
 
+  // --- ROSTER MANAGEMENT PANEL STATES ---
+  const [rosterSearchQuery, setRosterSearchQuery] = useState('');
+  const [rosterSearchResults, setRosterSearchResults] = useState<any[]>([]);
+  const [isSearchingRoster, setIsSearchingRoster] = useState(false);
+  const [selectedRosterUser, setSelectedRosterUser] = useState<any | null>(null);
+  const [isRosterLoading, setIsRosterLoading] = useState(false);
+  const [rosterEditableFields, setRosterEditableFields] = useState<any>({});
+  const [rosterHostSearchQuery, setRosterHostSearchQuery] = useState('');
+  const [rosterHostSearchResults, setRosterHostSearchResults] = useState<any[]>([]);
+  const [isSavingRoster, setIsSavingRoster] = useState(false);
+  const [isResettingLogin, setIsResettingLogin] = useState(false);
+  const [isRosterPushModalOpen, setIsRosterPushModalOpen] = useState(false);
+  const [rosterPushTitle, setRosterPushTitle] = useState('');
+  const [rosterPushBody, setRosterPushBody] = useState('');
+  const [rosterPushUrl, setRosterPushUrl] = useState('');
+  const [isSendingRosterPush, setIsSendingRosterPush] = useState(false);
+
   // Admin Fanbase Report Form States
   const [fanReportHostId, setFanReportHostId] = useState('');
   const [currentFollowers, setCurrentFollowers] = useState('');
@@ -940,6 +957,8 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
     
     if (
       userRoleLower === 'director' || 
+      userRoleLower === 'head admin' ||
+      userRoleLower === 'head_admin' ||
       userRoleLower === 'admin' ||
       profileRoleLower === 'head admin' ||
       profileRoleLower === 'head_admin' ||
@@ -1047,6 +1066,808 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
       setTodoList([]);
     }
   }, [rootAuth?.role, rootAuth?.poppo_id, rootAuth?.poppoId, rootAuth?.id]);
+
+  // --- ROSTER MANAGEMENT PANEL HELPERS & MEMOS ---
+  const rosterManagerAgentList = useMemo(() => {
+    return allUsers.filter(u => {
+      const r = String(u.role || '').toLowerCase();
+      return r === 'manager' || r === 'agent';
+    });
+  }, [allUsers]);
+
+  const selectedRosterUserAssignedHosts = useMemo(() => {
+    if (!selectedRosterUser) return [];
+    const targetId = String(selectedRosterUser.poppo_id || selectedRosterUser.id || '');
+    const targetRole = String(selectedRosterUser.role || '').toLowerCase();
+    const targetAnchor = String(selectedRosterUser.teamAnchor || selectedRosterUser.team || selectedRosterUser.team_anchor || '').trim().toLowerCase();
+    
+    // 1. Hosts assigned to this manager/agent
+    const directlyAssignedHosts = allUsers.filter(u => {
+      const uRole = String(u.role || '').toLowerCase();
+      const isHost = uRole === 'host' || uRole === 'talent';
+      const mgrId = String(u.assignedManagerId || u.assigned_manager_poppo_id || '').trim();
+      return isHost && mgrId === targetId;
+    });
+
+    // 2. Special rule: If agent, find any Admin with matching Team Anchor
+    const automaticallyAssignedAdmins = (targetRole === 'agent' && targetAnchor) ? allUsers.filter(u => {
+      const uRole = String(u.role || '').toLowerCase();
+      const isAdmin = uRole === 'admin';
+      const uAnchor = String(u.teamAnchor || u.team || u.team_anchor || '').trim().toLowerCase();
+      return isAdmin && uAnchor === targetAnchor;
+    }) : [];
+
+    // Combine them (make sure unique)
+    const combined = [...directlyAssignedHosts];
+    automaticallyAssignedAdmins.forEach(admin => {
+      const adminId = String(admin.poppo_id || admin.id);
+      if (!combined.some(c => String(c.poppo_id || c.id) === adminId)) {
+        combined.push(admin);
+      }
+    });
+
+    return combined;
+  }, [allUsers, selectedRosterUser]);
+
+  const fetchWithAuth = async (url: string, options: RequestInit = {}) => {
+    const authState = Storage.getAuthState();
+    const token = authState?.token;
+    const headers = {
+      'Content-Type': 'application/json',
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+      ...(options.headers || {})
+    };
+    return fetch(url, { ...options, headers });
+  };
+
+  const handleRosterSearch = async (queryVal: string) => {
+    setRosterSearchQuery(queryVal);
+    if (!queryVal.trim()) {
+      setRosterSearchResults([]);
+      return;
+    }
+    setIsSearchingRoster(true);
+    try {
+      const res = await fetchWithAuth(`/api/roster-management/search?query=${encodeURIComponent(queryVal)}`);
+      if (res.ok) {
+        const data = await res.json();
+        setRosterSearchResults(data);
+      } else {
+        const errData = await res.json();
+        showToast('error', errData.error || 'Failed to search roster.');
+      }
+    } catch (err: any) {
+      console.error(err);
+      showToast('error', 'Network error during search.');
+    } finally {
+      setIsSearchingRoster(false);
+    }
+  };
+
+  const handleSelectRosterUser = async (user: any) => {
+    setIsRosterLoading(true);
+    try {
+      const poppoId = user.poppo_id || user.id;
+      const res = await fetchWithAuth(`/api/roster-management/user/${poppoId}`);
+      if (res.ok) {
+        const data = await res.json();
+        setSelectedRosterUser(data);
+        setRosterEditableFields({
+          ...data,
+          nickname: data.nickname || data.name || '',
+          role: data.role || 'Host',
+          teamAnchor: data.teamAnchor || data.team || data.team_anchor || '',
+          tier_pay: data.tier_pay || '',
+          status: data.status || 'Active',
+          photoUrl: data.photoUrl || data.profile_photo || '',
+          assignedManagerId: data.assignedManagerId || data.assigned_manager_poppo_id || '',
+          assignedManagerName: data.manager || data.assigned_manager || ''
+        });
+        // Clear host search state
+        setRosterHostSearchQuery('');
+        setRosterHostSearchResults([]);
+      } else {
+        const errData = await res.json();
+        showToast('error', errData.error || 'Failed to fetch user details.');
+      }
+    } catch (err) {
+      console.error(err);
+      showToast('error', 'Network error fetching user details.');
+    } finally {
+      setIsRosterLoading(false);
+    }
+  };
+
+  const handleSaveRosterChanges = async () => {
+    if (!selectedRosterUser || !rosterEditableFields) return;
+    setIsSavingRoster(true);
+    try {
+      const poppoId = selectedRosterUser.poppo_id;
+      const originalRole = selectedRosterUser.role;
+      const newRole = rosterEditableFields.role;
+      
+      // 1. If role changed, call change-role first
+      if (String(originalRole).toLowerCase() !== String(newRole).toLowerCase()) {
+        const roleRes = await fetchWithAuth('/api/roster-management/change-role', {
+          method: 'PATCH',
+          body: JSON.stringify({
+            poppo_id: poppoId,
+            old_role: originalRole,
+            new_role: newRole
+          })
+        });
+        if (!roleRes.ok) {
+          const errData = await roleRes.json();
+          showToast('error', errData.error || 'Failed to change role.');
+          setIsSavingRoster(false);
+          return;
+        }
+      }
+
+      // 2. Call update for the fields
+      const updateRes = await fetchWithAuth('/api/roster-management/update', {
+        method: 'PATCH',
+        body: JSON.stringify({
+          poppo_id: poppoId,
+          role: newRole,
+          nickname: rosterEditableFields.nickname,
+          photoUrl: rosterEditableFields.photoUrl,
+          profile_photo: rosterEditableFields.photoUrl,
+          status: rosterEditableFields.status,
+          teamAnchor: rosterEditableFields.teamAnchor,
+          tier_pay: rosterEditableFields.tier_pay,
+          assignedManagerId: rosterEditableFields.assignedManagerId,
+          manager: rosterEditableFields.assignedManagerName
+        })
+      });
+
+      if (updateRes.ok) {
+        showToast('success', 'Roster changes saved successfully.');
+        
+        // Refresh users list
+        const list = await FirebaseService.getAllRoleMetadata();
+        setAllUsers(list || []);
+        
+        // Reload details
+        await handleSelectRosterUser({ poppo_id: poppoId });
+      } else {
+        const errData = await updateRes.json();
+        showToast('error', errData.error || 'Failed to update user.');
+      }
+    } catch (err) {
+      console.error(err);
+      showToast('error', 'Network error saving roster changes.');
+    } finally {
+      setIsSavingRoster(false);
+    }
+  };
+
+  const handleResetLoginState = async () => {
+    if (!selectedRosterUser) return;
+    if (!confirm(`Are you sure you want to reset the login state for ${selectedRosterUser.nickname || selectedRosterUser.name || 'this user'}? This will force them to set a new password on their next login.`)) return;
+    setIsResettingLogin(true);
+    try {
+      const poppoId = selectedRosterUser.poppo_id;
+      const res = await fetchWithAuth('/api/users/reset-login', {
+        method: 'PATCH',
+        body: JSON.stringify({
+          poppo_id: poppoId,
+          is_first_time: true
+        })
+      });
+      if (res.ok) {
+        showToast('success', 'Login state reset successful. User must set a new password on next login.');
+        // Reload details
+        await handleSelectRosterUser({ poppo_id: poppoId });
+      } else {
+        const errData = await res.json();
+        showToast('error', errData.error || 'Failed to reset login state.');
+      }
+    } catch (err) {
+      console.error(err);
+      showToast('error', 'Network error resetting login state.');
+    } finally {
+      setIsResettingLogin(false);
+    }
+  };
+
+  const handleSendPushNotification = async () => {
+    if (!selectedRosterUser || !rosterPushTitle || !rosterPushBody) return;
+    setIsSendingRosterPush(true);
+    try {
+      const poppoId = selectedRosterUser.poppo_id;
+      const res = await fetchWithAuth('/api/push/send-to-user', {
+        method: 'POST',
+        body: JSON.stringify({
+          poppo_id: poppoId,
+          title: rosterPushTitle,
+          body: rosterPushBody,
+          url: rosterPushUrl || undefined
+        })
+      });
+      if (res.ok) {
+        showToast('success', 'Notification sent');
+        setIsRosterPushModalOpen(false);
+        setRosterPushTitle('');
+        setRosterPushBody('');
+        setRosterPushUrl('');
+      } else {
+        const errData = await res.json();
+        showToast('error', errData.error || 'Failed to send notification.');
+      }
+    } catch (err) {
+      console.error(err);
+      showToast('error', 'Network error sending notification.');
+    } finally {
+      setIsSendingRosterPush(false);
+    }
+  };
+
+  const handleSearchHosts = (queryVal: string) => {
+    setRosterHostSearchQuery(queryVal);
+    if (!queryVal.trim()) {
+      setRosterHostSearchResults([]);
+      return;
+    }
+    const q = queryVal.toLowerCase();
+    const filtered = allUsers.filter(u => {
+      const roleLower = String(u.role || '').toLowerCase();
+      const isHost = roleLower === 'host' || roleLower === 'talent';
+      if (!isHost) return false;
+      
+      const poppoId = String(u.poppo_id || u.id || '');
+      const nickname = String(u.nickname || u.name || '').toLowerCase();
+      const name = String(u.name || '').toLowerCase();
+      
+      return poppoId.includes(q) || nickname.includes(q) || name.includes(q);
+    });
+    setRosterHostSearchResults(filtered);
+  };
+
+  const handleAssignHostToManager = async (hostId: string) => {
+    if (!selectedRosterUser) return;
+    try {
+      const res = await fetchWithAuth('/api/roster-management/assign-host', {
+        method: 'PATCH',
+        body: JSON.stringify({
+          manager_id: selectedRosterUser.poppo_id,
+          host_id: hostId,
+          action: 'assign'
+        })
+      });
+      if (res.ok) {
+        showToast('success', 'Host successfully assigned.');
+        
+        // Refresh users list
+        const list = await FirebaseService.getAllRoleMetadata();
+        setAllUsers(list || []);
+        
+        // Reload details
+        await handleSelectRosterUser({ poppo_id: selectedRosterUser.poppo_id });
+      } else {
+        const errData = await res.json();
+        showToast('error', errData.error || 'Failed to assign host.');
+      }
+    } catch (err) {
+      console.error(err);
+      showToast('error', 'Network error assigning host.');
+    }
+  };
+
+  const handleUnassignHostFromManager = async (hostId: string) => {
+    if (!selectedRosterUser) return;
+    if (!confirm('Are you sure you want to unassign this host?')) return;
+    try {
+      const res = await fetchWithAuth('/api/roster-management/assign-host', {
+        method: 'PATCH',
+        body: JSON.stringify({
+          manager_id: selectedRosterUser.poppo_id,
+          host_id: hostId,
+          action: 'unassign'
+        })
+      });
+      if (res.ok) {
+        showToast('success', 'Host successfully unassigned.');
+        
+        // Refresh users list
+        const list = await FirebaseService.getAllRoleMetadata();
+        setAllUsers(list || []);
+        
+        // Reload details
+        await handleSelectRosterUser({ poppo_id: selectedRosterUser.poppo_id });
+      } else {
+        const errData = await res.json();
+        showToast('error', errData.error || 'Failed to unassign host.');
+      }
+    } catch (err) {
+      console.error(err);
+      showToast('error', 'Network error unassigning host.');
+    }
+  };
+
+  const handleRosterPhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !selectedRosterUser) return;
+    
+    if (!file.type.startsWith('image/')) {
+      showToast('error', 'Please upload an image file.');
+      return;
+    }
+    
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const fileData = reader.result as string;
+      try {
+        const res = await fetch('/api/upload-profile-photo', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            fileData,
+            fileName: `${selectedRosterUser.poppo_id}_${Date.now()}_${file.name}`,
+            contentType: file.type
+          })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setRosterEditableFields(prev => ({
+            ...prev,
+            photoUrl: data.url
+          }));
+          showToast('success', 'Profile photo uploaded. Remember to Save Changes.');
+        } else {
+          showToast('error', 'Failed to upload image.');
+        }
+      } catch (err) {
+        console.error(err);
+        showToast('error', 'Network error uploading image.');
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const renderRosterManagementPanel = () => {
+    if (!isDirectorOrHeadAdmin) return null;
+
+    return (
+      <div className="glass-card p-6 space-y-6 relative overflow-hidden transition-all duration-300" style={{
+        background: 'linear-gradient(to bottom right, rgba(20, 10, 5, 0.55), rgba(5, 5, 10, 0.75))',
+        border: '1px solid rgba(212, 175, 55, 0.25)',
+        boxShadow: '0 10px 40px rgba(0,0,0,0.6), inset 0 1px 1px rgba(255, 255, 255, 0.05), 0 0 20px rgba(212, 175, 55, 0.03)'
+      }}>
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-[#D4AF37]/20 pb-3">
+          <div className="flex items-center gap-2">
+            <Users className="text-[#D4AF37] drop-shadow-[0_0_8px_rgba(212,175,55,0.4)]" size={20} />
+            <h3 className="font-black text-sm uppercase tracking-widest text-[#D4AF37] drop-shadow-[0_0_8px_rgba(212,175,55,0.3)]">
+              Roster Management Panel
+            </h3>
+          </div>
+          {selectedRosterUser && (
+            <button
+              onClick={() => setSelectedRosterUser(null)}
+              className="px-3 py-1 text-[10px] font-black uppercase tracking-widest text-[#A09E9A] hover:text-[#F0EFE8] border border-white/10 hover:border-[#D4AF37]/45 bg-black/40 rounded-lg transition-all cursor-pointer"
+            >
+              Clear Selection
+            </button>
+          )}
+        </div>
+
+        {/* Search Section */}
+        {!selectedRosterUser ? (
+          <div className="space-y-4">
+            <div className="relative">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#A09E9A]" size={16} />
+              <input
+                type="text"
+                placeholder="Search roster by Nickname/Name or POPPO ID..."
+                className="w-full pl-10 pr-4 py-3 glass-input text-xs focus:border-[#D4AF37]/60"
+                value={rosterSearchQuery}
+                onChange={(e) => handleRosterSearch(e.target.value)}
+              />
+              {isSearchingRoster && (
+                <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                  <Loader2 className="w-4 h-4 animate-spin text-[#D4AF37]" />
+                </div>
+              )}
+            </div>
+
+            {/* Search Results */}
+            {rosterSearchResults.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[300px] overflow-y-auto custom-scrollbar pr-1">
+                {rosterSearchResults.map((usr) => (
+                  <div
+                    key={usr.poppo_id}
+                    onClick={() => handleSelectRosterUser(usr)}
+                    className="flex items-center gap-3 bg-black/30 border border-[#D4AF37]/20 hover:border-[#D4AF37]/60 p-3 rounded-2xl cursor-pointer hover:bg-black/50 transition-all duration-300 group"
+                  >
+                    {usr.photoUrl ? (
+                      <img src={usr.photoUrl} alt={usr.nickname} className="w-10 h-10 rounded-full object-cover border border-[#D4AF37]/30" referrerPolicy="no-referrer" />
+                    ) : (
+                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-black/80 to-black border border-[#D4AF37]/30 flex items-center justify-center text-xs font-black text-[#D4AF37]">
+                        {usr.nickname ? usr.nickname[0].toUpperCase() : 'U'}
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0 text-left">
+                      <h4 className="text-xs font-bold text-[#F0EFE8] truncate group-hover:text-[#D4AF37] transition-colors">
+                        {usr.nickname}
+                      </h4>
+                      <p className="text-[9px] text-[#A09E9A] font-mono">ID: {usr.poppo_id}</p>
+                    </div>
+                    <span className="px-2 py-0.5 text-[8px] font-black rounded-full uppercase tracking-widest border border-amber-500/30 text-amber-400 bg-amber-500/10">
+                      {usr.role}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : rosterSearchQuery.trim() ? (
+              <p className="text-xs text-[#A09E9A]/60 italic text-center py-4">No matching users found.</p>
+            ) : null}
+          </div>
+        ) : (
+          /* Editable Section */
+          <div className="space-y-6 text-left">
+            {/* User Identity Card */}
+            <div className="bg-[#1A140A]/50 border border-[#D4AF37]/20 p-4 rounded-2xl flex flex-col sm:flex-row items-center gap-4">
+              <div className="relative group cursor-pointer shrink-0">
+                {rosterEditableFields.photoUrl ? (
+                  <img src={rosterEditableFields.photoUrl} alt="Avatar" className="w-16 h-16 rounded-full object-cover border-2 border-[#D4AF37]/40 shadow-md" referrerPolicy="no-referrer" />
+                ) : (
+                  <div className="w-16 h-16 rounded-full bg-gradient-to-br from-black/80 to-black border-2 border-[#D4AF37]/40 flex items-center justify-center text-xl font-black text-[#D4AF37]">
+                    {rosterEditableFields.nickname ? rosterEditableFields.nickname[0].toUpperCase() : 'U'}
+                  </div>
+                )}
+                <label className="absolute inset-0 bg-black/75 rounded-full opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center text-[8px] font-black uppercase tracking-widest text-[#D4AF37] transition-opacity cursor-pointer">
+                  <span>Change</span>
+                  <span>Photo</span>
+                  <input type="file" accept="image/*" className="hidden" onChange={handleRosterPhotoUpload} />
+                </label>
+              </div>
+
+              <div className="text-center sm:text-left flex-1 min-w-0">
+                <h4 className="text-sm font-bold text-[#F0EFE8] flex items-center justify-center sm:justify-start gap-2">
+                  <span className="truncate">{rosterEditableFields.nickname || 'No Nickname'}</span>
+                  <span className="px-2 py-0.5 text-[8px] font-black rounded-full uppercase tracking-widest border border-amber-500/30 text-amber-400 bg-amber-500/10 shrink-0">
+                    {selectedRosterUser.role}
+                  </span>
+                </h4>
+                <p className="text-[10px] text-[#A09E9A] font-mono mt-1">Poppo ID: {selectedRosterUser.poppo_id} (Read-only)</p>
+              </div>
+
+              {/* Action Buttons: Reset Login & Notification */}
+              <div className="flex gap-2 w-full sm:w-auto shrink-0">
+                <button
+                  onClick={handleResetLoginState}
+                  disabled={isResettingLogin}
+                  className="flex-1 sm:flex-none px-3 py-2 text-[9px] font-black uppercase tracking-widest text-[#D4AF37] border border-[#D4AF37]/30 hover:border-[#D4AF37] bg-[#D4AF37]/5 hover:bg-[#D4AF37]/10 rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-[0_0_10px_rgba(212,175,55,0.05)]"
+                >
+                  {isResettingLogin ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw size={11} />}
+                  Reset Login State
+                </button>
+                <button
+                  onClick={() => setIsRosterPushModalOpen(true)}
+                  className="flex-1 sm:flex-none px-3 py-2 text-[9px] font-black uppercase tracking-widest text-black bg-[#D4AF37] hover:bg-yellow-400 rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 font-bold shadow-[0_0_15px_rgba(212,175,55,0.3)] border-none"
+                >
+                  <Send size={11} />
+                  Send Notification
+                </button>
+              </div>
+            </div>
+
+            {/* Editable Fields Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Field: Nickname */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[9px] font-black uppercase tracking-widest text-[#A09E9A]">Nickname / Name</label>
+                <input
+                  type="text"
+                  className="glass-input text-xs border-[#D4AF37]/30 focus:border-[#D4AF37]/70"
+                  value={rosterEditableFields.nickname}
+                  onChange={(e) => setRosterEditableFields(prev => ({ ...prev, nickname: e.target.value }))}
+                />
+              </div>
+
+              {/* Field: Role Dropdown */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[9px] font-black uppercase tracking-widest text-[#A09E9A]">Role</label>
+                <select
+                  className="glass-input text-xs border-[#D4AF37]/30 focus:border-[#D4AF37]/70 bg-black"
+                  value={rosterEditableFields.role}
+                  onChange={(e) => setRosterEditableFields(prev => ({ ...prev, role: e.target.value }))}
+                >
+                  <option value="Host">Host</option>
+                  <option value="Admin">Admin</option>
+                  <option value="Manager">Manager</option>
+                  <option value="Agent">Agent</option>
+                  {loggedInUserRole === 'director' && (
+                    <>
+                      <option value="Head Admin">Head Admin</option>
+                      <option value="Director">Director</option>
+                    </>
+                  )}
+                </select>
+              </div>
+
+              {/* Field: Tier Pay Dropdown */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[9px] font-black uppercase tracking-widest text-[#A09E9A]">Tier Pay</label>
+                <select
+                  className="glass-input text-xs border-[#D4AF37]/30 focus:border-[#D4AF37]/70 bg-black"
+                  value={rosterEditableFields.tier_pay}
+                  onChange={(e) => setRosterEditableFields(prev => ({ ...prev, tier_pay: e.target.value }))}
+                >
+                  <option value="">Select Tier...</option>
+                  <option value="Star Host">Star Host</option>
+                  <option value="Rocket Host">Rocket Host</option>
+                  <option value="S idol">S idol</option>
+                  <option value="Esports">Esports</option>
+                  <option value="Regular Host">Regular Host</option>
+                </select>
+              </div>
+
+              {/* Field: Status Dropdown */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[9px] font-black uppercase tracking-widest text-[#A09E9A]">Status</label>
+                <select
+                  className="glass-input text-xs border-[#D4AF37]/30 focus:border-[#D4AF37]/70 bg-black"
+                  value={rosterEditableFields.status}
+                  onChange={(e) => setRosterEditableFields(prev => ({ ...prev, status: e.target.value }))}
+                >
+                  <option value="Active">Active</option>
+                  <option value="Intermittent">Intermittent</option>
+                  <option value="Inactive">Inactive</option>
+                  <option value="Releasing">Releasing</option>
+                  <option value="Released">Released</option>
+                </select>
+              </div>
+
+              {/* Field: Team Anchor */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[9px] font-black uppercase tracking-widest text-[#A09E9A]">Team Anchor</label>
+                <input
+                  type="text"
+                  className="glass-input text-xs border-[#D4AF37]/30 focus:border-[#D4AF37]/70"
+                  value={rosterEditableFields.teamAnchor}
+                  onChange={(e) => setRosterEditableFields(prev => ({ ...prev, teamAnchor: e.target.value }))}
+                  placeholder="e.g. Alpha, Beta..."
+                />
+              </div>
+
+              {/* HOST ONLY FIELD: Assigned Manager/Agent Dropdown */}
+              {String(rosterEditableFields.role).toLowerCase() === 'host' && (
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[9px] font-black uppercase tracking-widest text-[#A09E9A]">Assigned Manager / Agent</label>
+                  <select
+                    className="glass-input text-xs border-[#D4AF37]/30 focus:border-[#D4AF37]/70 bg-black"
+                    value={rosterEditableFields.assignedManagerId}
+                    onChange={(e) => {
+                      const selId = e.target.value;
+                      const selMgr = rosterManagerAgentList.find(m => String(m.poppo_id || m.id) === String(selId));
+                      setRosterEditableFields(prev => ({
+                        ...prev,
+                        assignedManagerId: selId,
+                        assignedManagerName: selMgr ? (selMgr.nickname || selMgr.name || '') : ''
+                      }));
+                    }}
+                  >
+                    <option value="">Unassigned</option>
+                    {rosterManagerAgentList.map(mgr => (
+                      <option key={mgr.poppo_id || mgr.id} value={mgr.poppo_id || mgr.id}>
+                        {mgr.nickname || mgr.name} ({mgr.role})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
+
+            {/* MANAGER / AGENT ONLY: Assigned Hosts Management Section */}
+            {['manager', 'agent'].includes(String(rosterEditableFields.role).toLowerCase()) && (
+              <div className="border-t border-white/5 pt-4 space-y-4">
+                <h5 className="text-xs font-black uppercase tracking-widest text-[#D4AF37]">
+                  Assigned Hosts Management
+                </h5>
+
+                {/* Host Search Box for Assignment */}
+                <div className="space-y-3">
+                  <label className="text-[9px] font-black uppercase tracking-widest text-[#A09E9A]">Search Host to Assign</label>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[#A09E9A]" size={14} />
+                    <input
+                      type="text"
+                      placeholder="Type nickname or Poppo ID of host..."
+                      className="w-full pl-9 pr-4 py-2 bg-black/40 border border-white/10 rounded-xl text-xs text-[#F0EFE8]"
+                      value={rosterHostSearchQuery}
+                      onChange={(e) => handleSearchHosts(e.target.value)}
+                    />
+                  </div>
+
+                  {/* Host Search Results */}
+                  {rosterHostSearchResults.length > 0 && (
+                    <div className="bg-black/60 border border-white/5 rounded-xl p-2 max-h-[200px] overflow-y-auto custom-scrollbar space-y-1">
+                      {rosterHostSearchResults.map(h => {
+                        const isAlreadyAssigned = selectedRosterUserAssignedHosts.some(x => String(x.poppo_id || x.id) === String(h.poppo_id || h.id));
+                        return (
+                          <div key={h.poppo_id} className="flex items-center justify-between p-2 hover:bg-white/[0.03] rounded-lg transition-colors">
+                            <div className="flex items-center gap-2">
+                              {h.photoUrl ? (
+                                <img src={h.photoUrl} alt="Host" className="w-7 h-7 rounded-full object-cover border border-[#D4AF37]/20" referrerPolicy="no-referrer" />
+                              ) : (
+                                <div className="w-7 h-7 rounded-full bg-black border border-[#D4AF37]/20 flex items-center justify-center text-[10px] font-black text-[#D4AF37]">
+                                  {h.nickname ? h.nickname[0].toUpperCase() : 'U'}
+                                </div>
+                              )}
+                              <div className="text-left">
+                                <p className="text-xs font-bold text-[#F0EFE8]">{h.nickname}</p>
+                                <p className="text-[9px] text-[#A09E9A] font-mono">ID: {h.poppo_id}</p>
+                              </div>
+                            </div>
+                            <button
+                              onClick={() => handleAssignHostToManager(h.poppo_id)}
+                              disabled={isAlreadyAssigned}
+                              className={cn(
+                                "px-2.5 py-1 text-[9px] font-black uppercase tracking-widest rounded-lg border transition-all cursor-pointer",
+                                isAlreadyAssigned
+                                  ? "text-[#A09E9A]/40 border-white/5 bg-white/[0.01] cursor-not-allowed"
+                                  : "text-black bg-[#D4AF37] border-transparent hover:bg-yellow-400 font-bold"
+                              )}
+                            >
+                              {isAlreadyAssigned ? 'Assigned' : 'Assign Host'}
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* Grid of Assigned Hosts */}
+                <div className="space-y-2">
+                  <label className="text-[9px] font-black uppercase tracking-widest text-[#A09E9A] block">
+                    Assigned Hosts ({selectedRosterUserAssignedHosts.length})
+                  </label>
+                  {selectedRosterUserAssignedHosts.length === 0 ? (
+                    <p className="text-xs text-[#A09E9A]/40 italic py-2">No hosts assigned.</p>
+                  ) : (
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                      {selectedRosterUserAssignedHosts.map(h => {
+                        const isAutofilledAdmin = String(h.role || '').toLowerCase() === 'admin';
+                        return (
+                          <div key={h.poppo_id} className="relative group bg-black/40 border border-[#D4AF37]/20 hover:border-[#D4AF37]/50 p-2.5 rounded-xl flex flex-col items-center text-center transition-all duration-300">
+                            {h.photoUrl ? (
+                              <img src={h.photoUrl} alt="Host" className="w-12 h-12 rounded-full object-cover border border-[#D4AF37]/20" referrerPolicy="no-referrer" />
+                            ) : (
+                              <div className="w-12 h-12 rounded-full bg-black border border-[#D4AF37]/20 flex items-center justify-center text-base font-black text-[#D4AF37]">
+                                {h.nickname ? h.nickname[0].toUpperCase() : 'U'}
+                              </div>
+                            )}
+                            <span className="text-[10px] font-bold text-[#F0EFE8] mt-1.5 truncate w-full">{h.nickname}</span>
+                            <span className="text-[8px] text-[#A09E9A] font-mono mt-0.5">ID: {h.poppo_id}</span>
+                            {isAutofilledAdmin && (
+                              <span className="mt-1 text-[7px] font-black uppercase tracking-widest text-[#D4AF37] px-1 py-0.5 rounded bg-[#D4AF37]/10 border border-[#D4AF37]/25" title="Automatically assigned admin with matching Team Anchor">
+                                Admin Anchor
+                              </span>
+                            )}
+                            
+                            {/* Unassign button (hidden for auto-assigned admins) */}
+                            {!isAutofilledAdmin && (
+                              <button
+                                onClick={() => handleUnassignHostFromManager(h.poppo_id)}
+                                className="absolute top-1 right-1 p-1 bg-black/80 hover:bg-rose-950/80 text-[#A09E9A] hover:text-rose-400 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity border border-white/5 hover:border-rose-500/30 cursor-pointer"
+                                title="Unassign Host"
+                              >
+                                <Trash2 size={10} />
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Save / Cancel Buttons */}
+            <div className="flex gap-3 justify-end border-t border-white/5 pt-4">
+              <button
+                onClick={() => setSelectedRosterUser(null)}
+                className="px-4 py-2.5 text-xs font-black uppercase tracking-widest text-[#A09E9A] hover:text-[#F0EFE8] border border-white/10 hover:border-[#D4AF37]/45 rounded-xl transition-all cursor-pointer bg-black/20"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveRosterChanges}
+                disabled={isSavingRoster}
+                className="px-5 py-2.5 text-xs font-black uppercase tracking-widest text-black bg-[#D4AF37] hover:bg-yellow-400 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 font-bold shadow-[0_0_20px_rgba(212,175,55,0.25)] border-none"
+              >
+                {isSavingRoster ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save size={14} />}
+                Save Changes
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Send Notification Modal */}
+        {isRosterPushModalOpen && selectedRosterUser && (
+          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setIsRosterPushModalOpen(false)}></div>
+            <div className="glass-card w-full max-w-md p-6 relative z-10 space-y-4 text-left" style={{
+              background: 'linear-gradient(to bottom right, rgba(30, 15, 5, 0.95), rgba(10, 10, 20, 0.95))',
+              border: '1px solid rgba(212, 175, 55, 0.35)'
+            }}>
+              <div className="flex items-center justify-between border-b border-white/5 pb-2">
+                <h4 className="text-xs font-black uppercase tracking-widest text-[#D4AF37]">
+                  Send Push Notification
+                </h4>
+                <button
+                  onClick={() => setIsRosterPushModalOpen(false)}
+                  className="w-6 h-6 rounded-full bg-black/40 border border-white/10 flex items-center justify-center text-[#A09E9A] hover:text-[#F0EFE8] transition-all cursor-pointer"
+                >
+                  <X size={10} />
+                </button>
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex flex-col gap-1">
+                  <label className="text-[9px] font-black uppercase tracking-widest text-[#A09E9A]">Target User</label>
+                  <p className="text-xs font-bold text-[#F0EFE8]">{rosterEditableFields.nickname} (ID: {selectedRosterUser.poppo_id})</p>
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  <label className="text-[9px] font-black uppercase tracking-widest text-[#A09E9A]">Title</label>
+                  <input
+                    type="text"
+                    placeholder="Enter notification title..."
+                    className="glass-input text-xs border-[#D4AF37]/20 focus:border-[#D4AF37]/50"
+                    value={rosterPushTitle}
+                    onChange={(e) => setRosterPushTitle(e.target.value)}
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  <label className="text-[9px] font-black uppercase tracking-widest text-[#A09E9A]">Message Body</label>
+                  <textarea
+                    placeholder="Type message body here..."
+                    className="glass-input text-xs h-20 border-[#D4AF37]/20 focus:border-[#D4AF37]/50 resize-none"
+                    value={rosterPushBody}
+                    onChange={(e) => setRosterPushBody(e.target.value)}
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  <label className="text-[9px] font-black uppercase tracking-widest text-[#A09E9A]">Optional Action URL</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. /dashboard or https://..."
+                    className="glass-input text-xs border-[#D4AF37]/20 focus:border-[#D4AF37]/50"
+                    value={rosterPushUrl}
+                    onChange={(e) => setRosterPushUrl(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-2 justify-end pt-2">
+                <button
+                  onClick={() => setIsRosterPushModalOpen(false)}
+                  className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-[#A09E9A] hover:text-[#F0EFE8] border border-white/5 rounded-lg transition-all cursor-pointer bg-black/20"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSendPushNotification}
+                  disabled={isSendingRosterPush || !rosterPushTitle || !rosterPushBody}
+                  className="px-4 py-2 text-[9px] font-black uppercase tracking-widest text-black bg-[#D4AF37] hover:bg-yellow-400 disabled:opacity-40 rounded-lg transition-all cursor-pointer flex items-center gap-1 font-bold shadow-[0_0_15px_rgba(212,175,55,0.2)] border-none"
+                >
+                  {isSendingRosterPush ? <Loader2 className="w-3 h-3 animate-spin" /> : <Send size={10} />}
+                  Send Notification
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
 
   const handleIntakeSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -4323,7 +5144,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                     className="w-full bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-1.5 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37] font-bold disabled:opacity-50 disabled:cursor-not-allowed"
                     disabled={!isDirectorOrHeadAdmin}
                   >
-                    {['Host', 'Manager', 'Admin', 'Head Admin', 'Agent']
+                    {['Host', 'Manager', 'Admin', 'Agent']
                       .concat(host.role === 'Director' ? ['Director'] : [])
                       .map(r => (
                         <option key={r} value={r} className="bg-[#1A1A28] text-[#F0EFE8]">{r}</option>
@@ -5145,6 +5966,12 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
 
     const activeCount = assignedAwards.filter(a => a.startDate && a.endDate && getIsLastMonth(a.startDate, a.endDate)).length;
 
+    const sortedAwards = [...assignedAwards].sort((a, b) => {
+      const dateA = a.startDate || a.awardedAt || a.dateAwarded || a.assignedAt || '';
+      const dateB = b.startDate || b.awardedAt || b.dateAwarded || b.assignedAt || '';
+      return dateB.localeCompare(dateA);
+    });
+
     return (
       <div className={cn("space-y-4 bg-[#1A140A]/80 backdrop-blur-xl border border-[#D4AF37]/20 p-5 rounded-3xl transition-all duration-300 hover:border-[#D4AF37]/50 group", styles.shadow)}>
         <div className="flex items-center justify-between">
@@ -5152,11 +5979,6 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
             <div className="w-8 h-8 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-400 text-sm shadow-inner">🏆</div>
             <h4 className="text-xs font-black uppercase tracking-widest text-[#F0EFE8]">AGENCY RECOGNITION</h4>
           </div>
-        </div>
-
-        {/* Header stats inside tab */}
-        <div className="flex items-center justify-between bg-black/20 border border-white/5 p-3 rounded-2xl">
-          <span className="text-[10px] font-black uppercase text-[#A09E9A] tracking-wider">Agency Badges & Recognitions</span>
           <span className="px-2.5 py-0.5 text-[9px] font-black text-amber-400 border border-amber-500/20 bg-amber-500/10 rounded-full uppercase tracking-widest shadow-inner">
             {activeCount} active / {assignedAwards.length} total
           </span>
@@ -5164,9 +5986,9 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
 
         {/* Badges list */}
         <div className="space-y-3 mt-4 max-h-48 overflow-y-auto custom-scrollbar pr-1">
-          {assignedAwards.length > 0 ? (
+          {sortedAwards.length > 0 ? (
             <div className="grid grid-cols-2 gap-2.5 pt-1">
-              {assignedAwards.map((a: any) => {
+              {sortedAwards.map((a: any) => {
                 const isActive = getIsLastMonth(a.startDate, a.endDate);
 
                 let glowStyle = '';
@@ -7292,6 +8114,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
           {isSpotlight && renderDirectorPosition()}
           {isSpotlight && renderDirectorRoleSupervision()}
           {!isSpotlight && String(rootAuth?.role || '').toLowerCase() === 'director' && renderImpersonationBlock()}
+          {!onClose && (loggedInUserRole === 'director' || loggedInUserRole === 'head admin' || loggedInUserRole === 'head_admin') && renderRosterManagementPanel()}
           {!onClose && (loggedInUserRole === 'director' || loggedInUserRole === 'head admin' || loggedInUserRole === 'head_admin') && renderBadgeAndTaskAssignment()}
         </div>
       ) : (profileOwnerRole === 'head admin' || profileOwnerRole === 'head_admin') ? (
@@ -7300,6 +8123,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
           {renderHeadAdminReportsTo()}
           {renderRoleSupervision()}
           {!isSpotlight && String(rootAuth?.role || '').toLowerCase() === 'director' && renderImpersonationBlock()}
+          {!onClose && (loggedInUserRole === 'director' || loggedInUserRole === 'head admin' || loggedInUserRole === 'head_admin') && renderRosterManagementPanel()}
           {!onClose && (loggedInUserRole === 'director' || loggedInUserRole === 'head admin' || loggedInUserRole === 'head_admin') && renderBadgeAndTaskAssignment()}
         </div>
       ) : profileOwnerRole === 'admin' ? (
