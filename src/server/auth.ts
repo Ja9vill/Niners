@@ -418,6 +418,7 @@ router.post("/check-username", async (req: any, res: any) => {
     const isFirstLogin =
       data.is_first_login === true ||
       data.is_temp_password === true ||
+      data.is_first_time === true ||
       !data.password ||
       data.password === null;
 
@@ -479,6 +480,7 @@ router.post("/set-initial-password", loginRateLimiter, async (req: any, res: any
     const isFirstLogin =
       dbUser.is_first_login === true ||
       dbUser.is_temp_password === true ||
+      dbUser.is_first_time === true ||
       !dbUser.password ||
       dbUser.password === null;
 
@@ -512,7 +514,8 @@ router.post("/set-initial-password", loginRateLimiter, async (req: any, res: any
         password: hashed,
         password_hash: hashed,
         is_first_login: false,
-        is_temp_password: false // Safely deprecate legacy keys
+        is_temp_password: false,
+        is_first_time: false // Safely deprecate legacy keys and reset-login flag
       });
 
       // 3. Assign structural application roles now that the Auth target record exists
@@ -1830,6 +1833,10 @@ router.post("/login-with-poppo", loginRateLimiter, async (req: any, res: any) =>
     if (hostData.isActive === false || hostData.isActive === "false") {
       logAuthEvent(cleanPoppoId, "FAILURE", ipAddress, "INACTIVE_ACCOUNT");
       return res.status(403).json({ error: "Account is inactive." });
+    }
+    if (hostData.is_first_time === true) {
+      logAuthEvent(cleanPoppoId, "FAILURE", ipAddress, "RESET_PASSWORD_REQUIRED");
+      return res.status(403).json({ error: "Password reset required. Please enter your Poppo ID on the login page to set a new password." });
     }
     
     // Check password

@@ -140,11 +140,11 @@ export const FinancialData = ({ isAgentMode = false }: { isAgentMode?: boolean }
     }
   };
 
-  const handleTabularImport = async () => {
-    if (!pasteData.trim()) return;
+  const parseAndLoadTabularData = async (dataString: string) => {
+    if (!dataString.trim()) return;
     setIsLoading(true);
     try {
-      let rows = pasteData.trim().split('\n').filter(line => line.trim() !== '').map(line => line.split('\t'));
+      let rows = dataString.trim().split('\n').filter(line => line.trim() !== '').map(line => line.split('\t'));
       
       if (rows.length === 0) return;
 
@@ -210,7 +210,7 @@ export const FinancialData = ({ isAgentMode = false }: { isAgentMode?: boolean }
         const rawMonth = getVal('month', 2)?.trim() || '';
         const rawYear = getVal('year', 3)?.trim() || '';
 
-        if (rawYear && /^\\d{4}$/.test(rawYear)) {
+        if (rawYear && /^\d{4}$/.test(rawYear)) {
            parsedYear = parseInt(rawYear);
            parsedMonth = rawMonth;
         } else if (rawMonth && !rawYear) {
@@ -227,7 +227,6 @@ export const FinancialData = ({ isAgentMode = false }: { isAgentMode?: boolean }
            parsedYear = parseInt(rawYear) || parsedYear;
            parsedMonth = rawMonth;
         } else {
-           // Fallback to globally selected month/year from UI
            const [sYear, sMonth] = selectedMonth.split('-');
            parsedYear = parseInt(sYear);
            parsedMonth = selectedMonth;
@@ -274,6 +273,36 @@ export const FinancialData = ({ isAgentMode = false }: { isAgentMode?: boolean }
     } catch (err) {
       setErrorMessage('Failed to parse tabular data.');
       console.error(err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleTabularImport = () => {
+    parseAndLoadTabularData(pasteData);
+  };
+
+  const handleGoogleSheetSync = async () => {
+    setIsLoading(true);
+    try {
+      const response = await fetch('https://script.google.com/macros/s/AKfycbwHT8K4fH6PL7-DIr-C4KSYyxulXxIJCmrfJKNg3gRLY8YMoBzKC4yMx9IT7DOEY7L3NQ/exec');
+      const json = await response.json();
+      
+      if (json.status === 'success' && json.data && json.data.length > 0) {
+        // Extract headers from the first object
+        const headers = Object.keys(json.data[0]);
+        // Convert array of JSON objects to TSV format matching the copy/paste structure
+        const rows = json.data.map((row: any) => headers.map(h => String(row[h] || '').replace(/\t/g, ' ')).join('\t'));
+        const tabularString = [headers.join('\t'), ...rows].join('\n');
+        
+        await parseAndLoadTabularData(tabularString);
+        showSuccess(`Successfully synced ${json.data.length} records from Google Sheets!`);
+      } else {
+        setErrorMessage(json.message || "No data found in Google Sheet or failed to fetch.");
+      }
+    } catch (err) {
+      setErrorMessage("Error connecting to Google Script.");
+      console.error("Google Script Sync Error:", err);
     } finally {
       setIsLoading(false);
     }
@@ -405,9 +434,15 @@ export const FinancialData = ({ isAgentMode = false }: { isAgentMode?: boolean }
           placeholder="Paste Excel/Sheets data here (Poppo ID, Nickname, Month/Date, Total Points...)"
           className="w-full h-24 glass-input font-mono text-[9px] resize-none"
         />
-        <button onClick={handleTabularImport} className="px-4 py-2 bg-[#D4AF37] hover:bg-[#F2CD5C] text-[#0D0D14] rounded-lg text-xs font-black uppercase transition-all shadow-md">
-          Process & Load Data
-        </button>
+        <div className="flex gap-3">
+          <button onClick={handleTabularImport} className="px-4 py-2 bg-[#D4AF37] hover:bg-[#F2CD5C] text-[#0D0D14] rounded-lg text-xs font-black uppercase transition-all shadow-md">
+            Process & Load Data
+          </button>
+          <button onClick={handleGoogleSheetSync} disabled={isLoading} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-black uppercase transition-all shadow-md flex items-center gap-2 disabled:opacity-50">
+            {isLoading ? <Loader2 size={14} className="animate-spin" /> : null}
+            Sync from Google Sheets API
+          </button>
+        </div>
       </div>
 
       <div className="tech-card !p-0 overflow-hidden bg-[#13131E] shadow-xl">
@@ -465,7 +500,7 @@ export const FinancialData = ({ isAgentMode = false }: { isAgentMode?: boolean }
         </div>
 
         <div className="overflow-x-auto max-h-[500px] relative">
-          <table className="w-full text-left text-xs min-w-[800px] border-collapse">
+          <table className="w-full text-left text-xs min-w-[2000px] border-collapse">
             <thead>
               <tr className="border-b border-white/5 text-[9px] font-black text-[#A09E9A] uppercase bg-[#1A1A28] sticky top-0 z-20">
                 <th className="px-3 py-3 w-12 text-center sticky left-0 z-30 bg-[#13131E] border-r border-white/5">
@@ -493,18 +528,18 @@ export const FinancialData = ({ isAgentMode = false }: { isAgentMode?: boolean }
                   />
                 </th>
                 <th className="px-4 py-3 w-36 sticky left-[48px] bg-[#13131E] z-30 border-r border-white/5">Poppo ID</th>
-                <th className="px-3 py-3">Nickname</th>
+                <th className="px-3 py-3 w-32 min-w-[120px]">Nickname</th>
                 {financialTab === 'monthly' ? (
                   <>
-                    <th className="px-3 py-3">Month</th>
+                    <th className="px-3 py-3 w-32 min-w-[120px]">Month</th>
                   </>
                 ) : (
                   <>
-                    <th className="px-3 py-3">From</th>
-                    <th className="px-3 py-3">To</th>
+                    <th className="px-3 py-3 w-28 min-w-[110px]">From</th>
+                    <th className="px-3 py-3 w-28 min-w-[110px]">To</th>
                   </>
                 )}
-                <th className="px-3 py-3">Year</th>
+                <th className="px-3 py-3 w-24 min-w-[90px]">Year</th>
                 <th className="px-3 py-3">Live duration</th>
                 <th className="px-3 py-3">Party host duration</th>
                 <th className="px-3 py-3">Total earnings of points</th>
@@ -570,16 +605,16 @@ export const FinancialData = ({ isAgentMode = false }: { isAgentMode?: boolean }
                         )}>
                           <input type="text" value={row.poppo_id} onChange={e => handleCellChange(idx, 'poppo_id', e.target.value)} className={cn("bg-transparent border-none w-full outline-none", (row as any)._isDuplicate ? "text-red-400" : "text-indigo-400")} title="Poppo ID" />
                         </td>
-                        <td className="px-3 py-2"><input type="text" value={row.nickname || ''} onChange={e => handleCellChange(idx, 'nickname', e.target.value)} className="bg-transparent w-full text-white outline-none" title="Nickname" aria-label="Nickname" /></td>
+                        <td className="px-3 py-2 w-32 min-w-[120px]"><input type="text" value={row.nickname || ''} onChange={e => handleCellChange(idx, 'nickname', e.target.value)} className="bg-transparent w-full text-white outline-none" title="Nickname" aria-label="Nickname" /></td>
                         {financialTab === 'monthly' ? (
-                          <td className="px-3 py-2"><input type="text" value={row.month || ''} onChange={e => handleCellChange(idx, 'month', e.target.value)} className="bg-transparent w-full text-white outline-none" title="Month" aria-label="Month" /></td>
+                          <td className="px-3 py-2 w-32 min-w-[120px]"><input type="text" value={row.month || ''} onChange={e => handleCellChange(idx, 'month', e.target.value)} className="bg-transparent w-full text-white outline-none" title="Month" aria-label="Month" /></td>
                         ) : (
                           <>
-                            <td className="px-3 py-2"><input type="text" value={row.from_date || ''} onChange={e => handleCellChange(idx, 'from_date', e.target.value)} className="bg-transparent w-full text-white outline-none" title="From date" aria-label="From date" /></td>
-                            <td className="px-3 py-2"><input type="text" value={row.to_date || ''} onChange={e => handleCellChange(idx, 'to_date', e.target.value)} className="bg-transparent w-full text-white outline-none" title="To date" aria-label="To date" /></td>
+                            <td className="px-3 py-2 w-28 min-w-[110px]"><input type="text" value={row.from_date || ''} onChange={e => handleCellChange(idx, 'from_date', e.target.value)} className="bg-transparent w-full text-white outline-none" title="From date" aria-label="From date" /></td>
+                            <td className="px-3 py-2 w-28 min-w-[110px]"><input type="text" value={row.to_date || ''} onChange={e => handleCellChange(idx, 'to_date', e.target.value)} className="bg-transparent w-full text-white outline-none" title="To date" aria-label="To date" /></td>
                           </>
                         )}
-                        <td className="px-3 py-2"><input type="number" value={row.year || new Date().getFullYear() || ''} onChange={e => handleCellChange(idx, 'year', parseInt(e.target.value) || 0)} className="bg-transparent w-full text-white outline-none" title="Year" aria-label="Year" /></td>
+                        <td className="px-3 py-2 w-24 min-w-[90px]"><input type="number" value={row.year || new Date().getFullYear() || ''} onChange={e => handleCellChange(idx, 'year', parseInt(e.target.value) || 0)} className="bg-transparent w-full text-white outline-none" title="Year" aria-label="Year" /></td>
                         <td className="px-3 py-2"><input type="number" value={row.live_duration || 0} onChange={e => handleCellChange(idx, 'live_duration', parseFloat(e.target.value) || 0)} className="bg-transparent w-full text-white outline-none" title="Live duration" aria-label="Live duration" /></td>
                         <td className="px-3 py-2"><input type="number" value={row.party_host_duration || 0} onChange={e => handleCellChange(idx, 'party_host_duration', parseFloat(e.target.value) || 0)} className="bg-transparent w-full text-white outline-none" title="Party host duration" aria-label="Party host duration" /></td>
                         <td className="px-3 py-2"><input type="number" value={row.total_earnings || row.total_points || 0} onChange={e => handleCellChange(idx, 'total_earnings', parseInt(e.target.value) || 0)} className="bg-transparent w-full text-white outline-none font-bold" title="Total earnings of points" /></td>

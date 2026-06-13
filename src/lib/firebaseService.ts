@@ -449,13 +449,28 @@ export const FirebaseService = {
       const batch = writeBatch(db);
       requests.forEach(r => batch.set(doc(db, 'livehouse_requests', r.id), r, { merge: true }));
       await batch.commit();
+
+      // Notify registered hosts whose requests are approved
+      for (const r of requests) {
+        if (r.status === 'Approved') {
+          FirebaseService.notifyHostIfRegistered(r.poppoId, r.date || r.proposedDate, r.timeslot || r.proposedTimeslot).catch(console.error);
+        }
+      }
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, 'livehouse_requests');
     }
   },
   async updateLivehouseStatus(id: string, status: string) {
     try {
-      await updateDoc(doc(db, 'livehouse_requests', id), { status });
+      const docRef = doc(db, 'livehouse_requests', id);
+      await updateDoc(docRef, { status });
+      if (status === 'Approved') {
+        const snap = await getDoc(docRef);
+        if (snap.exists()) {
+          const req = snap.data();
+          FirebaseService.notifyHostIfRegistered(req.poppoId, req.date || req.proposedDate, req.timeslot || req.proposedTimeslot).catch(console.error);
+        }
+      }
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, `livehouse_requests/${id}`);
     }
@@ -1425,6 +1440,10 @@ export const FirebaseService = {
       const validCalendarEventIds: string[] = [];
       const logsRef = collection(db, 'livehouse_logs');
 
+      // Fetch all users to match poppo_id quickly
+      const usersSnap = await getDocs(collection(db, 'users'));
+      const existingUserIds = new Set(usersSnap.docs.map(doc => doc.id.trim()));
+
       for (const r of scheduleRows) {
         if (!r.date || !r.timeslot) continue;
         const docId = `${r.date}_${r.timeslot}`.replace(/[^a-zA-Z0-9_-]/g, '_');
@@ -1445,6 +1464,23 @@ export const FirebaseService = {
           });
           batchCount++;
           await commitBatchIfNeeded();
+
+          // Create notification if matched user in 'users'
+          if (existingUserIds.has(newSlot1)) {
+            const notifId = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 15);
+            const notifRef = doc(db, 'user_notifications', notifId);
+            batch.set(notifRef, {
+              id: notifId,
+              poppoId: newSlot1,
+              title: 'Livehouse Event Scheduled',
+              message: `Your Livehouse Event is scheduled on ${r.date} at ${r.timeslot}.`,
+              type: 'success',
+              timestamp: new Date().toISOString(),
+              read: false
+            });
+            batchCount++;
+            await commitBatchIfNeeded();
+          }
         }
         
         const newSlot2 = String(r.slot_2?.poppo_id || '').trim();
@@ -1461,6 +1497,23 @@ export const FirebaseService = {
           });
           batchCount++;
           await commitBatchIfNeeded();
+
+          // Create notification if matched user in 'users'
+          if (existingUserIds.has(newSlot2)) {
+            const notifId = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 15);
+            const notifRef = doc(db, 'user_notifications', notifId);
+            batch.set(notifRef, {
+              id: notifId,
+              poppoId: newSlot2,
+              title: 'Livehouse Event Scheduled',
+              message: `Your Livehouse Event is scheduled on ${r.date} at ${r.timeslot}.`,
+              type: 'success',
+              timestamp: new Date().toISOString(),
+              read: false
+            });
+            batchCount++;
+            await commitBatchIfNeeded();
+          }
         }
 
         const docRef = doc(db, path, docId);
@@ -1561,6 +1614,29 @@ export const FirebaseService = {
 
 
 
+  async notifyHostIfRegistered(poppoId: string, date: string, timeslot: string) {
+    if (!poppoId) return;
+    try {
+      const cleanId = String(poppoId).trim();
+      const userDocRef = doc(db, 'users', cleanId);
+      const userDoc = await getDoc(userDocRef);
+      if (userDoc.exists()) {
+        const notifId = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 15);
+        await setDoc(doc(db, 'user_notifications', notifId), {
+          id: notifId,
+          poppoId: cleanId,
+          title: 'Livehouse Event Scheduled',
+          message: `Your Livehouse Event is scheduled on ${date} at ${timeslot}.`,
+          type: 'success',
+          timestamp: new Date().toISOString(),
+          read: false
+        });
+      }
+    } catch (err) {
+      console.error('[FirebaseService] notifyHostIfRegistered failed:', err);
+    }
+  },
+
   async saveLivehouseRequests(requests: LivehouseRequest[]) {
     const path = 'livehouse_requests';
     try {
@@ -1571,6 +1647,13 @@ export const FirebaseService = {
         batch.set(docRef, r);
       });
       await batch.commit();
+
+      // Notify registered hosts whose requests are approved
+      for (const r of requests) {
+        if (r.status === 'Approved') {
+          FirebaseService.notifyHostIfRegistered(r.poppoId, r.date, r.timeslot).catch(console.error);
+        }
+      }
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, path);
     }

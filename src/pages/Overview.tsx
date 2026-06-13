@@ -10,6 +10,44 @@ import { BarChart, Bar, AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContai
 
 const MONTH_ORDER = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
+const MONTH_MAP: Record<string, string> = {
+  jan: 'January', feb: 'February', mar: 'March', apr: 'April',
+  may: 'May', jun: 'June', jul: 'July', aug: 'August',
+  sep: 'September', oct: 'October', nov: 'November', dec: 'December'
+};
+
+const normalizeMonthYear = (monthStr: string, yearVal?: any): { monthName: string; year: string; key: string } | null => {
+  if (!monthStr) return null;
+  let cleanStr = String(monthStr).replace(/[-_]/g, ' ').trim();
+  let year = String(yearVal || '').trim();
+  const yearMatch = cleanStr.match(/\b(20\d{2})\b/);
+  if (yearMatch) {
+    year = yearMatch[1];
+    cleanStr = cleanStr.replace(year, '').trim();
+  }
+  const monthMatch = cleanStr.match(/^([A-Za-z]+)/);
+  if (!monthMatch) return null;
+  const rawMonth = monthMatch[1].toLowerCase();
+  let fullMonth = '';
+  for (const [abbr, full] of Object.entries(MONTH_MAP)) {
+    if (rawMonth.startsWith(abbr)) {
+      fullMonth = full;
+      break;
+    }
+  }
+  if (!fullMonth) {
+    fullMonth = rawMonth.charAt(0).toUpperCase() + rawMonth.slice(1);
+  }
+  if (!year || year === '0') {
+    year = new Date().getFullYear().toString();
+  }
+  return {
+    monthName: fullMonth,
+    year: year,
+    key: `${fullMonth} ${year}`
+  };
+};
+
 function formatPts(n: number) {
   if (!n || n === 0) return '—';
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
@@ -215,16 +253,25 @@ export const Overview = () => {
 
   // Available years from reports
   const availableYears = useMemo(() => {
-    const years = Array.from(new Set(reports.map(r => String(r.year)).filter(Boolean)));
-    return years.sort().reverse();
+    const years = new Set<string>();
+    reports.forEach(r => {
+      if (r.report_type === 'weekly') return;
+      const norm = normalizeMonthYear(r.monthName, r.year);
+      if (norm) {
+        years.add(norm.year);
+      }
+    });
+    return Array.from(years).sort().reverse();
   }, [reports]);
 
   // Filtered reports
   const filteredReports = useMemo(() => {
     return reports.filter(r => {
       if (r.report_type === 'weekly') return false; // Prevent duplicating weekly into monthly totals
-      if (selectedYear !== 'all' && String(r.year) !== selectedYear) return false;
-      if (selectedMonth !== 'all' && r.monthName !== selectedMonth) return false;
+      const norm = normalizeMonthYear(r.monthName, r.year);
+      if (!norm) return false;
+      if (selectedYear !== 'all' && norm.year !== selectedYear) return false;
+      if (selectedMonth !== 'all' && norm.monthName !== selectedMonth) return false;
       return true;
     });
   }, [reports, selectedYear, selectedMonth]);
@@ -234,13 +281,31 @@ export const Overview = () => {
     return reports.filter(r => {
       if (r.report_type === 'weekly') return false; // Prevent duplicating weekly into monthly totals
       if (lbPeriod !== 'all') {
-        const [pMon, pYr] = lbPeriod.split(' ');
-        if (String(r.year) !== pYr) return false;
-        if (!r.monthName?.startsWith(pMon)) return false;
+        const norm = normalizeMonthYear(r.monthName, r.year);
+        if (!norm || norm.key !== lbPeriod) return false;
       }
       return true;
     });
   }, [reports, lbPeriod]);
+
+  // Dynamic period options for the leaderboard dropdown
+  const lbPeriodOptions = useMemo(() => {
+    const periods = new Set<string>();
+    reports.forEach(r => {
+      if (r.report_type === 'weekly') return;
+      const norm = normalizeMonthYear(r.monthName, r.year);
+      if (norm) {
+        periods.add(norm.key);
+      }
+    });
+    return Array.from(periods).sort((a, b) => {
+      const [aM, aY] = a.split(' ');
+      const [bM, bY] = b.split(' ');
+      const yearDiff = Number(bY) - Number(aY);
+      if (yearDiff !== 0) return yearDiff;
+      return MONTH_ORDER.indexOf(bM) - MONTH_ORDER.indexOf(aM);
+    });
+  }, [reports]);
 
   // Agency-wide KPIs
   const totalPoints = useMemo(() =>
@@ -307,8 +372,11 @@ export const Overview = () => {
   const monthlyTrend = useMemo(() => {
     const grouped: Record<string, number> = {};
     reports.forEach(r => {
-      if (selectedYear !== 'all' && String(r.year) !== selectedYear) return;
-      const key = `${r.monthName} ${r.year}`;
+      if (r.report_type === 'weekly') return;
+      const norm = normalizeMonthYear(r.monthName, r.year);
+      if (!norm) return;
+      if (selectedYear !== 'all' && norm.year !== selectedYear) return;
+      const key = norm.key;
       grouped[key] = (grouped[key] || 0) + getPoints(r);
     });
     return Object.entries(grouped)
@@ -325,7 +393,10 @@ export const Overview = () => {
   const monthlyTotalCommission = useMemo(() => {
     const map = new Map<string, number>();
     reports.forEach(r => {
-      const key = `${r.monthName} ${r.year}`;
+      if (r.report_type === 'weekly') return;
+      const norm = normalizeMonthYear(r.monthName, r.year);
+      if (!norm) return;
+      const key = norm.key;
       const comm = getAgentComm(r);
       map.set(key, (map.get(key) || 0) + comm);
     });
@@ -342,12 +413,14 @@ export const Overview = () => {
       });
     } else if (recordsSortOption === 'share') {
       data.sort((a, b) => {
-        const keyA = `${a.monthName} ${a.year}`;
+        const normA = normalizeMonthYear(a.monthName, a.year);
+        const keyA = normA ? normA.key : `${a.monthName} ${a.year}`;
         const totalA = monthlyTotalCommission.get(keyA) || 0;
         const hostCommA = getAgentComm(a);
         const pctA = totalA > 0 ? (hostCommA / totalA) : 0;
 
-        const keyB = `${b.monthName} ${b.year}`;
+        const normB = normalizeMonthYear(b.monthName, b.year);
+        const keyB = normB ? normB.key : `${b.monthName} ${b.year}`;
         const totalB = monthlyTotalCommission.get(keyB) || 0;
         const hostCommB = getAgentComm(b);
         const pctB = totalB > 0 ? (hostCommB / totalB) : 0;
@@ -361,8 +434,14 @@ export const Overview = () => {
       });
     } else {
       data.sort((a, b) => {
-        if (a.year !== b.year) return Number(b.year) - Number(a.year);
-        return MONTH_ORDER.indexOf(b.monthName) - MONTH_ORDER.indexOf(a.monthName);
+        const normA = normalizeMonthYear(a.monthName, a.year);
+        const normB = normalizeMonthYear(b.monthName, b.year);
+        const yA = normA ? Number(normA.year) : Number(a.year);
+        const yB = normB ? Number(normB.year) : Number(b.year);
+        const mA = normA ? normA.monthName : a.monthName;
+        const mB = normB ? normB.monthName : b.monthName;
+        if (yA !== yB) return yB - yA;
+        return MONTH_ORDER.indexOf(mB) - MONTH_ORDER.indexOf(mA);
       });
     }
     return data;
@@ -984,7 +1063,7 @@ export const Overview = () => {
               className="bg-[#0D0D14] border border-[#D4AF37]/20 rounded-lg px-3 py-1.5 text-xs font-bold text-[#FFB700] outline-none focus:border-[#D4AF37] cursor-pointer shadow-inner"
             >
               <option value="all">All Time</option>
-              {['Aug 2025', 'Sept 2025', 'Oct 2025', 'Dec 2025', 'Jan 2025', 'Feb 2025', 'Mar 2025', 'Apr 2025', 'May 2025'].map(p => <option key={p} value={p}>{p}</option>)}
+              {lbPeriodOptions.map(p => <option key={p} value={p}>{p}</option>)}
             </select>
           </div>
         </div>
@@ -1184,11 +1263,17 @@ export const Overview = () => {
                             <p className="text-[9px] text-[#A09E9A]/50 font-mono">{r.poppoId}</p>
                           </div>
                         </td>
-                        <td className="py-2 px-2 text-[#A09E9A]">{r.monthName} {r.year}</td>
+                        <td className="py-2 px-2 text-[#A09E9A]">
+                          {(() => {
+                            const norm = normalizeMonthYear(r.monthName, r.year);
+                            return norm ? norm.key : `${r.monthName} ${r.year}`;
+                          })()}
+                        </td>
                         <td className="py-2 px-2 text-cyan-400 font-mono">{fmtH(getLiveDuration(r))}</td>
                         <td className="py-2 px-2 text-purple-400 font-mono">
                           {(() => {
-                            const key = `${r.monthName} ${r.year}`;
+                            const norm = normalizeMonthYear(r.monthName, r.year);
+                            const key = norm ? norm.key : `${r.monthName} ${r.year}`;
                             const total = monthlyTotalCommission.get(key) || 0;
                             const hostComm = getAgentComm(r);
                             const pct = total > 0 ? (hostComm / total) * 100 : 0;

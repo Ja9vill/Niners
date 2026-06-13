@@ -9,6 +9,7 @@ import { useViewMode } from './hooks/useViewMode';
 // Pages & Tabs
 import { Login } from './pages/Login';
 import { Overview } from './pages/Overview';
+import { NotificationControlCenter } from './pages/NotificationControlCenter';
 import { RosterTab } from './components/RosterTab';
 import { CalendarTab } from './components/CalendarTab';
 import { DirectorOperations } from './pages/DirectorOperations';
@@ -102,6 +103,7 @@ export default function App() {
         >
           {/* Shared tabs (all authenticated roles) */}
           <Route path="dashboard" element={<Overview />} />
+          <Route path="notifications-control" element={<NotificationControlCenter />} />
 
           {/* My Profile — accessible to hosts and admin/manager/agent/head admin roles */}
           <Route
@@ -224,29 +226,29 @@ export default function App() {
             }
           />
 
-          {/* Reporting Pages (Director and Head Admin) */}
+          {/* Reporting Pages (Director Only) */}
           <Route path="reporting/events" element={
-            <RoleGuard roles={['director', 'head admin', 'head_admin']}>
+            <RoleGuard roles={['director']}>
               <ReportingPages collectionName="calendar" reportType="Events Log" />
             </RoleGuard>
           } />
           <Route path="reporting/attendance" element={
-            <RoleGuard roles={['director', 'head admin', 'head_admin']}>
+            <RoleGuard roles={['director']}>
               <ReportingPages collectionName="attendance" reportType="Attendance Log" />
             </RoleGuard>
           } />
           <Route path="reporting/pk-performance" element={
-            <RoleGuard roles={['director', 'head admin', 'head_admin']}>
+            <RoleGuard roles={['director']}>
               <ReportingPages collectionName="pk_reports" reportType="PK Performance" />
             </RoleGuard>
           } />
           <Route path="reporting/fanbase-health" element={
-            <RoleGuard roles={['director', 'head admin', 'head_admin']}>
+            <RoleGuard roles={['director']}>
               <ReportingPages collectionName="fanbase_reports" reportType="Fanbase Health" />
             </RoleGuard>
           } />
           <Route path="reporting/assigned-badges" element={
-            <RoleGuard roles={['director', 'head admin', 'head_admin']}>
+            <RoleGuard roles={['director']}>
               <ReportingPages collectionName="users" filterField="badges" reportType="Assigned Badges" />
             </RoleGuard>
           } />

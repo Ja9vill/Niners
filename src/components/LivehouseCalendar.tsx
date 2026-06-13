@@ -92,6 +92,18 @@ export const LivehouseCalendar: React.FC<LivehouseCalendarProps> = ({ allUsers, 
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [spotlightHost, setSpotlightHost] = useState<{ user: any, timeslot: string, date: string } | null>(null);
+
+  // Dynamic portal target setup to resolve iframe/mobile layout clipping
+  const containerRef = React.useRef<HTMLDivElement>(null);
+  const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
+
+  useEffect(() => {
+    if (containerRef.current) {
+      setPortalTarget(containerRef.current.ownerDocument.body);
+    } else {
+      setPortalTarget(document.body);
+    }
+  }, [spotlightHost]);
   
   const [activeDateStr, setActiveDateStr] = useState<string>(() => {
     if (sessionActiveDateStr) return sessionActiveDateStr;
@@ -278,7 +290,7 @@ export const LivehouseCalendar: React.FC<LivehouseCalendarProps> = ({ allUsers, 
   }
 
   return (
-    <div className="animate-fade-in space-y-4 bg-gradient-to-b from-[#0a0806]/90 to-[#050403]/90 backdrop-blur-2xl border border-[#D4AF37]/20 rounded-3xl p-4 sm:p-5 shadow-[0_0_40px_rgba(212,175,55,0.08)] relative overflow-hidden">
+    <div ref={containerRef} className="animate-fade-in space-y-4 bg-gradient-to-b from-[#0a0806]/90 to-[#050403]/90 backdrop-blur-2xl border border-[#D4AF37]/20 rounded-3xl p-4 sm:p-5 shadow-[0_0_40px_rgba(212,175,55,0.08)] relative overflow-hidden">
       {/* Subtle Fiery Glow Background accents */}
       <div className="absolute top-0 left-1/4 w-1/2 h-32 bg-[#FF8C00]/5 blur-[80px] pointer-events-none" />
       <div className="absolute bottom-0 right-1/4 w-1/2 h-32 bg-[#D4AF37]/5 blur-[80px] pointer-events-none" />
@@ -492,7 +504,7 @@ export const LivehouseCalendar: React.FC<LivehouseCalendarProps> = ({ allUsers, 
       </div>
 
       {/* Spotlight Modal */}
-      {spotlightHost && createPortal(
+      {spotlightHost && portalTarget && createPortal(
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-black/80 backdrop-blur-md animate-fade-in" onClick={() => setSpotlightHost(null)}>
           <div 
             className="w-full max-w-md bg-[#050301] border border-[#D4AF37]/30 shadow-[0_0_50px_rgba(255,140,0,0.2),inset_0_0_20px_rgba(212,175,55,0.1)] p-6 sm:p-8 rounded-3xl flex flex-col gap-6"
@@ -564,7 +576,7 @@ export const LivehouseCalendar: React.FC<LivehouseCalendarProps> = ({ allUsers, 
             </button>
           </div>
         </div>,
-        document.body
+        portalTarget
       )}
     </div>
   );

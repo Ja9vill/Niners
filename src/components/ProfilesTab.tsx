@@ -61,6 +61,18 @@ export const ProfilesTab: React.FC<ProfilesTabProps> = ({ isReadOnly = false }) 
   // Spotlight State
   const [selectedHost, setSelectedHost] = useState<Host | null>(null);
 
+  // Dynamic portal target setup to resolve iframe/mobile layout clipping
+  const containerRef = React.useRef<HTMLDivElement>(null);
+  const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
+
+  useEffect(() => {
+    if (containerRef.current) {
+      setPortalTarget(containerRef.current.ownerDocument.body);
+    } else {
+      setPortalTarget(document.body);
+    }
+  }, [selectedHost]);
+
   const fetchUsers = async () => {
     setIsLoading(true);
     try {
@@ -157,7 +169,7 @@ export const ProfilesTab: React.FC<ProfilesTabProps> = ({ isReadOnly = false }) 
   }
 
   return (
-    <div className="space-y-6 relative">
+    <div ref={containerRef} className="space-y-6 relative">
       {/* FILTER MENU BLOCKS */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-[#1A1A28] p-4 rounded-2xl border border-white/5 sticky top-0 z-10">
         
@@ -277,7 +289,7 @@ export const ProfilesTab: React.FC<ProfilesTabProps> = ({ isReadOnly = false }) 
       )}
 
       {/* SPOTLIGHT MODAL */}
-      {selectedHost && createPortal(
+      {selectedHost && portalTarget && createPortal(
         <div className="fixed inset-0 z-[100]">
           <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={closeSpotlight}></div>
           <div className="absolute inset-0 overflow-y-auto p-4 py-10 pointer-events-none">
@@ -291,7 +303,7 @@ export const ProfilesTab: React.FC<ProfilesTabProps> = ({ isReadOnly = false }) 
             </div>
           </div>
         </div>,
-        document.body
+        portalTarget
       )}
     </div>
   );

@@ -106,6 +106,11 @@ export const LivehouseData = () => {
   const [queueDescription, setQueueDescription] = useState('');
   const [isAddingEvent, setIsAddingEvent] = useState(false);
 
+  // Party Livehouse States
+  const [partyParticipants, setPartyParticipants] = useState<string[]>([]);
+  const [eventHostId, setEventHostId] = useState<string>('');
+  const [participantSearch, setParticipantSearch] = useState('');
+
   useEffect(() => {
     loadFirestoreData();
     loadDependencies();
@@ -153,6 +158,8 @@ export const LivehouseData = () => {
           description: `Auto-generated from approved Livehouse Request for ${req.name}. Timeslot: ${req.timeslot}`,
           participants_id: [req.poppoId],
           poppo_id: req.poppoId,
+          event_host_id: req.poppoId,
+          visibility: 'all',
           created_by_id: adminState.poppo_id || 'system',
           created_by_name: adminState.nickname || 'System Auto-Approve',
           created_by_role: adminState.role || 'Admin',
@@ -424,6 +431,9 @@ export const LivehouseData = () => {
       setQueueEventType('Solo Livehouse');
       setQueueEventTitle(`${currentRecommendation.nickname} - Solo Livehouse`);
       setQueueDescription('');
+      setPartyParticipants([currentRecommendation.poppo_id]);
+      setEventHostId(currentRecommendation.poppo_id);
+      setParticipantSearch('');
     }
   }, [currentRecommendation]);
 
@@ -446,10 +456,14 @@ export const LivehouseData = () => {
       const authState = Storage.getAuthState();
       const eventId = `evt_${Date.now()}_${currentRecommendation.poppo_id}`;
       
+      const chosenHostId = queueEventType === 'Solo Livehouse' ? currentRecommendation.poppo_id : eventHostId;
+      const chosenParticipants = queueEventType === 'Solo Livehouse' ? [currentRecommendation.poppo_id] : partyParticipants;
+
       const newEvent = {
         id: eventId,
         event_id: eventId,
-        poppo_id: currentRecommendation.poppo_id,
+        poppo_id: chosenHostId,
+        event_host_id: chosenHostId,
         title: queueEventTitle || `${currentRecommendation.nickname} - ${queueEventType}`,
         type_of_event: queueEventType,
         type: queueEventType,
@@ -457,10 +471,11 @@ export const LivehouseData = () => {
         date: currentRecommendation.date,
         time: currentRecommendation.timeslot,
         description: queueDescription,
-        participants_id: [currentRecommendation.poppo_id],
-        participants: [currentRecommendation.poppo_id],
+        participants_id: chosenParticipants,
+        participants: chosenParticipants,
+        visibility: 'all',
         is_automated: false, // manually confirmed
-        created_by_id: authState.id || "admin",
+        created_by_id: authState.poppo_id || authState.id || "admin",
         created_by_name: authState.nickname || authState.name || "Admin",
         created_by_role: authState.role || "admin",
         timestamp: new Date().toISOString()
@@ -696,6 +711,118 @@ export const LivehouseData = () => {
                     placeholder="Add an event description..."
                   />
                 </div>
+
+                {queueEventType === 'Party Livehouse' && (
+                  <div className="border border-[#D4AF37]/20 rounded-xl p-4 bg-black/45 space-y-4 relative z-20">
+                    <h3 className="text-xs font-black uppercase tracking-widest text-[#D4AF37] border-b border-white/5 pb-2">Party Setup</h3>
+                    
+                    {/* Add Participants Selector */}
+                    <div className="space-y-2 relative">
+                      <label className="block text-[9px] font-black text-[#A09E9A] uppercase tracking-wider">Search & Add Participants</label>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          value={participantSearch}
+                          onChange={e => setParticipantSearch(e.target.value)}
+                          className="w-full bg-black/60 border border-white/10 focus:border-[#D4AF37] rounded-lg px-3 py-2 text-xs text-white outline-none"
+                          placeholder="Search by ID or Nickname..."
+                        />
+                        {participantSearch.trim() && (
+                          <div className="absolute left-0 right-0 mt-1 bg-[#1A120E] border border-[#D4AF37]/30 rounded-lg max-h-40 overflow-y-auto z-50 shadow-2xl">
+                            {users
+                              .filter(u => {
+                                const idStr = String(u.poppo_id || u.id || '').toLowerCase();
+                                const nameStr = String(u.nickname || u.name || '').toLowerCase();
+                                const searchStr = participantSearch.toLowerCase();
+                                return (idStr.includes(searchStr) || nameStr.includes(searchStr)) && 
+                                       !partyParticipants.includes(u.poppo_id || u.id);
+                              })
+                              .slice(0, 5)
+                              .map(u => {
+                                const uid = u.poppo_id || u.id;
+                                return (
+                                  <button
+                                    key={uid}
+                                    type="button"
+                                    onClick={() => {
+                                      setPartyParticipants(prev => [...prev, uid]);
+                                      setParticipantSearch('');
+                                    }}
+                                    className="w-full text-left px-3 py-2 text-xs hover:bg-[#D4AF37]/20 text-white flex justify-between items-center border-b border-white/5 last:border-none"
+                                  >
+                                    <span>{u.nickname || u.name}</span>
+                                    <span className="text-[10px] text-[#D4AF37] font-mono">ID: {uid}</span>
+                                  </button>
+                                );
+                              })}
+                            {users.filter(u => {
+                                const idStr = String(u.poppo_id || u.id || '').toLowerCase();
+                                const nameStr = String(u.nickname || u.name || '').toLowerCase();
+                                const searchStr = participantSearch.toLowerCase();
+                                return (idStr.includes(searchStr) || nameStr.includes(searchStr)) && 
+                                       !partyParticipants.includes(u.poppo_id || u.id);
+                              }).length === 0 && (
+                                <div className="px-3 py-2 text-xs text-white/40 italic">No members found</div>
+                              )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Participant Chips */}
+                    <div className="space-y-1.5">
+                      <label className="block text-[9px] font-black text-[#A09E9A] uppercase tracking-wider">Selected Participants</label>
+                      <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto">
+                        {partyParticipants.map(pid => {
+                          const user = users.find(u => String(u.poppo_id || u.id) === String(pid));
+                          const displayName = user ? (user.nickname || user.name) : pid;
+                          return (
+                            <span 
+                              key={pid} 
+                              className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-[#D4AF37]/10 border border-[#D4AF37]/30 text-white text-[10px] font-bold"
+                            >
+                              <span>{displayName} (ID: {pid})</span>
+                              {pid !== currentRecommendation.poppo_id && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setPartyParticipants(prev => prev.filter(x => x !== pid));
+                                    if (eventHostId === pid) {
+                                      setEventHostId(currentRecommendation.poppo_id);
+                                    }
+                                  }}
+                                  className="text-red-400 hover:text-red-300 font-bold transition-colors ml-1"
+                                >
+                                  <X size={10} />
+                                </button>
+                              )}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Designated Event Host Selector */}
+                    <div className="space-y-1.5">
+                      <label className="block text-[9px] font-black text-[#D4AF37] uppercase tracking-wider">Designated Event Host *</label>
+                      <select
+                        value={eventHostId}
+                        onChange={e => setEventHostId(e.target.value)}
+                        className="w-full bg-black/60 border border-white/10 focus:border-[#D4AF37] rounded-lg px-3 py-2 text-xs text-white outline-none"
+                      >
+                        {partyParticipants.map(pid => {
+                          const user = users.find(u => String(u.poppo_id || u.id) === String(pid));
+                          const displayName = user ? (user.nickname || user.name) : pid;
+                          return (
+                            <option key={pid} value={pid} className="bg-[#0A0500] text-white">
+                              {displayName} (ID: {pid})
+                            </option>
+                          );
+                        })}
+                      </select>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 

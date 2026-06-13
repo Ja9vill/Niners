@@ -146,6 +146,7 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
     try {
       const docRef = doc(db, 'livehouse_requests', req.id);
       await setDoc(docRef, { ...req, status: 'Approved' }, { merge: true });
+      await FirebaseService.notifyHostIfRegistered(req.poppoId, req.date, req.timeslot);
 
       // Create Calendar Event in 'calendar' collection
       const eventId = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 15);
@@ -506,6 +507,7 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
     links.push({ path: '/roster', label: 'Roster', icon: Users });
     links.push({ path: '/calendar', label: 'Calendar', icon: Calendar });
     links.push({ path: '/my-profile', label: 'My Profile', icon: User });
+    links.push({ path: '/notifications-control', label: 'Notification Center', icon: Bell });
 
     const role = (authState.role || '').toLowerCase();
     
@@ -538,20 +540,6 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
         ]
       });
 
-      links.push({
-        id: 'dropdown-reporting',
-        isDropdown: true,
-        label: 'Reporting',
-        icon: BarChart,
-        subLinks: [
-          { path: '/reporting/events', label: 'Events Log', icon: Calendar },
-          { path: '/reporting/attendance', label: 'Attendance Log', icon: ClipboardList },
-          { path: '/reporting/pk-performance', label: 'PK Performance', icon: Activity },
-          { path: '/reporting/fanbase-health', label: 'Fanbase Health', icon: Users },
-          { path: '/reporting/assigned-badges', label: 'Assigned Badges', icon: Award }
-        ]
-      });
-      
       if (role === 'director') {
         links.push({ isDivider: true, id: 'div-2' });
         links.push({ isTitle: true, label: "Directors Access", id: 'title-access' });
@@ -559,6 +547,19 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
         links.push({ path: '/financial-data', label: 'Financial Data', icon: DollarSign });
         links.push({ path: '/collections-log', label: 'Collections Log', icon: Database });
         links.push({ path: '/data-vault', label: 'Data Vault', icon: Shield });
+
+        links.push({
+          id: 'dropdown-reporting',
+          isDropdown: true,
+          label: 'Reporting',
+          icon: BarChart,
+          subLinks: [
+            { path: '/reporting/events', label: 'Events Log', icon: Calendar },
+            { path: '/reporting/attendance', label: 'Attendance Log', icon: ClipboardList },
+            { path: '/reporting/pk-performance', label: 'PK Performance', icon: Activity },
+            { path: '/reporting/fanbase-health', label: 'Fanbase Health', icon: Users }
+          ]
+        });
       }
     } else if (role === 'manager' || role === 'agent') {
       links.push({ isDivider: true, id: 'div-manager' });

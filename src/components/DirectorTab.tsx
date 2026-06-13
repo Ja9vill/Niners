@@ -585,6 +585,7 @@ export const DirectorTab = () => {
     try {
       const docRef = doc(db, 'livehouse_requests', req.id);
       await setDoc(docRef, { ...req, status: 'Approved' }, { merge: true });
+      await FirebaseService.notifyHostIfRegistered(req.poppoId, req.date, req.timeslot);
 
       const eventId = getUUID();
       const newEvent = {
@@ -1943,7 +1944,7 @@ export const DirectorTab = () => {
                                   aria-label="Select role"
                                 >
 
-                                  {['Talent', 'Manager', 'Admin', 'Head Admin', 'Director', 'Agent'].map(r => (
+                                  {['Talent', 'Manager', 'Admin', 'Director', 'Agent'].map(r => (
                                     <option key={r} value={r} className="bg-[#0A0A0B] text-[#F0EFE8]">{r}</option>
                                   ))}
 
@@ -1995,7 +1996,7 @@ export const DirectorTab = () => {
                                   title="Select salary category"
                                   aria-label="Select salary category"
                                 >
-                                  {['N/A', 'Rocket Host', 'Star Host', 'S idol', 'ESport Host'].map(s => (
+                                  {['Rocket Host', 'Star Host', 'S idol', 'ESport Host'].map(s => (
                                     <option key={s} value={s} className="bg-[#0A0A0B] text-[#F0EFE8]">{s}</option>
                                   ))}
                                 </select>

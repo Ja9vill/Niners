@@ -111,15 +111,43 @@ export const LivehouseBookingModal: React.FC<LivehouseBookingModalProps> = ({
     try {
       await FirebaseService.saveLivehouseRequests(updatedRequests);
       await FirebaseService.logSystemActivity(`Host requested livehouse timeslot: ${timeslot} on ${date} (Host: ${hostName}, Poppo ID: ${hostPoppoId}, Type: ${selectedType}, Notes: "${notes}")`, 'Info');
+      
+      try {
+        const dateObj = new Date(date);
+        // Correctly handle timezone issues by formatting parts or just doing simple local timezone formatting
+        const formattedDate = !isNaN(dateObj.getTime()) 
+          ? dateObj.toLocaleDateString('en-US', { month: 'long', day: 'numeric', timeZone: 'UTC' }) 
+          : date;
+
+        const webhookUrl = 'https://open.larksuite.com/open-apis/bot/v2/hook/2ddbdcff-fbd9-487c-9da6-d66d0f9fc259';
+        const messageText = `Type of event: ${selectedType}\nDate: ${formattedDate}\nTimeslot: ${timeslot}\nNickname: ${hostName}\nPoppo ID: ${hostPoppoId}`;
+        
+        await fetch(webhookUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            msg_type: "text",
+            content: {
+              text: messageText
+            }
+          })
+        });
+      } catch (webhookErr) {
+        console.error("Failed to send Lark webhook:", webhookErr);
+      }
+
     } catch (err) {
       console.error("Firestore sync failed for reservation request:", err);
     }
 
     Storage.addLog('Calendar', `Requested livehouse slot: ${timeslot} on ${date}`, hostName);
+    
+    // Alert the submitter and add dashboard notification
+    alert("Your request has been successfully forwarded to the related admin of Poppo Live. You will receive a notification once your request is approved.");
     Storage.addNotification({
-      title: 'New Livehouse Request',
-      message: `Host ${hostName} (${hostPoppoId}) requested Livehouse slot on ${date} at ${timeslot}.`,
-      type: 'info'
+      title: 'Request Forwarded',
+      message: 'Your request has been successfully forwarded to the related admin of Poppo Live. You will receive a notification once your request is approved.',
+      type: 'success'
     });
 
     onClose();
@@ -128,13 +156,13 @@ export const LivehouseBookingModal: React.FC<LivehouseBookingModalProps> = ({
   return (
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-[1000] flex items-center justify-center p-6">
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
-          <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="relative glass-card w-full max-w-lg rounded-3xl overflow-hidden z-10 max-h-[90vh] overflow-y-auto custom-scrollbar p-0 bg-[#0A0B0E] border border-[#D4AF37]/30 shadow-2xl shadow-[#D4AF37]/10">
-            <div className="p-6 border-b border-[#D4AF37]/20 font-black text-[#D4AF37] uppercase tracking-widest text-[12px] bg-[#1a120e]">
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} className="fixed inset-0 bg-black/60 backdrop-blur-sm" />
+          <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="relative glass-card w-full max-w-lg rounded-3xl overflow-hidden z-10 flex flex-col max-h-[90vh] p-0 bg-[#0A0B0E] border border-[#D4AF37]/30 shadow-2xl shadow-[#D4AF37]/10">
+            <div className="p-6 border-b border-[#D4AF37]/20 font-black text-[#D4AF37] uppercase tracking-widest text-[12px] bg-[#1a120e] shrink-0">
               REQUEST NEW LIVEHOUSE EVENT
             </div>
-            <form onSubmit={handleSubmit} className="p-6 space-y-5">
+            <form onSubmit={handleSubmit} className="p-6 space-y-5 overflow-y-auto custom-scrollbar flex-1">
               <fieldset disabled={!isLoggedIn} className="space-y-5 group">
                 
                 {!isLoggedIn && (
@@ -144,18 +172,26 @@ export const LivehouseBookingModal: React.FC<LivehouseBookingModalProps> = ({
                 )}
               
               {!isHostRole && (
-                <div className="grid grid-cols-3 gap-4 mb-2 p-3 rounded-xl border border-white/10 bg-white/5">
+                <div className="grid grid-cols-5 gap-4 mb-2 p-3 rounded-xl border border-white/10 bg-white/5">
                   <div className="space-y-1">
-                    <label className="text-[9px] font-black text-white/40 uppercase tracking-widest block">Reporter ID</label>
-                    <div className="text-[11px] font-bold text-white/70">{auth?.poppo_id}</div>
+                    <label className="text-[9px] font-black text-white/40 uppercase tracking-widest block truncate">Role</label>
+                    <div className="text-[11px] font-bold text-white/70 truncate">{auth?.role}</div>
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[9px] font-black text-white/40 uppercase tracking-widest block">Reporter Name</label>
-                    <div className="text-[11px] font-bold text-white/70">{auth?.nickname || auth?.name}</div>
+                    <label className="text-[9px] font-black text-white/40 uppercase tracking-widest block truncate">Name</label>
+                    <div className="text-[11px] font-bold text-white/70 truncate">{auth?.nickname || auth?.name}</div>
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[9px] font-black text-white/40 uppercase tracking-widest block">Role</label>
-                    <div className="text-[11px] font-bold text-white/70">{auth?.role}</div>
+                    <label className="text-[9px] font-black text-white/40 uppercase tracking-widest block truncate">ID</label>
+                    <div className="text-[11px] font-bold text-white/70 truncate">{auth?.poppo_id}</div>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black text-white/40 uppercase tracking-widest block truncate">Date</label>
+                    <div className="text-[11px] font-bold text-[#D4AF37] truncate">{date}</div>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black text-white/40 uppercase tracking-widest block truncate">Timeslot</label>
+                    <div className="text-[11px] font-bold text-[#D4AF37] truncate">{timeslot}</div>
                   </div>
                 </div>
               )}
@@ -178,86 +214,90 @@ export const LivehouseBookingModal: React.FC<LivehouseBookingModalProps> = ({
                       className="w-full bg-black/50 border border-[#D4AF37]/20 rounded-xl px-4 py-3 text-xs text-white/50 cursor-not-allowed" 
                     />
                   </div>
-                </div>
-              ) : (
-                <div className="space-y-1.5 relative">
-                  <label className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">Search & Select Host</label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <Search size={14} className="text-[#D4AF37]/50" />
-                    </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">Date Selector (Locked)</label>
                     <input 
-                      type="text"
-                      value={searchQuery}
-                      onChange={(e) => {
-                        setSearchQuery(e.target.value);
-                        setIsDropdownOpen(true);
-                      }}
-                      onFocus={() => setIsDropdownOpen(true)}
-                      onBlur={() => setTimeout(() => setIsDropdownOpen(false), 200)}
-                      placeholder="Search by name, nickname or Poppo ID..."
-                      className="w-full bg-[#181B24] border border-[#D4AF37]/20 focus:border-[#D4AF37]/60 rounded-xl pl-9 pr-4 py-3 text-xs text-white transition-all"
+                      disabled 
+                      value={date} 
+                      type={prefillDate ? 'text' : 'date'}
+                      className="w-full bg-black/50 border border-[#D4AF37]/20 rounded-xl px-4 py-3 text-xs text-white/50 cursor-not-allowed" 
                     />
                   </div>
-                  
-                  {isDropdownOpen && searchQuery && (
-                    <div className="absolute z-50 mt-1 w-full bg-[#0A0B0E] border border-[#D4AF37]/30 rounded-xl shadow-2xl max-h-48 overflow-y-auto custom-scrollbar">
-                      {filteredHosts.length > 0 ? (
-                        filteredHosts.map(h => (
-                          <div 
-                            key={h.id || h.poppo_id}
-                            onMouseDown={() => handleSelectHost(h)}
-                            className="px-4 py-2 hover:bg-[#D4AF37]/20 cursor-pointer border-b border-white/5 last:border-0 flex justify-between items-center"
-                          >
-                            <span className="text-xs text-white font-bold">{h.nickname || h.name}</span>
-                            <span className="text-[10px] text-[#D4AF37]">{h.id || h.poppo_id}</span>
-                          </div>
-                        ))
-                      ) : (
-                        <div className="px-4 py-3 text-xs text-white/50 text-center">No hosts found</div>
-                      )}
-                    </div>
-                  )}
-                  
-                  {targetPoppoId && (
-                    <div className="grid grid-cols-2 gap-4 mt-2">
-                      <div className="bg-black/40 border border-[#D4AF37]/20 rounded-lg px-3 py-2">
-                        <span className="block text-[8px] text-white/40 uppercase tracking-widest">Selected Poppo ID</span>
-                        <span className="text-xs text-[#D4AF37] font-bold">{targetPoppoId}</span>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">Timeslot (Locked)</label>
+                    <input 
+                      disabled 
+                      value={timeslot} 
+                      className="w-full bg-black/50 border border-[#D4AF37]/20 rounded-xl px-4 py-3 text-xs text-white/50 cursor-not-allowed" 
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="space-y-1.5 relative">
+                    <label className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">Search & Select Host</label>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <Search size={14} className="text-[#D4AF37]/50" />
                       </div>
-                      <div className="bg-black/40 border border-[#D4AF37]/20 rounded-lg px-3 py-2">
-                        <span className="block text-[8px] text-white/40 uppercase tracking-widest">Selected Host Name</span>
-                        <span className="text-xs text-[#D4AF37] font-bold">{targetHostName}</span>
-                      </div>
+                      <input 
+                        type="text"
+                        value={searchQuery}
+                        onChange={(e) => {
+                          setSearchQuery(e.target.value);
+                          setIsDropdownOpen(true);
+                        }}
+                        onFocus={() => setIsDropdownOpen(true)}
+                        onBlur={() => setTimeout(() => setIsDropdownOpen(false), 200)}
+                        placeholder="Search by name, nickname or Poppo ID..."
+                        className="w-full bg-[#181B24] border border-[#D4AF37]/20 focus:border-[#D4AF37]/60 rounded-xl pl-9 pr-4 py-3 text-xs text-white transition-all"
+                      />
                     </div>
-                  )}
+                    
+                    {isDropdownOpen && searchQuery && (
+                      <div className="absolute z-50 mt-1 w-full bg-[#0A0B0E] border border-[#D4AF37]/30 rounded-xl shadow-2xl max-h-48 overflow-y-auto custom-scrollbar">
+                        {filteredHosts.length > 0 ? (
+                          filteredHosts.map(h => (
+                            <div 
+                              key={h.id || h.poppo_id}
+                              onMouseDown={() => handleSelectHost(h)}
+                              className="px-4 py-2 hover:bg-[#D4AF37]/20 cursor-pointer border-b border-white/5 last:border-0 flex justify-between items-center"
+                            >
+                              <span className="text-xs text-white font-bold">{h.nickname || h.name}</span>
+                              <span className="text-[10px] text-[#D4AF37]">{h.id || h.poppo_id}</span>
+                            </div>
+                          ))
+                        ) : (
+                          <div className="px-4 py-3 text-xs text-white/50 text-center">No hosts found</div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">Poppo ID</label>
+                      <input 
+                        type="text" 
+                        value={targetPoppoId} 
+                        onChange={(e) => setTargetPoppoId(e.target.value)}
+                        placeholder="Enter or select Poppo ID"
+                        className="w-full bg-[#181B24] border border-[#D4AF37]/20 focus:border-[#D4AF37]/60 rounded-xl px-4 py-3 text-xs text-white transition-all" 
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">Host Name</label>
+                      <input 
+                        type="text" 
+                        value={targetHostName} 
+                        onChange={(e) => setTargetHostName(e.target.value)}
+                        placeholder="Enter or select Host Name"
+                        className="w-full bg-[#181B24] border border-[#D4AF37]/20 focus:border-[#D4AF37]/60 rounded-xl px-4 py-3 text-xs text-white transition-all" 
+                      />
+                    </div>
+                  </div>
                 </div>
               )}
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">Date</label>
-                  <input 
-                    value={date} 
-                    onChange={(e) => setDate(e.target.value)}
-                    type={prefillDate ? 'text' : 'date'}
-                    disabled={!!prefillDate}
-                    className="w-full bg-[#181B24] border border-[#D4AF37]/20 focus:border-[#D4AF37]/60 rounded-xl px-4 py-3 text-xs text-white disabled:opacity-50 disabled:cursor-not-allowed transition-all" 
-                    required
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">Timeslot</label>
-                  <input 
-                    value={timeslot} 
-                    onChange={(e) => setTimeslot(e.target.value)}
-                    placeholder="e.g. 07:00 PM - 08:00 PM"
-                    disabled={!!prefillTimeslot}
-                    className="w-full bg-[#181B24] border border-[#D4AF37]/20 focus:border-[#D4AF37]/60 rounded-xl px-4 py-3 text-xs text-white disabled:opacity-50 disabled:cursor-not-allowed transition-all" 
-                    required
-                  />
-                </div>
-              </div>
 
               <div className="space-y-1.5">
                 <label className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">Livehouse Type</label>

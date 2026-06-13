@@ -32,8 +32,8 @@ var import_messaging = require("firebase-admin/messaging");
 // src/server/auth.ts
 var import_express = require("express");
 var import_app = require("firebase-admin/app");
-var import_auth = require("firebase-admin/auth");
-var import_firestore = require("firebase-admin/firestore");
+var import_auth2 = require("firebase-admin/auth");
+var import_firestore2 = require("firebase-admin/firestore");
 var import_storage = require("firebase-admin/storage");
 var import_jsonwebtoken = __toESM(require("jsonwebtoken"), 1);
 var import_bcrypt = __toESM(require("bcrypt"), 1);
@@ -114,6 +114,225 @@ async function initFirebaseSecrets() {
   }
 }
 
+// src/server/cron.ts
+var import_firestore = require("firebase-admin/firestore");
+async function acquireLock(jobName, intervalMinutes) {
+  const db = getAdminFirestore();
+  const lockRef = db.collection("system").doc("cron_state");
+  try {
+    return await db.runTransaction(async (transaction) => {
+      const doc = await transaction.get(lockRef);
+      const now = Date.now();
+      if (!doc.exists) {
+        transaction.set(lockRef, { [jobName]: now });
+        return true;
+      }
+      const data = doc.data() || {};
+      const lastRun = data[jobName] || 0;
+      const intervalMs = intervalMinutes * 60 * 1e3 - 6e4;
+      if (now - lastRun < intervalMs) {
+        return false;
+      }
+      transaction.update(lockRef, { [jobName]: now });
+      return true;
+    });
+  } catch (error) {
+    console.error(`Failed to acquire lock for ${jobName}:`, error);
+    return false;
+  }
+}
+async function runAutoSyncLivehouseData(ignoreLock = false) {
+  if (!ignoreLock && !await acquireLock("autoSyncLivehouseData", 15)) return;
+  const API_URL = "https://script.google.com/macros/s/AKfycbxI-gtTa_gjoBHJZIZ1k7XYkXsEomPhBYi6oweGi_9_4GLC8YloEs72IOCj89EKBrQsfw/exec";
+  const db = getAdminFirestore();
+  try {
+    const response = await fetch(API_URL);
+    const data = await response.json();
+    if (!data || data.status === "error" || !Array.isArray(data)) {
+      console.warn("Livehouse auto-sync aborted: Invalid or error data returned from Apps Script.", data);
+      return;
+    }
+    const scheduleRows = data;
+    const maxBatchSize = 400;
+    let batch = db.batch();
+    let batchCount = 0;
+    const commitBatchIfNeeded = async () => {
+      if (batchCount >= maxBatchSize) {
+        await batch.commit();
+        batch = db.batch();
+        batchCount = 0;
+      }
+    };
+    const path2 = "livehouse_schedule";
+    const snap = await db.collection(path2).get();
+    const oldSchedule = /* @__PURE__ */ new Map();
+    for (const d of snap.docs) {
+      oldSchedule.set(d.id, d.data());
+      batch.delete(d.ref);
+      batchCount++;
+      await commitBatchIfNeeded();
+    }
+    const validCalendarEventIds = [];
+    const logsRef = db.collection("livehouse_logs");
+    for (const r of scheduleRows) {
+      if (!r.date || !r.timeslot) continue;
+      const docId = `${r.date}_${r.timeslot}`.replace(/[^a-zA-Z0-9_-]/g, "_");
+      const oldRow = oldSchedule.get(docId);
+      const newSlot1 = String(r.slot_1?.poppo_id || "").trim();
+      const oldSlot1 = String(oldRow?.slot_1?.poppo_id || "").trim();
+      if (newSlot1 && newSlot1 !== oldSlot1) {
+        const logDocRef = logsRef.doc();
+        batch.set(logDocRef, {
+          poppo_id: newSlot1,
+          date: r.date,
+          timeslot: r.timeslot,
+          timestamp: import_firestore.FieldValue.serverTimestamp(),
+          source: "auto-sync"
+        });
+        batchCount++;
+        await commitBatchIfNeeded();
+      }
+      const newSlot2 = String(r.slot_2?.poppo_id || "").trim();
+      const oldSlot2 = String(oldRow?.slot_2?.poppo_id || "").trim();
+      if (newSlot2 && newSlot2 !== oldSlot2) {
+        const logDocRef = logsRef.doc();
+        batch.set(logDocRef, {
+          poppo_id: newSlot2,
+          date: r.date,
+          timeslot: r.timeslot,
+          timestamp: import_firestore.FieldValue.serverTimestamp(),
+          source: "auto-sync"
+        });
+        batchCount++;
+        await commitBatchIfNeeded();
+      }
+      const docRef = db.collection(path2).doc(docId);
+      batch.set(docRef, r);
+      batchCount++;
+      await commitBatchIfNeeded();
+    }
+    const syncStatusRef = db.collection("system").doc("livehouse_sync");
+    batch.set(syncStatusRef, {
+      last_synced_at: import_firestore.FieldValue.serverTimestamp(),
+      last_synced_iso: (/* @__PURE__ */ new Date()).toISOString()
+    }, { merge: true });
+    batchCount++;
+    await commitBatchIfNeeded();
+    if (batchCount > 0) {
+      await batch.commit();
+    }
+    console.log(`Successfully completed automated Livehouse sync! Extracted ${scheduleRows.length} timeslots.`);
+  } catch (err) {
+    console.error("Failed to execute autoSyncLivehouseData:", err);
+  }
+}
+function parseManilaTimeToUTC(dateStr, timeStr) {
+  try {
+    const timeMatch = timeStr.match(/(\d{1,2}):(\d{2})\s+(AM|PM)/i);
+    if (!timeMatch) return 0;
+    let hours = parseInt(timeMatch[1], 10);
+    const minutes = parseInt(timeMatch[2], 10);
+    const ampm = timeMatch[3].toUpperCase();
+    if (ampm === "PM" && hours < 12) hours += 12;
+    if (ampm === "AM" && hours === 12) hours = 0;
+    const paddedHours = hours.toString().padStart(2, "0");
+    const paddedMinutes = minutes.toString().padStart(2, "0");
+    const isoString = `${dateStr}T${paddedHours}:${paddedMinutes}:00+08:00`;
+    const eventDate = new Date(isoString);
+    return eventDate.getTime();
+  } catch (e) {
+    return 0;
+  }
+}
+async function runCheckUpcomingEvents() {
+  if (!await acquireLock("checkUpcomingEvents", 5)) return;
+  const db = getAdminFirestore();
+  const now = Date.now();
+  try {
+    const calendarRef = db.collection("calendar");
+    const snapshot = await calendarRef.where("notifiedStart", "!=", true).get();
+    if (snapshot.empty) return;
+    const batch = db.batch();
+    const announcementsRef = db.collection("announcements");
+    let batchCount = 0;
+    snapshot.docs.forEach((doc) => {
+      const data = doc.data();
+      if (!data.date || !data.time) return;
+      const eventTimeMs = parseManilaTimeToUTC(data.date, data.time);
+      if (eventTimeMs === 0) return;
+      const timeDiffMins = (eventTimeMs - now) / (1e3 * 60);
+      if (!data.notified30Min && timeDiffMins > 0 && timeDiffMins <= 35 && timeDiffMins >= 25) {
+        const annRef = announcementsRef.doc();
+        batch.set(annRef, {
+          title: `Starting in 30 mins: ${data.title || "Upcoming Event"}`,
+          content: `${data.title || "The event"} starts in 30 minutes! Show up and support your co-niners. Flag the comment section to help boost their livestream. Remember, all attendance is recorded and impacts your performance scores/ratio!`,
+          type: "System",
+          priority: "high",
+          timestamp: (/* @__PURE__ */ new Date()).toISOString(),
+          createdAt: import_firestore.FieldValue.serverTimestamp()
+        });
+        batch.update(doc.ref, { notified30Min: true });
+        batchCount += 2;
+      }
+      if (!data.notifiedStart && timeDiffMins <= 5 && timeDiffMins >= -5) {
+        const annRef = announcementsRef.doc();
+        batch.set(annRef, {
+          title: `Event Starting NOW: ${data.title || "Live Event"}`,
+          content: `${data.title || "The event"} is starting right now! Join the stream, drop your comments, and support the agency!`,
+          type: "System",
+          priority: "urgent",
+          timestamp: (/* @__PURE__ */ new Date()).toISOString(),
+          createdAt: import_firestore.FieldValue.serverTimestamp()
+        });
+        batch.update(doc.ref, { notifiedStart: true, notified30Min: true });
+        batchCount += 2;
+      }
+    });
+    if (batchCount > 0) {
+      await batch.commit();
+      console.log(`Committed ${batchCount} operations for upcoming events.`);
+    }
+  } catch (err) {
+    console.error("Failed to check upcoming events:", err);
+  }
+}
+async function runCleanupOldSystemLogs() {
+  if (!await acquireLock("cleanupOldSystemLogs", 24 * 60)) return;
+  const db = getAdminFirestore();
+  const thirtyDaysAgo = /* @__PURE__ */ new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  const cutoffTimestamp = thirtyDaysAgo.toISOString();
+  try {
+    const logsRef = db.collection("system_logs");
+    const oldLogsQuery = logsRef.where("timestamp", "<", cutoffTimestamp).limit(500);
+    let deletedCount = 0;
+    while (true) {
+      const snapshot = await oldLogsQuery.get();
+      if (snapshot.empty) break;
+      const batch = db.batch();
+      snapshot.docs.forEach((doc) => {
+        batch.delete(doc.ref);
+      });
+      await batch.commit();
+      deletedCount += snapshot.size;
+    }
+    if (deletedCount > 0) {
+      console.log(`Successfully deleted ${deletedCount} old system_logs.`);
+    }
+  } catch (err) {
+    console.error("Failed to clean up old system_logs:", err);
+  }
+}
+function startCronJobs() {
+  console.log("Starting backend cron jobs...");
+  runAutoSyncLivehouseData().catch(console.error);
+  runCheckUpcomingEvents();
+  runCleanupOldSystemLogs();
+  setInterval(runAutoSyncLivehouseData, 15 * 60 * 1e3);
+  setInterval(runCheckUpcomingEvents, 5 * 60 * 1e3);
+  setInterval(runCleanupOldSystemLogs, 24 * 60 * 60 * 1e3);
+}
+
 // src/server/auth.ts
 var router = (0, import_express.Router)();
 var JWT_SECRET = process.env.JWT_SECRET || "nine-dashboard-secret-key-12345";
@@ -146,7 +365,7 @@ function getFirebaseAdminApp() {
 }
 function getAdminFirestore() {
   const app = getFirebaseAdminApp();
-  return (0, import_firestore.getFirestore)(app, "ai-studio-f578d03a-99b3-4c41-84dd-9901137e8386");
+  return (0, import_firestore2.getFirestore)(app, "ai-studio-f578d03a-99b3-4c41-84dd-9901137e8386");
 }
 async function getCallerPoppoId(uid) {
   if (!uid) return "";
@@ -167,7 +386,7 @@ async function getCallerPoppoId(uid) {
 }
 async function syncCustomClaims(poppoId, role, tempPasswordRequired) {
   try {
-    const authInstance = (0, import_auth.getAuth)(getFirebaseAdminApp());
+    const authInstance = (0, import_auth2.getAuth)(getFirebaseAdminApp());
     const claims = {
       role: role || "host",
       isSuperAdmin: (role || "").toLowerCase() === "director",
@@ -537,7 +756,7 @@ router.post("/set-initial-password", loginRateLimiter, async (req, res) => {
     if (!isFirstLogin) {
       return res.status(403).json({ error: "This account is not eligible for password setup." });
     }
-    const adminAuth = (0, import_auth.getAuth)(getFirebaseAdminApp());
+    const adminAuth = (0, import_auth2.getAuth)(getFirebaseAdminApp());
     const hashPassword = async (pwd) => import_bcrypt.default.hash(pwd, BCRYPT_ROUNDS);
     try {
       try {
@@ -594,7 +813,7 @@ router.post("/google-login", async (req, res) => {
     if (!idToken) {
       return res.status(400).json({ error: "idToken is required" });
     }
-    const auth = (0, import_auth.getAuth)(getFirebaseAdminApp());
+    const auth = (0, import_auth2.getAuth)(getFirebaseAdminApp());
     const decoded = await auth.verifyIdToken(idToken);
     const uid = decoded.uid;
     const email = decoded.email || "";
@@ -689,7 +908,7 @@ router.post("/google-register", async (req, res) => {
     if (!/^\d+$/.test(cleanPoppoId)) {
       return res.status(400).json({ error: "Poppo ID must be a numeric value" });
     }
-    const auth = (0, import_auth.getAuth)(getFirebaseAdminApp());
+    const auth = (0, import_auth2.getAuth)(getFirebaseAdminApp());
     const decoded = await auth.verifyIdToken(idToken);
     const uid = decoded.uid;
     const email = decoded.email || "";
@@ -772,7 +991,7 @@ router.post("/verify", async (req, res) => {
     if (!idToken) {
       return res.status(400).json({ error: "idToken is required" });
     }
-    const auth = (0, import_auth.getAuth)(getFirebaseAdminApp());
+    const auth = (0, import_auth2.getAuth)(getFirebaseAdminApp());
     const decoded = await auth.verifyIdToken(idToken);
     return res.json({
       uid: decoded.uid,
@@ -784,6 +1003,24 @@ router.post("/verify", async (req, res) => {
   } catch (error) {
     console.error("Token verification failed:", error);
     return res.status(401).json({ error: error?.message || "Unauthorized" });
+  }
+});
+router.post("/livehouse/sync", requireAuth(3), async (req, res) => {
+  try {
+    await runAutoSyncLivehouseData(true);
+    res.json({ success: true, message: "Sync triggered successfully. The UI will update automatically." });
+  } catch (error) {
+    console.error("Manual Livehouse Sync Error:", error);
+    res.status(500).json({ error: error?.message || "Failed to sync Livehouse data." });
+  }
+});
+router.post("/public/livehouse/sync", async (req, res) => {
+  try {
+    await runAutoSyncLivehouseData(false);
+    res.json({ success: true, message: "Sync triggered" });
+  } catch (error) {
+    console.error("Public Livehouse Sync Error:", error);
+    res.status(500).json({ error: "Failed to sync" });
   }
 });
 router.post("/reset-password", requireAuth(3), async (req, res) => {
@@ -1076,7 +1313,7 @@ router.post(
       if (userSnap.exists) {
         return res.status(400).json({ error: `User with Poppo ID '${poppoId}' already exists.` });
       }
-      const authInstance = (0, import_auth.getAuth)(getFirebaseAdminApp());
+      const authInstance = (0, import_auth2.getAuth)(getFirebaseAdminApp());
       try {
         await authInstance.getUser(poppoId);
         return res.status(400).json({ error: `User with Poppo ID '${poppoId}' already exists in Authentication.` });
@@ -1195,7 +1432,7 @@ router.delete("/delete-user/:poppoId", verifyAdminRole, async (req, res) => {
       await batch.commit();
     }
     try {
-      const authInstance = (0, import_auth.getAuth)(getFirebaseAdminApp());
+      const authInstance = (0, import_auth2.getAuth)(getFirebaseAdminApp());
       await authInstance.deleteUser(cleanPoppoId);
       console.log(`\u{1F525} Deleted Firebase Auth user: ${cleanPoppoId}`);
     } catch (authErr) {
@@ -1260,7 +1497,7 @@ router.get("/verify-claims/:uid", verifyAdminRole, async (req, res) => {
     return res.status(400).json({ error: "User UID is required." });
   }
   try {
-    const authInstance = (0, import_auth.getAuth)(getFirebaseAdminApp());
+    const authInstance = (0, import_auth2.getAuth)(getFirebaseAdminApp());
     const userRecord = await authInstance.getUser(uid);
     console.log(`
 === SECURITY DIAGNOSTIC: Custom Claims for UID: ${uid} ===`);
@@ -1427,7 +1664,7 @@ async function verifyFirebaseIdToken(req, res, next) {
   }
   const idToken = authHeader.split("Bearer ")[1];
   try {
-    const auth = (0, import_auth.getAuth)(getFirebaseAdminApp());
+    const auth = (0, import_auth2.getAuth)(getFirebaseAdminApp());
     const decodedToken = await auth.verifyIdToken(idToken);
     await resolveTokenRole(decodedToken);
     req.firebaseUser = decodedToken;
@@ -1444,7 +1681,7 @@ async function verifyAdminRole(req, res, next) {
   }
   const idToken = authHeader.split("Bearer ")[1];
   try {
-    const auth = (0, import_auth.getAuth)(getFirebaseAdminApp());
+    const auth = (0, import_auth2.getAuth)(getFirebaseAdminApp());
     const decodedToken = await auth.verifyIdToken(idToken);
     await resolveTokenRole(decodedToken);
     const isSuperAdmin = decodedToken.isSuperAdmin === true;
@@ -1508,7 +1745,7 @@ router.post("/login-with-poppo", loginRateLimiter, async (req, res) => {
       }
       if (hostData2) {
         await syncCustomClaims("19157913", "director", false);
-        const authInstance = (0, import_auth.getAuth)(getFirebaseAdminApp());
+        const authInstance = (0, import_auth2.getAuth)(getFirebaseAdminApp());
         const customToken2 = await authInstance.createCustomToken("19157913", { tempPasswordRequired: false, role: "director", isSuperAdmin: true });
         const userPayload2 = buildUserPayload(hostData2);
         const token2 = import_jsonwebtoken.default.sign(userPayload2, JWT_SECRET, { expiresIn: "7d" });
@@ -1562,7 +1799,7 @@ router.post("/login-with-poppo", loginRateLimiter, async (req, res) => {
     await syncCustomClaims(cleanPoppoId, hostData.role, tempPasswordRequired);
     let customToken;
     try {
-      const authInstance = (0, import_auth.getAuth)(getFirebaseAdminApp());
+      const authInstance = (0, import_auth2.getAuth)(getFirebaseAdminApp());
       const developerClaims = {
         tempPasswordRequired,
         role: hostData.role || "host",
@@ -1641,7 +1878,7 @@ router.post("/change-password", verifyFirebaseIdToken, async (req, res) => {
       console.warn("Optional users collection update failed/skipped:", usersErr);
     }
     try {
-      const authInstance = (0, import_auth.getAuth)(getFirebaseAdminApp());
+      const authInstance = (0, import_auth2.getAuth)(getFirebaseAdminApp());
       const role = req.firebaseUser.role || "host";
       const isSuperAdmin = req.firebaseUser.isSuperAdmin === true || role === "director";
       await authInstance.setCustomUserClaims(poppoId, {
@@ -1972,7 +2209,7 @@ var auth_default = router;
 // src/server/auditRouter.ts
 var import_express2 = require("express");
 var import_firebase_admin = __toESM(require("firebase-admin"), 1);
-var import_auth2 = require("firebase-admin/auth");
+var import_auth3 = require("firebase-admin/auth");
 var router2 = (0, import_express2.Router)();
 var financialFields = [
   "agentCommission",
@@ -1996,7 +2233,7 @@ async function verifyFirebaseToken(req, res, next) {
   }
   const idToken = authHeader.split("Bearer ")[1];
   try {
-    const auth = (0, import_auth2.getAuth)(getFirebaseAdminApp());
+    const auth = (0, import_auth3.getAuth)(getFirebaseAdminApp());
     const decodedToken = await auth.verifyIdToken(idToken);
     req.firebaseUser = decodedToken;
     next();
@@ -2360,227 +2597,8 @@ async function sendCriticalAlert(log) {
 
 // server.ts
 var import_net = __toESM(require("net"), 1);
-
-// src/server/cron.ts
-var import_firestore2 = require("firebase-admin/firestore");
-async function acquireLock(jobName, intervalMinutes) {
-  const db = getAdminFirestore();
-  const lockRef = db.collection("system").doc("cron_state");
-  try {
-    return await db.runTransaction(async (transaction) => {
-      const doc = await transaction.get(lockRef);
-      const now = Date.now();
-      if (!doc.exists) {
-        transaction.set(lockRef, { [jobName]: now });
-        return true;
-      }
-      const data = doc.data() || {};
-      const lastRun = data[jobName] || 0;
-      const intervalMs = intervalMinutes * 60 * 1e3 - 6e4;
-      if (now - lastRun < intervalMs) {
-        return false;
-      }
-      transaction.update(lockRef, { [jobName]: now });
-      return true;
-    });
-  } catch (error) {
-    console.error(`Failed to acquire lock for ${jobName}:`, error);
-    return false;
-  }
-}
-async function runAutoSyncLivehouseData() {
-  if (!await acquireLock("autoSyncLivehouseData", 15)) return;
-  const API_URL = "https://script.google.com/macros/s/AKfycbxM3XxkT30dpaNbVSsUFVlLhSCejbcZcIizqEE1StZpj4nKGGMmMSzN0xn0tmYHQuuwaQ/exec";
-  const db = getAdminFirestore();
-  try {
-    const response = await fetch(API_URL);
-    const data = await response.json();
-    if (!data || data.status === "error" || !Array.isArray(data)) {
-      console.warn("Livehouse auto-sync aborted: Invalid or error data returned from Apps Script.", data);
-      return;
-    }
-    const scheduleRows = data;
-    const maxBatchSize = 400;
-    let batch = db.batch();
-    let batchCount = 0;
-    const commitBatchIfNeeded = async () => {
-      if (batchCount >= maxBatchSize) {
-        await batch.commit();
-        batch = db.batch();
-        batchCount = 0;
-      }
-    };
-    const path2 = "livehouse_schedule";
-    const snap = await db.collection(path2).get();
-    const oldSchedule = /* @__PURE__ */ new Map();
-    for (const d of snap.docs) {
-      oldSchedule.set(d.id, d.data());
-      batch.delete(d.ref);
-      batchCount++;
-      await commitBatchIfNeeded();
-    }
-    const validCalendarEventIds = [];
-    const logsRef = db.collection("livehouse_logs");
-    for (const r of scheduleRows) {
-      if (!r.date || !r.timeslot) continue;
-      const docId = `${r.date}_${r.timeslot}`.replace(/[^a-zA-Z0-9_-]/g, "_");
-      const oldRow = oldSchedule.get(docId);
-      const newSlot1 = String(r.slot_1?.poppo_id || "").trim();
-      const oldSlot1 = String(oldRow?.slot_1?.poppo_id || "").trim();
-      if (newSlot1 && newSlot1 !== oldSlot1) {
-        const logDocRef = logsRef.doc();
-        batch.set(logDocRef, {
-          poppo_id: newSlot1,
-          date: r.date,
-          timeslot: r.timeslot,
-          timestamp: import_firestore2.FieldValue.serverTimestamp(),
-          source: "auto-sync"
-        });
-        batchCount++;
-        await commitBatchIfNeeded();
-      }
-      const newSlot2 = String(r.slot_2?.poppo_id || "").trim();
-      const oldSlot2 = String(oldRow?.slot_2?.poppo_id || "").trim();
-      if (newSlot2 && newSlot2 !== oldSlot2) {
-        const logDocRef = logsRef.doc();
-        batch.set(logDocRef, {
-          poppo_id: newSlot2,
-          date: r.date,
-          timeslot: r.timeslot,
-          timestamp: import_firestore2.FieldValue.serverTimestamp(),
-          source: "auto-sync"
-        });
-        batchCount++;
-        await commitBatchIfNeeded();
-      }
-      const docRef = db.collection(path2).doc(docId);
-      batch.set(docRef, r);
-      batchCount++;
-      await commitBatchIfNeeded();
-    }
-    const syncStatusRef = db.collection("system").doc("livehouse_sync");
-    batch.set(syncStatusRef, {
-      last_synced_at: import_firestore2.FieldValue.serverTimestamp(),
-      last_synced_iso: (/* @__PURE__ */ new Date()).toISOString()
-    }, { merge: true });
-    batchCount++;
-    await commitBatchIfNeeded();
-    if (batchCount > 0) {
-      await batch.commit();
-    }
-    console.log(`Successfully completed automated Livehouse sync! Extracted ${scheduleRows.length} timeslots.`);
-  } catch (err) {
-    console.error("Failed to execute autoSyncLivehouseData:", err);
-  }
-}
-function parseManilaTimeToUTC(dateStr, timeStr) {
-  try {
-    const timeMatch = timeStr.match(/(\d{1,2}):(\d{2})\s+(AM|PM)/i);
-    if (!timeMatch) return 0;
-    let hours = parseInt(timeMatch[1], 10);
-    const minutes = parseInt(timeMatch[2], 10);
-    const ampm = timeMatch[3].toUpperCase();
-    if (ampm === "PM" && hours < 12) hours += 12;
-    if (ampm === "AM" && hours === 12) hours = 0;
-    const paddedHours = hours.toString().padStart(2, "0");
-    const paddedMinutes = minutes.toString().padStart(2, "0");
-    const isoString = `${dateStr}T${paddedHours}:${paddedMinutes}:00+08:00`;
-    const eventDate = new Date(isoString);
-    return eventDate.getTime();
-  } catch (e) {
-    return 0;
-  }
-}
-async function runCheckUpcomingEvents() {
-  if (!await acquireLock("checkUpcomingEvents", 5)) return;
-  const db = getAdminFirestore();
-  const now = Date.now();
-  try {
-    const calendarRef = db.collection("calendar");
-    const snapshot = await calendarRef.where("notifiedStart", "!=", true).get();
-    if (snapshot.empty) return;
-    const batch = db.batch();
-    const announcementsRef = db.collection("announcements");
-    let batchCount = 0;
-    snapshot.docs.forEach((doc) => {
-      const data = doc.data();
-      if (!data.date || !data.time) return;
-      const eventTimeMs = parseManilaTimeToUTC(data.date, data.time);
-      if (eventTimeMs === 0) return;
-      const timeDiffMins = (eventTimeMs - now) / (1e3 * 60);
-      if (!data.notified30Min && timeDiffMins > 0 && timeDiffMins <= 35 && timeDiffMins >= 25) {
-        const annRef = announcementsRef.doc();
-        batch.set(annRef, {
-          title: `Starting in 30 mins: ${data.title || "Upcoming Event"}`,
-          content: `${data.title || "The event"} starts in 30 minutes! Show up and support your co-niners. Flag the comment section to help boost their livestream. Remember, all attendance is recorded and impacts your performance scores/ratio!`,
-          type: "System",
-          priority: "high",
-          timestamp: (/* @__PURE__ */ new Date()).toISOString(),
-          createdAt: import_firestore2.FieldValue.serverTimestamp()
-        });
-        batch.update(doc.ref, { notified30Min: true });
-        batchCount += 2;
-      }
-      if (!data.notifiedStart && timeDiffMins <= 5 && timeDiffMins >= -5) {
-        const annRef = announcementsRef.doc();
-        batch.set(annRef, {
-          title: `Event Starting NOW: ${data.title || "Live Event"}`,
-          content: `${data.title || "The event"} is starting right now! Join the stream, drop your comments, and support the agency!`,
-          type: "System",
-          priority: "urgent",
-          timestamp: (/* @__PURE__ */ new Date()).toISOString(),
-          createdAt: import_firestore2.FieldValue.serverTimestamp()
-        });
-        batch.update(doc.ref, { notifiedStart: true, notified30Min: true });
-        batchCount += 2;
-      }
-    });
-    if (batchCount > 0) {
-      await batch.commit();
-      console.log(`Committed ${batchCount} operations for upcoming events.`);
-    }
-  } catch (err) {
-    console.error("Failed to check upcoming events:", err);
-  }
-}
-async function runCleanupOldSystemLogs() {
-  if (!await acquireLock("cleanupOldSystemLogs", 24 * 60)) return;
-  const db = getAdminFirestore();
-  const thirtyDaysAgo = /* @__PURE__ */ new Date();
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-  const cutoffTimestamp = thirtyDaysAgo.toISOString();
-  try {
-    const logsRef = db.collection("system_logs");
-    const oldLogsQuery = logsRef.where("timestamp", "<", cutoffTimestamp).limit(500);
-    let deletedCount = 0;
-    while (true) {
-      const snapshot = await oldLogsQuery.get();
-      if (snapshot.empty) break;
-      const batch = db.batch();
-      snapshot.docs.forEach((doc) => {
-        batch.delete(doc.ref);
-      });
-      await batch.commit();
-      deletedCount += snapshot.size;
-    }
-    if (deletedCount > 0) {
-      console.log(`Successfully deleted ${deletedCount} old system_logs.`);
-    }
-  } catch (err) {
-    console.error("Failed to clean up old system_logs:", err);
-  }
-}
-function startCronJobs() {
-  console.log("\u{1F680} Initializing backend cron jobs...");
-  runAutoSyncLivehouseData();
-  runCheckUpcomingEvents();
-  runCleanupOldSystemLogs();
-  setInterval(runAutoSyncLivehouseData, 15 * 60 * 1e3);
-  setInterval(runCheckUpcomingEvents, 5 * 60 * 1e3);
-  setInterval(runCleanupOldSystemLogs, 24 * 60 * 60 * 1e3);
-}
-
-// server.ts
+var import_web_push = __toESM(require("web-push"), 1);
+var import_fs = __toESM(require("fs"), 1);
 import_dotenv.default.config();
 function findFreePort(start) {
   return new Promise((resolve) => {
@@ -2903,6 +2921,165 @@ Rules:
       console.error("FCM Notify error:", error);
       return res.status(500).json({ error: error?.message || "Notification dispatch failed" });
     }
+  });
+  const DEFAULT_NOTIFICATION_TYPES = [
+    { id: "form_submission", label: "Form Submission", description: "When a new booking form or request is submitted.", active: false },
+    { id: "roster_update", label: "Roster Update", description: "When a host is added, removed, or updated on the roster.", active: false },
+    { id: "pk_update", label: "PK Performance Update", description: "When PK battle data or performance scores are updated.", active: false },
+    { id: "event_added", label: "Event Added", description: "When a new livehouse event or schedule is added to the calendar.", active: false },
+    { id: "commission_uploaded", label: "Commission Uploaded", description: "When a new commission sheet or financial record is uploaded.", active: false },
+    { id: "host_sos", label: "Host SOS Alert", description: "When a host triggers an emergency SOS or support alert.", active: false },
+    { id: "whatsapp_auto_reply", label: "WhatsApp Auto Reply", description: "When the automated WhatsApp assistant auto-replies to a customer.", active: false },
+    { id: "lark_message_received", label: "Lark GC Message Received", description: "When a new message notification is received from Lark GC webhook.", active: false }
+  ];
+  const VAPID_KEYS_FILE = import_path.default.join(__dirname, "vapid_keys_fallback.json");
+  let vapidPublicKey = process.env.VAPID_PUBLIC_KEY || "";
+  let vapidPrivateKey = process.env.VAPID_PRIVATE_KEY || "";
+  if (!vapidPublicKey || !vapidPrivateKey) {
+    if (import_fs.default.existsSync(VAPID_KEYS_FILE)) {
+      try {
+        const savedKeys = JSON.parse(import_fs.default.readFileSync(VAPID_KEYS_FILE, "utf8"));
+        vapidPublicKey = savedKeys.publicKey;
+        vapidPrivateKey = savedKeys.privateKey;
+      } catch (e) {
+        console.error("Failed to parse saved VAPID keys fallback:", e);
+      }
+    }
+    if (!vapidPublicKey || !vapidPrivateKey) {
+      try {
+        const generated = import_web_push.default.generateVAPIDKeys();
+        vapidPublicKey = generated.publicKey;
+        vapidPrivateKey = generated.privateKey;
+        import_fs.default.writeFileSync(VAPID_KEYS_FILE, JSON.stringify(generated), "utf8");
+        console.log("=== DYNAMIC FALLBACK VAPID KEYS GENERATED & PERSISTED ===");
+        console.log("Public Key:", vapidPublicKey);
+        console.log("=========================================================");
+      } catch (err) {
+        console.error("Failed to dynamically generate VAPID keys. Ensure web-push is installed.");
+      }
+    }
+  }
+  if (vapidPublicKey && vapidPrivateKey) {
+    try {
+      import_web_push.default.setVapidDetails(
+        "mailto:admin@9poppo.com",
+        vapidPublicKey,
+        vapidPrivateKey
+      );
+    } catch (err) {
+      console.error("Failed to set VAPID details:", err.message);
+    }
+  }
+  const SUBSCRIPTIONS_FILE = import_path.default.join(__dirname, "push_subscriptions.json");
+  const NOTIFICATION_TYPES_FILE = import_path.default.join(__dirname, "notification_types.json");
+  let pushSubscriptions = [];
+  if (import_fs.default.existsSync(SUBSCRIPTIONS_FILE)) {
+    try {
+      pushSubscriptions = JSON.parse(import_fs.default.readFileSync(SUBSCRIPTIONS_FILE, "utf8"));
+    } catch (e) {
+      console.error("Failed to read push subscriptions file:", e);
+    }
+  }
+  let notificationTypes = [...DEFAULT_NOTIFICATION_TYPES];
+  if (import_fs.default.existsSync(NOTIFICATION_TYPES_FILE)) {
+    try {
+      const loaded = JSON.parse(import_fs.default.readFileSync(NOTIFICATION_TYPES_FILE, "utf8"));
+      notificationTypes = DEFAULT_NOTIFICATION_TYPES.map((def) => {
+        const found = loaded.find((l) => l.id === def.id);
+        return found ? { ...def, active: found.active } : def;
+      });
+    } catch (e) {
+      console.error("Failed to read notification types file:", e);
+    }
+  }
+  function saveSubscriptions() {
+    try {
+      import_fs.default.writeFileSync(SUBSCRIPTIONS_FILE, JSON.stringify(pushSubscriptions, null, 2), "utf8");
+    } catch (e) {
+      console.error("Failed to save push subscriptions:", e);
+    }
+  }
+  function saveNotificationTypes() {
+    try {
+      import_fs.default.writeFileSync(NOTIFICATION_TYPES_FILE, JSON.stringify(notificationTypes, null, 2), "utf8");
+    } catch (e) {
+      console.error("Failed to save notification types:", e);
+    }
+  }
+  app.get("/api/push/public-key", (req, res) => {
+    res.json({ publicKey: vapidPublicKey });
+  });
+  app.post("/api/push/subscribe", (req, res) => {
+    const subscription = req.body;
+    if (!subscription || !subscription.endpoint) {
+      return res.status(400).json({ error: "Invalid subscription payload" });
+    }
+    const exists = pushSubscriptions.some((sub) => sub.endpoint === subscription.endpoint);
+    if (!exists) {
+      pushSubscriptions.push(subscription);
+      saveSubscriptions();
+    }
+    res.status(201).json({ status: "success", message: "Subscription registered." });
+  });
+  app.post("/api/push/send", async (req, res) => {
+    const { title, body: body2, url, type } = req.body;
+    if (!title || !body2 || !type) {
+      return res.status(400).json({ error: "Missing title, body, or type fields" });
+    }
+    const notifType = notificationTypes.find((t) => t.id === type);
+    if (!notifType || !notifType.active) {
+      return res.json({
+        status: "ignored",
+        message: `Notification type '${type}' is currently inactive.`
+      });
+    }
+    const payload = JSON.stringify({
+      title,
+      body: body2,
+      url: url || "/dashboard",
+      icon: "/logo.jpg",
+      badge: "/logo.jpg"
+    });
+    const sendPromises = pushSubscriptions.map(async (sub) => {
+      try {
+        await import_web_push.default.sendNotification(sub, payload);
+      } catch (err) {
+        if (err.statusCode === 410 || err.statusCode === 404) {
+          pushSubscriptions = pushSubscriptions.filter((s) => s.endpoint !== sub.endpoint);
+          saveSubscriptions();
+        } else {
+          console.error(`Error sending push to ${sub.endpoint}:`, err.message);
+        }
+      }
+    });
+    await Promise.all(sendPromises);
+    res.json({
+      status: "success",
+      message: `Notification sent to active subscribers. Total active subscriptions: ${pushSubscriptions.length}`
+    });
+  });
+  app.patch("/api/notifications/activate", (req, res) => {
+    const { id } = req.body;
+    const item = notificationTypes.find((t) => t.id === id);
+    if (!item) {
+      return res.status(404).json({ error: "Notification type not found" });
+    }
+    item.active = true;
+    saveNotificationTypes();
+    res.json({ status: "success", item });
+  });
+  app.patch("/api/notifications/revoke", (req, res) => {
+    const { id } = req.body;
+    const item = notificationTypes.find((t) => t.id === id);
+    if (!item) {
+      return res.status(404).json({ error: "Notification type not found" });
+    }
+    item.active = false;
+    saveNotificationTypes();
+    res.json({ status: "success", item });
+  });
+  app.get("/api/notifications", (req, res) => {
+    res.json(notificationTypes);
   });
   const isDev = process.env.NODE_ENV !== "production";
   console.log(`

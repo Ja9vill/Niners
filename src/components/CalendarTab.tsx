@@ -12,6 +12,7 @@ import { EVENT_COLORS, TIMESLOTS } from '../lib/constants';
 import { collection, getDocs, getDoc, doc, setDoc, Timestamp, query, where } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { LivehouseCalendar } from './LivehouseCalendar';
+import { LivehouseBookingModal } from './LivehouseBookingModal';
 
 
 
@@ -1984,182 +1985,16 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
       </AnimatePresence>
 
       {/* Reserve Livehouse Timeslot Modal */}
-      <AnimatePresence>
-        {isReservingLivehouse && (
-          <div className="fixed inset-0 z-[1000] flex items-center justify-center p-6">
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsReservingLivehouse(false)} className="absolute inset-0 bg-black/20 backdrop-blur-sm" />
-            <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="relative glass-card w-full max-w-lg rounded-3xl overflow-hidden z-10 max-h-[90vh] overflow-y-auto custom-scrollbar p-0">
-              <div className="p-6 border-b border-[#D4AF37]/20 font-black text-white uppercase tracking-widest text-[10px]">SCHEDULE LIVEHOUSE</div>
-              <form onSubmit={handleReserveLivehouse} className="p-6 space-y-5">
-                
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <label htmlFor="res-poppo-id" className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">Poppo ID</label>
-                    <input 
-                      id="res-poppo-id"
-                      disabled 
-                      value={auth.poppo_id} 
-                      className="w-full glass-input text-xs cursor-not-allowed opacity-50" 
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label htmlFor="res-host-name" className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">Host Name</label>
-                    <input 
-                      id="res-host-name"
-                      disabled 
-                      value={auth.nickname || auth.name} 
-                      className="w-full glass-input text-xs cursor-not-allowed opacity-50" 
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <label htmlFor="reserve-livehouse-type" className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">Livehouse Type</label>
-                    <select 
-                      id="reserve-livehouse-type"
-                      value={selectedLivehouseType}
-                      onChange={(e) => setSelectedLivehouseType(e.target.value as any)}
-                      title="Livehouse Type" 
-                      className="w-full glass-input text-xs font-bold cursor-pointer appearance-none"
-                    >
-                      <option value="SOLO LIVEHOUSE" className="bg-[#0e0a08] text-[#F0EFE8]">SOLO LIVEHOUSE</option>
-                      <option value="PARTY LIVEHOUSE" className="bg-[#0e0a08] text-[#F0EFE8]">PARTY LIVEHOUSE</option>
-                    </select>
-                  </div>
-                  <div className="space-y-1.5">
-                    <label htmlFor="reserve-date" className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">Date Selector</label>
-                    {activeTab === 'LIVEHOUSE' ? (
-                      <input 
-                        disabled
-                        value={reserveDate ? format(reserveDate, 'yyyy-MM-dd') : ''}
-                        className="w-full glass-input text-xs cursor-not-allowed opacity-50"
-                      />
-                    ) : (
-                      <SingleDatePicker 
-                        id="reserve-date" 
-                        name="reserveDate"
-                        value={reserveDate} 
-                        onChange={(val) => setReserveDate(val)} 
-                        required 
-                      />
-                    )}
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  <span className="text-[10px] font-black text-white/40 uppercase tracking-widest block">Select Timeslot</span>
-                  
-                  {/* Timezone Notice */}
-                  <div className="text-[11px] font-bold text-[#D4AF37]/90 bg-[#D4AF37]/5 border border-[#D4AF37]/20 rounded-xl px-4 py-2.5 flex items-center gap-2 mb-2">
-                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#D4AF37] animate-pulse" />
-                    All times are in Manila Time (PHT)
-                  </div>
-
-                  {activeTab === 'LIVEHOUSE' ? (
-                    <div className="p-3.5 rounded-xl border border-[#D4AF37]/50 bg-[#181B24] shadow-[0_0_12px_rgba(212,175,55,0.15)] text-white">
-                      <div className="flex items-center justify-between">
-                         <span className="font-mono text-xs font-black tracking-tight">{reserveTimeslot}</span>
-                         <span className="px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider border text-[#D4AF37] bg-[#D4AF37]/10 border-[#D4AF37]/20">
-                           Selected
-                         </span>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="space-y-4 max-h-[300px] overflow-y-auto pr-1 custom-scrollbar">
-                      {TIMESLOT_BLOCKS.map(block => {
-                        const blockSlots = getTimeslotAvailability(reserveDate).filter(t => block.slots.includes(t.slot));
-                        
-                        return (
-                        <div key={block.name} className="space-y-2">
-                          <h4 className="text-[9px] font-black text-[#D4AF37]/75 uppercase tracking-widest border-b border-[#D4AF37]/10 pb-1 flex items-center gap-1.5">
-                            <span className="w-1.5 h-1.5 rounded-full bg-[#D4AF37]/40" />
-                            {block.name}
-                          </h4>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                            {blockSlots.map(t => {
-                              const displaySlot = t.slot;
-                              const isSelected = reserveTimeslot === t.slot;
-                              
-                              let statusText = '2 Available';
-                              let statusClass = 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20';
-                              if (t.count >= 2) {
-                                statusText = 'Full';
-                                statusClass = 'text-red-400 bg-red-500/10 border-red-500/20';
-                              } else if (t.count === 1) {
-                                statusText = '1 slot left';
-                                statusClass = 'text-amber-400 bg-amber-500/10 border-amber-500/20';
-                              }
-
-                              return (
-                                <button
-                                  key={t.slot}
-                                  type="button"
-                                  disabled={t.count >= 2}
-                                  onClick={() => setReserveTimeslot(t.slot)}
-                                  className={cn(
-                                    "p-3.5 rounded-xl border text-left transition-all flex flex-col justify-between gap-2.5 relative overflow-hidden",
-                                    t.count >= 2
-                                      ? "bg-[#0A0B0E]/40 border-red-500/10 cursor-not-allowed opacity-50"
-                                      : isSelected
-                                        ? "bg-[#181B24] border-[#D4AF37] shadow-[0_0_12px_rgba(212,175,55,0.15)] text-white"
-                                        : "bg-[#0A0B0E] border-[#D4AF37]/10 hover:border-[#D4AF37]/20 hover:bg-[#12151D] text-white/70"
-                                  )}
-                                >
-                                  <div className="flex justify-between items-start gap-2.5 w-full">
-                                    <span className="font-mono text-xs font-black tracking-tight">{displaySlot}</span>
-                                    <span className={cn("px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider border shrink-0", statusClass)}>
-                                      {statusText}
-                                    </span>
-                                  </div>
-
-                                  {t.pendingCount > 0 && (
-                                    <div className="text-[9px] font-bold text-amber-500 bg-amber-500/5 px-2 py-1 rounded border border-amber-500/10 w-fit">
-                                      {t.pendingCount} pending request{t.pendingCount > 1 ? 's' : ''}
-                                    </div>
-                                  )}
-
-                                  {t.eventTitles.length > 0 && (
-                                    <div className="space-y-1 mt-1 border-t border-white/5 pt-1.5 w-full">
-                                      <span className="block text-[8px] font-black text-white/30 uppercase tracking-wider">Booked Events:</span>
-                                      {t.eventTitles.map((title, i) => (
-                                        <p key={i} className="text-[9px] font-bold text-white/60 truncate" title={title}>
-                                          • {title}
-                                        </p>
-                                      ))}
-                                    </div>
-                                  )}
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                  )}
-                </div>
-
-                <div className="space-y-1.5">
-                  <label htmlFor="reserve-notes" className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">Description / Special Request Notes</label>
-                  <textarea 
-                    id="reserve-notes" 
-                    value={reserveNotes} 
-                    onChange={(e) => setReserveNotes(e.target.value)} 
-                    placeholder="e.g. Any specific requests for the livehouse?" 
-                    className="w-full glass-input text-xs min-h-[100px] resize-none"
-                  />
-                </div>
-
-                <div className="pt-2 flex gap-4">
-                  <button type="button" onClick={() => setIsReservingLivehouse(false)} className="flex-1 px-6 py-4 rounded-xl bg-[#0e0a08]/90 border border-white/10 text-[#A09E9A] font-black uppercase text-[10px] tracking-widest hover:bg-[#1a120e] hover:border-white/20 hover:text-[#F0EFE8] transition-colors cursor-pointer">Cancel</button>
-                  <button type="submit" className="flex-[2] bg-[#D4AF37] hover:bg-[#FFEA00] text-black font-black uppercase text-[10px] tracking-[0.2em] py-4 rounded-xl shadow-xl transition-all cursor-pointer">Submit Schedule Request</button>
-                </div>
-              </form>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+      <LivehouseBookingModal
+        isOpen={isReservingLivehouse}
+        onClose={() => setIsReservingLivehouse(false)}
+        prefillDate={typeof reserveDate === 'string' ? reserveDate : format(reserveDate, 'yyyy-MM-dd')}
+        prefillTimeslot={reserveTimeslot}
+        auth={auth}
+        hosts={allUsers}
+        livehouseRequests={livehouseRequests}
+        setLivehouseRequests={setLivehouseRequests}
+      />
 
       {/* Event Spotlight Modal */}
       <AnimatePresence>

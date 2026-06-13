@@ -33,7 +33,8 @@ import { LearningResourcesTab } from './components/LearningResourcesTab';
 import { Storage } from './lib/storage';
 import { FirebaseService } from './lib/firebaseService';
 import { CommissionEntry, Host } from './types';
-import { auth } from './lib/firebase';
+import { auth, db } from './lib/firebase';
+import { collection, query, where, onSnapshot, deleteDoc } from 'firebase/firestore';
 import { HostProfileView } from './components/HostProfileView';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { INITIAL_HOSTS, INITIAL_COMMISSION, TIMELINE_DATA } from './lib/constants';
@@ -111,6 +112,58 @@ export default function App() {
   useEffect(() => {
     try { localStorage.setItem('nine-view-mode', isMobileView ? 'mobile' : 'desktop'); } catch { }
   }, [isMobileView]);
+
+  // Listen to cloud notifications in user_notifications collection
+  useEffect(() => {
+    if (!authState?.poppo_id) return;
+
+    const q = query(
+      collection(db, 'user_notifications'),
+      where('poppoId', '==', String(authState.poppo_id).trim())
+    );
+
+    const unsubscribe = onSnapshot(q, async (snapshot) => {
+      if (snapshot.empty) return;
+
+      const newNotifs: any[] = [];
+      for (const change of snapshot.docChanges()) {
+        if (change.type === 'added') {
+          const data = change.doc.data();
+          newNotifs.push({
+            id: change.doc.id,
+            title: data.title || 'Notification',
+            message: data.message || '',
+            type: data.type || 'info',
+            timestamp: data.timestamp || new Date().toISOString(),
+            read: false
+          });
+
+          // Delete from Firestore immediately so it's a one-shot delivery
+          try {
+            await deleteDoc(change.doc.ref);
+          } catch (err) {
+            console.error("Failed to delete processed cloud notification:", err);
+          }
+        }
+      }
+
+      if (newNotifs.length > 0) {
+        // Add to local storage using Storage helper
+        newNotifs.forEach(notif => {
+          Storage.addNotification({
+            title: notif.title,
+            message: notif.message,
+            type: notif.type
+          });
+        });
+
+        // Sync local React state
+        setNotifications(Storage.getNotifications());
+      }
+    });
+
+    return () => unsubscribe();
+  }, [authState?.poppo_id]);
 
   useEffect(() => {
     setIsAuthChecking(true);

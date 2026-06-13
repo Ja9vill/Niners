@@ -136,6 +136,18 @@ export const RosterTab: React.FC<RosterTabProps> = ({ isReadOnly = false }) => {
   // Spotlight State
   const [selectedHost, setSelectedHost] = useState<Host | null>(null);
 
+  // Dynamic portal target setup to resolve iframe/mobile layout clipping
+  const containerRef = React.useRef<HTMLDivElement>(null);
+  const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
+
+  useEffect(() => {
+    if (containerRef.current) {
+      setPortalTarget(containerRef.current.ownerDocument.body);
+    } else {
+      setPortalTarget(document.body);
+    }
+  }, [selectedHost]);
+
   // Top Niners & Badges
   const [allAwards, setAllAwards] = useState<any[]>([]);
 
@@ -300,7 +312,7 @@ export const RosterTab: React.FC<RosterTabProps> = ({ isReadOnly = false }) => {
   }
 
   return (
-    <div className="space-y-6 relative">
+    <div ref={containerRef} className="space-y-6 relative">
       {/* FILTER MENU BLOCKS */}
       <div className="global-block-1 relative z-10 flex flex-col gap-2.5 overflow-hidden p-4">
         {/* Subtle background glow for the filter section */}
@@ -356,12 +368,12 @@ export const RosterTab: React.FC<RosterTabProps> = ({ isReadOnly = false }) => {
                     else setSelectedTiers(prev => [...prev, tier]);
                   }}
                   className={cn(
-                    "relative flex items-center justify-between min-w-[110px] px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border overflow-hidden shadow-md",
+                    "px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider border backdrop-blur-sm shadow-sm flex items-center gap-1 transition-all",
                     getTierFilterStyle(tier, isSelected)
                   )}
                 >
-                  <span className="relative z-10 text-left w-full">{tier}</span>
-                  <Icon size={16} className="absolute right-2 top-1/2 -translate-y-1/2 opacity-20 pointer-events-none" />
+                  <Star size={8} />
+                  {tier}
                 </button>
               );
             })}
@@ -383,14 +395,14 @@ export const RosterTab: React.FC<RosterTabProps> = ({ isReadOnly = false }) => {
                 }
               }}
               className={cn(
-                "relative flex items-center justify-between min-w-[110px] px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border overflow-hidden",
+                "px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider border backdrop-blur-sm shadow-sm flex items-center gap-1 transition-all",
                 showTopNiners
                   ? "text-[#D4AF37] bg-[#D4AF37]/20 border-[#D4AF37]/50 shadow-[0_0_12px_rgba(212,175,55,0.5)] opacity-100 ring-1 ring-white/30"
                   : "text-[#D4AF37] bg-[#D4AF37]/20 border-transparent shadow-none opacity-50 hover:opacity-80 cursor-pointer"
               )}
             >
-              <span className="relative z-10 text-left w-full">TOP NINERS</span>
-              <Medal size={16} className="absolute right-2 top-1/2 -translate-y-1/2 opacity-20 pointer-events-none" />
+              <Medal size={8} />
+              TOP NINERS
             </button>
           </div>
         </div>
@@ -453,26 +465,12 @@ export const RosterTab: React.FC<RosterTabProps> = ({ isReadOnly = false }) => {
                 <div className="relative z-10 w-full px-3 pt-1.5 pb-3 flex justify-between items-start pointer-events-none">
                   {/* Status indicator or Badge on top-left */}
                   <div className="flex flex-col gap-1 items-start">
-                    {/* Top Niner (Dynamic Share%) or Manual Badges (Active or Last Month) */}
+                    {/* Top Niner (Dynamic Share%) and Manual Badges (Active or Last Month) */}
                     {(() => {
                       const dynamicTopNiner = top9NinerData.find(d => String(d.id) === String(host.id));
-                      if (dynamicTopNiner) {
-                        const rank = dynamicTopNiner.rank;
-                        let badgeColorStyle = 'text-[#D4AF37] bg-[#D4AF37]/20 border-[#D4AF37]/50 shadow-[0_0_12px_rgba(212,175,55,0.5)]'; // Gold for Top 1-3
-                        if (rank >= 4 && rank <= 6) badgeColorStyle = 'text-[#F97316] bg-[#F97316]/20 border-[#F97316]/50 shadow-[0_0_12px_rgba(249,115,22,0.5)]'; // Orange for Top 4-6
-                        else if (rank >= 7) badgeColorStyle = 'text-[#EF4444] bg-[#EF4444]/20 border-[#EF4444]/50 shadow-[0_0_12px_rgba(239,68,68,0.5)]'; // Red for Top 7-9
-
-                        return (
-                          <div className={cn("px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider border backdrop-blur-sm shadow-sm flex items-center gap-1", badgeColorStyle)}>
-                            <Medal size={8} />
-                            Top {rank} Niner
-                          </div>
-                        );
-                      }
 
                       const now = new Date();
                       const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1).getTime();
-                      const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
                       const current = now.getTime();
 
                       const hostAwards = allAwards.filter(a => {
@@ -482,7 +480,6 @@ export const RosterTab: React.FC<RosterTabProps> = ({ isReadOnly = false }) => {
                         if (a.startDate && a.endDate) {
                           const start = new Date(a.startDate).getTime();
                           const end = new Date(a.endDate).getTime();
-                          // Expand end date boundary to end of day to be generous
                           if (current >= start && current <= end + 86400000) isActive = true;
                         }
                         
@@ -492,39 +489,57 @@ export const RosterTab: React.FC<RosterTabProps> = ({ isReadOnly = false }) => {
                           isRecentlyAssigned = true;
                         }
 
-                        // We will count it if it is strictly active, OR if it was assigned within the last month or so.
                         return isActive || isRecentlyAssigned;
                       });
 
-                      if (hostAwards.length > 0) {
-                        const latestAward = hostAwards.sort((a, b) => {
-                          const aIsTopNiner = /Top (\d+) Niner/i.test(String(a.title || a.awardName || a.name || ''));
-                          const bIsTopNiner = /Top (\d+) Niner/i.test(String(b.title || b.awardName || b.name || ''));
-                          if (aIsTopNiner && !bIsTopNiner) return -1;
-                          if (!aIsTopNiner && bIsTopNiner) return 1;
-                          return new Date(b.awardedAt || b.dateAwarded || b.assignedAt || 0).getTime() - new Date(a.awardedAt || a.dateAwarded || a.assignedAt || 0).getTime();
-                        })[0];
-                        
-                        // Prevent duplicate dynamic badge if they somehow manually assigned a Top Niner badge as well
-                        if (/Top (\d+) Niner/i.test(String(latestAward.title || latestAward.awardName || latestAward.name || ''))) {
-                          return null;
-                        }
+                      // Filter out any manual awards that are Top Niner badges (since Top Niner badge is dynamically rendered)
+                      const manualAwards = hostAwards.filter(a => {
+                        const title = String(a.title || a.awardName || a.name || '');
+                        return !/Top (\d+) Niner/i.test(title);
+                      });
 
-                        let badgeColorStyle = 'border-amber-500 text-amber-200 bg-amber-500/30 shadow-[0_0_8px_rgba(245,158,11,0.6)]';
-                        if (latestAward.awardColor === 'Purple' || latestAward.color === 'Purple') badgeColorStyle = 'border-purple-500 text-purple-200 bg-purple-500/30 shadow-[0_0_8px_rgba(168,85,247,0.6)]';
-                        else if (latestAward.awardColor === 'Emerald' || latestAward.color === 'Emerald') badgeColorStyle = 'border-emerald-500 text-emerald-200 bg-emerald-500/30 shadow-[0_0_8px_rgba(16,185,129,0.6)]';
-                        else if (latestAward.awardColor === 'Blue' || latestAward.color === 'Blue') badgeColorStyle = 'border-blue-500 text-blue-200 bg-blue-500/30 shadow-[0_0_8px_rgba(59,130,246,0.6)]';
-                        else if (latestAward.awardColor === 'Red' || latestAward.color === 'Red') badgeColorStyle = 'border-red-500 text-red-200 bg-red-500/30 shadow-[0_0_8px_rgba(239,68,68,0.6)]';
-                        else if (latestAward.awardColor === 'Orange' || latestAward.color === 'Orange') badgeColorStyle = 'border-orange-500 text-orange-200 bg-orange-500/30 shadow-[0_0_8px_rgba(249,115,22,0.6)]';
+                      // Sort manual awards by time period descending (most recent first)
+                      const sortedManualAwards = [...manualAwards].sort((a, b) => {
+                        const dateA = a.startDate || a.awardedAt || a.dateAwarded || a.assignedAt || '';
+                        const dateB = b.startDate || b.awardedAt || b.dateAwarded || b.assignedAt || '';
+                        return dateB.localeCompare(dateA);
+                      });
 
-                        return (
-                          <div className={cn("px-1.5 py-0.5 rounded text-[7.5px] font-black uppercase tracking-wider border backdrop-blur-sm flex items-center gap-1", badgeColorStyle)}>
-                            <Star size={8} className="drop-shadow-md" />
-                            {formatBadgeTitle(latestAward.title || latestAward.awardName || latestAward.name)}
-                          </div>
-                        );
-                      }
-                      return null;
+                      if (!dynamicTopNiner && sortedManualAwards.length === 0) return null;
+
+                      return (
+                        <>
+                          {dynamicTopNiner && (() => {
+                            const rank = dynamicTopNiner.rank;
+                            let badgeColorStyle = 'text-[#D4AF37] bg-[#D4AF37]/20 border-[#D4AF37]/50 shadow-[0_0_12px_rgba(212,175,55,0.5)]'; // Gold for Top 1-3
+                            if (rank >= 4 && rank <= 6) badgeColorStyle = 'text-[#F97316] bg-[#F97316]/20 border-[#F97316]/50 shadow-[0_0_12px_rgba(249,115,22,0.5)]'; // Orange for Top 4-6
+                            else if (rank >= 7) badgeColorStyle = 'text-[#EF4444] bg-[#EF4444]/20 border-[#EF4444]/50 shadow-[0_0_12px_rgba(239,68,68,0.5)]'; // Red for Top 7-9
+
+                            return (
+                              <div className={cn("px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider border backdrop-blur-sm shadow-sm flex items-center gap-1", badgeColorStyle)}>
+                                <Medal size={8} />
+                                Top {rank} Niner
+                              </div>
+                            );
+                          })()}
+
+                          {sortedManualAwards.map(a => {
+                            let badgeColorStyle = 'border-amber-500 text-amber-200 bg-amber-500/30 shadow-[0_0_8px_rgba(245,158,11,0.6)]';
+                            if (a.awardColor === 'Purple' || a.color === 'Purple') badgeColorStyle = 'border-purple-500 text-purple-200 bg-purple-500/30 shadow-[0_0_8px_rgba(168,85,247,0.6)]';
+                            else if (a.awardColor === 'Emerald' || a.color === 'Emerald') badgeColorStyle = 'border-emerald-500 text-emerald-200 bg-emerald-500/30 shadow-[0_0_8px_rgba(16,185,129,0.6)]';
+                            else if (a.awardColor === 'Blue' || a.color === 'Blue') badgeColorStyle = 'border-blue-500 text-blue-200 bg-blue-500/30 shadow-[0_0_8px_rgba(59,130,246,0.6)]';
+                            else if (a.awardColor === 'Red' || a.color === 'Red') badgeColorStyle = 'border-red-500 text-red-200 bg-red-500/30 shadow-[0_0_8px_rgba(239,68,68,0.6)]';
+                            else if (a.awardColor === 'Orange' || a.color === 'Orange') badgeColorStyle = 'border-orange-500 text-orange-200 bg-orange-500/30 shadow-[0_0_8px_rgba(249,115,22,0.6)]';
+
+                            return (
+                              <div key={a.id} className={cn("px-1.5 py-0.5 rounded text-[7.5px] font-black uppercase tracking-wider border backdrop-blur-sm flex items-center gap-1", badgeColorStyle)}>
+                                <Star size={8} className="drop-shadow-md" />
+                                {formatBadgeTitle(a.title || a.awardName || a.name)}
+                              </div>
+                            );
+                          })}
+                        </>
+                      );
                     })()}
                     
                     {/* Status */}
@@ -539,6 +554,7 @@ export const RosterTab: React.FC<RosterTabProps> = ({ isReadOnly = false }) => {
                   {/* Tier Pay badge top right */}
                   {host.tier_pay && (() => {
                     const tier = String(host.tier_pay);
+                    if (tier.toLowerCase().includes('regular')) return null;
                     const getTierStyle = (t: string) => {
                       const lower = t.toLowerCase();
                       if (lower.includes('star')) return 'text-[#FFEA00] bg-[#FFEA00]/20 border-[#FFEA00]/50 shadow-[0_0_12px_rgba(255,234,0,0.5)]';
@@ -583,7 +599,7 @@ export const RosterTab: React.FC<RosterTabProps> = ({ isReadOnly = false }) => {
       )}
 
       {/* SPOTLIGHT MODAL */}
-      {selectedHost && createPortal(
+      {selectedHost && portalTarget && createPortal(
         <div className="fixed inset-0 z-[9999]">
           <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={closeSpotlight}></div>
           <div className="absolute inset-0 overflow-y-auto p-4 py-10 pb-24">
@@ -597,7 +613,7 @@ export const RosterTab: React.FC<RosterTabProps> = ({ isReadOnly = false }) => {
             </div>
           </div>
         </div>,
-        document.body
+        portalTarget
       )}
     </div>
   );
