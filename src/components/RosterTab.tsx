@@ -514,8 +514,8 @@ export const RosterTab: React.FC<RosterTabProps> = ({ isReadOnly = false }) => {
                             else if (rank >= 7) badgeColorStyle = 'text-[#EF4444] bg-[#EF4444]/20 border-[#EF4444]/50 shadow-[0_0_12px_rgba(239,68,68,0.5)]'; // Red for Top 7-9
 
                             return (
-                              <div className={cn("px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider border backdrop-blur-sm shadow-sm flex items-center gap-1", badgeColorStyle)}>
-                                <Medal size={8} />
+                              <div className={cn("px-1 py-0.5 sm:px-1.5 sm:py-0.5 rounded text-[6.5px] sm:text-[8px] font-black uppercase tracking-wider border backdrop-blur-sm shadow-sm flex items-center gap-0.5 sm:gap-1", badgeColorStyle)}>
+                                <Medal className="w-1.5 h-1.5 sm:w-2 sm:h-2 shrink-0" />
                                 Top {rank} Niner
                               </div>
                             );
@@ -530,8 +530,8 @@ export const RosterTab: React.FC<RosterTabProps> = ({ isReadOnly = false }) => {
                             else if (a.awardColor === 'Orange' || a.color === 'Orange') badgeColorStyle = 'border-orange-500 text-orange-200 bg-orange-500/30 shadow-[0_0_8px_rgba(249,115,22,0.6)]';
 
                             return (
-                              <div key={a.id} className={cn("px-1.5 py-0.5 rounded text-[7.5px] font-black uppercase tracking-wider border backdrop-blur-sm flex items-center gap-1", badgeColorStyle)}>
-                                <Star size={8} className="drop-shadow-md" />
+                              <div key={a.id} className={cn("px-1 py-0.5 sm:px-1.5 sm:py-0.5 rounded text-[6px] sm:text-[7.5px] font-black uppercase tracking-wider border backdrop-blur-sm flex items-center gap-0.5 sm:gap-1", badgeColorStyle)}>
+                                <Star className="w-1.5 h-1.5 sm:w-2 sm:h-2 shrink-0 drop-shadow-md" />
                                 {formatBadgeTitle(a.title || a.awardName || a.name)}
                               </div>
                             );
@@ -542,9 +542,9 @@ export const RosterTab: React.FC<RosterTabProps> = ({ isReadOnly = false }) => {
                     
                     {/* Status */}
                     {host.status && String(host.status).toLowerCase() !== 'active' && (
-                      <div className="flex items-center gap-1 bg-black/40 backdrop-blur-md px-1.5 py-0.5 rounded-full border border-red-500/30">
+                      <div className="flex items-center gap-0.5 sm:gap-1 bg-black/40 backdrop-blur-md px-1 sm:px-1.5 py-0.5 rounded-full border border-red-500/30">
                         <span className="w-1 h-1 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.8)] animate-pulse"></span>
-                        <span className="text-[6.5px] font-black text-red-400 uppercase tracking-widest">{host.status}</span>
+                        <span className="text-[5.5px] sm:text-[6.5px] font-black text-red-400 uppercase tracking-widest">{host.status}</span>
                       </div>
                     )}
                   </div>
@@ -564,8 +564,8 @@ export const RosterTab: React.FC<RosterTabProps> = ({ isReadOnly = false }) => {
                     };
 
                     return (
-                      <div className={cn("px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider border backdrop-blur-sm shadow-sm flex items-center gap-1", getTierStyle(tier))}>
-                        <Star size={8} />
+                      <div className={cn("px-1 py-0.5 sm:px-1.5 sm:py-0.5 rounded text-[6.5px] sm:text-[8px] font-black uppercase tracking-wider border backdrop-blur-sm shadow-sm flex items-center gap-0.5 sm:gap-1", getTierStyle(tier))}>
+                        <Star className="w-1.5 h-1.5 sm:w-2 sm:h-2 shrink-0" />
                         {tier}
                       </div>
                     );
