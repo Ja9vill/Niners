@@ -13,7 +13,7 @@ export const PublicLayout = ({ children }: { children?: React.ReactNode }) => {
   const isLoggedIn = authState && authState.level > 0;
 
   return (
-    <div className="fixed inset-0 w-full h-[100dvh] flex flex-col overflow-hidden bg-[#0A0A0F] text-[#F0EFE8] font-sans selection:bg-[#D4AF37]/30 selection:text-white">
+    <div className="fixed inset-0 w-full h-[100dvh] flex flex-col overflow-hidden bg-transparent text-[#F0EFE8] font-sans selection:bg-[#D4AF37]/30 selection:text-white">
       {/* Mobile Top Bar (Matching Dashboard Mobile Header) */}
       <header className="global-block-1 !overflow-visible md:hidden flex items-center justify-between p-4 shrink-0 z-50">
         <div className="flex items-center gap-3">
