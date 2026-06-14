@@ -1050,7 +1050,7 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
       {/* Mobile Bottom Nav */}
       <div className="md:hidden fixed bottom-1 left-1.5 right-1.5 pb-safe z-50 pointer-events-none">
         <div className="global-block-1 rounded-2xl pointer-events-auto flex w-full items-center justify-between gap-1.5 p-2 transition-all duration-500 relative overflow-hidden">
-          <div className="absolute inset-0 bg-black/60 pointer-events-none z-0"></div>
+          <div className="absolute inset-0 bg-[#0F0A06]/95 backdrop-blur-md pointer-events-none z-0"></div>
           {bottomNavLinks.map(tab => {
             const Icon = tab.icon;
             const isActive = location.pathname.startsWith(tab.path);
