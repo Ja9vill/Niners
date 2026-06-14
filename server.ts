@@ -1030,8 +1030,8 @@ Rules:
     }
   }
 
-  const SUBSCRIPTIONS_FILE = path.join(__dirname, "push_subscriptions.json");
-  const NOTIFICATION_TYPES_FILE = path.join(__dirname, "notification_types.json");
+  const SUBSCRIPTIONS_FILE = path.join(resolvedDirname, "push_subscriptions.json");
+  const NOTIFICATION_TYPES_FILE = path.join(resolvedDirname, "notification_types.json");
 
   // Load Push Subscriptions
   let pushSubscriptions: any[] = [];
