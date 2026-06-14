@@ -14,31 +14,102 @@ export const PublicLayout = ({ children }: { children?: React.ReactNode }) => {
 
   return (
     <div className="fixed inset-0 w-full h-[100dvh] flex flex-col overflow-hidden bg-[#0A0A0F] text-[#F0EFE8] font-sans selection:bg-[#D4AF37]/30 selection:text-white">
-      {/* Native App Top Bar */}
-      <header className="global-block-1 w-full flex items-center justify-between p-4 shrink-0 z-50 transition-all duration-500">
-        <div className="flex items-center gap-2 md:gap-3">
-          <Link to="/" className="flex items-center gap-2 md:gap-3">
-          <img 
-            src={appLogo} 
-            alt="Nine Talent Management" 
-            className="w-8 h-8 rounded-md border border-white/10 shrink-0 object-cover" 
-          />
-          <div className="flex flex-col">
-            <span className="font-black tracking-widest text-[#D4AF37] text-[11px] uppercase leading-tight">
-              NINE TALENT MANAGEMENT
-            </span>
-            <span className="text-[10px] text-[#A09E9A]">Official Portal</span>
-          </div>
+      {/* Mobile Top Bar (Matching Dashboard Mobile Header) */}
+      <header className="global-block-1 !overflow-visible md:hidden flex items-center justify-between p-4 shrink-0 z-50">
+        <div className="flex items-center gap-3">
+          <Link to="/" className="flex items-center gap-3">
+            <img 
+              src={appLogo} 
+              alt="Nine Talent Management" 
+              className="w-8 h-8 rounded-md border border-white/10 shrink-0 object-cover" 
+            />
+            <div className="flex flex-col">
+              <span className="font-black tracking-widest text-[#D4AF37] text-[11px] uppercase leading-tight">
+                NINE TALENT MANAGEMENT
+              </span>
+              <span className="text-[10px] text-[#A09E9A]">Official Portal</span>
+            </div>
           </Link>
         </div>
-        {!isLoggedIn && (
-          <Link 
-            to="/login"
-            className="global-block-1 px-4 py-1.5 rounded-xl text-[#D4AF37] hover:text-[#D4AF37] hover:scale-105 text-[10px] font-bold uppercase tracking-widest transition-all"
-          >
-            Login
+        <div className="flex items-center gap-2">
+          {!isLoggedIn ? (
+            <Link 
+              to="/login"
+              className="global-block-1 px-4 py-1.5 rounded-xl text-[#D4AF37] hover:text-[#D4AF37] hover:scale-105 text-[10px] font-bold uppercase tracking-widest transition-all"
+            >
+              Login
+            </Link>
+          ) : (
+            <Link 
+              to="/dashboard"
+              className="global-block-1 px-4 py-1.5 rounded-xl text-[#D4AF37] hover:text-[#D4AF37] hover:scale-105 text-[10px] font-bold uppercase tracking-widest transition-all"
+            >
+              Dashboard
+            </Link>
+          )}
+        </div>
+      </header>
+
+      {/* Desktop Top Bar (Matching Dashboard Desktop Header) */}
+      <header className="hidden md:flex items-center justify-between px-8 py-4 bg-[#140E0A] border-b border-[#D4AF37]/10 shrink-0 z-20 h-16 animate-fadeIn">
+        <div className="flex items-center gap-6">
+          <Link to="/" className="flex items-center gap-3">
+            <img 
+              src={appLogo} 
+              alt="Nine Talent Management" 
+              className="w-8 h-8 rounded-md border border-[#D4AF37]/30 shrink-0 object-cover" 
+            />
+            <div className="flex flex-col">
+              <span className="font-black tracking-widest text-[#D4AF37] text-[11px] uppercase leading-tight">
+                NINE TALENT MANAGEMENT
+              </span>
+              <span className="text-[10px] text-[#A09E9A]">Official Portal</span>
+            </div>
           </Link>
-        )}
+
+          <nav className="flex items-center gap-1">
+            {[
+              { to: '/', label: 'Home' },
+              { to: '/roster', label: 'Roster' },
+              { to: '/calendar', label: 'Calendar' },
+              { to: '/poppo-live', label: 'Poppo' },
+            ].map(({ to, label }) => {
+              const isActive = to === '/' ? location.pathname === '/' : location.pathname.startsWith(to);
+              return (
+                <Link
+                  key={to}
+                  to={to}
+                  className={cn(
+                    "px-4 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all",
+                    isActive
+                      ? "bg-[#D4AF37]/10 text-[#D4AF37]"
+                      : "text-[#A09E9A] hover:text-[#D4AF37] hover:bg-white/[0.02]"
+                  )}
+                >
+                  {label}
+                </Link>
+              );
+            })}
+          </nav>
+        </div>
+
+        <div className="flex items-center gap-4">
+          {!isLoggedIn ? (
+            <Link 
+              to="/login"
+              className="global-block-1 px-4 py-1.5 rounded-xl text-[#D4AF37] hover:text-[#D4AF37] hover:scale-105 text-[10px] font-bold uppercase tracking-widest transition-all"
+            >
+              Login
+            </Link>
+          ) : (
+            <Link 
+              to="/dashboard"
+              className="global-block-1 px-4 py-1.5 rounded-xl text-[#D4AF37] hover:text-[#D4AF37] hover:scale-105 text-[10px] font-bold uppercase tracking-widest transition-all"
+            >
+              Dashboard
+            </Link>
+          )}
+        </div>
       </header>
 
       {/* Main Scrollable Content */}
@@ -62,9 +133,9 @@ export const PublicLayout = ({ children }: { children?: React.ReactNode }) => {
         {children || <Outlet />}
       </main>
 
-      {/* Floating Glassmorphism Bottom Nav */}
-      <div className="fixed bottom-4 left-4 right-4 pb-safe z-50 pointer-events-none">
-        <div className="global-block-1 rounded-2xl pointer-events-auto flex w-full items-center justify-between gap-2 p-2 transition-all duration-500 relative overflow-hidden">
+      {/* Mobile Bottom Nav (Matching Dashboard Mobile Bottom Nav layout, colors, and styling) */}
+      <div className="md:hidden fixed bottom-1 left-1.5 right-1.5 pb-safe z-50 pointer-events-none">
+        <div className="global-block-1 rounded-2xl pointer-events-auto flex w-full items-center justify-between gap-1.5 p-2 transition-all duration-500 relative overflow-hidden">
           <div className="absolute inset-0 bg-black/60 pointer-events-none z-0"></div>
           {[
             { to: '/', icon: Home, label: 'Home' },
