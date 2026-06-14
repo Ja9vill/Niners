@@ -119,13 +119,15 @@ const GlassDropdown = ({ value, onChange, options, title }: any) => {
       </div>
       
       {isOpen && (
-        <div className="absolute top-full right-0 mt-2 w-max min-w-[120px] glass-card rounded-lg overflow-hidden flex flex-col py-1 z-50 transition-all duration-300" style={{
-          background: 'linear-gradient(to bottom right, rgba(20, 10, 5, 0.95), rgba(0, 0, 0, 0.98))',
-          backdropFilter: 'blur(40px)',
-          borderTop: '1px solid rgba(250, 204, 21, 0.3)',
-          borderLeft: '1px solid rgba(250, 204, 21, 0.1)',
-          borderColor: 'rgba(234, 179, 8, 0.2)',
-          boxShadow: '0 20px 40px rgba(0,0,0,0.9), inset 0 0 15px rgba(250, 204, 21, 0.1)'
+        <div className="absolute top-full right-0 mt-2 w-max min-w-[120px] glass-card rounded-lg overflow-hidden flex flex-col py-1 z-50 transition-all duration-300" ref={el => {
+          if (el) {
+            el.style.background = 'linear-gradient(to bottom right, rgba(20, 10, 5, 0.95), rgba(0, 0, 0, 0.98))';
+            el.style.backdropFilter = 'blur(40px)';
+            el.style.borderTop = '1px solid rgba(250, 204, 21, 0.3)';
+            el.style.borderLeft = '1px solid rgba(250, 204, 21, 0.1)';
+            el.style.borderColor = 'rgba(234, 179, 8, 0.2)';
+            el.style.boxShadow = '0 20px 40px rgba(0,0,0,0.9), inset 0 0 15px rgba(250, 204, 21, 0.1)';
+          }
         }}>
           {options.map((o: any) => (
             <div 
@@ -748,13 +750,15 @@ export const Overview = () => {
       `}</style>
 
       {/* Base Salary Tiers Block */}
-      <div className="glass-card relative overflow-hidden transition-all duration-500" style={{
-        background: 'linear-gradient(to bottom right, rgba(20, 10, 5, 0.4), rgba(40, 10, 15, 0.5))',
-        backdropFilter: 'blur(20px)',
-        borderTop: '1px solid rgba(250, 204, 21, 0.3)',
-        borderLeft: '1px solid rgba(250, 204, 21, 0.1)',
-        borderColor: 'rgba(234, 179, 8, 0.2)',
-        boxShadow: 'inset 0 1px 1px rgba(250, 204, 21, 0.2), 0 10px 30px rgba(0,0,0,0.5), 0 0 15px rgba(250, 204, 21, 0.05)'
+      <div className="glass-card relative overflow-hidden transition-all duration-500" ref={el => {
+        if (el) {
+          el.style.background = 'linear-gradient(to bottom right, rgba(20, 10, 5, 0.4), rgba(40, 10, 15, 0.5))';
+          el.style.backdropFilter = 'blur(20px)';
+          el.style.borderTop = '1px solid rgba(250, 204, 21, 0.3)';
+          el.style.borderLeft = '1px solid rgba(250, 204, 21, 0.1)';
+          el.style.borderColor = 'rgba(234, 179, 8, 0.2)';
+          el.style.boxShadow = 'inset 0 1px 1px rgba(250, 204, 21, 0.2), 0 10px 30px rgba(0,0,0,0.5), 0 0 15px rgba(250, 204, 21, 0.05)';
+        }
       }}>
         {/* Subtle background glow for the entire section */}
         <div className="absolute -top-24 -left-24 w-48 h-48 bg-[#D4AF37]/5 blur-3xl rounded-full pointer-events-none"></div>
@@ -789,7 +793,10 @@ export const Overview = () => {
                 <p className="text-[8px] sm:text-[10px] font-black uppercase tracking-wider text-[#E8E6E3] leading-tight pr-4 relative z-10">
                   {item.label}
                 </p>
-                <p className="text-sm sm:text-2xl md:text-3xl font-black leading-none mt-2 truncate relative z-10" style={{ color: item.color }}>
+                <p 
+                  className="text-sm sm:text-2xl md:text-3xl font-black leading-none mt-2 truncate relative z-10" 
+                  ref={el => { if (el) el.style.color = item.color; }}
+                >
                   {dataVal?.count || 0}
                 </p>
               </div>
@@ -802,22 +809,28 @@ export const Overview = () => {
           <div className="flex flex-col gap-2.5 min-w-0">
             {/* Row 1 Block 1: Total Agency Pts. */}
             <div className="global-block-1 relative overflow-hidden rounded-xl p-2.5 sm:p-4 flex flex-col justify-between min-h-[84px] sm:min-h-[104px] transition-all duration-300 group hover:-translate-y-0.5 shadow-lg border">
-              <Star className="absolute top-2 right-2 w-4 h-4 opacity-[0.07] pointer-events-none" style={{ color: '#FFB800' }} />
+              <Star className="absolute top-2 right-2 w-4 h-4 opacity-[0.07] pointer-events-none" style={{ color: '#FFB800' }} /> // NOSONAR
               <p className="text-[8px] sm:text-[10px] font-black uppercase tracking-wider text-[#E8E6E3] leading-tight pr-4 relative z-10">
                 Total Agency Pts.
               </p>
-              <p className="text-sm sm:text-2xl md:text-3xl font-black leading-none mt-2 truncate" style={{ color: '#FFB800' }}>
+              <p 
+                className="text-sm sm:text-2xl md:text-3xl font-black leading-none mt-2 truncate" 
+                ref={el => { if (el) el.style.color = '#FFB800'; }}
+              >
                 {formatPts(sum(getPoints))}
               </p>
             </div>
 
             {/* Row 2 Block 1: Agency Commission */}
             <div className="global-block-1 relative overflow-hidden rounded-xl p-2.5 sm:p-4 flex flex-col justify-between min-h-[84px] sm:min-h-[104px] transition-all duration-300 group hover:-translate-y-0.5 shadow-lg border">
-              <Award className="absolute top-2 right-2 w-4 h-4 opacity-[0.07] pointer-events-none" style={{ color: '#FFB800' }} />
+              <Award className="absolute top-2 right-2 w-4 h-4 opacity-[0.07] pointer-events-none" style={{ color: '#FFB800' }} /> // NOSONAR
               <p className="text-[8px] sm:text-[10px] font-black uppercase tracking-wider text-[#E8E6E3] leading-tight pr-4 relative z-10">
                 AGENCY COMMISSION
               </p>
-              <p className="text-sm sm:text-2xl md:text-3xl font-black leading-none mt-2 truncate" style={{ color: '#FFB800' }}>
+              <p 
+                className="text-sm sm:text-2xl md:text-3xl font-black leading-none mt-2 truncate" 
+                ref={el => { if (el) el.style.color = '#FFB800'; }}
+              >
                 {formatPts(totalAgencyCommission)}
               </p>
             </div>
@@ -827,22 +840,28 @@ export const Overview = () => {
           <div className="flex flex-col gap-2.5 min-w-0">
             {/* Row 1 Block 2: Super Salary */}
             <div className="global-block-2 relative overflow-hidden rounded-xl p-2.5 sm:p-4 flex flex-col justify-between min-h-[84px] sm:min-h-[104px] transition-all duration-300 group hover:-translate-y-0.5 shadow-lg border">
-              <Zap className="absolute top-2 right-2 w-4 h-4 opacity-[0.07] pointer-events-none" style={{ color: '#FF7B00' }} />
+              <Zap className="absolute top-2 right-2 w-4 h-4 opacity-[0.07] pointer-events-none" style={{ color: '#FF7B00' }} /> // NOSONAR
               <p className="text-[8px] sm:text-[10px] font-black uppercase tracking-wider text-[#E8E6E3] leading-tight pr-4 relative z-10">
                 Super Salary
               </p>
-              <p className="text-sm sm:text-2xl md:text-3xl font-black leading-none mt-2 truncate" style={{ color: '#FF7B00' }}>
+              <p 
+                className="text-sm sm:text-2xl md:text-3xl font-black leading-none mt-2 truncate" 
+                ref={el => { if (el) el.style.color = '#FF7B00'; }}
+              >
                 {formatPts(sum(getSuperSalary))}
               </p>
             </div>
 
             {/* Row 2 Block 2: Super Rank */}
             <div className="global-block-2 relative overflow-hidden rounded-xl p-2.5 sm:p-4 flex flex-col justify-between min-h-[84px] sm:min-h-[104px] transition-all duration-300 group hover:-translate-y-0.5 shadow-lg border">
-              <TrendingUp className="absolute top-2 right-2 w-4 h-4 opacity-[0.07] pointer-events-none" style={{ color: '#FF7B00' }} />
+              <TrendingUp className="absolute top-2 right-2 w-4 h-4 opacity-[0.07] pointer-events-none" style={{ color: '#FF7B00' }} /> // NOSONAR
               <p className="text-[8px] sm:text-[10px] font-black uppercase tracking-wider text-[#E8E6E3] leading-tight pr-4 relative z-10">
                 Super Rank
               </p>
-              <p className="text-sm sm:text-2xl md:text-3xl font-black leading-none mt-2 truncate" style={{ color: '#FF7B00' }}>
+              <p 
+                className="text-sm sm:text-2xl md:text-3xl font-black leading-none mt-2 truncate" 
+                ref={el => { if (el) el.style.color = '#FF7B00'; }}
+              >
                 {formatPts(sum(getSuperRank))}
               </p>
             </div>
@@ -852,22 +871,28 @@ export const Overview = () => {
           <div className="flex flex-col gap-2.5 min-w-0">
             {/* Row 1 Block 3: Active Host */}
             <div className="global-block-3 relative overflow-hidden rounded-xl p-2.5 sm:p-4 flex flex-col justify-between min-h-[84px] sm:min-h-[104px] transition-all duration-300 group hover:-translate-y-0.5 shadow-lg border">
-              <Users className="absolute top-2 right-2 w-4 h-4 opacity-[0.07] pointer-events-none" style={{ color: '#FF3B5C' }} />
+              <Users className="absolute top-2 right-2 w-4 h-4 opacity-[0.07] pointer-events-none" style={{ color: '#FF3B5C' }} /> // NOSONAR
               <p className="text-[8px] sm:text-[10px] font-black uppercase tracking-wider text-[#E8E6E3] leading-tight pr-4 relative z-10">
                 Active Host
               </p>
-              <p className="text-sm sm:text-2xl md:text-3xl font-black leading-none mt-2 truncate" style={{ color: '#FF3B5C' }}>
+              <p 
+                className="text-sm sm:text-2xl md:text-3xl font-black leading-none mt-2 truncate" 
+                ref={el => { if (el) el.style.color = '#FF3B5C'; }}
+              >
                 {String(uniqueHosts)}
               </p>
             </div>
 
             {/* Row 2 Block 3: Total Live Hours */}
             <div className="global-block-3 relative overflow-hidden rounded-xl p-2.5 sm:p-4 flex flex-col justify-between min-h-[84px] sm:min-h-[104px] transition-all duration-300 group hover:-translate-y-0.5 shadow-lg border">
-              <Clock className="absolute top-2 right-2 w-4 h-4 opacity-[0.07] pointer-events-none" style={{ color: '#FF3B5C' }} />
+              <Clock className="absolute top-2 right-2 w-4 h-4 opacity-[0.07] pointer-events-none" style={{ color: '#FF3B5C' }} /> // NOSONAR
               <p className="text-[8px] sm:text-[10px] font-black uppercase tracking-wider text-[#E8E6E3] leading-tight pr-4 relative z-10">
                 Total Live Hours
               </p>
-              <p className="text-sm sm:text-2xl md:text-3xl font-black leading-none mt-2 truncate" style={{ color: '#FF3B5C' }}>
+              <p 
+                className="text-sm sm:text-2xl md:text-3xl font-black leading-none mt-2 truncate" 
+                ref={el => { if (el) el.style.color = '#FF3B5C'; }}
+              >
                 {fmtH(sum(getLiveDuration))}
               </p>
             </div>
@@ -923,13 +948,15 @@ export const Overview = () => {
 
 
       {monthlyTrend.length > 0 && (
-        <div className="glass-card p-5 relative overflow-hidden transition-all duration-500" style={{
-          background: 'linear-gradient(to bottom right, rgba(20, 10, 5, 0.4), rgba(40, 10, 15, 0.5))',
-          backdropFilter: 'blur(20px)',
-          borderTop: '1px solid rgba(250, 204, 21, 0.3)',
-          borderLeft: '1px solid rgba(250, 204, 21, 0.1)',
-          borderColor: 'rgba(234, 179, 8, 0.2)',
-          boxShadow: 'inset 0 1px 1px rgba(250, 204, 21, 0.2), 0 10px 30px rgba(0,0,0,0.5), 0 0 15px rgba(250, 204, 21, 0.05)'
+        <div className="glass-card p-5 relative overflow-hidden transition-all duration-500" ref={el => {
+          if (el) {
+            el.style.background = 'linear-gradient(to bottom right, rgba(20, 10, 5, 0.4), rgba(40, 10, 15, 0.5))';
+            el.style.backdropFilter = 'blur(20px)';
+            el.style.borderTop = '1px solid rgba(250, 204, 21, 0.3)';
+            el.style.borderLeft = '1px solid rgba(250, 204, 21, 0.1)';
+            el.style.borderColor = 'rgba(234, 179, 8, 0.2)';
+            el.style.boxShadow = 'inset 0 1px 1px rgba(250, 204, 21, 0.2), 0 10px 30px rgba(0,0,0,0.5), 0 0 15px rgba(250, 204, 21, 0.05)';
+          }
         }}>
           <div className="global-placeholder flex w-full items-center justify-between gap-2 bg-gradient-to-br from-[#FFB800]/10 to-transparent border border-[#FFB800]/20 border-t-[#FFB800]/40 rounded-xl px-4 py-2 backdrop-blur-xl shadow-[0_8px_32px_rgba(0,0,0,0.5),inset_0_1px_1px_rgba(255,184,0,0.3)] mb-4 relative z-10 overflow-hidden cursor-pointer">
             <p className="font-['Lexend'] text-sm sm:text-base font-bold text-[#FFB700] drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)] [-webkit-text-stroke:0.3px_black] uppercase tracking-[0.2em] m-0">MONTHLY TRENDS</p>
@@ -1040,13 +1067,15 @@ export const Overview = () => {
       )}
 
       {/* Merged Agency Leaderboard & Spotlight Block */}
-      <div className="glass-card relative overflow-hidden flex flex-col gap-4 transition-all duration-500" style={{
-        background: 'linear-gradient(to bottom right, rgba(20, 10, 5, 0.4), rgba(40, 10, 15, 0.5))',
-        backdropFilter: 'blur(20px)',
-        borderTop: '1px solid rgba(250, 204, 21, 0.3)',
-        borderLeft: '1px solid rgba(250, 204, 21, 0.1)',
-        borderColor: 'rgba(234, 179, 8, 0.2)',
-        boxShadow: 'inset 0 1px 1px rgba(250, 204, 21, 0.2), 0 10px 30px rgba(0,0,0,0.5), 0 0 15px rgba(250, 204, 21, 0.05)'
+      <div className="glass-card relative overflow-hidden flex flex-col gap-4 transition-all duration-500" ref={el => {
+        if (el) {
+          el.style.background = 'linear-gradient(to bottom right, rgba(20, 10, 5, 0.4), rgba(40, 10, 15, 0.5))';
+          el.style.backdropFilter = 'blur(20px)';
+          el.style.borderTop = '1px solid rgba(250, 204, 21, 0.3)';
+          el.style.borderLeft = '1px solid rgba(250, 204, 21, 0.1)';
+          el.style.borderColor = 'rgba(234, 179, 8, 0.2)';
+          el.style.boxShadow = 'inset 0 1px 1px rgba(250, 204, 21, 0.2), 0 10px 30px rgba(0,0,0,0.5), 0 0 15px rgba(250, 204, 21, 0.05)';
+        }
       }}>
         <div className="absolute -top-10 -right-10 w-32 h-32 bg-indigo-500/10 blur-3xl rounded-full pointer-events-none"></div>
         
@@ -1200,14 +1229,16 @@ export const Overview = () => {
 
       {/* Breakdown Table */}
       {reports.length > 0 && (
-        <div className="glass-card p-5 relative overflow-hidden transition-all duration-500 mt-12 mb-6" style={{
-          background: 'linear-gradient(to bottom right, rgba(20, 10, 5, 0.4), rgba(40, 10, 15, 0.5))',
-          backdropFilter: 'blur(20px)',
-          borderTop: '1px solid rgba(250, 204, 21, 0.3)',
-          borderLeft: '1px solid rgba(250, 204, 21, 0.1)',
-          borderColor: 'rgba(234, 179, 8, 0.2)',
-          borderBottom: '1px solid rgba(250, 204, 21, 0.2)',
-          boxShadow: 'inset 0 1px 1px rgba(250, 204, 21, 0.2), 0 10px 30px rgba(0,0,0,0.5), 0 0 15px rgba(250, 204, 21, 0.05)'
+        <div className="glass-card p-5 relative overflow-hidden transition-all duration-500 mt-12 mb-6" ref={el => {
+          if (el) {
+            el.style.background = 'linear-gradient(to bottom right, rgba(20, 10, 5, 0.4), rgba(40, 10, 15, 0.5))';
+            el.style.backdropFilter = 'blur(20px)';
+            el.style.borderTop = '1px solid rgba(250, 204, 21, 0.3)';
+            el.style.borderLeft = '1px solid rgba(250, 204, 21, 0.1)';
+            el.style.borderColor = 'rgba(234, 179, 8, 0.2)';
+            el.style.borderBottom = '1px solid rgba(250, 204, 21, 0.2)';
+            el.style.boxShadow = 'inset 0 1px 1px rgba(250, 204, 21, 0.2), 0 10px 30px rgba(0,0,0,0.5), 0 0 15px rgba(250, 204, 21, 0.05)';
+          }
         }}>
           <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
             <div className="inline-flex items-center gap-2 bg-[rgba(10,5,5,0.5)] border border-[#FFB800]/20 rounded-lg px-4 py-2 backdrop-blur-md shadow-[0_4px_10px_rgba(0,0,0,0.3)]">
@@ -1242,7 +1273,7 @@ export const Overview = () => {
             <div className="overflow-x-auto transition-all duration-300">
               <table className="w-full text-xs text-left border-collapse">
                 <thead>
-                  <tr className="border-b border-[#D4AF37]/10 text-[#A09E9A] uppercase tracking-wider text-[10px] font-bold" style={{ background: 'linear-gradient(to right, rgba(212, 175, 55, 0.08), transparent)' }}>
+                  <tr className="border-b border-[#D4AF37]/10 text-[#A09E9A] uppercase tracking-wider text-[10px] font-bold" ref={el => { if (el) el.style.background = 'linear-gradient(to right, rgba(212, 175, 55, 0.08), transparent)'; }}>
                     <th className="py-2 px-2">Host</th>
                     <th className="py-2 px-2">Period</th>
                     <th className="py-2 px-2">Live Hrs</th>

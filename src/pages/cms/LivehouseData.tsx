@@ -153,6 +153,7 @@ export const LivehouseData = () => {
 
         // Auto-create calendar event using existing saveCalendarEvents method
         await FirebaseService.saveCalendarEvents([{
+          id: req.id || (crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 15)),
           type_of_event: (req.livehouseType || 'Solo Livehouse') as any,
           event_date: req.date,
           description: `Auto-generated from approved Livehouse Request for ${req.name}. Timeslot: ${req.timeslot}`,
@@ -295,7 +296,7 @@ export const LivehouseData = () => {
   const availableYears = useMemo(() => [...new Set(parsedDates.map(d => d.year))].sort(), [parsedDates]);
   const availableMonths = useMemo(() => {
     if (!selectedYear) return [];
-    return [...new Set(parsedDates.filter(d => d.year === selectedYear).map(d => d.month))].sort((a, b) => MONTHS.indexOf(a) - MONTHS.indexOf(b));
+    return ([...new Set(parsedDates.filter(d => d.year === selectedYear).map(d => d.month))] as string[]).sort((a, b) => MONTHS.indexOf(a) - MONTHS.indexOf(b));
   }, [parsedDates, selectedYear]);
 
   // Set default selections
@@ -317,7 +318,7 @@ export const LivehouseData = () => {
     const days = parsedDates
       .filter(d => d.year === selectedYear && d.month === selectedMonth)
       .map(d => d.day);
-    return [...new Set(days)].sort((a, b) => a - b);
+    return ([...new Set(days)] as number[]).sort((a, b) => a - b);
   }, [parsedDates, selectedYear, selectedMonth]);
 
   // Helper to get data for a specific day and timeslot
@@ -576,6 +577,7 @@ export const LivehouseData = () => {
                 value={selectedMonth} 
                 onChange={e => setSelectedMonth(e.target.value)}
                 className="bg-transparent text-[#D4AF37] hover:text-[#FFF0B3] hover:bg-[#D4AF37]/10 font-black uppercase tracking-wider text-xs px-4 py-3 transition-colors appearance-none cursor-pointer outline-none text-center border-r border-[#D4AF37]/20"
+                title="Select Month"
               >
                 {availableMonths.length === 0 && <option value="" className="bg-[#0A0500] text-[#D4AF37]">-</option>}
                 {availableMonths.map(m => <option key={m} value={m} className="bg-[#0A0500] text-[#D4AF37]">{m}</option>)}
@@ -585,6 +587,7 @@ export const LivehouseData = () => {
                 value={selectedYear} 
                 onChange={e => setSelectedYear(e.target.value)}
                 className="bg-transparent text-[#D4AF37] hover:text-[#FFF0B3] hover:bg-[#D4AF37]/10 font-black uppercase tracking-wider text-xs px-4 py-3 transition-colors appearance-none cursor-pointer outline-none text-center"
+                title="Select Year"
               >
                 {availableYears.length === 0 && <option value="" className="bg-[#0A0500] text-[#D4AF37]">-</option>}
                 {availableYears.map(y => <option key={y} value={y} className="bg-[#0A0500] text-[#D4AF37]">{y}</option>)}
@@ -686,6 +689,7 @@ export const LivehouseData = () => {
                       setQueueEventTitle(`${currentRecommendation.nickname} - ${e.target.value}`);
                     }}
                     className="w-full bg-black/60 backdrop-blur-md border border-white/10 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37]/30 rounded-lg px-4 py-2.5 text-sm text-white outline-none transition-all"
+                    title="Select Event Type"
                   >
                     <option value="Solo Livehouse">Solo Livehouse</option>
                     <option value="Party Livehouse">Party Livehouse</option>
@@ -792,6 +796,7 @@ export const LivehouseData = () => {
                                     }
                                   }}
                                   className="text-red-400 hover:text-red-300 font-bold transition-colors ml-1"
+                                  title="Remove Participant"
                                 >
                                   <X size={10} />
                                 </button>
@@ -809,6 +814,7 @@ export const LivehouseData = () => {
                         value={eventHostId}
                         onChange={e => setEventHostId(e.target.value)}
                         className="w-full bg-black/60 border border-white/10 focus:border-[#D4AF37] rounded-lg px-3 py-2 text-xs text-white outline-none"
+                        title="Select Designated Event Host"
                       >
                         {partyParticipants.map(pid => {
                           const user = users.find(u => String(u.poppo_id || u.id) === String(pid));
@@ -868,7 +874,7 @@ export const LivehouseData = () => {
         {/* LIVEHOUSE DATABASE TABLE */}
         <div className="relative mb-4">
           <div className="overflow-x-auto custom-scrollbar pb-8">
-            <table className="w-full text-left border-separate min-w-max" style={{ borderSpacing: '0 8px' }}>
+            <table className="w-full text-left border-separate min-w-max livehouse-table">
               <thead>
                 <tr>
                   <th className="p-4 pb-2 text-[11px] font-black uppercase tracking-widest text-[#A09E9A] whitespace-nowrap sticky top-0 left-0 z-40 bg-[#050200] border-b border-r border-white/5 rounded-tl-2xl shadow-[5px_0_15px_rgba(0,0,0,0.5)]">
@@ -953,6 +959,7 @@ export const LivehouseData = () => {
                   value={deleteAmount}
                   onChange={e => setDeleteAmount(Number(e.target.value))}
                   className="bg-black border border-red-500/20 rounded-lg px-2 py-1.5 text-xs text-white outline-none focus:border-red-500/50"
+                  title="Select Delete Logs Amount"
                 >
                   <option value={50}>50 logs</option>
                   <option value={100}>100 logs</option>
@@ -1022,6 +1029,7 @@ export const LivehouseData = () => {
                     onClick={() => setLogsPage(p => Math.max(1, p - 1))}
                     disabled={logsPage === 1}
                     className="p-2 bg-white/5 hover:bg-white/10 rounded-lg text-white disabled:opacity-30 transition-colors"
+                    title="Previous Page"
                   >
                     <ChevronLeft size={16} />
                   </button>
@@ -1033,6 +1041,7 @@ export const LivehouseData = () => {
                     }}
                     disabled={currentLogs.length < 50 && !logsHasMore}
                     className="p-2 bg-white/5 hover:bg-white/10 rounded-lg text-white disabled:opacity-30 transition-colors"
+                    title="Next Page"
                   >
                     <ChevronRight size={16} />
                   </button>
@@ -1055,6 +1064,7 @@ export const LivehouseData = () => {
               <button 
                 onClick={() => setIsQueueModalOpen(false)}
                 className="p-1.5 text-white/50 hover:text-white hover:bg-white/5 rounded-lg transition-colors"
+                title="Close"
               >
                 <X size={16} />
               </button>
@@ -1093,6 +1103,7 @@ export const LivehouseData = () => {
               <button 
                 onClick={() => { setIsSpotlightModalOpen(false); setSelectedRequest(null); }}
                 className="p-1.5 text-white/50 hover:text-white hover:bg-white/5 rounded-lg transition-colors"
+                title="Close"
               >
                 <X size={16} />
               </button>

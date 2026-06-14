@@ -1722,11 +1722,13 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                 <div className="p-6 sm:p-8 flex flex-col gap-6 overflow-y-auto custom-scrollbar">
                   {/* Header/Close */}
                   <div className="w-full flex flex-col items-end gap-2 absolute top-4 right-4 z-20">
-                    <button onClick={() => {
-                      setSpotlightEvent(null);
-                      setIsAttendanceExpanded(false);
-                      setIsEditExpanded(false);
-                    }} className="text-white/30 hover:text-[#D4AF37] transition-colors p-1 bg-white/5 hover:bg-white/10 rounded-full">
+                    <button 
+                      title="Close"
+                      onClick={() => {
+                        setSpotlightEvent(null);
+                        setIsAttendanceExpanded(false);
+                        setIsEditExpanded(false);
+                      }} className="text-white/30 hover:text-[#D4AF37] transition-colors p-1 bg-white/5 hover:bg-white/10 rounded-full">
                       <X size={20} />
                     </button>
                     
@@ -1746,6 +1748,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                     {canEdit && !isEditExpanded && (
                       <div className="absolute top-4 right-14 z-20">
                          <button 
+                           title="Edit Event"
                            onClick={() => {
                              setEditEventDesc(spotlightEvent.description || '');
                              setEditEventParticipants(spotlightEvent.participants || []);
@@ -2382,7 +2385,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                   <h4 className="text-[12px] uppercase tracking-widest text-[#D4AF37] font-black">{attendanceRecord ? 'Update' : 'Report'} Attendance</h4>
                   <span className="text-[10px] font-bold text-white/50">{attendanceModalEvent.title || 'Event'} • {attendanceModalEvent.time}</span>
                 </div>
-                <button type="button" onClick={() => setAttendanceModalOpen(false)} className="w-8 h-8 flex items-center justify-center rounded-full bg-white/5 text-white/40 hover:text-white hover:bg-white/10 transition-colors"><X size={16} /></button>
+                <button type="button" title="Close" onClick={() => setAttendanceModalOpen(false)} className="w-8 h-8 flex items-center justify-center rounded-full bg-white/5 text-white/40 hover:text-white hover:bg-white/10 transition-colors"><X size={16} /></button>
               </div>
               
               <div className="p-5 sm:p-6 overflow-y-auto custom-scrollbar flex-1">
@@ -2494,8 +2497,9 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                                   <img src={avatar} alt={dispName} className="w-8 h-8 rounded-full border border-[#D4AF37]/30 object-cover shrink-0" />
                                   <span className="text-xs font-bold text-[#D4AF37] truncate">{dispName}</span>
                                 </div>
-                                <button
+                                 <button
                                   type="button"
+                                  title="Remove Attendee"
                                   onClick={() => setAttAttendees(attAttendees.filter(user => String(user.poppo_id || user.id || user.poppoId) !== String(pId)))}
                                   className="w-6 h-6 flex items-center justify-center rounded-lg bg-black/50 text-white/40 hover:text-red-400 hover:bg-red-500/10 font-bold transition-all shrink-0 cursor-pointer opacity-0 group-hover:opacity-100"
                                 >

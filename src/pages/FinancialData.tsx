@@ -404,17 +404,53 @@ export const FinancialData = ({ isAgentMode = false }: { isAgentMode?: boolean }
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
               <span className="text-[10px] font-bold text-[#A09E9A] uppercase">Fallback Month/Date:</span>
-              <input
-                type="month"
-                value={selectedMonth}
-                onChange={(e) => setSelectedMonth(e.target.value)}
-                className="bg-[#0D0D14] border border-white/10 text-white text-[10px] uppercase font-bold py-1 px-2 rounded focus:outline-none focus:border-[#D4AF37]"
-              />
+              <div className="flex gap-1">
+                <select
+                  title="Fallback Year"
+                  value={selectedMonth.split('-')[0] || new Date().getFullYear().toString()}
+                  onChange={(e) => {
+                    const currentMonth = selectedMonth.split('-')[1] || '01';
+                    setSelectedMonth(`${e.target.value}-${currentMonth}`);
+                  }}
+                  className="bg-[#0D0D14] border border-white/10 text-white text-[10px] uppercase font-bold py-1 px-1.5 rounded focus:outline-none focus:border-[#D4AF37] cursor-pointer"
+                >
+                  {Array.from({ length: 6 }, (_, i) => String(2024 + i)).map(y => (
+                    <option key={y} value={y}>{y}</option>
+                  ))}
+                </select>
+                <select
+                  title="Fallback Month"
+                  value={selectedMonth.split('-')[1] || '01'}
+                  onChange={(e) => {
+                    const currentYear = selectedMonth.split('-')[0] || new Date().getFullYear().toString();
+                    setSelectedMonth(`${currentYear}-${e.target.value}`);
+                  }}
+                  className="bg-[#0D0D14] border border-white/10 text-white text-[10px] uppercase font-bold py-1 px-1.5 rounded focus:outline-none focus:border-[#D4AF37] cursor-pointer"
+                >
+                  {[
+                    { val: '01', label: 'Jan' },
+                    { val: '02', label: 'Feb' },
+                    { val: '03', label: 'Mar' },
+                    { val: '04', label: 'Apr' },
+                    { val: '05', label: 'May' },
+                    { val: '06', label: 'Jun' },
+                    { val: '07', label: 'Jul' },
+                    { val: '08', label: 'Aug' },
+                    { val: '09', label: 'Sep' },
+                    { val: '10', label: 'Oct' },
+                    { val: '11', label: 'Nov' },
+                    { val: '12', label: 'Dec' }
+                  ].map(m => (
+                    <option key={m.val} value={m.val}>{m.label}</option>
+                  ))}
+                </select>
+              </div>
             </div>
             {!isAgentMode && isDirectorOrAdmin && (
               <div className="flex items-center gap-2 border-l border-white/10 pl-4">
                 <span className="text-[10px] font-bold text-[#A09E9A] uppercase tracking-wider">Assign to Agent:</span>
                 <select
+                  title="Assign to Agent"
                   value={agentOverride}
                   onChange={(e) => setAgentOverride(e.target.value)}
                   className="bg-[#0D0D14] border border-white/10 text-white text-[10px] uppercase font-bold py-1 px-2 rounded focus:outline-none focus:border-[#D4AF37]"
@@ -470,6 +506,7 @@ export const FinancialData = ({ isAgentMode = false }: { isAgentMode?: boolean }
           <motion.div initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} className="flex items-center gap-3 bg-[#0D0D14] p-3 border-b border-[#D4AF37]/30">
              <span className="text-[10px] font-black uppercase text-[#D4AF37] ml-2">Bulk Edit Selected:</span>
              <select 
+               title="Bulk Edit Field"
                value={bulkEditField} 
                onChange={(e) => setBulkEditField(e.target.value)}
                className="bg-[#1A1A28] border border-white/10 text-white text-xs rounded px-2 py-1.5 focus:outline-none focus:border-[#D4AF37]"
@@ -504,7 +541,7 @@ export const FinancialData = ({ isAgentMode = false }: { isAgentMode?: boolean }
             <thead>
               <tr className="border-b border-white/5 text-[9px] font-black text-[#A09E9A] uppercase bg-[#1A1A28] sticky top-0 z-20">
                 <th className="px-3 py-3 w-12 text-center sticky left-0 z-30 bg-[#13131E] border-r border-white/5">
-                  <input type="checkbox" onChange={(e) => {
+                  <input type="checkbox" title="Select All Rows" onChange={(e) => {
                       const data = financialTab === 'monthly' ? monthlyLedger : weeklyLedger;
                       const lowerSearch = ledgerSearch.toLowerCase();
                       const filtered = data.map((row, idx) => {
@@ -600,7 +637,7 @@ export const FinancialData = ({ isAgentMode = false }: { isAgentMode?: boolean }
                           isHighlight ? "bg-[#282010] group-hover:bg-[#352a15]" :
                           "bg-[#13131E] group-hover:bg-[#1A1A28]"
                         )}>
-                          <input type="checkbox" checked={isChecked} onChange={e => setSelectedRows(prev => ({...prev, [`${financialTab}_${idx}`]: e.target.checked}))} className="rounded border-white/10 text-[#D4AF37] focus:ring-[#D4AF37] cursor-pointer" />
+                          <input type="checkbox" title="Select Row" checked={isChecked} onChange={e => setSelectedRows(prev => ({...prev, [`${financialTab}_${idx}`]: e.target.checked}))} className="rounded border-white/10 text-[#D4AF37] focus:ring-[#D4AF37] cursor-pointer" />
                           {(row as any)._isDuplicate && (
                             <div className="absolute top-1/2 -translate-y-1/2 left-8 text-xs cursor-help" title="Duplicate Entry Detected">⚠️</div>
                           )}

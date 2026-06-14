@@ -1467,11 +1467,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
     if (!isDirectorOrHeadAdmin) return null;
 
     return (
-      <div className="glass-card p-6 space-y-6 relative overflow-hidden transition-all duration-300" style={{
-        background: 'linear-gradient(to bottom right, rgba(20, 10, 5, 0.55), rgba(5, 5, 10, 0.75))',
-        border: '1px solid rgba(212, 175, 55, 0.25)',
-        boxShadow: '0 10px 40px rgba(0,0,0,0.6), inset 0 1px 1px rgba(255, 255, 255, 0.05), 0 0 20px rgba(212, 175, 55, 0.03)'
-      }}>
+      <div className="glass-card p-6 space-y-6 relative overflow-hidden transition-all duration-300 roster-management-panel">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-[#D4AF37]/20 pb-3">
           <div className="flex items-center gap-2">
@@ -1590,22 +1586,27 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Field: Nickname */}
               <div className="flex flex-col gap-1.5">
-                <label className="text-[9px] font-black uppercase tracking-widest text-[#A09E9A]">Nickname / Name</label>
+                <label htmlFor="editable-nickname" className="text-[9px] font-black uppercase tracking-widest text-[#A09E9A]">Nickname / Name</label>
                 <input
+                  id="editable-nickname"
                   type="text"
                   className="glass-input text-xs border-[#D4AF37]/30 focus:border-[#D4AF37]/70"
                   value={rosterEditableFields.nickname}
                   onChange={(e) => setRosterEditableFields(prev => ({ ...prev, nickname: e.target.value }))}
+                  title="Nickname / Name"
+                  placeholder="Nickname / Name"
                 />
               </div>
 
               {/* Field: Role Dropdown */}
               <div className="flex flex-col gap-1.5">
-                <label className="text-[9px] font-black uppercase tracking-widest text-[#A09E9A]">Role</label>
+                <label htmlFor="editable-role" className="text-[9px] font-black uppercase tracking-widest text-[#A09E9A]">Role</label>
                 <select
+                  id="editable-role"
                   className="glass-input text-xs border-[#D4AF37]/30 focus:border-[#D4AF37]/70 bg-black"
                   value={rosterEditableFields.role}
                   onChange={(e) => setRosterEditableFields(prev => ({ ...prev, role: e.target.value }))}
+                  title="Role"
                 >
                   <option value="Host">Host</option>
                   <option value="Admin">Admin</option>
@@ -1622,11 +1623,13 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
 
               {/* Field: Tier Pay Dropdown */}
               <div className="flex flex-col gap-1.5">
-                <label className="text-[9px] font-black uppercase tracking-widest text-[#A09E9A]">Tier Pay</label>
+                <label htmlFor="editable-tier-pay" className="text-[9px] font-black uppercase tracking-widest text-[#A09E9A]">Tier Pay</label>
                 <select
+                  id="editable-tier-pay"
                   className="glass-input text-xs border-[#D4AF37]/30 focus:border-[#D4AF37]/70 bg-black"
                   value={rosterEditableFields.tier_pay}
                   onChange={(e) => setRosterEditableFields(prev => ({ ...prev, tier_pay: e.target.value }))}
+                  title="Tier Pay"
                 >
                   <option value="">Select Tier...</option>
                   <option value="Star Host">Star Host</option>
@@ -1639,11 +1642,13 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
 
               {/* Field: Status Dropdown */}
               <div className="flex flex-col gap-1.5">
-                <label className="text-[9px] font-black uppercase tracking-widest text-[#A09E9A]">Status</label>
+                <label htmlFor="editable-status" className="text-[9px] font-black uppercase tracking-widest text-[#A09E9A]">Status</label>
                 <select
+                  id="editable-status"
                   className="glass-input text-xs border-[#D4AF37]/30 focus:border-[#D4AF37]/70 bg-black"
                   value={rosterEditableFields.status}
                   onChange={(e) => setRosterEditableFields(prev => ({ ...prev, status: e.target.value }))}
+                  title="Status"
                 >
                   <option value="Active">Active</option>
                   <option value="Intermittent">Intermittent</option>
@@ -1655,21 +1660,24 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
 
               {/* Field: Team Anchor */}
               <div className="flex flex-col gap-1.5">
-                <label className="text-[9px] font-black uppercase tracking-widest text-[#A09E9A]">Team Anchor</label>
+                <label htmlFor="editable-team-anchor" className="text-[9px] font-black uppercase tracking-widest text-[#A09E9A]">Team Anchor</label>
                 <input
+                  id="editable-team-anchor"
                   type="text"
                   className="glass-input text-xs border-[#D4AF37]/30 focus:border-[#D4AF37]/70"
                   value={rosterEditableFields.teamAnchor}
                   onChange={(e) => setRosterEditableFields(prev => ({ ...prev, teamAnchor: e.target.value }))}
                   placeholder="e.g. Alpha, Beta..."
+                  title="Team Anchor"
                 />
               </div>
 
               {/* HOST ONLY FIELD: Assigned Manager/Agent Dropdown */}
               {String(rosterEditableFields.role).toLowerCase() === 'host' && (
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[9px] font-black uppercase tracking-widest text-[#A09E9A]">Assigned Manager / Agent</label>
+                  <label htmlFor="editable-assigned-manager" className="text-[9px] font-black uppercase tracking-widest text-[#A09E9A]">Assigned Manager / Agent</label>
                   <select
+                    id="editable-assigned-manager"
                     className="glass-input text-xs border-[#D4AF37]/30 focus:border-[#D4AF37]/70 bg-black"
                     value={rosterEditableFields.assignedManagerId}
                     onChange={(e) => {
@@ -1681,6 +1689,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
                         assignedManagerName: selMgr ? (selMgr.nickname || selMgr.name || '') : ''
                       }));
                     }}
+                    title="Assigned Manager / Agent"
                   >
                     <option value="">Unassigned</option>
                     {rosterManagerAgentList.map(mgr => (
@@ -1824,10 +1833,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
         {isRosterPushModalOpen && selectedRosterUser && (
           <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
             <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setIsRosterPushModalOpen(false)}></div>
-            <div className="glass-card w-full max-w-md p-6 relative z-10 space-y-4 text-left" style={{
-              background: 'linear-gradient(to bottom right, rgba(30, 15, 5, 0.95), rgba(10, 10, 20, 0.95))',
-              border: '1px solid rgba(212, 175, 55, 0.35)'
-            }}>
+            <div className="glass-card w-full max-w-md p-6 relative z-10 space-y-4 text-left send-push-modal">
               <div className="flex items-center justify-between border-b border-white/5 pb-2">
                 <h4 className="text-xs font-black uppercase tracking-widest text-[#D4AF37]">
                   Send Push Notification
@@ -1835,6 +1841,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
                 <button
                   onClick={() => setIsRosterPushModalOpen(false)}
                   className="w-6 h-6 rounded-full bg-black/40 border border-white/10 flex items-center justify-center text-[#A09E9A] hover:text-[#F0EFE8] transition-all cursor-pointer"
+                  title="Close"
                 >
                   <X size={10} />
                 </button>
@@ -2026,7 +2033,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
         timestamp: new Date().toISOString()
       };
 
-      const noteId = generateSubmissionId(managerId, rootAuth?.role || 'Manager', managerName);
+      const noteId = generateSubmissionId(String(managerPoppoId), rootAuth?.role || 'Manager', managerName);
       const docRef = doc(db, 'notes', noteId);
       await setDoc(docRef, newNote);
       await FirebaseService.logSystemActivity(`Manager/Agent ${managerName} added coaching feedback note for host "${hostNickname}" (Poppo ID: ${noteHostId})`, 'Info');
@@ -4945,7 +4952,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                 return (
                   <div
                     key={i}
-                    style={{ background: tile.bgGradient }}
+                    ref={el => { if (el) el.style.background = tile.bgGradient; }}
                     className={cn(
                       "border border-white/5 p-3 sm:p-4.5 rounded-2xl flex flex-col items-center justify-center text-center min-h-[90px] transition-all duration-300 transform group-hover:translate-y-[-2px] shadow-lg gap-1.5",
                       tile.hoverBorder
@@ -4955,7 +4962,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                       {tile.label}
                     </span>
                     <span
-                      style={{ color: tile.accentColor }}
+                      ref={el => { if (el) el.style.color = tile.accentColor; }}
                       className={cn("font-black tracking-tight drop-shadow-md", textClass)}
                     >
                       {valStr}
@@ -5526,10 +5533,10 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
           )}
 
           {/* Top Overlay (17% total height, top 12% is solid black, remaining 5% fades) */}
-          <div className="absolute top-0 inset-x-0 h-[17%] pointer-events-none" style={{ background: 'linear-gradient(to bottom, #000000 0%, #000000 70.6%, transparent 100%)', zIndex: 10 }} />
+          <div className="absolute top-0 inset-x-0 h-[17%] pointer-events-none profile-top-overlay" />
 
           {/* Bottom Overlay (30% total height, bottom 20% is solid black, remaining 10% fades) */}
-          <div className="absolute bottom-0 inset-x-0 h-[30%] pointer-events-none" style={{ background: 'linear-gradient(to top, #000000 0%, #000000 66.7%, transparent 100%)', zIndex: 10 }} />
+          <div className="absolute bottom-0 inset-x-0 h-[30%] pointer-events-none profile-bottom-overlay" />
 
           {/* Faded gradient overlay at the bottom 25% to merge with profile block */}
           <div className="absolute bottom-0 inset-x-0 h-1/3 bg-gradient-to-t from-black via-black/60 to-transparent z-10" />
@@ -5784,7 +5791,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
           )}
         </div>
 
-        <div className="grid gap-[12px] pt-2" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+        <div className="grid grid-cols-3 gap-[12px] pt-2">
           {[
             {
               label: 'WIN %',
@@ -5813,7 +5820,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
           ].map((cell, idx) => (
             <div
               key={idx}
-              style={{ background: cell.bgGradient }}
+              ref={el => { if (el) el.style.background = cell.bgGradient; }}
               className={cn(
                 "border border-white/5 p-2.5 sm:p-4 rounded-2xl flex flex-col justify-between min-h-[85px] sm:min-h-[90px] transition-all duration-300 transform group-hover:translate-y-[-2px] shadow-lg",
                 cell.hoverBorder
@@ -5823,7 +5830,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                 {cell.label}
               </span>
               <span
-                style={{ color: cell.accentColor }}
+                ref={el => { if (el) el.style.color = cell.accentColor; }}
                 className="text-sm sm:text-lg md:text-xl font-black tracking-tight mt-2 block drop-shadow-md font-mono"
               >
                 {cell.value}
@@ -5970,7 +5977,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
               ].map((cell, idx) => (
                 <div
                   key={idx}
-                  style={{ background: cell.bgGradient }}
+                  ref={el => { if (el) el.style.background = cell.bgGradient; }}
                   className={cn(
                     "border border-white/5 p-2.5 sm:p-4 rounded-2xl flex flex-col justify-between min-h-[85px] transition-all duration-300 transform group-hover:translate-y-[-2px] shadow-lg",
                     cell.hoverBorder
@@ -5980,7 +5987,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                     {cell.label}
                   </span>
                   <span
-                    style={{ color: cell.accentColor }}
+                    ref={el => { if (el) el.style.color = cell.accentColor; }}
                     className="text-sm sm:text-lg font-black tracking-tight mt-2 block drop-shadow-md font-mono"
                   >
                     {cell.value}
@@ -5997,7 +6004,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
               <div className="w-full bg-black/40 rounded-full h-1.5 border border-white/5 overflow-hidden">
                 <div
                   className="bg-gradient-to-r from-amber-600 via-orange-500 to-yellow-400 h-1.5 rounded-full transition-all duration-500"
-                  style={{ width: `${Math.min(100, Math.max(0, presencePercentage))}%` }}
+                  ref={el => { if (el) el.style.width = `${Math.min(100, Math.max(0, presencePercentage))}%`; }}
                 />
               </div>
             </div>
@@ -6148,7 +6155,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                       "flex flex-col justify-center items-center border rounded-xl px-3 py-1.5 transition-all duration-300 hover:scale-[1.02] hover:border-amber-500/50 shadow-md cursor-help relative group/badge w-full min-w-0 text-center",
                       customStyle ? customStyle.className : glowStyle
                     )}
-                    style={customStyle ? customStyle.style : undefined}
+                    ref={el => { if (el) { if (customStyle?.style) { Object.assign(el.style, customStyle.style); } else { el.removeAttribute('style'); } } }}
                     title={`Award: ${a.awardName}\nDuration: ${a.startDate} to ${a.endDate}\nStatus: ${isActive ? 'Active Badge' : 'Past Award'}`}
                   >
                     <div className="flex flex-col min-w-0 items-center justify-center">
@@ -6231,7 +6238,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
           ].map((cell, idx) => (
             <div
               key={idx}
-              style={{ background: cell.bgGradient }}
+              ref={el => { if (el) el.style.background = cell.bgGradient; }}
               className={cn(
                 "border border-white/5 p-2.5 sm:p-4 rounded-2xl flex flex-col justify-between min-h-[85px] sm:min-h-[90px] transition-all duration-300 transform group-hover:translate-y-[-2px] shadow-lg w-full min-w-0",
                 cell.hoverBorder
@@ -6241,7 +6248,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                 {cell.label}
               </span>
               <span
-                style={{ color: cell.accentColor }}
+                ref={el => { if (el) el.style.color = cell.accentColor; }}
                 className="text-sm sm:text-lg md:text-xl font-black tracking-tight mt-2 block drop-shadow-md font-mono"
               >
                 {cell.value}

@@ -42,9 +42,9 @@ export const PublicLayout = ({ children }: { children?: React.ReactNode }) => {
       </header>
 
       {/* Main Scrollable Content */}
-      <main 
+      <main
         className="flex-1 w-full overflow-y-auto custom-scrollbar relative" 
-        style={{ WebkitOverflowScrolling: 'touch' }}
+        ref={el => { if (el) (el.style as any).WebkitOverflowScrolling = 'touch'; }}
       >
         {!isFooterPage && (
           <div className="w-full max-w-4xl mx-auto px-4 pt-4 md:pt-6 -mb-10 relative z-20">

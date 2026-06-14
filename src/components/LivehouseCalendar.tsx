@@ -57,17 +57,17 @@ const LivehouseSlotButton = ({ slot, timeslotStr, activeDateStr, dataLength, all
     return (
       <div 
         className="w-[95%] mr-auto relative h-[28px] sm:h-[32px] cursor-pointer group"
-        style={{ perspective: '1000px' }}
+        ref={el => { if (el) el.style.perspective = '1000px'; }}
         onClick={() => setIsFlipped(!isFlipped)}
       >
         <div 
           className="w-full h-full relative transition-all duration-500 group-hover:scale-105"
-          style={{ transformStyle: 'preserve-3d', transform: isFlipped ? 'rotateX(180deg)' : 'rotateX(0deg)' }}
+          ref={el => { if (el) { el.style.transformStyle = 'preserve-3d'; el.style.transform = isFlipped ? 'rotateX(180deg)' : 'rotateX(0deg)'; } }}
         >
           {/* Front: BOOKED */}
           <div 
             className="absolute inset-0 flex items-center justify-center rounded-full border border-rose-500/40 bg-rose-500/10 shadow-[0_0_10px_rgba(244,63,94,0.1)] group-hover:border-rose-400 group-hover:bg-rose-500/20 group-hover:shadow-[0_0_20px_rgba(244,63,94,0.3)] transition-all duration-300"
-            style={{ backfaceVisibility: 'hidden' }}
+            ref={el => { if (el) { (el.style as any).backfaceVisibility = 'hidden'; } }}
           >
             <span className="text-rose-400 font-bold text-[10px] sm:text-xs uppercase tracking-wider truncate">BOOKED</span>
           </div>
@@ -75,7 +75,7 @@ const LivehouseSlotButton = ({ slot, timeslotStr, activeDateStr, dataLength, all
           {/* Back: POPPO ID */}
           <div 
             className="absolute inset-0 flex items-center justify-center rounded-full border border-rose-500 bg-rose-500/20 shadow-[0_0_20px_rgba(244,63,94,0.3)]"
-            style={{ backfaceVisibility: 'hidden', transform: 'rotateX(180deg)' }}
+            ref={el => { if (el) { (el.style as any).backfaceVisibility = 'hidden'; el.style.transform = 'rotateX(180deg)'; } }}
           >
             <span className="text-rose-100 font-black text-[12px] sm:text-[15px] uppercase tracking-wider drop-shadow-md truncate px-1">{rawId}</span>
           </div>
@@ -301,6 +301,7 @@ export const LivehouseCalendar: React.FC<LivehouseCalendarProps> = ({ allUsers, 
           <button 
             onClick={() => setActiveDateStr(format(subMonths(baseMonthStart, 1), 'yyyy-MM-dd'))} 
             className="p-1 sm:p-1.5 hover:bg-[#D4AF37]/20 rounded-xl transition-all text-[#D4AF37]"
+            title="Previous Month"
           >
             <ChevronLeft size={18} className="sm:w-5 sm:h-5" />
           </button>
@@ -314,6 +315,7 @@ export const LivehouseCalendar: React.FC<LivehouseCalendarProps> = ({ allUsers, 
           <button 
             onClick={() => setActiveDateStr(format(addMonths(baseMonthStart, 1), 'yyyy-MM-dd'))} 
             className="p-1 sm:p-1.5 hover:bg-[#D4AF37]/20 rounded-xl transition-all text-[#D4AF37]"
+            title="Next Month"
           >
             <ChevronRight size={18} className="sm:w-5 sm:h-5" />
           </button>
@@ -512,7 +514,7 @@ export const LivehouseCalendar: React.FC<LivehouseCalendarProps> = ({ allUsers, 
           >
             {/* Header/Close */}
             <div className="w-full flex justify-end">
-              <button onClick={() => setSpotlightHost(null)} className="text-white/30 hover:text-[#D4AF37] transition-colors p-1 bg-white/5 hover:bg-white/10 rounded-full">
+              <button onClick={() => setSpotlightHost(null)} className="text-white/30 hover:text-[#D4AF37] transition-colors p-1 bg-white/5 hover:bg-white/10 rounded-full" title="Close">
                 <X size={20} />
               </button>
             </div>

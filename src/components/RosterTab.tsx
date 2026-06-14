@@ -337,8 +337,7 @@ export const RosterTab: React.FC<RosterTabProps> = ({ isReadOnly = false }) => {
               value={roleFilter}
               onChange={(e) => setRoleFilter(e.target.value as any)}
               title="Filter by Role"
-              className="w-full bg-transparent border-none text-xs text-[#FFB700] font-bold focus:outline-none cursor-pointer uppercase tracking-wider text-right appearance-none"
-              style={{ textAlignLast: 'right' }}
+              className="w-full bg-transparent border-none text-xs text-[#FFB700] font-bold focus:outline-none cursor-pointer uppercase tracking-wider text-right appearance-none text-align-last-right"
             >
               <option value="all" className="bg-black text-[#FFB700]">All Members</option>
               <option value="hosts" className="bg-black text-[#FFB700]">Hosts</option>
@@ -446,20 +445,19 @@ export const RosterTab: React.FC<RosterTabProps> = ({ isReadOnly = false }) => {
                   <img 
                     src={host.photoUrl} 
                     alt="" 
-                    className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" 
-                    style={{ zIndex: 0 }}
+                    className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-110 z-0" 
                   />
                 ) : (
-                  <div className="absolute inset-0 flex items-center justify-center text-[#A09E9A]/20 bg-gradient-to-br from-[#1A1A28] to-[#0D0D14]" style={{ zIndex: 0 }}>
+                  <div className="absolute inset-0 flex items-center justify-center text-[#A09E9A]/20 bg-gradient-to-br from-[#1A1A28] to-[#0D0D14] z-0">
                     <Users size={40} className="opacity-30" />
                   </div>
                 )}
 
                 {/* Top Overlay (17% total height, top 12% is solid black, remaining 5% fades) */}
-                <div className="absolute top-0 inset-x-0 h-[17%] pointer-events-none" style={{ background: 'linear-gradient(to bottom, #000000 0%, #000000 70.6%, transparent 100%)', zIndex: 1 }} />
+                <div className="absolute top-0 inset-x-0 h-[17%] pointer-events-none roster-top-overlay" />
                 
                 {/* Bottom Overlay (30% total height, bottom 20% is solid black, remaining 10% fades) */}
-                <div className="absolute bottom-0 inset-x-0 h-[30%] pointer-events-none" style={{ background: 'linear-gradient(to top, #000000 0%, #000000 66.7%, transparent 100%)', zIndex: 1 }} />
+                <div className="absolute bottom-0 inset-x-0 h-[30%] pointer-events-none roster-bottom-overlay" />
 
                 {/* Top Labels */}
                 <div className="relative z-10 w-full px-3 pt-1.5 pb-3 flex justify-between items-start pointer-events-none">

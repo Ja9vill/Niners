@@ -86,7 +86,7 @@ export const NotificationPrompt: React.FC = () => {
             </p>
           </div>
         </div>
-        <button onClick={handleDismiss} className="text-[#A09E9A] hover:text-[#F0EFE8]">
+        <button title="Dismiss" onClick={handleDismiss} className="text-[#A09E9A] hover:text-[#F0EFE8]">
           <X size={16} />
         </button>
       </div>

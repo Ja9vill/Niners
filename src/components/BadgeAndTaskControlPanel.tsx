@@ -503,7 +503,7 @@ export const BadgeAndTaskControlPanel = () => {
                                   "w-7 h-7 rounded-full border transition-all relative flex items-center justify-center cursor-pointer hover:scale-110",
                                   isSelected ? "border-white scale-105 shadow-[0_0_8px_rgba(255,255,255,0.4)]" : "border-white/10"
                                 )}
-                                style={{ backgroundColor: solid.color }}
+                                ref={el => { if (el) el.style.backgroundColor = solid.color; }}
                                 title={solid.name}
                               >
                                 {isSelected && <Check size={12} className="text-white drop-shadow-md" />}
@@ -530,7 +530,7 @@ export const BadgeAndTaskControlPanel = () => {
                                   "h-7 px-2.5 rounded-lg border text-[8px] font-bold uppercase tracking-wider transition-all relative flex items-center justify-center cursor-pointer hover:scale-105",
                                   isSelected ? "border-white text-white shadow-[0_0_8px_rgba(255,255,255,0.4)] font-black" : "border-white/10 text-white/70"
                                 )}
-                                style={{ background: gradient.value }}
+                                ref={el => { if (el) el.style.background = gradient.value; }}
                                 title={gradient.name}
                               >
                                 <span className="drop-shadow-sm">{gradient.name}</span>
@@ -615,6 +615,8 @@ export const BadgeAndTaskControlPanel = () => {
                               value={gradColor1}
                               onChange={(e) => setGradColor1(e.target.value)}
                               className="bg-transparent border-0 border-b border-white/10 text-[10px] font-mono w-14 text-white focus:outline-none"
+                              title="Color 1 hex code"
+                              placeholder="#FFFFFF"
                             />
                           </div>
 
@@ -634,6 +636,8 @@ export const BadgeAndTaskControlPanel = () => {
                               value={gradColor2}
                               onChange={(e) => setGradColor2(e.target.value)}
                               className="bg-transparent border-0 border-b border-white/10 text-[10px] font-mono w-14 text-white focus:outline-none"
+                              title="Color 2 hex code"
+                              placeholder="#FFFFFF"
                             />
                           </div>
 
@@ -654,13 +658,17 @@ export const BadgeAndTaskControlPanel = () => {
                                 value={gradColor3}
                                 onChange={(e) => setGradColor3(e.target.value)}
                                 className="bg-transparent border-0 border-b border-white/10 text-[10px] font-mono w-14 text-white focus:outline-none"
+                                title="Color 3 hex code"
+                                placeholder="#FFFFFF"
                               />
                             </div>
                           )}
                         </div>
 
-                        {/* Live Gradient Preview Bar */}
-                        <div className="h-6 rounded-lg border border-white/10 flex items-center justify-center text-[8px] font-black uppercase tracking-widest text-white shadow-inner" style={{ background: badgeColor }}>
+                        <div 
+                          className="h-6 rounded-lg border border-white/10 flex items-center justify-center text-[8px] font-black uppercase tracking-widest text-white shadow-inner" 
+                          ref={el => { if (el) el.style.background = badgeColor; }}
+                        >
                           <span className="drop-shadow-md">Gradient Preview</span>
                         </div>
                       </div>
@@ -777,7 +785,7 @@ export const BadgeAndTaskControlPanel = () => {
                           "px-4 py-3 sm:py-4 rounded-[1.5rem] border text-[10px] sm:text-xs font-bold uppercase tracking-wider transition-all text-center flex items-center justify-center",
                           previewStyle.className
                         )}
-                        style={previewStyle.style}
+                        ref={el => { if (el && previewStyle.style) Object.assign(el.style, previewStyle.style); }}
                       >
                         <span className="drop-shadow-md truncate">{badge.name}</span>
                       </button>
@@ -839,7 +847,7 @@ export const BadgeAndTaskControlPanel = () => {
                           "px-4 py-3 sm:py-4 rounded-[1.5rem] border text-[10px] sm:text-xs font-bold uppercase tracking-wider transition-all text-center flex items-center justify-center",
                           previewStyle.className
                         )}
-                        style={previewStyle.style}
+                        ref={el => { if (el && previewStyle.style) Object.assign(el.style, previewStyle.style); }}
                       >
                         <span className="drop-shadow-md truncate">{assignment.awardName}</span>
                       </button>

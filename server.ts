@@ -19,16 +19,15 @@ import admin from "firebase-admin";
 import jwt from "jsonwebtoken";
 import { fileURLToPath } from "url";
 
-// Safely define __dirname for both ESM (tsx dev server) and CommonJS (production bundle)
+// Safely define dirname for both ESM and CommonJS
 const getDirname = () => {
-  if (typeof __dirname !== "undefined") return __dirname;
   try {
     return path.dirname(fileURLToPath(import.meta.url));
   } catch (e) {
     return process.cwd();
   }
 };
-const __dirname = getDirname();
+const resolvedDirname = getDirname();
 
 dotenv.config();
 
@@ -644,12 +643,11 @@ async function startServer() {
       }
 
       // Authenticate with Google APIs using service account
-      const auth = new google.auth.JWT(
-        clientEmail,
-        undefined,
-        privateKey,
-        ['https://www.googleapis.com/auth/devstorage.read_write']
-      );
+      const auth = new google.auth.JWT({
+        email: clientEmail,
+        key: privateKey,
+        scopes: ['https://www.googleapis.com/auth/devstorage.read_write']
+      });
       const tokenResponse = await auth.getAccessToken();
       const accessToken = tokenResponse.token;
 
@@ -990,7 +988,7 @@ Rules:
     { id: 'commission_upload', label: 'Commission Sheet Uploads', description: 'When new monthly commission sheets are processed and uploaded.', targets: ['host'], when: 'immediately', active: true }
   ];
 
-  const VAPID_KEYS_FILE = path.join(__dirname, "vapid_keys_fallback.json");
+  const VAPID_KEYS_FILE = path.join(resolvedDirname, "vapid_keys_fallback.json");
   let vapidPublicKey = process.env.VAPID_PUBLIC_KEY || "";
   let vapidPrivateKey = process.env.VAPID_PRIVATE_KEY || "";
 

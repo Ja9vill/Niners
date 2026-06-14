@@ -805,9 +805,6 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
       if (role === 'director') {
         links.push({ isDivider: true, id: 'div-2' });
         links.push({ isTitle: true, label: "Directors Access", id: 'title-access' });
-        links.push({ path: '/provision-user', label: 'Provision User', icon: Plus });
-        links.push({ path: '/collections-log', label: 'Collections Log', icon: Database });
-        links.push({ path: '/data-vault', label: 'Data Vault', icon: Shield });
         links.push({ path: '/notifications-control', label: 'Notification Center', icon: Bell });
 
         links.push({
@@ -818,7 +815,10 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
           subLinks: [
             { path: '/profiles', label: 'Roster Management', icon: Users },
             { path: '/financial-data', label: 'Financial Data', icon: DollarSign },
-            { path: '/cms/livehouse', label: 'Livehouse Data', icon: Calendar }
+            { path: '/cms/livehouse', label: 'Livehouse Data', icon: Calendar },
+            { path: '/collections-log', label: 'Collections Log', icon: Database },
+            { path: '/data-vault', label: 'Data Vault', icon: Shield },
+            { path: '/provision-user', label: 'Provision User', icon: Plus }
           ]
         });
       }
@@ -891,16 +891,9 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
 
       <div className="flex flex-1 overflow-hidden relative">
         <aside className={cn(
-          "absolute md:static inset-y-0 left-0 w-64 glass-card z-30 transition-all duration-500 ease-in-out flex flex-col",
+          "absolute md:static inset-y-0 left-0 w-64 glass-card z-30 transition-all duration-500 ease-in-out flex flex-col dashboard-sidebar",
           !isSidebarOpen && "-translate-x-full md:translate-x-0"
-        )} style={{
-          background: 'linear-gradient(to bottom right, rgba(20, 10, 5, 0.4), rgba(40, 10, 15, 0.5))',
-          backdropFilter: 'blur(30px)',
-          borderRight: '1px solid rgba(250, 204, 21, 0.3)',
-          borderTop: '1px solid rgba(250, 204, 21, 0.1)',
-          borderColor: 'rgba(234, 179, 8, 0.2)',
-          boxShadow: 'inset -1px 0 1px rgba(250, 204, 21, 0.1), inset 1px 1px 1px rgba(250, 204, 21, 0.2), 10px 0 30px rgba(0,0,0,0.7), 0 0 20px rgba(250, 204, 21, 0.05)'
-        }}>
+        )}>
           <div className="p-6 hidden md:flex items-center gap-3 border-b border-[rgba(250,204,21,0.2)] bg-black/10 shadow-[0_10px_20px_rgba(0,0,0,0.3)]">
             <img src={appLogo} alt="Nine Dashboard" className="w-10 h-10 rounded-md border border-[#D4AF37]/30 shrink-0 object-cover" />
             <div className="flex flex-col">
@@ -1087,6 +1080,7 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
           <div className="global-block-1 bg-[#0A0604] border border-[#D4AF37]/30 rounded-2xl p-6 w-full max-w-md shadow-[0_20px_50px_rgba(0,0,0,1)] relative flex flex-col">
             <button 
+              title="Close"
               onClick={() => setSpotlightNotification(null)}
               className="absolute top-4 right-4 text-white/40 hover:text-white cursor-pointer z-10"
             >

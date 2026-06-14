@@ -202,6 +202,7 @@ export const LivehouseBookingModal: React.FC<LivehouseBookingModalProps> = ({
                     <label className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">Poppo ID (Locked)</label>
                     <input 
                       disabled 
+                      title="Poppo ID"
                       value={targetPoppoId} 
                       className="w-full bg-black/50 border border-[#D4AF37]/20 rounded-xl px-4 py-3 text-xs text-white/50 cursor-not-allowed" 
                     />
@@ -210,6 +211,7 @@ export const LivehouseBookingModal: React.FC<LivehouseBookingModalProps> = ({
                     <label className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">Host Name (Locked)</label>
                     <input 
                       disabled 
+                      title="Host Name"
                       value={targetHostName} 
                       className="w-full bg-black/50 border border-[#D4AF37]/20 rounded-xl px-4 py-3 text-xs text-white/50 cursor-not-allowed" 
                     />
@@ -218,6 +220,7 @@ export const LivehouseBookingModal: React.FC<LivehouseBookingModalProps> = ({
                     <label className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">Date Selector (Locked)</label>
                     <input 
                       disabled 
+                      title="Date Selector"
                       value={date} 
                       type={prefillDate ? 'text' : 'date'}
                       className="w-full bg-black/50 border border-[#D4AF37]/20 rounded-xl px-4 py-3 text-xs text-white/50 cursor-not-allowed" 
@@ -227,6 +230,7 @@ export const LivehouseBookingModal: React.FC<LivehouseBookingModalProps> = ({
                     <label className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">Timeslot (Locked)</label>
                     <input 
                       disabled 
+                      title="Timeslot"
                       value={timeslot} 
                       className="w-full bg-black/50 border border-[#D4AF37]/20 rounded-xl px-4 py-3 text-xs text-white/50 cursor-not-allowed" 
                     />
@@ -302,6 +306,7 @@ export const LivehouseBookingModal: React.FC<LivehouseBookingModalProps> = ({
               <div className="space-y-1.5">
                 <label className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">Livehouse Type</label>
                 <select 
+                  title="Livehouse Type"
                   value={selectedType}
                   onChange={(e) => setSelectedType(e.target.value as any)}
                   className="w-full bg-[#181B24] border border-[#D4AF37]/20 focus:border-[#D4AF37]/60 rounded-xl px-4 py-3 text-xs font-bold text-white transition-all cursor-pointer"
