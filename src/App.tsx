@@ -46,6 +46,7 @@ import { ContactUs } from './pages/public/ContactUs';
 import { Storage } from './lib/storage';
 import { SmartRoute } from './components/SmartRoute';
 import { Analytics } from './pages/TeamAnalytics';
+import { ReportData } from './pages/ReportData';
 
 const RootIndex = () => {
   const authState = Storage.getAuthState();
@@ -103,6 +104,7 @@ export default function App() {
         >
           {/* Shared tabs (all authenticated roles) */}
           <Route path="dashboard" element={<Overview />} />
+          <Route path="report-data" element={<ReportData />} />
           <Route
             path="notifications-control"
             element={

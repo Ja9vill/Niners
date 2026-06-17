@@ -771,6 +771,7 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
     links.push({ path: '/roster', label: 'Roster', icon: Users });
     links.push({ path: '/calendar', label: 'Calendar', icon: Calendar });
     links.push({ path: '/my-profile', label: 'My Profile', icon: User });
+    links.push({ path: '/report-data', label: 'Streamer Center', icon: FileText });
 
     const role = (authState.role || '').toLowerCase();
     

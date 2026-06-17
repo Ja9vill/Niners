@@ -2832,14 +2832,13 @@ var import_jsonwebtoken2 = __toESM(require("jsonwebtoken"), 1);
 var import_url = require("url");
 var import_meta = {};
 var getDirname = () => {
-  if (typeof __dirname !== "undefined") return __dirname;
   try {
     return import_path.default.dirname((0, import_url.fileURLToPath)(import_meta.url));
   } catch (e) {
     return process.cwd();
   }
 };
-var __dirname = getDirname();
+var resolvedDirname = getDirname();
 import_dotenv.default.config();
 var JWT_SECRET2 = process.env.JWT_SECRET || "nine-dashboard-secret-key-12345";
 function findFreePort(start) {
@@ -3336,12 +3335,11 @@ async function startServer() {
       if (!privateKey || !clientEmail || !bucketName) {
         return res.status(500).json({ error: "Missing Firebase service account credentials" });
       }
-      const auth = new import_googleapis.google.auth.JWT(
-        clientEmail,
-        void 0,
-        privateKey,
-        ["https://www.googleapis.com/auth/devstorage.read_write"]
-      );
+      const auth = new import_googleapis.google.auth.JWT({
+        email: clientEmail,
+        key: privateKey,
+        scopes: ["https://www.googleapis.com/auth/devstorage.read_write"]
+      });
       const tokenResponse = await auth.getAccessToken();
       const accessToken = tokenResponse.token;
       if (!accessToken) throw new Error("Failed to obtain GCS access token");
@@ -3544,6 +3542,214 @@ Rules:
       return res.status(500).json({ error: error?.message || "Extraction failed" });
     }
   });
+  app.post("/api/extract-pk-report", async (req, res) => {
+    try {
+      const { fileData, mimeType } = req.body;
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey) {
+        return res.status(500).json({ error: "GEMINI_API_KEY is not configured" });
+      }
+      if (!fileData || !mimeType) {
+        return res.status(400).json({ error: "fileData and mimeType are required" });
+      }
+      const ai = new import_genai.GoogleGenAI({
+        apiKey,
+        httpOptions: { headers: { "User-Agent": "aistudio-build" } }
+      });
+      const base64DataRaw = fileData.includes("base64,") ? fileData.split("base64,")[1] : fileData;
+      const prompt = `
+PK REPORTING (Random PK / Friend PK / Team PK)
+Extract ONLY these fields:
+
+start_date
+end_date
+win_percent
+pk_score
+sessions
+
+Ignore everything else.
+
+\u{1F6AB} IGNORE EVERYTHING THAT IS NOT A VALID FIELD
+This includes:
+Full Scoop
+Level icons
+Profile pictures
+Tabs (Daily / Weekly / Monthly)
+Buttons
+Graph labels
+Ads
+Emojis
+Decorative text
+Any number or text not matching the valid field list
+
+If it is not in the valid field list, discard it.
+
+\u{1F3AF} BEHAVIOR RULES
+Never extract extra fields
+Never rename fields
+Never guess missing values
+Never mix fields from different screenshot types
+Only return fields that match the screenshot type
+If a field is missing in the screenshot, return it as empty
+If the screenshot does not match any known type, return an error message
+
+Return ONLY the raw JSON object, no markdown blocks.`;
+      let attempts = 0;
+      let extractedData = {};
+      while (attempts < 3) {
+        try {
+          const response = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: [
+              { inlineData: { mimeType, data: base64DataRaw } },
+              { text: prompt }
+            ],
+            config: {
+              responseMimeType: "application/json"
+            }
+          });
+          extractedData = JSON.parse(response.text || "{}");
+          break;
+        } catch (err) {
+          attempts += 1;
+          const maybeRetryable = err?.status === 503 || String(err?.message || "").includes("503") || String(err?.message || "").toLowerCase().includes("high demand");
+          if (maybeRetryable && attempts < 3) {
+            await new Promise((resolve) => setTimeout(resolve, 2e3 * attempts));
+            continue;
+          }
+          throw err;
+        }
+      }
+      return res.json({ data: extractedData });
+    } catch (error) {
+      console.error("PK extraction error:", error);
+      logSystemEvent({ severity: "Error", actionDescription: "PK Report Extraction failed", stackTrace: error?.stack || error?.message });
+      return res.status(500).json({ error: error?.message || "Extraction failed" });
+    }
+  });
+  app.post("/api/extract-stream-report", async (req, res) => {
+    try {
+      const { fileData, mimeType, reportType } = req.body;
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey) {
+        return res.status(500).json({ error: "GEMINI_API_KEY is not configured" });
+      }
+      if (!fileData || !mimeType || !reportType) {
+        return res.status(400).json({ error: "fileData, mimeType, and reportType are required" });
+      }
+      const ai = new import_genai.GoogleGenAI({
+        apiKey,
+        httpOptions: { headers: { "User-Agent": "aistudio-build" } }
+      });
+      let fieldsToExtract = "";
+      if (reportType === "daily") {
+        fieldsToExtract = `DAILY STREAMING DATA
+Extract ONLY:
+
+date
+won_points
+live_duration
+live_earnings
+avg_online_users_today
+party_duration
+party_earnings
+party_crown_duration
+new_fans
+new_fan_club_members
+
+Ignore everything else.`;
+      } else if (reportType === "weekly") {
+        fieldsToExtract = `WEEKLY STREAMING DATA
+Extract ONLY:
+
+dates
+live_duration
+points
+total_duration
+total_earnings
+avg_online_users_week
+new_fans
+new_fan_club_members
+gifting_this_week
+unfollowers_this_week
+
+Ignore everything else.`;
+      } else if (reportType === "monthly") {
+        fieldsToExtract = `MONTHLY STREAMING DATA
+Extract ONLY:
+
+dates
+points
+live_duration
+total_duration
+total_earnings
+three_month_earnings_excl_rewards
+last_live_broadcast_date
+
+Ignore everything else.`;
+      }
+      const prompt = `
+${fieldsToExtract}
+
+\u{1F6AB} IGNORE EVERYTHING THAT IS NOT A VALID FIELD
+This includes:
+Full Scoop
+Level icons
+Profile pictures
+Tabs (Daily / Weekly / Monthly)
+Buttons
+Graph labels
+Ads
+Emojis
+Decorative text
+Any number or text not matching the valid field list
+
+If it is not in the valid field list, discard it.
+
+\u{1F3AF} BEHAVIOR RULES
+Never extract extra fields
+Never rename fields
+Never guess missing values
+Never mix fields from different screenshot types
+Only return fields that match the screenshot type
+If a field is missing in the screenshot, return it as empty
+If the screenshot does not match any known type, return an error message
+
+Return ONLY the raw JSON object, no markdown blocks.`;
+      const base64DataRaw = fileData.includes("base64,") ? fileData.split("base64,")[1] : fileData;
+      let attempts = 0;
+      let extractedData = {};
+      while (attempts < 3) {
+        try {
+          const response = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: [
+              { inlineData: { mimeType, data: base64DataRaw } },
+              { text: prompt }
+            ],
+            config: {
+              responseMimeType: "application/json"
+            }
+          });
+          extractedData = JSON.parse(response.text || "{}");
+          break;
+        } catch (err) {
+          attempts += 1;
+          const maybeRetryable = err?.status === 503 || String(err?.message || "").includes("503") || String(err?.message || "").toLowerCase().includes("high demand");
+          if (maybeRetryable && attempts < 3) {
+            await new Promise((resolve) => setTimeout(resolve, 2e3 * attempts));
+            continue;
+          }
+          throw err;
+        }
+      }
+      return res.json({ data: extractedData });
+    } catch (error) {
+      console.error("Stream report extraction error:", error);
+      logSystemEvent({ severity: "Error", actionDescription: "Stream Report Extraction failed", stackTrace: error?.stack || error?.message });
+      return res.status(500).json({ error: error?.message || "Extraction failed" });
+    }
+  });
   app.post("/api/verify-recaptcha", async (req, res) => {
     try {
       const { token, action } = req.body;
@@ -3627,7 +3833,7 @@ Rules:
     { id: "roster_update", label: "Roster Updates", description: "When a host profile is updated, provisioned, or terminated.", targets: ["director", "admin"], when: "immediately", active: true },
     { id: "commission_upload", label: "Commission Sheet Uploads", description: "When new monthly commission sheets are processed and uploaded.", targets: ["host"], when: "immediately", active: true }
   ];
-  const VAPID_KEYS_FILE = import_path.default.join(__dirname, "vapid_keys_fallback.json");
+  const VAPID_KEYS_FILE = import_path.default.join(resolvedDirname, "vapid_keys_fallback.json");
   let vapidPublicKey = process.env.VAPID_PUBLIC_KEY || "";
   let vapidPrivateKey = process.env.VAPID_PRIVATE_KEY || "";
   if (!vapidPublicKey || !vapidPrivateKey) {
@@ -3665,8 +3871,8 @@ Rules:
       console.error("Failed to set VAPID details:", err.message);
     }
   }
-  const SUBSCRIPTIONS_FILE = import_path.default.join(__dirname, "push_subscriptions.json");
-  const NOTIFICATION_TYPES_FILE = import_path.default.join(__dirname, "notification_types.json");
+  const SUBSCRIPTIONS_FILE = import_path.default.join(resolvedDirname, "push_subscriptions.json");
+  const NOTIFICATION_TYPES_FILE = import_path.default.join(resolvedDirname, "notification_types.json");
   let pushSubscriptions = [];
   if (import_fs.default.existsSync(SUBSCRIPTIONS_FILE)) {
     try {

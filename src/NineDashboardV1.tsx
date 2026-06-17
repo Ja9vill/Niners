@@ -945,7 +945,7 @@ export default function App() {
                         className={cn('nav-item', activeTab === 'reporting' && 'active', migrationRequired && 'opacity-50 cursor-not-allowed')}
                         disabled={migrationRequired}
                       >
-                        <BookOpen size={17} /><span>Reporting</span>
+                        <BookOpen size={17} /><span>Streamer Center</span>
                       </button>
                       <button
                         onClick={() => { if (!migrationRequired) { setActiveTab('events'); setIsSidebarOpen(false); } }}

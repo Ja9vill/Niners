@@ -1,0 +1,25 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 4%;
+    --foreground: 0 0% 93%;
+    --primary: 217.2 91.2% 59.8%;
+    --primary-foreground: 222.2 47.4% 11.2%;
+  }
+
+  * {
+    @apply border-muted;
+  }
+  
+  body {
+    @apply bg-background text-foreground font-sans overscroll-none;
+  }
+
+  /* Safe area padding for mobile PWA */
+  .safe-pb {
+    padding-bottom: env(safe-area-inset-bottom, 20px);
+  }
+}

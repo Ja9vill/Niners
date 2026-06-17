@@ -883,6 +883,235 @@ Rules:
     }
   });
 
+  app.post("/api/extract-pk-report", async (req, res) => {
+    try {
+      const { fileData, mimeType } = req.body;
+      const apiKey = process.env.GEMINI_API_KEY;
+
+      if (!apiKey) {
+        return res.status(500).json({ error: "GEMINI_API_KEY is not configured" });
+      }
+
+      if (!fileData || !mimeType) {
+        return res.status(400).json({ error: "fileData and mimeType are required" });
+      }
+
+      const ai = new GoogleGenAI({
+        apiKey,
+        httpOptions: { headers: { "User-Agent": "aistudio-build" } },
+      });
+
+      const base64DataRaw = fileData.includes("base64,") ? fileData.split("base64,")[1] : fileData;
+
+      const prompt = `
+PK REPORTING (Random PK / Friend PK / Team PK)
+Extract ONLY these fields:
+
+start_date
+end_date
+win_percent
+pk_score
+sessions
+
+Ignore everything else.
+
+🚫 IGNORE EVERYTHING THAT IS NOT A VALID FIELD
+This includes:
+Full Scoop
+Level icons
+Profile pictures
+Tabs (Daily / Weekly / Monthly)
+Buttons
+Graph labels
+Ads
+Emojis
+Decorative text
+Any number or text not matching the valid field list
+
+If it is not in the valid field list, discard it.
+
+🎯 BEHAVIOR RULES
+Never extract extra fields
+Never rename fields
+Never guess missing values
+Never mix fields from different screenshot types
+Only return fields that match the screenshot type
+If a field is missing in the screenshot, return it as empty
+If the screenshot does not match any known type, return an error message
+
+Return ONLY the raw JSON object, no markdown blocks.`;
+
+      let attempts = 0;
+      let extractedData: any = {};
+
+      while (attempts < 3) {
+        try {
+          const response = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: [
+              { inlineData: { mimeType, data: base64DataRaw } },
+              { text: prompt },
+            ],
+            config: {
+              responseMimeType: "application/json",
+            },
+          });
+
+          extractedData = JSON.parse(response.text || "{}");
+          break;
+        } catch (err: any) {
+          attempts += 1;
+          const maybeRetryable = err?.status === 503 || String(err?.message || "").includes("503") || String(err?.message || "").toLowerCase().includes("high demand");
+          if (maybeRetryable && attempts < 3) {
+            await new Promise((resolve) => setTimeout(resolve, 2000 * attempts));
+            continue;
+          }
+          throw err;
+        }
+      }
+
+      return res.json({ data: extractedData });
+    } catch (error: any) {
+      console.error("PK extraction error:", error);
+      logSystemEvent({ severity: 'Error', actionDescription: 'PK Report Extraction failed', stackTrace: error?.stack || error?.message });
+      return res.status(500).json({ error: error?.message || "Extraction failed" });
+    }
+  });
+
+  app.post("/api/extract-stream-report", async (req, res) => {
+    try {
+      const { fileData, mimeType, reportType } = req.body;
+      const apiKey = process.env.GEMINI_API_KEY;
+
+      if (!apiKey) {
+        return res.status(500).json({ error: "GEMINI_API_KEY is not configured" });
+      }
+
+      if (!fileData || !mimeType || !reportType) {
+        return res.status(400).json({ error: "fileData, mimeType, and reportType are required" });
+      }
+
+      const ai = new GoogleGenAI({
+        apiKey,
+        httpOptions: { headers: { "User-Agent": "aistudio-build" } },
+      });
+
+      let fieldsToExtract = "";
+      if (reportType === "daily") {
+        fieldsToExtract = `DAILY STREAMING DATA
+Extract ONLY:
+
+date
+won_points
+live_duration
+live_earnings
+avg_online_users_today
+party_duration
+party_earnings
+party_crown_duration
+new_fans
+new_fan_club_members
+
+Ignore everything else.`;
+      } else if (reportType === "weekly") {
+        fieldsToExtract = `WEEKLY STREAMING DATA
+Extract ONLY:
+
+dates
+live_duration
+points
+total_duration
+total_earnings
+avg_online_users_week
+new_fans
+new_fan_club_members
+gifting_this_week
+unfollowers_this_week
+
+Ignore everything else.`;
+      } else if (reportType === "monthly") {
+        fieldsToExtract = `MONTHLY STREAMING DATA
+Extract ONLY:
+
+dates
+points
+live_duration
+total_duration
+total_earnings
+three_month_earnings_excl_rewards
+last_live_broadcast_date
+
+Ignore everything else.`;
+      }
+
+      const prompt = `
+${fieldsToExtract}
+
+🚫 IGNORE EVERYTHING THAT IS NOT A VALID FIELD
+This includes:
+Full Scoop
+Level icons
+Profile pictures
+Tabs (Daily / Weekly / Monthly)
+Buttons
+Graph labels
+Ads
+Emojis
+Decorative text
+Any number or text not matching the valid field list
+
+If it is not in the valid field list, discard it.
+
+🎯 BEHAVIOR RULES
+Never extract extra fields
+Never rename fields
+Never guess missing values
+Never mix fields from different screenshot types
+Only return fields that match the screenshot type
+If a field is missing in the screenshot, return it as empty
+If the screenshot does not match any known type, return an error message
+
+Return ONLY the raw JSON object, no markdown blocks.`;
+
+      const base64DataRaw = fileData.includes("base64,") ? fileData.split("base64,")[1] : fileData;
+
+      let attempts = 0;
+      let extractedData: any = {};
+
+      while (attempts < 3) {
+        try {
+          const response = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: [
+              { inlineData: { mimeType, data: base64DataRaw } },
+              { text: prompt },
+            ],
+            config: {
+              responseMimeType: "application/json",
+            },
+          });
+
+          extractedData = JSON.parse(response.text || "{}");
+          break;
+        } catch (err: any) {
+          attempts += 1;
+          const maybeRetryable = err?.status === 503 || String(err?.message || "").includes("503") || String(err?.message || "").toLowerCase().includes("high demand");
+          if (maybeRetryable && attempts < 3) {
+            await new Promise((resolve) => setTimeout(resolve, 2000 * attempts));
+            continue;
+          }
+          throw err;
+        }
+      }
+
+      return res.json({ data: extractedData });
+    } catch (error: any) {
+      console.error("Stream report extraction error:", error);
+      logSystemEvent({ severity: 'Error', actionDescription: 'Stream Report Extraction failed', stackTrace: error?.stack || error?.message });
+      return res.status(500).json({ error: error?.message || "Extraction failed" });
+    }
+  });
+
   app.post("/api/verify-recaptcha", async (req, res) => {
     try {
       const { token, action } = req.body;

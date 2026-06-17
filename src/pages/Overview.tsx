@@ -809,7 +809,7 @@ export const Overview = () => {
           <div className="flex flex-col gap-2.5 min-w-0">
             {/* Row 1 Block 1: Total Agency Pts. */}
             <div className="global-block-1 relative overflow-hidden rounded-xl p-2.5 sm:p-4 flex flex-col justify-between min-h-[84px] sm:min-h-[104px] transition-all duration-300 group hover:-translate-y-0.5 shadow-lg border">
-              <Star className="absolute top-2 right-2 w-4 h-4 opacity-[0.07] pointer-events-none" style={{ color: '#FFB800' }} /> // NOSONAR
+              <Star className="absolute top-2 right-2 w-4 h-4 opacity-[0.07] pointer-events-none" color="#FFB800" />
               <p className="text-[8px] sm:text-[10px] font-black uppercase tracking-wider text-[#E8E6E3] leading-tight pr-4 relative z-10">
                 Total Agency Pts.
               </p>
@@ -823,7 +823,7 @@ export const Overview = () => {
 
             {/* Row 2 Block 1: Agency Commission */}
             <div className="global-block-1 relative overflow-hidden rounded-xl p-2.5 sm:p-4 flex flex-col justify-between min-h-[84px] sm:min-h-[104px] transition-all duration-300 group hover:-translate-y-0.5 shadow-lg border">
-              <Award className="absolute top-2 right-2 w-4 h-4 opacity-[0.07] pointer-events-none" style={{ color: '#FFB800' }} /> // NOSONAR
+              <Award className="absolute top-2 right-2 w-4 h-4 opacity-[0.07] pointer-events-none" color="#FFB800" />
               <p className="text-[8px] sm:text-[10px] font-black uppercase tracking-wider text-[#E8E6E3] leading-tight pr-4 relative z-10">
                 AGENCY COMMISSION
               </p>
@@ -840,7 +840,7 @@ export const Overview = () => {
           <div className="flex flex-col gap-2.5 min-w-0">
             {/* Row 1 Block 2: Super Salary */}
             <div className="global-block-2 relative overflow-hidden rounded-xl p-2.5 sm:p-4 flex flex-col justify-between min-h-[84px] sm:min-h-[104px] transition-all duration-300 group hover:-translate-y-0.5 shadow-lg border">
-              <Zap className="absolute top-2 right-2 w-4 h-4 opacity-[0.07] pointer-events-none" style={{ color: '#FF7B00' }} /> // NOSONAR
+              <Zap className="absolute top-2 right-2 w-4 h-4 opacity-[0.07] pointer-events-none" color="#FF7B00" />
               <p className="text-[8px] sm:text-[10px] font-black uppercase tracking-wider text-[#E8E6E3] leading-tight pr-4 relative z-10">
                 Super Salary
               </p>
@@ -854,7 +854,7 @@ export const Overview = () => {
 
             {/* Row 2 Block 2: Super Rank */}
             <div className="global-block-2 relative overflow-hidden rounded-xl p-2.5 sm:p-4 flex flex-col justify-between min-h-[84px] sm:min-h-[104px] transition-all duration-300 group hover:-translate-y-0.5 shadow-lg border">
-              <TrendingUp className="absolute top-2 right-2 w-4 h-4 opacity-[0.07] pointer-events-none" style={{ color: '#FF7B00' }} /> // NOSONAR
+              <TrendingUp className="absolute top-2 right-2 w-4 h-4 opacity-[0.07] pointer-events-none" color="#FF7B00" />
               <p className="text-[8px] sm:text-[10px] font-black uppercase tracking-wider text-[#E8E6E3] leading-tight pr-4 relative z-10">
                 Super Rank
               </p>
@@ -871,7 +871,7 @@ export const Overview = () => {
           <div className="flex flex-col gap-2.5 min-w-0">
             {/* Row 1 Block 3: Active Host */}
             <div className="global-block-3 relative overflow-hidden rounded-xl p-2.5 sm:p-4 flex flex-col justify-between min-h-[84px] sm:min-h-[104px] transition-all duration-300 group hover:-translate-y-0.5 shadow-lg border">
-              <Users className="absolute top-2 right-2 w-4 h-4 opacity-[0.07] pointer-events-none" style={{ color: '#FF3B5C' }} /> // NOSONAR
+              <Users className="absolute top-2 right-2 w-4 h-4 opacity-[0.07] pointer-events-none" color="#FF3B5C" />
               <p className="text-[8px] sm:text-[10px] font-black uppercase tracking-wider text-[#E8E6E3] leading-tight pr-4 relative z-10">
                 Active Host
               </p>
@@ -885,7 +885,7 @@ export const Overview = () => {
 
             {/* Row 2 Block 3: Total Live Hours */}
             <div className="global-block-3 relative overflow-hidden rounded-xl p-2.5 sm:p-4 flex flex-col justify-between min-h-[84px] sm:min-h-[104px] transition-all duration-300 group hover:-translate-y-0.5 shadow-lg border">
-              <Clock className="absolute top-2 right-2 w-4 h-4 opacity-[0.07] pointer-events-none" style={{ color: '#FF3B5C' }} /> // NOSONAR
+              <Clock className="absolute top-2 right-2 w-4 h-4 opacity-[0.07] pointer-events-none" color="#FF3B5C" />
               <p className="text-[8px] sm:text-[10px] font-black uppercase tracking-wider text-[#E8E6E3] leading-tight pr-4 relative z-10">
                 Total Live Hours
               </p>
@@ -1127,12 +1127,12 @@ export const Overview = () => {
         {/* Leaderboard Section */}
         <div className="mt-2">
           {/* Column Headers */}
-          <div className="grid grid-cols-[auto_1fr_auto_auto_auto] gap-x-1.5 sm:gap-x-4 items-center px-3 mb-2 text-[9px] font-black uppercase tracking-widest text-[#A09E9A]/50">
+          <div className="grid grid-cols-[auto_1fr] sm:grid-cols-[auto_1fr_auto_auto_auto] gap-x-2 sm:gap-x-4 items-center px-3 mb-2 text-[9px] font-black uppercase tracking-widest text-[#A09E9A]/50">
             <span className="w-5 sm:w-6 text-center">#</span>
             <span>Nickname</span>
-            <span className="text-right w-12 sm:w-20">Live Hrs</span>
-            <span className="text-right w-16 sm:w-24">Points</span>
-            <span className="text-right w-14 sm:w-20">Share %</span>
+            <span className="text-right w-12 sm:w-20 hidden sm:block">Live Hrs</span>
+            <span className="text-right w-16 sm:w-24 hidden sm:block">Points</span>
+            <span className="text-right w-14 sm:w-20 hidden sm:block">Share %</span>
           </div>
 
           <div className="space-y-1.5">
@@ -1164,30 +1164,49 @@ export const Overview = () => {
                   ? "bg-gradient-to-r from-[#D4AF37]/8 via-transparent to-transparent border-[#D4AF37]/15"
                   : "bg-transparent border-[#D4AF37]/5 hover:bg-white/[0.02]";
 
+              const sharePct = lbTotalPeriodCommission > 0 ? (h.commission / lbTotalPeriodCommission) * 100 : 0;
+
               return (
                 <div
                   key={h.poppoId}
                   onClick={() => { if(idx < 9) handleSpotlightClick(h.poppoId); }}
                   className={cn(
-                    "grid grid-cols-[auto_1fr_auto_auto_auto] gap-x-1.5 sm:gap-x-4 items-center rounded-xl p-2 sm:p-3 transition-all border",
+                    "grid grid-cols-[auto_1fr] sm:grid-cols-[auto_1fr_auto_auto_auto] gap-x-2 sm:gap-x-4 items-center rounded-xl p-2 sm:p-3 transition-all border",
                     rowStyle,
                     idx < 9 && "cursor-pointer hover:scale-[1.01] hover:brightness-110"
                   )}
                 >
-                  <span className="text-sm font-black text-[#A09E9A]/50 w-5 sm:w-6 text-center shrink-0">
+                  <span className="text-sm sm:text-base font-black text-[#A09E9A]/80 w-5 sm:w-6 text-center shrink-0">
                     {medals[idx] || `#${idx + 1}`}
                   </span>
 
-                  <div className="min-w-0">
-                    <div className="flex flex-col mb-1">
-                      <span className="text-sm font-black text-[#F0EFE8] truncate">{h.name}</span>
-                      <span className="text-[9px] text-[#A09E9A]/40 font-mono mt-0.5">ID: {h.poppoId}</span>
+                  <div className="min-w-0 pr-1 sm:pr-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-sm sm:text-base font-black text-[#F0EFE8] truncate">{h.name}</span>
+                      <span className="text-[8px] sm:text-[9px] text-[#A09E9A]/40 font-mono bg-white/5 px-1.5 py-0.5 rounded-md shrink-0">ID: {h.poppoId}</span>
                     </div>
-                    <div className="h-1.5 bg-black/40 rounded-full overflow-hidden shadow-inner border border-white/5">
+
+                    {/* Stats visible ONLY on mobile, placed UNDER the name */}
+                    <div className="flex sm:hidden items-center gap-3 mt-1.5 mb-2 overflow-x-auto custom-scrollbar pb-1">
+                      <div className="flex items-center gap-1.5 bg-white/5 px-2 py-0.5 rounded-md shrink-0">
+                        <span className="text-[9px] font-bold text-[#A09E9A]/70 uppercase">Pts</span>
+                        <span className="text-xs font-black text-[#D4AF37]">{formatPts(h.points)}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 bg-white/5 px-2 py-0.5 rounded-md shrink-0">
+                        <span className="text-[9px] font-bold text-[#A09E9A]/70 uppercase">Live</span>
+                        <span className="text-xs font-black text-purple-400">{fmtH(h.liveHrs)}h</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 bg-white/5 px-2 py-0.5 rounded-md shrink-0">
+                        <span className="text-[9px] font-bold text-[#A09E9A]/70 uppercase">Share</span>
+                        <span className="text-xs font-black text-cyan-400">{sharePct.toFixed(1)}%</span>
+                      </div>
+                    </div>
+
+                    <div className="h-1.5 sm:h-2 bg-black/60 rounded-full overflow-hidden shadow-inner border border-white/5">
                       <div
-                        className="h-full rounded-full relative overflow-hidden"
+                        className="h-full rounded-full relative overflow-hidden transition-all duration-1000 ease-out"
                         {...({ style: {
-                          width: `${pct}%`,
+                          width: `${Math.max(1, pct)}%`,
                           background: idx < 9 
                             ? `linear-gradient(90deg, ${top9Colors[idx]}40, ${top9Colors[idx]})` 
                             : '#374151',
@@ -1199,24 +1218,22 @@ export const Overview = () => {
                     </div>
                   </div>
 
-                  <div className="text-right w-12 sm:w-20 shrink-0">
-                    <p className="text-xs font-black text-purple-400">{fmtH(h.liveHrs)}</p>
-                    <p className="text-[9px] text-[#A09E9A]/40 uppercase tracking-wider hidden sm:block">Live</p>
+                  {/* These 3 columns hidden on mobile, visible on sm and up */}
+                  <div className="text-right w-12 sm:w-20 shrink-0 hidden sm:block">
+                    <p className="text-sm font-black text-purple-400">{fmtH(h.liveHrs)}</p>
+                    <p className="text-[9px] text-[#A09E9A]/50 uppercase tracking-wider">Live</p>
                   </div>
 
-                  <div className="text-right w-16 sm:w-24 shrink-0">
-                    <p className="text-sm font-black text-[#D4AF37]">{formatPts(h.points)}</p>
-                    <p className="text-[9px] text-[#A09E9A]/40 uppercase tracking-wider hidden sm:block">{h.months} mo</p>
+                  <div className="text-right w-16 sm:w-24 shrink-0 hidden sm:block">
+                    <p className="text-[15px] font-black text-[#D4AF37]">{formatPts(h.points)}</p>
+                    <p className="text-[9px] text-[#A09E9A]/50 uppercase tracking-wider">{h.months} mo</p>
                   </div>
 
-                  <div className="text-right w-14 sm:w-20 shrink-0">
-                    <p className="text-xs font-black text-cyan-400">
-                      {(() => {
-                        const sharePct = lbTotalPeriodCommission > 0 ? (h.commission / lbTotalPeriodCommission) * 100 : 0;
-                        return `${sharePct.toFixed(2)}%`;
-                      })()}
+                  <div className="text-right w-14 sm:w-20 shrink-0 hidden sm:block">
+                    <p className="text-sm font-black text-cyan-400">
+                      {sharePct.toFixed(2)}%
                     </p>
-                    <p className="text-[9px] text-[#A09E9A]/40 uppercase tracking-wider hidden sm:block">Share</p>
+                    <p className="text-[9px] text-[#A09E9A]/50 uppercase tracking-wider">Share</p>
                   </div>
                 </div>
               );
