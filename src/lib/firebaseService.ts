@@ -1,6 +1,15 @@
 import { auth, db, storage } from './firebase';
 import { ref, uploadString, getBytes, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { Storage } from './storage';
+<<<<<<< HEAD
+<<<<<<< HEAD
+import { doc, setDoc, getDoc, collection, query, where, getDocs, deleteDoc, writeBatch, Timestamp, onSnapshot, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
+import { CommissionEntry, Host, PKEntry, ExposureEntry, FanbaseHealthEntry, WeeklyLiveDataEntry, MonthlyLiveDataEntry, TopNinersEarningsSummary, EventsCalendarPublic, ReportingSubmission, Task, ActivityAuditLog, CalendarEvent, LivehouseRequest, AwardBadge, AwardAssignment } from '../types';
+=======
+import { doc, setDoc, getDoc, collection, query, where, getDocs, deleteDoc, writeBatch, Timestamp, onSnapshot, updateDoc, arrayUnion, arrayRemove, deleteField } from 'firebase/firestore';
+import { CommissionEntry, Host, PKEntry, ExposureEntry, FanbaseHealthEntry, WeeklyLiveDataEntry, MonthlyLiveDataEntry, TopNinersEarningsSummary, EventsCalendarPublic, Task, ActivityAuditLog, CalendarEvent, LivehouseRequest, AwardBadge, AwardAssignment, ManagerNote } from '../types';
+>>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
+=======
 import { doc, setDoc, getDoc, collection, query, where, getDocs, deleteDoc, writeBatch, Timestamp, onSnapshot, updateDoc, arrayUnion, arrayRemove, deleteField, orderBy, limit } from 'firebase/firestore';
 import { CommissionEntry, Host, PKEntry, ExposureEntry, FanbaseHealthEntry, WeeklyLiveDataEntry, MonthlyLiveDataEntry, TopNinersEarningsSummary, EventsCalendarPublic, Task, ActivityAuditLog, CalendarEvent, LivehouseRequest, AwardBadge, AwardAssignment, ManagerNote } from '../types';
 import { LivehouseDataRow } from '../types/livehouse';
@@ -22,6 +31,7 @@ export const generateSubmissionId = (reporterId: string, role: string, name: str
   
   return `${safeId}_${safeRole}_${safeName}_${timestamp}`.replace(/\s+/g, '');
 };
+>>>>>>> 2b42d3ae84c3e300e1faeb35e7009a759158d1e9
 
 export enum OperationType {
   CREATE = 'create',
@@ -752,7 +762,11 @@ export const FirebaseService = {
 
   // Hosts management
   async saveHosts(hosts: Host[]) {
+<<<<<<< HEAD
+    const path = 'host';
+=======
     const path = 'users';
+>>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
     try {
       const batch = writeBatch(db);
       hosts.forEach(h => {
@@ -782,6 +796,27 @@ export const FirebaseService = {
     }
   },
 
+<<<<<<< HEAD
+<<<<<<< HEAD
+  async syncHostManagerRelationship(hostId: string, newManagerId: string | null): Promise<void> {
+    const hostUserRef = doc(db, 'users', hostId);
+    const hostHostsRef = doc(db, 'host', hostId);
+    
+    // 1. Fetch current host document to find old manager
+    let oldManagerId: string | null = null;
+    try {
+      const hostSnap = await getDoc(hostUserRef);
+      if (hostSnap.exists()) {
+        const hostData = hostSnap.data();
+        oldManagerId = hostData?.assignedManagerId || hostData?.assigned_manager_poppo_id || null;
+      } else {
+        const hostHostsSnap = await getDoc(hostHostsRef);
+        if (hostHostsSnap.exists()) {
+          const hostData = hostHostsSnap.data();
+          oldManagerId = hostData?.assignedManagerId || hostData?.assigned_manager_poppo_id || null;
+        }
+=======
+=======
   async saveAgentCommissions(commissions: CommissionEntry[], agentId: string, isWeekly: boolean = false, submitterName: string = 'Agent') {
     const uploadId = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 15);
     
@@ -795,6 +830,7 @@ export const FirebaseService = {
     await this.submitBulkToStaging('performance_reports', uploadId, taggedCommissions, submitterName);
   },
 
+>>>>>>> 2b42d3ae84c3e300e1faeb35e7009a759158d1e9
   async updateManagerHostFields(managerId: string, hostIdToAdd: string | null, hostIdToRemove: string | null, forceHosts?: string[]): Promise<void> {
     // Get current manager data from role collection first, since it contains the profile fields
     const normRoleCol = 'manager';
@@ -874,11 +910,84 @@ export const FirebaseService = {
       if (hostSnap.exists()) {
         const hostData = hostSnap.data();
         oldManagerId = hostData?.assignedManagerId || hostData?.assigned_manager_poppo_id || null;
+>>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
       }
     } catch (e) {
       console.warn("Could not fetch current host to determine old manager:", e);
     }
 
+<<<<<<< HEAD
+    if (oldManagerId === newManagerId) {
+      return;
+    }
+
+    const batch = writeBatch(db);
+
+    // Ensure host document in both users and hosts collections has the correct assignedManagerId
+    try {
+      const snap = await getDoc(hostUserRef);
+      if (snap.exists()) {
+        batch.update(hostUserRef, { assignedManagerId: newManagerId });
+      }
+    } catch (e) {}
+    try {
+      const snap = await getDoc(hostHostsRef);
+      if (snap.exists()) {
+        batch.update(hostHostsRef, { assignedManagerId: newManagerId });
+      }
+    } catch (e) {}
+
+    // Ensure new manager document in both users and hosts collections has hostId in assignedHosts
+    if (newManagerId) {
+      const newManagerUserRef = doc(db, 'users', newManagerId);
+      const newManagerHostsRef = doc(db, 'host', newManagerId);
+      try {
+        const snap = await getDoc(newManagerUserRef);
+        if (snap.exists()) {
+          batch.update(newManagerUserRef, { assignedHosts: arrayUnion(hostId) });
+        }
+      } catch (e) {}
+      try {
+        const snap = await getDoc(newManagerHostsRef);
+        if (snap.exists()) {
+          batch.update(newManagerHostsRef, { assignedHosts: arrayUnion(hostId) });
+        }
+      } catch (e) {}
+    }
+
+    // Ensure old manager document has hostId removed from assignedHosts
+    if (oldManagerId) {
+      const oldManagerUserRef = doc(db, 'users', oldManagerId);
+      const oldManagerHostsRef = doc(db, 'host', oldManagerId);
+      try {
+        const snap = await getDoc(oldManagerUserRef);
+        if (snap.exists()) {
+          batch.update(oldManagerUserRef, { assignedHosts: arrayRemove(hostId) });
+        }
+      } catch (e) {}
+      try {
+        const snap = await getDoc(oldManagerHostsRef);
+        if (snap.exists()) {
+          batch.update(oldManagerHostsRef, { assignedHosts: arrayRemove(hostId) });
+        }
+      } catch (e) {}
+    }
+
+    await batch.commit();
+  },
+
+  async updateHost(host: Host) {
+    const path = `host/${host.id}`;
+    try {
+      const managerName = host.manager || host.assigned_manager_nickname || host.assigned_manager || '';
+      const managerId = host.assignedManagerId || host.assigned_manager_poppo_id || '';
+      const teamName = host.team || host.team_anchor || '';
+      const salaryCategory = host.base_salary_category || host.tier_pay || '';
+
+      const updateData = {
+        ...host,
+        poppo_id: host.id,
+=======
     // 2. Fetch new manager's info to get name for host document update
     let newManagerName = '';
     if (newManagerId) {
@@ -937,6 +1046,7 @@ export const FirebaseService = {
       const baseData = {
         ...host,
         poppo_id: poppoId,
+>>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
         nickname: host.nickname || host.name,
         manager: managerName,
         assigned_manager: managerName,
@@ -945,6 +1055,24 @@ export const FirebaseService = {
         assignedManagerId: managerId || null,
         team: teamName,
         team_anchor: teamName,
+<<<<<<< HEAD
+        base_salary_category: salaryCategory,
+        tier_pay: salaryCategory,
+        updated_at: new Date().toISOString()
+      };
+      
+      const hostDocRef = doc(db, 'host', host.id);
+      await setDoc(hostDocRef, updateData, { merge: true });
+      
+      try {
+        const userDocRef = doc(db, 'users', host.id);
+        await setDoc(userDocRef, updateData, { merge: true });
+      } catch (userErr) {
+        console.warn(`[UPDATE] Could not sync user authentication document for ${host.id}:`, userErr);
+      }
+      
+      await this.syncHostManagerRelationship(host.id, host.assignedManagerId || null);
+=======
         teamAnchor: teamName,
         updated_at: new Date().toISOString()
       };
@@ -985,30 +1113,71 @@ export const FirebaseService = {
       if (newRoleCol === 'host') {
         await this.syncHostManagerRelationship(poppoId, (host as any).assignedManagerId || host.assigned_manager_poppo_id || null);
       }
+>>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, path);
     }
   },
 
   async deleteHost(hostId: string) {
-    const path = `hosts/${hostId}`;
+    const path = `host/${hostId}`;
     try {
+<<<<<<< HEAD
+      await deleteDoc(doc(db, 'host', hostId));
+=======
       await deleteDoc(doc(db, 'users', hostId));
+>>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
     } catch (error) {
       handleFirestoreError(error, OperationType.DELETE, path);
     }
   },
 
   async getAllHosts(): Promise<Host[]> {
+<<<<<<< HEAD
+    const path = 'host';
+    try {
+      const snapshot = await getDocs(collection(db, path));
+      return snapshot.docs.map(d => {
+        const data = d.data();
+        const managerName = data.manager || data.assigned_manager_nickname || data.assigned_manager || 'Nine Management';
+        const managerId = data.assignedManagerId || data.assigned_manager_poppo_id || null;
+        const teamName = data.team || data.team_anchor || 'Unassigned';
+        const salaryCategory = data.base_salary_category || data.tier_pay || 'Regular Host';
+        return {
+          ...data,
+          id: d.id,
+          poppo_id: d.id,
+          name: data.nickname || data.name || 'Unknown',
+          nickname: data.nickname || data.name || 'Unknown',
+          manager: managerName,
+          team: teamName,
+          base_salary_category: salaryCategory,
+          assignedManagerId: managerId,
+          assigned_manager_nickname: managerName,
+          assigned_manager_poppo_id: managerId,
+          team_anchor: teamName,
+          tier_pay: salaryCategory,
+        } as Host;
+      });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.LIST, path);
+      return [];
+    }
+=======
     return this.getAllRoleMetadata();
   },
   async getHosts(): Promise<Host[]> {
     return this.getAllRoleMetadata();
+>>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
   },
   
   // *** User credentials retrieval ***
   async getUserCredentials(): Promise<{ poppo_id: string; password?: string }[]> {
+<<<<<<< HEAD
+    const path = 'host';
+=======
     const path = 'users';
+>>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
     try {
       const snapshot = await getDocs(collection(db, path));
       return snapshot.docs.map(d => {
@@ -1099,9 +1268,53 @@ export const FirebaseService = {
     }
   },
 
+<<<<<<< HEAD
+  // Agent-Specific Team Financials
+  async saveAgentCommissions(commissions: CommissionEntry[], agentId: string, isWeekly: boolean = false) {
+    const collectionName = isWeekly ? 'agent_financials_weekly' : 'agent_financials_monthly';
+    try {
+      const batch = writeBatch(db);
+      commissions.forEach(c => {
+        const id = isWeekly ? `${c.poppo_id}_${c.from_date}_${c.to_date}` : `${c.poppo_id}_${c.month}`;
+        const docRef = doc(db, collectionName, id);
+        batch.set(docRef, { ...c, agentId });
+      });
+      await batch.commit();
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, collectionName);
+    }
+  },
+
+  async getAgentCommissions(agentId: string, isWeekly: boolean = false): Promise<CommissionEntry[]> {
+    const collectionName = isWeekly ? 'agent_financials_weekly' : 'agent_financials_monthly';
+    try {
+      const q = query(collection(db, collectionName), where('agentId', '==', agentId));
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(d => d.data() as CommissionEntry);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.LIST, collectionName);
+      return [];
+    }
+  },
+
+  async deleteAgentCommission(poppoId: string, dateKey: string, agentId: string, isWeekly: boolean = false) {
+    const collectionName = isWeekly ? 'agent_financials_weekly' : 'agent_financials_monthly';
+    const path = `${collectionName}/${poppoId}_${dateKey}`;
+    try {
+      // Security check could be handled by rules, but we explicitly use the known ID
+      await deleteDoc(doc(db, collectionName, `${poppoId}_${dateKey}`));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, path);
+    }
+  },
+
+  async updateCommission(commission: CommissionEntry) {
+    const path = `performance_reports/${commission.poppo_id}_${commission.month}`;
+=======
   async deleteAgentCommission(poppoId: string, monthOrRange: string, agentId: string, isWeekly: boolean = false) {
     const colName = isWeekly ? 'performance_weekly_reports' : 'performance_reports';
     const path = `${colName}/${poppoId}_${monthOrRange}`;
+>>>>>>> 2b42d3ae84c3e300e1faeb35e7009a759158d1e9
     try {
       const docRef = doc(db, colName, `${poppoId}_${monthOrRange}`);
       const docSnap = await getDoc(docRef);
@@ -1859,7 +2072,11 @@ export const FirebaseService = {
    * Returns an unsubscribe function — call it on component unmount to stop listening.
    */
   subscribeToHosts(callback: (hosts: Host[]) => void): () => void {
+<<<<<<< HEAD
+    const path = 'host';
+=======
     const path = 'users';
+>>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
     const unsubscribe = onSnapshot(
       collection(db, path),
       (snapshot) => {
@@ -1880,9 +2097,13 @@ export const FirebaseService = {
    * @param patch - Object with only the fields to update
    */
   async patchHost(poppoId: string, patch: Partial<Host>): Promise<void> {
-    const path = `hosts/${poppoId}`;
+    const path = `host/${poppoId}`;
     try {
+<<<<<<< HEAD
+      const docRef = doc(db, 'host', poppoId);
+=======
       const docRef = doc(db, 'users', poppoId);
+>>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
       await updateDoc(docRef, { ...patch, updated_at: new Date().toISOString() });
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, path);
@@ -1917,8 +2138,39 @@ export const FirebaseService = {
     }
   },
 
+<<<<<<< HEAD
+<<<<<<< HEAD
+  // Hosts alias (some callers use getHosts, others use getAllHosts)
+  async getHosts(): Promise<Host[]> {
+    return this.getAllHosts();
+  },
+
+  // Awards (badges) management
+  async getAwards(): Promise<AwardBadge[]> {
+    const path = 'awards';
+    try {
+      const snapshot = await getDocs(collection(db, path));
+      return snapshot.docs.map(d => ({ id: d.id, ...d.data() } as AwardBadge));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.LIST, path);
+      return [];
+    }
+  },
+
+  async saveAwards(awards: AwardBadge[]): Promise<void> {
+    const path = 'awards';
+    try {
+      const batch = writeBatch(db);
+      awards.forEach(a => {
+        const docRef = doc(db, path, a.id);
+        batch.set(docRef, a);
+=======
+  async savePerformanceReport(data: any[]): Promise<void> {
+    const path = 'performance_reports';
+=======
   async savePerformanceReport(data: any[], isWeekly: boolean = false): Promise<void> {
     const path = isWeekly ? 'performance_weekly_reports' : 'performance_reports';
+>>>>>>> 2b42d3ae84c3e300e1faeb35e7009a759158d1e9
     try {
       const batch = writeBatch(db);
       data.forEach(r => {
@@ -1926,6 +2178,7 @@ export const FirebaseService = {
         const id = `${r.poppo_id}_${dateKey}`;
         const docRef = doc(db, path, id);
         batch.set(docRef, r, { merge: true });
+>>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
       });
       await batch.commit();
     } catch (error) {
@@ -1933,6 +2186,23 @@ export const FirebaseService = {
     }
   },
 
+<<<<<<< HEAD
+  async deleteAward(awardId: string): Promise<void> {
+    const path = `awards/${awardId}`;
+    try {
+      await deleteDoc(doc(db, 'awards', awardId));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, path);
+    }
+  },
+
+  // Award assignments management
+  async getAwardAssignments(): Promise<AwardAssignment[]> {
+    const path = 'award_assignments';
+    try {
+      const snapshot = await getDocs(collection(db, path));
+      return snapshot.docs.map(d => ({ id: d.id, ...d.data() } as AwardAssignment));
+=======
   /**
    * Fetch all performance_reports documents.
    * Doc ID format: {poppoId}_{MonthName}_{Year} e.g. 19157913_March_2025
@@ -1966,12 +2236,54 @@ export const FirebaseService = {
           year: data.year || yearFromId,
         };
       });
+>>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
     } catch (error) {
       handleFirestoreError(error, OperationType.LIST, path);
       return [];
     }
   },
 
+<<<<<<< HEAD
+  async saveAwardAssignments(assignments: AwardAssignment[]): Promise<void> {
+    const path = 'award_assignments';
+    try {
+      const batch = writeBatch(db);
+      assignments.forEach(a => {
+        const docRef = doc(db, path, a.id);
+        batch.set(docRef, a);
+      });
+      await batch.commit();
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, path);
+    }
+  },
+
+  async deleteAwardAssignment(assignmentId: string): Promise<void> {
+    const path = `award_assignments/${assignmentId}`;
+    try {
+      await deleteDoc(doc(db, 'award_assignments', assignmentId));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, path);
+    }
+  },
+
+  // System activity log (used by audit trail in HostProfileView)
+  async logSystemActivity(description: string, level: 'Info' | 'Warning' | 'Error' = 'Info'): Promise<void> {
+    const path = 'system_activity_logs';
+    try {
+      const id = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2);
+      const docRef = doc(db, path, id);
+      await setDoc(docRef, {
+        id,
+        description,
+        level,
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      console.warn('[FirebaseService] logSystemActivity failed:', error);
+    }
+  },
+=======
   async logSystemActivity(actionDescription: string, severity: 'Info' | 'Warning' | 'Error' = 'Info') {
     try {
       const authState = Storage.getAuthState();
@@ -1989,6 +2301,7 @@ export const FirebaseService = {
       console.error('[FirebaseService] logSystemActivity failed:', error);
     }
   }
+>>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
 };
 // ─── Roster Management types & standalone exports ─────────────────────────────
 // These are used by AppUsersTab for the admin roster management feature.
@@ -2010,7 +2323,14 @@ export interface HostRosterUser {
  * poppo_id is pulled from docSnap.id (the document key).
  * Returns an unsubscribe function — call it in useEffect cleanup.
  */
+<<<<<<< HEAD
+export const subscribeToHosts = (
+  callback: (hosts: HostRosterUser[]) => void,
+  onError?: (error: any) => void
+): (() => void) => {
+=======
 export const subscribeToHosts = (callback: (hosts: HostRosterUser[]) => void): (() => void) => {
+>>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
   const q = query(collection(db, 'users'));
   return onSnapshot(
     q,
@@ -2029,6 +2349,7 @@ export const subscribeToHosts = (callback: (hosts: HostRosterUser[]) => void): (
     },
     (error) => {
       console.error('[subscribeToHosts] Firestore onSnapshot error:', error);
+      if (onError) onError(error);
     }
   );
 };

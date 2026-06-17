@@ -83,10 +83,14 @@ export const TeamLeaderboard: React.FC<TeamLeaderboardProps> = React.memo(({ man
   if (leaderboardData.length === 0) return null;
 
   return (
+<<<<<<< HEAD
+    <div className="bg-[#111111]/50 border border-white/5 p-5 rounded-2xl space-y-4">
+=======
     <div className="bg-[#1A1A28]/50 border border-[#D4AF37]/10 p-5 rounded-2xl space-y-4">
+>>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
       <div className="flex items-center justify-between px-1">
-        <h4 className="text-[10px] font-black uppercase tracking-[0.15em] text-[#A09E9A] font-outfit flex items-center gap-2">
-          <Trophy size={14} className="text-[#D4AF37]" />
+        <h4 className="text-[10px] font-black uppercase tracking-[0.15em] text-[#B0B0B0] font-outfit flex items-center gap-2">
+          <Trophy size={14} className="text-[#FFB800]" />
           Team Leaderboard (Top 5)
         </h4>
         <span className="text-[8px] font-bold text-indigo-400 border border-indigo-500/20 bg-indigo-500/5 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
@@ -104,25 +108,32 @@ export const TeamLeaderboard: React.FC<TeamLeaderboardProps> = React.memo(({ man
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: idx * 0.1 }}
+<<<<<<< HEAD
+              className="bg-[#222222]/40 border border-white/5 p-3 rounded-xl flex items-center justify-between hover:border-[#FFB800]/20 transition-colors shadow-sm group"
+            >
+              <div className="flex items-center gap-4">
+                <div className="w-6 h-6 flex items-center justify-center rounded-full bg-black/30 border border-white/10 text-xs font-black text-[#B0B0B0]">
+=======
               className="bg-[#222235]/40 border border-[#D4AF37]/10 p-3 rounded-xl flex items-center justify-between hover:border-[#D4AF37]/20 transition-colors shadow-sm group"
             >
               <div className="flex items-center gap-4">
                 <div className="w-6 h-6 flex items-center justify-center rounded-full bg-black/30 border border-[#D4AF37]/15 text-xs font-black text-[#A09E9A]">
+>>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
                   #{host.currentRank}
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <p className="text-sm font-bold text-[#F0EFE8] leading-tight truncate max-w-[120px] md:max-w-[200px]">
+                    <p className="text-sm font-bold text-[#F5F5F5] leading-tight truncate max-w-[120px] md:max-w-[200px]">
                       {host.nickname}
                     </p>
                     {host.isRisingStar && (
-                      <span className="flex items-center gap-1 text-[8px] font-black uppercase tracking-wider text-[#D4AF37] bg-[#D4AF37]/10 px-1.5 py-0.5 rounded border border-[#D4AF37]/20">
-                        <Star size={8} className="fill-[#D4AF37]" />
+                      <span className="flex items-center gap-1 text-[8px] font-black uppercase tracking-wider text-[#FFB800] bg-[#FFB800]/10 px-1.5 py-0.5 rounded border border-[#FFB800]/20">
+                        <Star size={8} className="fill-[#FFB800]" />
                         Rising Star
                       </span>
                     )}
                   </div>
-                  <p className="text-[10px] text-[#A09E9A] font-medium mt-0.5">
+                  <p className="text-[10px] text-[#B0B0B0] font-medium mt-0.5">
                     ID: {host.poppoId}
                   </p>
                 </div>
@@ -130,10 +141,10 @@ export const TeamLeaderboard: React.FC<TeamLeaderboardProps> = React.memo(({ man
 
               <div className="flex items-center gap-4 text-right">
                 <div className="flex flex-col items-end">
-                  <span className="text-sm font-black text-[#F0EFE8] tracking-tight">
+                  <span className="text-sm font-black text-[#F5F5F5] tracking-tight">
                     {formatNumber(host.currentEarnings)}
                   </span>
-                  <span className="text-[7px] font-bold text-[#A09E9A]/60 uppercase tracking-wider">
+                  <span className="text-[7px] font-bold text-[#B0B0B0]/60 uppercase tracking-wider">
                     Points
                   </span>
                 </div>
@@ -152,7 +163,7 @@ export const TeamLeaderboard: React.FC<TeamLeaderboardProps> = React.memo(({ man
                       <span className="text-[9px] font-bold">{Math.abs(rankChange)}</span>
                     </div>
                   ) : (
-                    <Minus size={12} className="text-[#A09E9A]" />
+                    <Minus size={12} className="text-[#B0B0B0]" />
                   )}
                 </div>
               </div>

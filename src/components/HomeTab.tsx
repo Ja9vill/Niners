@@ -97,11 +97,11 @@ export const HomeTab: React.FC<HomeTabProps> = ({ hosts, commissions, onOpenLogi
               value={selectedMonth}
               onChange={(e) => setSelectedMonth(e.target.value)}
               title="Filter by Month"
-              className="bg-[#13161C]/80 border border-white/10 rounded-xl pl-4 pr-10 py-2 text-xs font-bold text-white outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all cursor-pointer appearance-none"
+              className="bg-[#1A1A1A]/80 border border-white/10 rounded-xl pl-4 pr-10 py-2 text-xs font-bold text-white outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all cursor-pointer appearance-none"
             >
-              <option value="all" className="bg-[#0F1117] text-white">🏆 All Time Record</option>
+              <option value="all" className="bg-[#111111] text-white">🏆 All Time Record</option>
               {months.map(m => (
-                <option key={m} value={m} className="bg-[#0F1117] text-white">
+                <option key={m} value={m} className="bg-[#111111] text-white">
                   📅 {formatFullMonth(m)}
                 </option>
               ))}
@@ -116,7 +116,7 @@ export const HomeTab: React.FC<HomeTabProps> = ({ hosts, commissions, onOpenLogi
       </div>
 
       {/* Leaderboard Table */}
-      <div className="glass-card border border-white/5 shadow-2xl rounded-3xl overflow-hidden mb-8 bg-[#0F1117]/30">
+      <div className="glass-card border border-white/5 shadow-2xl rounded-3xl overflow-hidden mb-8 bg-[#111111]/30">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
@@ -195,7 +195,7 @@ export const HomeTab: React.FC<HomeTabProps> = ({ hosts, commissions, onOpenLogi
       {/* Monthly Honors Grid - directly below the Leaderboard table within the same view */}
       <div className="space-y-4">
         <div className="flex items-center gap-2 border-b border-slate-800 pb-3">
-          <Trophy className="text-[#D4AF37]" size={20} />
+          <Trophy className="text-[#FFB800]" size={20} />
           <h3 className="text-sm font-black uppercase tracking-[0.2em] text-white">Monthly Achievements</h3>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
@@ -207,20 +207,20 @@ export const HomeTab: React.FC<HomeTabProps> = ({ hosts, commissions, onOpenLogi
             { title: 'Role Model', emoji: '🌟', color: 'from-purple-500/10 to-transparent border-purple-500/20' },
             { title: 'Top Leader', emoji: '👑', color: 'from-indigo-500/10 to-transparent border-indigo-500/20' },
           ].map((item, idx) => (
-            <div key={idx} className={cn("glass border p-5 rounded-2xl relative overflow-hidden group bg-gradient-to-br transition-all hover:scale-[1.02] bg-[#0F1117]/60", item.color)}>
+            <div key={idx} className={cn("glass border p-5 rounded-2xl relative overflow-hidden group bg-gradient-to-br transition-all hover:scale-[1.02] bg-[#111111]/60", item.color)}>
               {/* Subtle hover background glow */}
               <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/5 to-white/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
               
               <div className="relative z-10 flex items-center justify-between gap-4">
                 <div className="space-y-1.5">
-                  <h4 className="text-[9px] font-black uppercase tracking-[0.2em] text-[#D4AF37]/60">Monthly Honor</h4>
+                  <h4 className="text-[9px] font-black uppercase tracking-[0.2em] text-[#FFB800]/60">Monthly Honor</h4>
                   <p className="font-black text-white text-base tracking-tight uppercase">{item.title}</p>
                   <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20">
                     <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
                     <span className="text-[9px] font-black uppercase text-amber-500 tracking-wider">Pending</span>
                   </div>
                 </div>
-                <div className="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center text-2xl border border-white/10 group-hover:bg-[#D4AF37]/10 group-hover:border-[#D4AF37]/30 transition-all duration-300 transform group-hover:scale-110 group-hover:rotate-6 shadow-md shrink-0">
+                <div className="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center text-2xl border border-white/10 group-hover:bg-[#FFB800]/10 group-hover:border-[#FFB800]/30 transition-all duration-300 transform group-hover:scale-110 group-hover:rotate-6 shadow-md shrink-0">
                   {item.emoji}
                 </div>
               </div>

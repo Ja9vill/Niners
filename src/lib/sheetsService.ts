@@ -306,3 +306,143 @@ export const SheetsService = {
     }).filter(r => r.poppoId && r.poppoId !== '');
   }
 };
+
+// ─────────────────────────────────────────────────────────────────
+// LIVEHOUSE MATRIX SERVICE
+// Fetches from the deployed Google Apps Script Web App which reads
+// the CALENDAR dashboard sheet and exposes slot_1 / slot_2 per day/timeslot.
+// Script URL: https://script.google.com/macros/s/AKfycbxLZMz62Ju2RCQAOJrMyuwaiT_sd-m3--uhTqzABO6Es6l3XEUnZlD54rsBxi2zdpyBIQ/exec
+// ─────────────────────────────────────────────────────────────────
+
+export const LIVEHOUSE_MATRIX_URL =
+  'https://script.google.com/macros/s/AKfycbxLZMz62Ju2RCQAOJrMyuwaiT_sd-m3--uhTqzABO6Es6l3XEUnZlD54rsBxi2zdpyBIQ/exec';
+
+/** One row as returned by doGet — primary and failover shapes are identical */
+export interface LivehouseMatrixRow {
+  source_origin: 'CALENDAR_DASHBOARD' | 'FAILOVER_MONTH_TAB_BACKUP';
+  date_label: string;   // e.g. "June 10, 2026"
+  day: number;          // 1–31
+  timeslot: string;     // e.g. "12:00AM-1:00AM"
+  slot_1: { available: boolean; poppo_id: string };
+  slot_2: { available: boolean; poppo_id: string };
+  fully_booked: boolean;
+}
+
+export interface LivehouseMatrixResponse {
+  status: 'success' | 'error';
+  schedule: LivehouseMatrixRow[];
+  message?: string;
+}
+
+/**
+ * Converts an API timeslot string ("12:00AM-1:00AM") to the Manila-time
+ * display format used throughout the UI ("12:00 AM - 01:00 AM (Manila Time)").
+ *
+ * Mirrors the normalizeTimeString logic from the Apps Script while producing
+ * a human-readable 12-hour display label instead of a numeric key.
+ */
+export function normalizeLivehouseTimeslot(apiSlot: string): string {
+  if (!apiSlot) return apiSlot;
+
+  const clean = apiSlot
+    .toUpperCase()
+    .replace(/[\u2013\u2014\u2015]/g, '-')
+    .replace(/\s+/g, '');
+
+  // Split on the dash between end of first time and start of second
+  // e.g. "12:00AM-1:00AM" -> ["12:00AM", "1:00AM"]
+  // Handle midnight wrap: "23:00PM-12:00AM"
+  const match = clean.match(/^(\d{1,2}(?::\d{2})?(?:AM|PM))-(\d{1,2}(?::\d{2})?(?:AM|PM))$/);
+  if (!match) return apiSlot;
+
+  const formatHalf = (s: string): string => {
+    const isPM = s.endsWith('PM');
+    const suffix = isPM ? 'PM' : 'AM';
+    const digits = s.replace(/[^0-9:]/g, '');
+    const [hStr, mStr = '00'] = digits.split(':');
+    const hh = String(parseInt(hStr, 10) || 0).padStart(2, '0');
+    const mm = String(parseInt(mStr, 10) || 0).padStart(2, '0');
+    return `${hh}:${mm} ${suffix}`;
+  };
+
+  return `${formatHalf(match[1])} - ${formatHalf(match[2])} (Manila Time)`;
+}
+
+export const LivehouseMatrixService = {
+  /**
+   * Fetch the full livehouse schedule from the Google Apps Script endpoint.
+   * Non-throwing — returns [] on any network or parse error.
+   */
+  async fetchSchedule(): Promise<LivehouseMatrixRow[]> {
+    try {
+      const res = await fetch(LIVEHOUSE_MATRIX_URL, { cache: 'no-store' });
+      if (!res.ok) {
+        console.warn('[LivehouseMatrix] HTTP error:', res.status);
+        return [];
+      }
+      const json: LivehouseMatrixResponse = await res.json();
+      if (json.status !== 'success' || !Array.isArray(json.schedule)) {
+        console.warn('[LivehouseMatrix] Unexpected payload:', json);
+        return [];
+      }
+      return json.schedule;
+    } catch (err) {
+      console.error('[LivehouseMatrix] Fetch failed:', err);
+      return [];
+    }
+  },
+
+  /**
+   * Returns all rows for a given YYYY-MM-DD date string.
+   * Converts it to "Month D, YYYY" to match date_label from the API.
+   */
+  filterByDate(schedule: LivehouseMatrixRow[], date: string): LivehouseMatrixRow[] {
+    let label = date;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      const d = new Date(date + 'T00:00:00');
+      label = d.toLocaleDateString('en-US', {
+        month: 'long', day: 'numeric', year: 'numeric'
+      });
+    }
+    return schedule.filter(row => row.date_label === label);
+  },
+
+  /**
+   * Returns all rows where a specific Poppo ID occupies slot_1 or slot_2.
+   */
+  filterByPoppoId(schedule: LivehouseMatrixRow[], poppoId: string): LivehouseMatrixRow[] {
+    const id = String(poppoId).trim();
+    return schedule.filter(
+      row =>
+        String(row.slot_1?.poppo_id || '').trim() === id ||
+        String(row.slot_2?.poppo_id || '').trim() === id
+    );
+  },
+
+  /**
+   * Availability summary for a specific YYYY-MM-DD date, one entry per timeslot.
+   * Drives the CalendarTab reservation modal's slot picker.
+   */
+  getDateAvailability(
+    schedule: LivehouseMatrixRow[],
+    date: string
+  ): Array<{
+    timeslot: string;        // raw API string, e.g. "14:00PM-15:00PM"
+    manilaLabel: string;     // display string, e.g. "02:00 PM - 03:00 PM (Manila Time)"
+    slot1Available: boolean;
+    slot1PoppoId: string;
+    slot2Available: boolean;
+    slot2PoppoId: string;
+    fullyBooked: boolean;
+  }> {
+    return this.filterByDate(schedule, date).map(row => ({
+      timeslot:       row.timeslot,
+      manilaLabel:    normalizeLivehouseTimeslot(row.timeslot),
+      slot1Available: row.slot_1.available,
+      slot1PoppoId:   row.slot_1.poppo_id,
+      slot2Available: row.slot_2.available,
+      slot2PoppoId:   row.slot_2.poppo_id,
+      fullyBooked:    row.fully_booked,
+    }));
+  },
+};
