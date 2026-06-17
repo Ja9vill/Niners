@@ -2,16 +2,25 @@
 <html lang="en" class="h-full">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Niners App</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Niners - NINE Talent Management</title>
+  <meta name="description" content="The home of quality livestreamers.">
+  <meta name="apple-mobile-web-app-title" content="Niners">
+  <meta name="application-name" content="Niners">
   
+  <link rel="icon" type="image/jpeg" href="/src/logo.jpg">
+  <link rel="apple-touch-icon" href="/src/logo.jpg">
   <!-- Modern Fonts from Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Lexend:wght@300;400;500;600;700;800;900&family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  
+  <!-- DOMPurify via CDN (bypasses node_modules issues) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.6/purify.min.js"></script>
 </head>
 <body class="h-full w-full bg-slate-950 text-slate-100 font-sans antialiased p-0 select-none">
   <div id="root" class="h-full w-full"></div>
+  <div id="modal-portal"></div>
   <script type="module" src="/src/main.tsx"></script>
 </body>
 </html>

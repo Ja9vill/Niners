@@ -2,16 +2,28 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Outlet, useNavigate, useLocation, Link } from 'react-router-dom';
 import { 
   Menu, X, LogOut, LayoutDashboard, Users, User, Shield, Calendar, DollarSign, Activity, FileText,
-  Bell, Trash2, Plus, Clock, ChevronDown, Monitor, Smartphone, TrendingUp
+  Bell, Trash2, Plus, Clock, ChevronDown, Monitor, Smartphone, TrendingUp, Edit3, Image as ImageIcon,
+  Settings, Database, BarChart, ClipboardList, Award, Network
 } from 'lucide-react';
 import { useViewMode } from '../hooks/useViewMode';
 import { Storage } from '../lib/storage';
-import { auth, db } from '../lib/firebase';
+import { auth, db, requestNotificationPermission } from '../lib/firebase';
 import { signOut } from 'firebase/auth';
 import { cn } from '../lib/utils';
-import { collection, query, onSnapshot, setDoc, doc, deleteDoc, where } from 'firebase/firestore';
+import { collection, query, onSnapshot, setDoc, doc, deleteDoc, where, updateDoc, arrayUnion } from 'firebase/firestore';
 import appLogo from '../logo.jpg';
 import { FirebaseService } from '../lib/firebaseService';
+
+const formatStrictDate = (dateString: string | undefined | null) => {
+  if (!dateString) return '';
+  try {
+    const d = new Date(dateString.includes('T') ? dateString : `${dateString}T12:00:00Z`);
+    if (isNaN(d.getTime())) return dateString;
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  } catch(e) {
+    return dateString;
+  }
+};
 
 export const DashboardLayout = ({ children }: { children?: React.ReactNode }) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -29,6 +41,7 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
   const [announcements, setAnnouncements] = useState<any[]>([]);
   const [livehouseRequests, setLivehouseRequests] = useState<any[]>([]);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
+  const [spotlightNotification, setSpotlightNotification] = useState<any>(null);
   const [isPostingAnnouncement, setIsPostingAnnouncement] = useState(false);
   const [announcementTitle, setAnnouncementTitle] = useState('');
   const [announcementContent, setAnnouncementContent] = useState('');
@@ -41,6 +54,97 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
   });
   const [systemLogs, setSystemLogs] = useState<any[]>([]);
   const [pendingEditRequests, setPendingEditRequests] = useState<any[]>([]);
+
+  const [browserNotificationPerm, setBrowserNotificationPerm] = useState<NotificationPermission>('default');
+  const [streamNotifications, setStreamNotifications] = useState<any[]>([]);
+  const [isPostingStream, setIsPostingStream] = useState(false);
+  const [streamLink, setStreamLink] = useState('');
+  const [isSubmittingStream, setIsSubmittingStream] = useState(false);
+  const [streamError, setStreamError] = useState<string | null>(null);
+  const [isDeviceRegistered, setIsDeviceRegistered] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('nine_notifications_registered') === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  useEffect(() => {
+    if ('Notification' in window) {
+      setBrowserNotificationPerm(Notification.permission);
+    }
+  }, []);
+
+  const urlB64ToUint8Array = (base64String: string) => {
+    const padding = '='.repeat((4 - base64String.length % 4) % 4);
+    const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+    const rawData = window.atob(base64);
+    const outputArray = new Uint8Array(rawData.length);
+    for (let i = 0; i < rawData.length; ++i) {
+      outputArray[i] = rawData.charCodeAt(i);
+    }
+    return outputArray;
+  };
+
+  const handleRequestBrowserNotification = async () => {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+      alert("This browser does not support desktop push notifications.");
+      return;
+    }
+    try {
+      // 1. Request notification permission via browser
+      const permission = await Notification.requestPermission();
+      setBrowserNotificationPerm(permission);
+      if (permission !== 'granted') {
+        alert("Notification permission was denied or blocked in browser settings.");
+        return;
+      }
+
+      // 2. Register service worker
+      const reg = await navigator.serviceWorker.register('/sw.js');
+
+      // 3. Fetch VAPID public key from backend
+      const keyRes = await fetch('/api/push/public-key');
+      if (!keyRes.ok) throw new Error('Failed to retrieve VAPID public key from backend');
+      const { publicKey } = await keyRes.json();
+
+      // 4. Subscribe with PushManager
+      const sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlB64ToUint8Array(publicKey)
+      });
+
+      // 5. Save subscription to backend
+      const token = authState.token || '';
+      const saveRes = await fetch('/api/push/subscribe', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({
+          subscription: sub,
+          poppo_id: authState.poppo_id
+        })
+      });
+
+      if (!saveRes.ok) {
+        throw new Error('Failed to save subscription payload to backend database');
+      }
+
+      // 6. Set success states
+      localStorage.setItem('nine_notifications_registered', 'true');
+      setIsDeviceRegistered(true);
+
+      new Notification("Success!", {
+        body: "Browser notifications are now enabled.",
+        icon: appLogo
+      });
+    } catch (err: any) {
+      console.error("Failed to request notification permission:", err);
+      alert("Failed to activate notifications: " + (err?.message || String(err)));
+    }
+  };
 
   // Real-time Firestore listeners for announcements, livehouse requests, and system logs
   useEffect(() => {
@@ -80,11 +184,20 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
       });
     }
 
+    const unsubStreams = onSnapshot(collection(db, 'stream_notifications'), (snapshot) => {
+      const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      list.sort((a: any, b: any) => (b.timestamp || '').localeCompare(a.timestamp || ''));
+      const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+      const activeStreams = list.filter((item: any) => (item.timestamp || '') >= twoHoursAgo);
+      setStreamNotifications(activeStreams);
+    });
+
     return () => {
       unsubAnn();
       unsubReq();
       unsubLogs();
       unsubEditReqs();
+      unsubStreams();
     };
   }, [authState.role, authState?.poppo_id]);
 
@@ -92,6 +205,41 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
     const updated = [...dismissedRequests, reqId];
     setDismissedRequests(updated);
     localStorage.setItem('dismissed_livehouse_reqs', JSON.stringify(updated));
+  };
+
+  const handlePublishStreamNotification = async () => {
+    if (isSubmittingStream) return;
+    setIsSubmittingStream(true);
+    setStreamError(null);
+    try {
+      const streamId = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 15);
+      const newStream = {
+        id: streamId,
+        poppoId: authState.poppo_id || 'unknown',
+        nickname: authState.nickname || authState.name || 'A Talent',
+        streamLink: streamLink.trim(),
+        timestamp: new Date().toISOString()
+      };
+      
+      // Attempt stream notification publication
+      await setDoc(doc(db, 'stream_notifications', streamId), newStream);
+      setStreamLink('');
+      setIsPostingStream(false);
+      
+      // Attempt system log, catch silently if role permissions prevent writing to logs
+      try {
+        await FirebaseService.logSystemActivity(`Stream notification posted: ${newStream.nickname} is streaming`, 'Info');
+      } catch (logErr) {
+        console.warn("Log write ignored:", logErr);
+      }
+    } catch (err: any) {
+      console.error("Failed to publish stream notification:", err);
+      const errMsg = err?.message || String(err);
+      setStreamError(errMsg);
+      alert("Failed to send stream notification: " + errMsg);
+    } finally {
+      setIsSubmittingStream(false);
+    }
   };
 
   const handleHostAccept = async (req: any) => {
@@ -133,6 +281,7 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
     try {
       const docRef = doc(db, 'livehouse_requests', req.id);
       await setDoc(docRef, { ...req, status: 'Approved' }, { merge: true });
+      await FirebaseService.notifyHostIfRegistered(req.poppoId, req.date, req.timeslot);
 
       // Create Calendar Event in 'calendar' collection
       const eventId = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 15);
@@ -241,7 +390,9 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
     if (!['director', 'head admin', 'head_admin'].includes(roleLower)) return 0;
     if (!lastReadTimestamp) return systemLogs.length;
     return systemLogs.filter(log => log.timestamp > lastReadTimestamp).length;
-  }, [systemLogs, lastReadTimestamp, authState.role]);  const totalUnreadCount = filteredRequests.length + unreadAnnouncementsCount + unreadLogsCount + pendingEditRequests.length;
+  }, [systemLogs, lastReadTimestamp, authState.role]);
+
+  const totalUnreadCount = filteredRequests.length + unreadAnnouncementsCount + unreadLogsCount + pendingEditRequests.length + streamNotifications.length;
   const toggleNotifications = () => {
     if (!isNotificationOpen) {
       const now = new Date().toISOString();
@@ -255,11 +406,20 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
     const roleLower = String(authState.role || '').toLowerCase();
     const canPostAnn = ['director', 'head admin', 'head_admin'].includes(roleLower);
     
+    const formatExternalLink = (url: string) => {
+      if (!url) return '';
+      const trimmed = url.trim();
+      if (/^https?:\/\//i.test(trimmed)) {
+        return trimmed;
+      }
+      return `https://${trimmed}`;
+    };
+    
     return (
       <div className="relative">
         <button
           onClick={toggleNotifications}
-          className="relative p-2.5 text-[#A09E9A] hover:text-white rounded-full bg-white/[0.02] hover:bg-white/[0.05] transition-all cursor-pointer border border-white/5 active:scale-95 flex items-center justify-center shrink-0"
+          className="relative global-block-1 p-2.5 text-[#A09E9A] hover:text-[#D4AF37] hover:scale-105 rounded-xl transition-all cursor-pointer flex items-center justify-center shrink-0"
           title="Notifications"
           type="button"
         >
@@ -272,7 +432,29 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
         </button>
 
         {isNotificationOpen && (
-          <div className="absolute right-0 mt-3 w-80 md:w-[380px] bg-[#11111A]/95 border border-white/10 backdrop-blur-md rounded-2xl shadow-2xl z-50 p-4 space-y-4 max-h-[480px] overflow-y-auto custom-scrollbar">
+          <div className="absolute right-0 mt-3 w-80 md:w-[380px] bg-[#0A0604] border border-[#D4AF37]/30 rounded-2xl z-50 p-4 space-y-4 max-h-[480px] overflow-y-auto custom-scrollbar shadow-[0_20px_50px_rgba(0,0,0,1)]">
+            {/* Device Notification Status Indicator Inside Dropdown */}
+            <div className="flex items-center justify-between border-b border-white/5 pb-2 text-left shrink-0">
+              <div className="flex items-center gap-1.5">
+                <span className={cn(
+                  "w-1.5 h-1.5 rounded-full inline-block",
+                  (browserNotificationPerm === 'granted' && isDeviceRegistered) ? "bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]" : "bg-rose-400 shadow-[0_0_8px_rgba(248,113,113,0.8)] animate-pulse"
+                )} />
+                <span className="text-[9px] font-black uppercase tracking-wider text-white/50">
+                  Device Notifications: {(browserNotificationPerm === 'granted' && isDeviceRegistered) ? 'Active' : 'Inactive'}
+                </span>
+              </div>
+              {!(browserNotificationPerm === 'granted' && isDeviceRegistered) && (
+                <button
+                  type="button"
+                  onClick={handleRequestBrowserNotification}
+                  className="px-2 py-0.5 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-400 rounded-lg text-[8px] font-black uppercase tracking-wider transition-all cursor-pointer"
+                >
+                  Activate
+                </button>
+              )}
+            </div>
+
             {isPostingAnnouncement ? (
               <form onSubmit={handlePublishAnnouncement} className="space-y-4 text-left">
                 <div className="flex items-center justify-between border-b border-white/5 pb-2">
@@ -280,7 +462,7 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
                   <button 
                     type="button" 
                     onClick={() => setIsPostingAnnouncement(false)}
-                    className="text-[9px] font-black uppercase text-[#A09E9A] hover:text-white cursor-pointer"
+                    className="text-[9px] font-black uppercase text-[#A09E9A] hover:text-white cursor-pointer transition-colors"
                   >
                     Cancel
                   </button>
@@ -288,38 +470,140 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
                 
                 <div className="space-y-1.5">
                   <label className="text-[8px] font-black text-white/40 uppercase tracking-widest block">Announcement Title</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Server Maintenance or Livehouse Rules Update"
-                    value={announcementTitle}
-                    onChange={(e) => setAnnouncementTitle(e.target.value)}
-                    className="w-full bg-[#0A0B0E] border border-white/10 rounded-xl px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
-                  />
+                  <div className="global-placeholder rounded-xl relative">
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. Server Maintenance or Livehouse Rules Update"
+                      value={announcementTitle}
+                      onChange={(e) => setAnnouncementTitle(e.target.value)}
+                      className="w-full bg-transparent border-none px-3 py-2 text-xs text-[#F0EFE8] outline-none placeholder:text-white/20 relative z-10"
+                    />
+                  </div>
                 </div>
 
                 <div className="space-y-1.5">
                   <label className="text-[8px] font-black text-white/40 uppercase tracking-widest block">Announcement Details</label>
-                  <textarea
-                    required
-                    rows={4}
-                    placeholder="Type details of the announcement..."
-                    value={announcementContent}
-                    onChange={(e) => setAnnouncementContent(e.target.value)}
-                    className="w-full bg-[#0A0B0E] border border-white/10 rounded-xl p-3 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37] resize-none"
-                  />
+                  <div className="global-placeholder rounded-xl relative">
+                    <textarea
+                      required
+                      rows={4}
+                      placeholder="Type details of the announcement..."
+                      value={announcementContent}
+                      onChange={(e) => setAnnouncementContent(e.target.value)}
+                      className="w-full bg-transparent border-none p-3 text-xs text-[#F0EFE8] outline-none placeholder:text-white/20 resize-none relative z-10"
+                    />
+                  </div>
                 </div>
 
                 <button
                   type="submit"
                   disabled={isSubmittingAnnouncement}
-                  className="w-full py-2 bg-[#D4AF37] hover:bg-[#D4AF37]/90 text-black font-black uppercase tracking-wider text-[10px] rounded-xl transition-all cursor-pointer"
+                  className="w-full py-2 bg-gradient-to-r from-[#D4AF37] to-[#F3E5AB] text-black font-black uppercase tracking-wider text-[10px] rounded-xl transition-all cursor-pointer shadow-[0_0_15px_rgba(212,175,55,0.4)] hover:shadow-[0_0_25px_rgba(212,175,55,0.6)] hover:scale-[1.02]"
                 >
                   {isSubmittingAnnouncement ? 'Publishing...' : 'Publish Announcement'}
                 </button>
               </form>
             ) : (
               <div className="space-y-4">
+                {/* Live Stream Sharing Control Block */}
+                <div className="border-b border-white/5 pb-3">
+                  {!isPostingStream ? (
+                    <button
+                      type="button"
+                      onClick={() => setIsPostingStream(true)}
+                      className="w-full py-1.5 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-400 rounded-xl text-[8px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <span>📢 Go Live Announcement</span>
+                    </button>
+                  ) : (
+                    <div className="space-y-3 p-3 bg-white/[0.02] border border-white/5 rounded-xl text-left">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[8px] font-black uppercase tracking-widest text-amber-400">Stream Notification</span>
+                        <button
+                          type="button"
+                          onClick={() => setIsPostingStream(false)}
+                          className="text-[8px] text-white/40 hover:text-white uppercase font-black cursor-pointer"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[7px] font-black text-white/40 uppercase tracking-wider block">Optional Stream Link</label>
+                        <input
+                          type="url"
+                          placeholder="https://invite=poppo.com/..."
+                          value={streamLink}
+                          onChange={(e) => setStreamLink(e.target.value)}
+                          className="w-full bg-[#0A0604] border border-white/10 rounded-lg px-2 py-1 text-[10px] text-[#F0EFE8] outline-none placeholder:text-white/20"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handlePublishStreamNotification}
+                        disabled={isSubmittingStream}
+                        className="w-full py-1.5 bg-gradient-to-r from-amber-500 to-amber-300 text-black font-black uppercase tracking-wider text-[8px] rounded-lg transition-all hover:scale-[1.02] cursor-pointer"
+                      >
+                        {isSubmittingStream ? 'Sending...' : 'Notify Everyone'}
+                      </button>
+                      {streamError && (
+                        <p className="text-[8px] text-red-400 font-bold leading-normal mt-1.5 text-center bg-red-950/20 border border-red-500/20 rounded-md p-1.5">
+                          ⚠️ {streamError}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Live Streams List */}
+                {streamNotifications.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-[7px] font-black uppercase tracking-wider text-amber-400 select-none border-b border-amber-400/20 pb-1 text-left">LIVE STREAMS</p>
+                    {streamNotifications.map((stream) => (
+                      <div 
+                        key={stream.id} 
+                        className="global-block-1 border-l-[3px] border-amber-500 p-3 rounded-xl space-y-1 text-left relative overflow-hidden group"
+                      >
+                        {(stream.poppoId === authState.poppo_id || ['director', 'head admin', 'head_admin', 'admin'].includes(roleLower)) && (
+                          <button
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              if (confirm("Are you sure you want to erase this stream notification?")) {
+                                try {
+                                  await deleteDoc(doc(db, 'stream_notifications', stream.id));
+                                } catch (err: any) {
+                                  alert("Failed to delete notification: " + err.message);
+                                }
+                              }
+                            }}
+                            className="absolute top-2 right-2 p-1 text-white/25 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer z-20"
+                            title="Delete Notification"
+                          >
+                            <Trash2 size={10} />
+                          </button>
+                        )}
+                        <p className="text-[10px] font-bold text-[#F0EFE8] leading-tight pr-6">
+                          📢 {stream.nickname} is streaming
+                        </p>
+                        <p className="text-[8px] text-white/40 font-black uppercase tracking-wider">
+                          Started: {formatStrictDate(stream.timestamp)}
+                        </p>
+                        {stream.streamLink && (
+                          <a
+                            href={formatExternalLink(stream.streamLink)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="mt-2 inline-flex items-center gap-1.5 px-3 py-1 bg-amber-500 hover:bg-amber-400 text-black font-black uppercase tracking-wider text-[8px] rounded-lg transition-all"
+                          >
+                            Visit Stream
+                          </a>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
                 <div className="flex items-center justify-between border-b border-white/5 pb-2">
                   <h4 className="text-[10px] font-black uppercase tracking-widest text-white/50">Announcements & Requests</h4>
                   {canPostAnn && (
@@ -336,22 +620,25 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
                   {/* Announcements List */}
                   {announcements.length > 0 && (
                     <div className="space-y-2">
-                      <p className="text-[7px] font-black uppercase tracking-wider text-white/20 select-none border-b border-white/5 pb-1">ANNOUNCEMENTS</p>
+                      <p className="text-[7px] font-black uppercase tracking-wider text-[#D4AF37] select-none border-b border-[#D4AF37]/20 pb-1">ANNOUNCEMENTS</p>
                       {announcements.slice(0, 3).map((ann) => (
-                        <div key={ann.id} className="relative group bg-indigo-500/5 border-l-2 border-indigo-500/50 p-3 rounded-r-xl space-y-1 text-left">
+                        <div 
+                          key={ann.id} 
+                          onClick={() => setSpotlightNotification({ type: 'announcement', data: ann })}
+                          className="relative group global-block-1 border-l-[3px] border-[#D4AF37] p-3 rounded-xl space-y-1 text-left overflow-hidden cursor-pointer hover:scale-[1.01] transition-all"
+                        >
                           {canPostAnn && (
                             <button
-                              onClick={() => handleDeleteAnnouncement(ann.id)}
-                              className="absolute top-2 right-2 p-1 text-white/20 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                              onClick={(e) => { e.stopPropagation(); handleDeleteAnnouncement(ann.id); }}
+                              className="absolute top-2 right-2 p-1 text-white/20 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer z-20"
                               title="Delete Announcement"
                             >
                               <Trash2 size={10} />
                             </button>
                           )}
-                          <p className="text-[10px] font-bold text-indigo-300 leading-snug">{ann.title}</p>
-                          <p className="text-[9px] text-[#A09E9A] leading-relaxed whitespace-pre-wrap">{ann.content}</p>
-                          <p className="text-[7px] text-white/30 font-bold uppercase tracking-wider mt-1">
-                            By {ann.authorName} ({ann.authorRole}) • {new Date(ann.timestamp).toLocaleDateString()}
+                          <p className="text-[10px] font-bold text-[#D4AF37] leading-snug relative z-10">{ann.title}</p>
+                          <p className="text-[8px] text-white/40 font-black uppercase tracking-wider mt-1 relative z-10">
+                            From {ann.authorRole} {ann.authorName} - {formatStrictDate(ann.timestamp)}
                           </p>
                         </div>
                       ))}
@@ -361,22 +648,18 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
                   {/* System Activity Logs (For Director and Head Admin) */}
                   {['director', 'head admin', 'head_admin'].includes(roleLower) && systemLogs.length > 0 && (
                     <div className="space-y-2">
-                      <p className="text-[7px] font-black uppercase tracking-wider text-white/20 select-none border-b border-white/5 pb-1">SYSTEM ACTIVITY LOGS</p>
+                      <p className="text-[7px] font-black uppercase tracking-wider text-[#D4AF37] select-none border-b border-[#D4AF37]/20 pb-1">SYSTEM ACTIVITY LOGS</p>
                       {systemLogs.slice(0, 5).map((log) => (
-                        <div key={log.id} className="bg-indigo-500/5 border-l-2 border-[#D4AF37] p-3 rounded-r-xl space-y-1 text-left">
-                          <div className="flex items-center justify-between">
-                            <span className={`text-[7px] font-black uppercase px-1.5 py-0.5 rounded ${
-                              log.severity === 'Error' ? 'bg-red-500/10 text-red-400 border border-red-500/20' :
-                              log.severity === 'Warning' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
-                              'bg-indigo-500/10 text-[#D4AF37] border border-[#D4AF37]/20'
-                            }`}>
-                              {log.severity}
-                            </span>
-                            <span className="text-[7px] font-mono text-slate-500">{new Date(log.timestamp).toLocaleTimeString()}</span>
+                        <div 
+                          key={log.id} 
+                          onClick={() => setSpotlightNotification({ type: 'log', data: log })}
+                          className="global-block-1 border-l-[3px] border-[#D4AF37] p-3 rounded-xl space-y-1 text-left relative overflow-hidden cursor-pointer hover:scale-[1.01] transition-all"
+                        >
+                          <div className="flex items-center justify-between relative z-10">
+                            <p className="text-[10px] font-bold text-[#D4AF37] leading-snug">System Activity: {log.severity}</p>
                           </div>
-                          <p className="text-[9px] text-slate-300 font-medium leading-relaxed">{log.actionDescription}</p>
-                          <p className="text-[7px] text-slate-500 font-bold uppercase mt-0.5">
-                            By {String(log.userRole || 'System').replace('_', ' ')} ({log.userId || 'System'})
+                          <p className="text-[8px] text-white/40 font-black uppercase tracking-wider mt-1 relative z-10">
+                            From {String(log.userRole || 'System').replace('_', ' ')} {log.userId || 'System'} - {formatStrictDate(log.timestamp)}
                           </p>
                         </div>
                       ))}
@@ -385,118 +668,35 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
 
                   {/* Requests requiring action */}
                   <div className="space-y-2">
-                    <p className="text-[7px] font-black uppercase tracking-wider text-white/20 select-none border-b border-white/5 pb-1">MESSAGES & ACTION ITEMS</p>                    {(filteredRequests.length > 0 || pendingEditRequests.length > 0) ? (
+                    <p className="text-[7px] font-black uppercase tracking-wider text-[#D4AF37] select-none border-b border-[#D4AF37]/20 pb-1">MESSAGES & ACTION ITEMS</p>
+                    {(filteredRequests.length > 0 || pendingEditRequests.length > 0) ? (
                       <>
                         {filteredRequests.map((req) => {
                           const isOwnReq = req.poppoId === authState.poppo_id;
+                          const canApprove = ['director', 'head admin', 'head_admin'].includes(roleLower);
                           
                           return (
-                            <div key={req.id} className="bg-slate-900/60 border border-white/5 p-3 rounded-xl space-y-2 text-left">
-                              <div>
+                            <div key={req.id} className="global-block-1 border-l-[3px] border-indigo-500 p-3 rounded-xl space-y-2 text-left relative overflow-hidden">
+                              <div 
+                                className="relative z-10 cursor-pointer"
+                                onClick={() => {
+                                  setIsNotificationOpen(false);
+                                  setSpotlightNotification({ type: 'request', data: req, isOwnReq, canApprove });
+                                }}
+                              >
                                 <p className="text-[10px] font-bold text-[#F0EFE8] leading-tight">
                                   {isOwnReq ? `Your Livehouse Request (${req.livehouseType || 'SOLO LIVEHOUSE'})` : `Request: ${req.name}`}
                                 </p>
-                                <p className="text-[8px] text-[#A09E9A] mt-0.5">
-                                  Date: {req.date} • Time: {req.timeslot.replace(" (Manila Time)", "")}
+                                <p className="text-[8px] text-white/40 font-black uppercase tracking-wider mt-1 relative z-10">
+                                  From {isOwnReq ? authState.role : 'Host'} {isOwnReq ? authState.nickname : req.name} - {formatStrictDate(req.date)}
                                 </p>
-                                {req.notes && (
-                                  <p className="text-[8px] text-[#A09E9A]/70 italic mt-1 leading-relaxed">
-                                    Notes: {req.notes}
-                                  </p>
-                                )}
                               </div>
-
-                              {/* Status Indicator */}
-                              <div className="flex items-center gap-1.5">
-                                {req.status === 'Pending Approval' && (
-                                  <span className="text-[7px] font-black uppercase tracking-wider bg-yellow-500/10 text-yellow-400 px-2 py-0.5 rounded border border-yellow-500/20">
-                                    Pending Approval
-                                  </span>
-                                )}
-                                {req.status === 'Host Accepted Proposal' && (
-                                  <span className="text-[7px] font-black uppercase tracking-wider bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded border border-emerald-500/20">
-                                    Proposal Accepted
-                                  </span>
-                                )}
-                                {req.status === 'New Timeslot Proposed' && (
-                                  <span className="text-[7px] font-black uppercase tracking-wider bg-indigo-500/10 text-indigo-400 px-2 py-0.5 rounded border border-indigo-500/20">
-                                    Alternative Slot Proposed
-                                  </span>
-                                )}
-                                {req.status === 'Approved' && (
-                                  <span className="text-[7px] font-black uppercase tracking-wider bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded border border-emerald-500/20 animate-pulse">
-                                    Approved
-                                  </span>
-                                )}
-                                {req.status === 'Closed' && (
-                                  <span className="text-[7px] font-black uppercase tracking-wider bg-red-500/10 text-red-400 px-2 py-0.5 rounded border border-red-500/20">
-                                    Closed / Denied
-                                  </span>
-                                )}
-                              </div>
-
-                              {/* Alternative slot description */}
-                              {req.status === 'New Timeslot Proposed' && (
-                                <div className="bg-indigo-500/5 border border-indigo-500/10 rounded-lg p-2 space-y-1">
-                                  <p className="text-[7px] font-black text-indigo-300 uppercase tracking-wider">Proposed Alternative:</p>
-                                  <p className="text-[8px] text-[#F0EFE8]">Date: {req.proposedDate}</p>
-                                  <p className="text-[8px] text-[#F0EFE8]">Time: {req.proposedTimeslot?.replace(" (Manila Time)", "")}</p>
-                                </div>
-                              )}
-
-                              {/* Action Buttons */}
-                              {/* Host accepts/declines alternative slot */}
-                              {req.status === 'New Timeslot Proposed' && isOwnReq && (
-                                <div className="flex items-center gap-2 pt-1">
-                                  <button
-                                    onClick={() => handleHostAccept(req)}
-                                    className="flex-1 py-1.5 bg-indigo-500 hover:bg-indigo-600 text-white text-[8px] font-black uppercase tracking-wider rounded-lg cursor-pointer transition-colors"
-                                  >
-                                    Accept
-                                  </button>
-                                  <button
-                                    onClick={() => handleHostDeny(req)}
-                                    className="flex-1 py-1.5 bg-slate-800 hover:bg-red-500/15 border border-white/10 hover:border-red-500/30 text-slate-400 hover:text-red-400 text-[8px] font-black uppercase tracking-wider rounded-lg cursor-pointer transition-colors"
-                                  >
-                                    Decline
-                                  </button>
-                                </div>
-                              )}
-
-                              {/* Host dismisses completed logs */}
-                              {(req.status === 'Approved' || req.status === 'Closed') && isOwnReq && (
-                                <button
-                                  onClick={() => handleDismissRequest(req.id)}
-                                  className="w-full py-1.5 bg-slate-800 hover:bg-slate-700 text-[#A09E9A] hover:text-white text-[8px] font-black uppercase tracking-wider rounded-lg cursor-pointer transition-colors"
-                                >
-                                  Dismiss
-                                </button>
-                              )}
-
-                              {/* Admin/Director approval controls */}
-                              {(req.status === 'Pending Approval' || req.status === 'Host Accepted Proposal') && 
-                               ['director', 'head admin', 'head_admin'].includes(roleLower) && (
-                                <div className="flex items-center gap-2 pt-1">
-                                  <button
-                                    onClick={() => handleApprove(req)}
-                                    className="flex-1 py-1.5 bg-emerald-550 hover:bg-emerald-600 text-white text-[8px] font-black uppercase tracking-wider rounded-lg cursor-pointer transition-colors"
-                                  >
-                                    Approve
-                                  </button>
-                                  <button
-                                    onClick={() => handleDeny(req)}
-                                    className="flex-1 py-1.5 bg-slate-800 hover:bg-red-500/15 border border-white/10 hover:border-red-500/30 text-slate-400 hover:text-red-400 text-[8px] font-black uppercase tracking-wider rounded-lg cursor-pointer transition-colors"
-                                  >
-                                    Deny
-                                  </button>
-                                </div>
-                              )}
                             </div>
                           );
                         })}
 
                         {pendingEditRequests.map((req) => (
-                          <div key={req.id} className="bg-slate-900/60 border border-yellow-500/20 p-3 rounded-xl space-y-2 text-left">
+                          <div key={req.id} className="bg-slate-900/60 border border-yellow-500/20 p-3 rounded-xl space-y-2 text-left cursor-pointer" onClick={() => setSpotlightNotification({ type: 'edit_request', data: req })}>
                             <div>
                               <p className="text-[10px] font-bold text-[#F0EFE8] leading-tight">
                                 Edit Request: {req.requesterName}
@@ -571,6 +771,7 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
     links.push({ path: '/roster', label: 'Roster', icon: Users });
     links.push({ path: '/calendar', label: 'Calendar', icon: Calendar });
     links.push({ path: '/my-profile', label: 'My Profile', icon: User });
+    links.push({ path: '/report-data', label: 'Streamer Center', icon: FileText });
 
     const role = (authState.role || '').toLowerCase();
     
@@ -578,28 +779,54 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
       links.push({ isDivider: true, id: 'div-1' });
       links.push({ isTitle: true, label: "Director's Hub", id: 'title-director' });
       
-      links.push({ path: '/profiles', label: 'Roster Management', icon: Users });
-      
-      links.push({ 
-        id: 'dropdown-dashboard',
+      links.push({
+        id: 'dropdown-cms',
         isDropdown: true,
-        label: 'Dashboard',
-        icon: LayoutDashboard,
+        label: 'Blog Posts',
+        icon: Edit3,
         subLinks: [
-          { path: '/director-operations', label: 'Operations', icon: Activity },
-          { path: '/system-logs', label: 'System Logs', icon: FileText }
+          { path: '/cms/blogs', label: 'Blog Management', icon: Edit3 },
+          { path: '/cms/assets', label: 'Page Assets', icon: ImageIcon }
         ]
       });
-      
+
+      links.push({
+        id: 'dropdown-reporting',
+        isDropdown: true,
+        label: 'Reporting',
+        icon: BarChart,
+        subLinks: [
+          { path: '/reporting/events', label: 'Events Log', icon: Calendar },
+          { path: '/reporting/attendance', label: 'Attendance Log', icon: ClipboardList },
+          { path: '/reporting/pk-performance', label: 'PK Performance', icon: Activity },
+          { path: '/reporting/fanbase-health', label: 'Fanbase Health', icon: Users }
+        ]
+      });
+
       if (role === 'director') {
         links.push({ isDivider: true, id: 'div-2' });
         links.push({ isTitle: true, label: "Directors Access", id: 'title-access' });
-        links.push({ path: '/provision-user', label: 'Provision User', icon: Plus });
-        links.push({ path: '/financial-data', label: 'Reporting', icon: DollarSign });
+        links.push({ path: '/notifications-control', label: 'Notification Center', icon: Bell });
+
+        links.push({
+          id: 'dropdown-database',
+          isDropdown: true,
+          label: 'Database',
+          icon: Database,
+          subLinks: [
+            { path: '/profiles', label: 'Roster Management', icon: Users },
+            { path: '/financial-data', label: 'Financial Data', icon: DollarSign },
+            { path: '/cms/livehouse', label: 'Livehouse Data', icon: Calendar },
+            { path: '/collections-log', label: 'Collections Log', icon: Database },
+            { path: '/data-vault', label: 'Data Vault', icon: Shield },
+            { path: '/provision-user', label: 'Provision User', icon: Plus }
+          ]
+        });
       }
     } else if (role === 'manager' || role === 'agent') {
       links.push({ isDivider: true, id: 'div-manager' });
       links.push({ path: '/analytics', label: 'Team Analytics', icon: TrendingUp });
+      links.push({ path: '/team-financials', label: 'Team Financials', icon: DollarSign });
     }
 
     return links;
@@ -607,7 +834,7 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
 
   const getBottomNavLinks = () => {
     return [
-      { path: '/dashboard', label: 'Overview', icon: LayoutDashboard },
+      { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
       { path: '/roster', label: 'Roster', icon: Users },
       { path: '/calendar', label: 'Calendar', icon: Calendar },
       { path: '/my-profile', label: 'My Profile', icon: User },
@@ -618,7 +845,7 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
   const bottomNavLinks = getBottomNavLinks();
 
   return (
-    <div className="flex flex-col h-[100dvh] bg-[#0A0A0F] text-[#F0EFE8] overflow-hidden selection:bg-[#D4AF37]/30 selection:text-white">
+    <div className="flex flex-col h-[100dvh] bg-transparent text-[#F0EFE8] overflow-hidden selection:bg-[#D4AF37]/30 selection:text-white">
       {authState.mockRole && (
         <div className="w-full bg-indigo-600 text-white text-xs font-bold py-2 flex items-center justify-center gap-4 z-[9999] shrink-0 sticky top-0 shadow-lg px-4 text-center">
           <span>
@@ -643,51 +870,52 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
           </button>
         </div>
       )}
-      <header className="md:hidden flex items-center justify-between p-4 bg-[#11111A] border-b border-white/5 shrink-0 z-20">
+      <header className="global-block-1 !overflow-visible md:hidden flex items-center justify-between p-4 shrink-0 z-50">
         <div className="flex items-center gap-3">
-          <img src={appLogo} alt="Nine Dashboard" className="w-8 h-8 rounded-full border border-white/10 shrink-0" />
+          <img src={appLogo} alt="Nine Dashboard" className="w-8 h-8 rounded-md border border-white/10 shrink-0 object-cover" />
           <div className="flex flex-col">
-            <h1 className="text-[11px] font-black uppercase tracking-widest text-[#F0EFE8] leading-tight">NINE TALENT MANAGEMENT</h1>
-            <div className="text-[10px] text-[#A09E9A] flex items-center gap-2">
-              <span className="capitalize">{authState.name} ({authState.role || 'Guest'})</span>
-            </div>
+            <h1 className="text-sm font-black uppercase tracking-widest text-[#D4AF37] leading-tight">NINE TALENT MANAGEMENT</h1>
           </div>
         </div>
         <div className="flex items-center gap-2">
           {renderNotificationCenter()}
-          <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 text-[#A09E9A] hover:text-white">
-            {isSidebarOpen ? <X size={24} /> : <Menu size={24} />}
+          <button 
+            onClick={() => setIsSidebarOpen(!isSidebarOpen)} 
+            className="global-block-1 p-2.5 text-[#A09E9A] hover:text-[#D4AF37] hover:scale-105 rounded-xl transition-all cursor-pointer flex items-center justify-center shrink-0"
+            title="Toggle Menu"
+            type="button"
+          >
+            {isSidebarOpen ? <X size={16} /> : <Menu size={16} />}
           </button>
         </div>
       </header>
 
       <div className="flex flex-1 overflow-hidden relative">
-        {/* Sidebar */}
         <aside className={cn(
-          "absolute md:static inset-y-0 left-0 w-64 bg-[#11111A] border-r border-white/5 z-30 transition-transform duration-300 ease-in-out flex flex-col",
+          "absolute md:static inset-y-0 left-0 w-64 glass-card z-30 transition-all duration-500 ease-in-out flex flex-col dashboard-sidebar",
           !isSidebarOpen && "-translate-x-full md:translate-x-0"
         )}>
-          <div className="p-6 hidden md:flex items-center gap-3 border-b border-white/5">
-            <img src={appLogo} alt="Nine Dashboard" className="w-10 h-10 rounded-full border border-[#D4AF37]/30 shrink-0" />
+          <div className="p-6 hidden md:flex items-center gap-3 border-b border-[rgba(250,204,21,0.2)] bg-black/10 shadow-[0_10px_20px_rgba(0,0,0,0.3)]">
+            <img src={appLogo} alt="Nine Dashboard" className="w-10 h-10 rounded-md border border-[#D4AF37]/30 shrink-0 object-cover" />
             <div className="flex flex-col">
-              <h1 className="text-[11px] font-black uppercase tracking-widest text-[#F0EFE8] leading-tight mt-1">NINE TALENT MANAGEMENT</h1>
+              <h1 className="text-[13px] font-black uppercase tracking-widest text-[#D4AF37] leading-tight mt-1">NINE TALENT MANAGEMENT</h1>
             </div>
           </div>
 
-          <div className="p-4 flex-1 overflow-y-auto space-y-2">
+          <div className="p-3 overflow-y-auto flex-1 space-y-1 mb-2">
             <div className="mb-6 px-2 flex items-center justify-between">
               <div className="flex-1 overflow-hidden">
                 <div className="text-sm font-bold truncate pr-2">{authState.name}</div>
                 <div className="text-xs text-[#A09E9A] capitalize">{authState.role}</div>
               </div>
-              <div className="flex items-center bg-black/20 rounded-full p-1 border border-white/5 shadow-inner shrink-0">
+              <div className="flex items-center gap-2 shrink-0">
                 <button
                   onClick={() => setViewMode('desktop')}
                   className={cn(
-                    "p-1.5 rounded-full transition-all duration-300",
+                    "global-block-1 p-2 rounded-xl transition-all duration-300 flex items-center justify-center",
                     currentViewMode === 'desktop' 
-                      ? "bg-[#D4AF37] text-black shadow-[0_0_10px_rgba(212,175,55,0.4)]" 
-                      : "text-[#A09E9A] hover:text-white"
+                      ? "active-tab border-[#D4AF37]/80 text-[#D4AF37] shadow-[0_0_15px_rgba(212,175,55,0.4)] scale-105" 
+                      : "text-[#A09E9A] hover:text-[#D4AF37] hover:scale-105"
                   )}
                   title="Desktop View"
                 >
@@ -696,10 +924,10 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
                 <button
                   onClick={() => setViewMode('mobile')}
                   className={cn(
-                    "p-1.5 rounded-full transition-all duration-300",
+                    "global-block-1 p-2 rounded-xl transition-all duration-300 flex items-center justify-center",
                     currentViewMode === 'mobile' 
-                      ? "bg-[#D4AF37] text-black shadow-[0_0_10px_rgba(212,175,55,0.4)]" 
-                      : "text-[#A09E9A] hover:text-white"
+                      ? "active-tab border-[#D4AF37]/80 text-[#D4AF37] shadow-[0_0_15px_rgba(212,175,55,0.4)] scale-105" 
+                      : "text-[#A09E9A] hover:text-[#D4AF37] hover:scale-105"
                   )}
                   title="Mobile View"
                 >
@@ -730,14 +958,14 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
                     <button
                       onClick={() => toggleDropdown(link.id)}
                       className={cn(
-                        "w-full flex items-center justify-between px-3 py-3 rounded-xl transition-all font-bold text-sm",
+                        "w-full flex items-center justify-between px-3 py-2 rounded-lg transition-all font-bold text-xs",
                         isAnyChildActive || isOpen
                           ? "bg-[#D4AF37]/10 text-[#D4AF37] shadow-[inset_0_0_12px_rgba(212,175,55,0.05)]" 
                           : "text-[#A09E9A] hover:bg-white/[0.02] hover:text-[#F0EFE8]"
                       )}
                     >
                       <div className="flex items-center gap-3">
-                        <Icon size={18} />
+                        <Icon size={16} />
                         <span>{link.label}</span>
                       </div>
                       <ChevronDown size={14} className={cn("transition-transform duration-200", isOpen ? "rotate-180" : "")} />
@@ -753,13 +981,13 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
                               to={subLink.path}
                               onClick={() => setIsSidebarOpen(false)}
                               className={cn(
-                                "flex items-center gap-3 px-3 py-2 rounded-lg transition-all font-bold text-xs",
+                                "flex items-center gap-3 px-3 py-1.5 rounded-md transition-all font-bold text-[11px]",
                                 isSubActive
                                   ? "bg-[#D4AF37]/10 text-[#D4AF37]"
                                   : "text-[#A09E9A] hover:text-[#F0EFE8] hover:bg-white/5"
                               )}
                             >
-                              {SubIcon && <SubIcon size={14} />}
+                               {SubIcon && <SubIcon size={14} />}
                               <span>{subLink.label}</span>
                             </Link>
                           );
@@ -777,34 +1005,34 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
                   to={link.path}
                   onClick={() => setIsSidebarOpen(false)}
                   className={cn(
-                    "flex items-center gap-3 px-3 py-3 rounded-xl transition-all font-bold text-sm",
+                    "flex items-center gap-3 px-3 py-2 rounded-lg transition-all font-bold text-xs",
                     isActive 
                       ? "bg-[#D4AF37]/10 text-[#D4AF37] shadow-[inset_0_0_12px_rgba(212,175,55,0.05)]" 
                       : "text-[#A09E9A] hover:bg-white/[0.02] hover:text-[#F0EFE8]"
                   )}
                 >
-                  <Icon size={18} />
+                  <Icon size={16} />
                   <span>{link.label}</span>
                 </Link>
               );
             })}
           </div>
 
-          <div className="p-4 border-t border-white/5">
+          <div className="p-4 pb-24 md:pb-4 border-t border-white/5">
             <button 
               onClick={handleLogout}
-              className="flex items-center gap-3 px-3 py-3 w-full text-left rounded-xl transition-all text-red-400 hover:bg-red-500/10 font-bold text-sm"
+              className="flex items-center gap-3 px-3 py-2 w-full text-left rounded-lg transition-all text-red-400 hover:bg-red-500/10 font-bold text-xs"
             >
-              <LogOut size={18} />
+              <LogOut size={16} />
               <span>Sign Out</span>
             </button>
           </div>
         </aside>
 
         {/* Main Content Area */}
-        <main className="flex-1 flex flex-col relative overflow-hidden bg-[#0A0A0F]">
+        <main className="flex-1 flex flex-col relative overflow-hidden bg-transparent">
           {/* Desktop Header */}
-          <header className="hidden md:flex items-center justify-between px-8 py-4 bg-[#11111A] border-b border-white/5 shrink-0 z-20 h-16 animate-fadeIn">
+          <header className="hidden md:flex items-center justify-between px-8 py-4 bg-[#140E0A] border-b border-[#D4AF37]/10 shrink-0 z-20 h-16 animate-fadeIn">
             <div className="flex items-center gap-2">
               <span className="text-[10px] font-black uppercase tracking-[0.2em] text-[#D4AF37]">Niners Portal Dashboard</span>
             </div>
@@ -814,32 +1042,169 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
             </div>
           </header>
 
-          <div className="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar">
+          <div className="flex-1 overflow-y-auto p-4 pb-24 md:p-8 custom-scrollbar">
             {children || <Outlet />}
           </div>
         </main>
       </div>
 
       {/* Mobile Bottom Nav */}
-      <div className="md:hidden h-16 bg-[#11111A] border-t border-white/5 flex items-center justify-around shrink-0 px-2 pb-safe z-20">
-        {bottomNavLinks.map(tab => {
-          const Icon = tab.icon;
-          const isActive = location.pathname.startsWith(tab.path);
-          return (
-            <Link
-              key={tab.path}
-              to={tab.path}
-              className={cn("flex flex-col items-center justify-center flex-1 h-full gap-1 transition-colors relative")}
-            >
-              <Icon size={18} className={isActive ? "text-[#D4AF37]" : "text-[#5A5865]"} />
-              <span className={cn(
-                "text-[8px] font-bold uppercase tracking-wider",
-                isActive ? "text-[#D4AF37]" : "text-[#5A5865]"
-              )}>{tab.label}</span>
-            </Link>
-          );
-        })}
+      <div className="md:hidden fixed bottom-1 left-1.5 right-1.5 pb-safe z-50 pointer-events-none">
+        <div className="global-block-1 rounded-2xl pointer-events-auto flex w-full items-center justify-between gap-1.5 p-2 transition-all duration-500 relative overflow-hidden">
+          <div className="absolute inset-0 bg-[#0F0A06]/95 backdrop-blur-md pointer-events-none z-0"></div>
+          {bottomNavLinks.map(tab => {
+            const Icon = tab.icon;
+            const isActive = location.pathname.startsWith(tab.path);
+            return (
+              <Link
+                key={tab.path}
+                to={tab.path}
+                className={cn(
+                  "global-block-1 flex flex-col items-center justify-center flex-1 py-2 rounded-xl transition-all duration-300 relative z-10",
+                  isActive
+                    ? "active-tab border-[#D4AF37]/80 text-[#D4AF37] shadow-[0_0_15px_rgba(212,175,55,0.4)] scale-[1.03]"
+                    : "text-[#A09E9A]"
+                )}
+              >
+                <Icon size={16} className={isActive ? "text-[#D4AF37]" : "text-[#A09E9A]"} />
+                <span className={cn(
+                  "text-[8px] font-black uppercase tracking-wider mt-0.5",
+                  isActive ? "text-[#D4AF37]" : "text-[#A09E9A]"
+                )}>{tab.label}</span>
+              </Link>
+            );
+          })}
+        </div>
       </div>
+      
+      {spotlightNotification && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+          <div className="global-block-1 bg-[#0A0604] border border-[#D4AF37]/30 rounded-2xl p-6 w-full max-w-md shadow-[0_20px_50px_rgba(0,0,0,1)] relative flex flex-col">
+            <button 
+              title="Close"
+              onClick={() => setSpotlightNotification(null)}
+              className="absolute top-4 right-4 text-white/40 hover:text-white cursor-pointer z-10"
+            >
+              <X size={20} />
+            </button>
+            
+            {(() => {
+              const { type, data, isOwnReq, canApprove } = spotlightNotification;
+              let photoUrl = '';
+              let role = '';
+              let nickname = '';
+              let poppoId = '';
+              let title = '';
+              let body = '';
+              let timestamp = '';
+              let dateStr = '';
+
+              if (type === 'announcement') {
+                role = data.authorRole || 'Management';
+                nickname = data.authorName || 'Admin';
+                poppoId = 'System';
+                title = data.title;
+                body = data.content;
+                timestamp = data.timestamp;
+                dateStr = formatStrictDate(data.timestamp);
+              } else if (type === 'log') {
+                role = String(data.userRole || 'System').replace('_', ' ');
+                nickname = 'System Action';
+                poppoId = data.userId || 'System';
+                title = `System Activity: ${data.severity}`;
+                body = data.actionDescription;
+                timestamp = data.timestamp;
+                dateStr = formatStrictDate(data.timestamp);
+              } else if (type === 'request') {
+                role = isOwnReq ? authState.role || 'Host' : 'Host';
+                nickname = isOwnReq ? authState.nickname || 'Unknown' : data.name;
+                poppoId = data.poppoId || 'Unknown';
+                title = isOwnReq ? `Your Livehouse Request (${data.livehouseType || 'SOLO'})` : `Request: ${data.name}`;
+                body = data.notes || 'No additional notes provided.';
+                timestamp = data.date;
+                dateStr = formatStrictDate(data.date);
+              }
+
+              return (
+                <>
+                  <div className="flex items-center gap-4 mb-4 border-b border-white/10 pb-4">
+                    <div className="w-14 h-14 rounded-xl overflow-hidden bg-white/5 flex items-center justify-center shrink-0 border border-white/10">
+                      {photoUrl ? (
+                        <img src={photoUrl} alt={nickname} className="w-full h-full object-cover" />
+                      ) : (
+                        <Users size={24} className="text-[#A09E9A]/30" />
+                      )}
+                    </div>
+                    <div className="flex flex-col">
+                      <p className="text-[12px] font-black text-white">{nickname}</p>
+                      <p className="text-[10px] text-[#A09E9A] uppercase tracking-widest">{role}</p>
+                      <p className="text-[9px] text-[#D4AF37] font-mono mt-0.5">ID: {poppoId}</p>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-2 mb-6">
+                    <h3 className="text-lg font-black text-[#F0EFE8]">{title}</h3>
+                    <p className="text-sm text-[#A09E9A] leading-relaxed whitespace-pre-wrap">{body}</p>
+                    <p className="text-[10px] text-white/40 font-mono mt-2 pt-2 border-t border-white/5">
+                      {dateStr} {new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </p>
+                  </div>
+
+                  {type === 'request' && (
+                    <div className="flex flex-col gap-2 mt-auto">
+                      {/* Admin/Director approval controls */}
+                      {(data.status === 'Pending Approval' || data.status === 'Host Accepted Proposal') && canApprove && (
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => { handleApprove(data); setSpotlightNotification(null); }}
+                            className="global-tier-approve flex-1 py-2 text-[10px] font-black uppercase tracking-wider rounded-xl cursor-pointer"
+                          >
+                            Approve
+                          </button>
+                          <button
+                            onClick={() => { handleDeny(data); setSpotlightNotification(null); }}
+                            className="global-tier-deny flex-1 py-2 text-[10px] font-black uppercase tracking-wider rounded-xl cursor-pointer"
+                          >
+                            Deny
+                          </button>
+                        </div>
+                      )}
+                      
+                      {/* Host accepts/declines alternative slot */}
+                      {data.status === 'New Timeslot Proposed' && isOwnReq && (
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => { handleHostAccept(data); setSpotlightNotification(null); }}
+                            className="flex-1 py-2 bg-indigo-500 hover:bg-indigo-600 text-white text-[10px] font-black uppercase tracking-wider rounded-xl cursor-pointer"
+                          >
+                            Accept
+                          </button>
+                          <button
+                            onClick={() => { handleHostDeny(data); setSpotlightNotification(null); }}
+                            className="flex-1 py-2 bg-slate-800 border border-white/10 text-slate-400 hover:text-red-400 text-[10px] font-black uppercase tracking-wider rounded-xl cursor-pointer"
+                          >
+                            Decline
+                          </button>
+                        </div>
+                      )}
+                      
+                      {/* Host dismisses completed requests */}
+                      {(data.status === 'Approved' || data.status === 'Closed') && isOwnReq && (
+                        <button
+                          onClick={() => { handleDismissRequest(data.id); setSpotlightNotification(null); }}
+                          className="w-full py-2 bg-slate-800 text-[#A09E9A] hover:text-white text-[10px] font-black uppercase tracking-wider rounded-xl cursor-pointer"
+                        >
+                          Dismiss
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </>
+              );
+            })()}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

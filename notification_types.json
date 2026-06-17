@@ -1,0 +1,67 @@
+[
+  {
+    "id": "booking_request",
+    "label": "Booking Requests",
+    "description": "When a new Livehouse booking request is submitted.",
+    "targets": [
+      "director"
+    ],
+    "when": "immediately",
+    "active": true
+  },
+  {
+    "id": "pk_report",
+    "label": "PK Reports",
+    "description": "When a host submits a PK battle performance report.",
+    "targets": [
+      "director"
+    ],
+    "when": "immediately",
+    "active": true
+  },
+  {
+    "id": "fanbase_report",
+    "label": "Fanbase Health Reports",
+    "description": "When a fanbase health status report is submitted.",
+    "targets": [
+      "director",
+      "manager",
+      "agent"
+    ],
+    "when": "immediately",
+    "active": true
+  },
+  {
+    "id": "host_sos",
+    "label": "Host SOS Emergency Alerts",
+    "description": "Critical SOS or emergency alerts triggered by hosts.",
+    "targets": [
+      "director",
+      "admin",
+      "manager"
+    ],
+    "when": "immediately",
+    "active": false
+  },
+  {
+    "id": "roster_update",
+    "label": "Roster Updates",
+    "description": "When a host profile is updated, provisioned, or terminated.",
+    "targets": [
+      "director",
+      "admin"
+    ],
+    "when": "immediately",
+    "active": false
+  },
+  {
+    "id": "commission_upload",
+    "label": "Commission Sheet Uploads",
+    "description": "When new monthly commission sheets are processed and uploaded.",
+    "targets": [
+      "director"
+    ],
+    "when": "immediately",
+    "active": true
+  }
+]

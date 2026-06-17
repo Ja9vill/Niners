@@ -47,6 +47,7 @@ service cloud.firestore {
     }
 
 <<<<<<< HEAD
+<<<<<<< HEAD
     function isNotLocked() {
       return resource == null || !resource.data.keys().hasAll(['isLocked']) || resource.data.isLocked != true;
     }
@@ -64,6 +65,15 @@ service cloud.firestore {
 
     // 1. users Collection Rules
 =======
+=======
+    // 0. staging_queue Collection Rules
+    match /staging_queue/{queueId} {
+      allow read: if isStaff();
+      allow create: if isSignedIn();
+      allow update, delete: if isLeadership();
+    }
+
+>>>>>>> 2b42d3ae84c3e300e1faeb35e7009a759158d1e9
     // 1. users and Role-Based Collections Rules
 >>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
     match /users/{userId} {
@@ -119,6 +129,7 @@ service cloud.firestore {
     // 2. performance_reports Collection Rules
     match /performance_reports/{reportId} {
       allow read: if isSignedIn();
+<<<<<<< HEAD
       // Regular creates are allowed (if not bulk), updates must respect the lock
       allow create: if isLeadership() || isAdmin() || isAgent();
       allow update, delete: if isLeadership() || ((isAdmin() || isAgent()) && isNotLocked());
@@ -127,20 +138,35 @@ service cloud.firestore {
       allow read: if isSignedIn();
       allow create: if isLeadership() || isAdmin() || isAgent();
       allow update, delete: if isLeadership() || ((isAdmin() || isAgent()) && isNotLocked());
+=======
+      allow write: if isLeadership() || isAdmin();
+    }
+    match /performance_weekly_reports/{reportId} {
+      allow read: if isSignedIn();
+      allow write: if isLeadership() || isAdmin();
+>>>>>>> 2b42d3ae84c3e300e1faeb35e7009a759158d1e9
     }
 
     // 3. fanbase_reports Collection Rules
     match /fanbase_reports/{reportId} {
       allow read: if isSignedIn();
+<<<<<<< HEAD
       allow create: if isSignedIn();
       allow update, delete: if isLeadership() || (isAdmin() && isNotLocked());
+=======
+      allow write: if isSignedIn();
+>>>>>>> 2b42d3ae84c3e300e1faeb35e7009a759158d1e9
     }
 
     // 4. pk_reports Collection Rules
     match /pk_reports/{reportId} {
       allow read: if isSignedIn();
+<<<<<<< HEAD
       allow create: if isSignedIn();
       allow update, delete: if isLeadership() || (isAdmin() && isNotLocked());
+=======
+      allow write: if isSignedIn();
+>>>>>>> 2b42d3ae84c3e300e1faeb35e7009a759158d1e9
     }
 
 <<<<<<< HEAD
@@ -158,7 +184,7 @@ service cloud.firestore {
     // 5. attendance Collection Rules
     match /attendance/{attendanceId} {
       allow read: if isSignedIn();
-      allow write: if isDirector() || isHeadAdmin() || isAdmin();
+      allow write: if isSignedIn();
     }
 
     // announcements Collection Rules
@@ -171,6 +197,19 @@ service cloud.firestore {
     match /calendar/{eventId} {
       allow read: if true;
 >>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
+      allow write: if isSignedIn();
+    }
+
+    // 5. events Collection Rules
+    match /events/{eventId} {
+      // Hidden events (marked as Director Only) can only be read by Directors
+      allow read: if isDirector() || (
+        isSignedIn() && 
+        (!resource.data.keys().hasAll(['visibility']) || resource.data.visibility != 'Director Only') &&
+        (!resource.data.keys().hasAll(['eventType']) || resource.data.eventType != 'Director Only')
+      );
+      
+      // All signed-in users can write events (hosts can add their own)
       allow write: if isSignedIn();
     }
 
@@ -268,6 +307,41 @@ service cloud.firestore {
       allow read: if isLeadership() || isAgent();
       allow create: if isAgent();
       allow update, delete: if isLeadership();
+    }
+
+    // 11. Livehouse Schedule
+    match /livehouse_schedule/{scheduleId} {
+      allow read: if isSignedIn();
+      allow write: if isStaff();
+    }
+
+    match /livehouse_requests/{requestId} {
+      allow read: if isSignedIn();
+      allow write: if isStaff() || (isSignedIn() && request.resource.data.poppoId == request.auth.uid);
+    }
+
+    // 12. Livehouse Logs & System config
+    match /livehouse_logs/{logId} {
+      allow read: if isSignedIn();
+      allow write: if isStaff();
+    }
+    match /system/{docId} {
+      allow read: if isSignedIn();
+      allow write: if isStaff();
+    }
+
+    // 13. Agent Financials
+    match /agent_financials_monthly/{docId} {
+      allow read, write: if isStaff();
+    }
+    match /agent_financials_weekly/{docId} {
+      allow read, write: if isStaff();
+    }
+
+    // 14. Stream Notifications
+    match /stream_notifications/{streamId} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn();
     }
 
     // Default Deny: block all other access by default

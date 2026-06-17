@@ -224,7 +224,7 @@ export const AddEventForm: React.FC<AddEventFormProps> = ({ onSuccess, onCancel 
             value={eventTitle}
             onChange={(e) => setEventTitle(e.target.value)}
             placeholder="e.g. Host PK Championship (Leave blank for default)"
-            className="w-full bg-[#0D0D14] border border-white/10 rounded-xl px-4 py-3 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37]/30 transition-all"
+            className="w-full glass-input text-xs"
           />
         </div>
 
@@ -235,7 +235,7 @@ export const AddEventForm: React.FC<AddEventFormProps> = ({ onSuccess, onCancel 
             id="event-type"
             value={eventType}
             onChange={(e) => setEventType(e.target.value)}
-            className="w-full bg-[#0D0D14] border border-white/10 rounded-xl px-4 py-3 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37]/30 transition-all font-bold cursor-pointer"
+            className="w-full glass-input text-xs font-bold cursor-pointer appearance-none"
           >
             <option value="SOLO LIVEHOUSE">SOLO LIVEHOUSE</option>
             <option value="PARTY LIVEHOUSE">PARTY LIVEHOUSE</option>
@@ -265,7 +265,7 @@ export const AddEventForm: React.FC<AddEventFormProps> = ({ onSuccess, onCancel 
               value={eventTimeHour}
               onChange={(e) => setEventTimeHour(e.target.value)}
               title="Hour"
-              className="flex-1 bg-[#0D0D14] border border-white/10 rounded-xl px-3 py-3 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37]/30 font-bold"
+              className="flex-1 glass-input text-xs font-bold text-center cursor-pointer appearance-none"
             >
               {['01','02','03','04','05','06','07','08','09','10','11','12'].map(h => (
                 <option key={h} value={h}>{h}</option>
@@ -275,7 +275,7 @@ export const AddEventForm: React.FC<AddEventFormProps> = ({ onSuccess, onCancel 
               value={eventTimeMinute}
               onChange={(e) => setEventTimeMinute(e.target.value)}
               title="Minute"
-              className="flex-1 bg-[#0D0D14] border border-white/10 rounded-xl px-3 py-3 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37]/30 font-bold"
+              className="flex-1 glass-input text-xs font-bold text-center cursor-pointer appearance-none"
             >
               {['00','05','10','15','20','25','30','35','40','45','50','55'].map(m => (
                 <option key={m} value={m}>{m}</option>
@@ -285,7 +285,7 @@ export const AddEventForm: React.FC<AddEventFormProps> = ({ onSuccess, onCancel 
               value={eventTimeAmpm}
               onChange={(e) => setEventTimeAmpm(e.target.value)}
               title="AM or PM"
-              className="flex-1 bg-[#0D0D14] border border-white/10 rounded-xl px-3 py-3 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37]/30 font-bold"
+              className="flex-1 glass-input text-xs font-bold text-center cursor-pointer appearance-none"
             >
               <option value="AM">AM</option>
               <option value="PM">PM</option>
@@ -303,7 +303,7 @@ export const AddEventForm: React.FC<AddEventFormProps> = ({ onSuccess, onCancel 
           value={eventDescription}
           onChange={(e) => setEventDescription(e.target.value)}
           placeholder="Log event parameters, rules, bonuses, or locations..."
-          className="w-full bg-[#0D0D14] border border-white/10 rounded-xl px-4 py-3 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37]/30 transition-all resize-none"
+          className="w-full glass-input text-xs min-h-[100px] resize-none"
         />
       </div>
 
@@ -476,7 +476,7 @@ export const AddEventForm: React.FC<AddEventFormProps> = ({ onSuccess, onCancel 
           className="flex-1 sm:flex-initial px-8 py-3.5 btn-gold rounded-xl text-xs font-black uppercase tracking-widest flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50 cursor-pointer shadow-lg"
         >
           <Send size={14} className="text-[#0D0D14]" />
-          {isProcessing ? 'Processing...' : 'Create Event Entry'}
+          {isProcessing ? 'Processing...' : 'Add Event'}
         </button>
       </div>
     </form>

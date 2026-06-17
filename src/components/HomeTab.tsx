@@ -66,7 +66,7 @@ export const HomeTab: React.FC<HomeTabProps> = ({ hosts, commissions, onOpenLogi
       const contribution = totalAgencyPts > 0 ? (pts / totalAgencyPts) * 100 : 0;
       return { ...host, totalPoints: pts, contribution };
     });
-    return hostPoints.sort((a, b) => b.totalPoints - a.totalPoints).slice(0, 10);
+    return hostPoints.sort((a, b) => b.contribution - a.contribution).slice(0, 10);
   }, [hosts, commissions, selectedMonth]);
 
   return (

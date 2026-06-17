@@ -9,7 +9,7 @@ import { FirebaseService } from '../lib/firebaseService';
 import appLogo from '../logo.jpg';
 
 const TEXT = {
-  title: 'NINERS APP',
+  title: 'NINERS',
   memberLogin: 'MEMBER LOGIN',
   loginDescription: 'Login to access your full agency roster and account features.',
   poppoId: 'Poppo ID',
@@ -269,12 +269,32 @@ export const AuthGate: React.FC<AuthGateProps> = ({ children, onAuthChange }) =>
       </div>
     )}
     <div className="w-full flex flex-col items-center justify-center p-4 bg-transparent relative overflow-hidden min-h-[80vh]">
+<<<<<<< HEAD
       <div className="w-full max-w-sm border border-[#FFB800]/20 rounded-[24px] p-6 space-y-6 glass-card shadow-2xl relative z-10 flex flex-col justify-between">
         
         {/* Top Header Grid line style */}
         <div className="border-b border-t border-white/5 py-3 flex items-center justify-center gap-2 shrink-0">
           <img src={appLogo} alt="Niners App Logo" className="h-6 w-6 rounded-md border border-[#FFB800]/20 object-cover select-none pointer-events-none" />
           <span className="text-xs font-black tracking-[0.25em] text-[#FFB800]">{TEXT.title}</span>
+=======
+      {/* Ambient glow / Fiery gold spotlight */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden">
+        <div className="absolute top-1/4 left-1/4 w-[300px] h-[300px] rounded-full bg-[#D4AF37]/10 blur-[100px]" />
+        <div className="absolute bottom-1/4 right-1/4 w-[350px] h-[350px] rounded-full bg-[#FF6B00]/10 blur-[120px]" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] rounded-full bg-[#D4AF37]/5 blur-[130px]" />
+      </div>
+
+      <div className="w-full max-w-sm border border-[#D4AF37]/20 rounded-[24px] p-6 space-y-6 bg-[#120D0A]/75 backdrop-blur-xl shadow-[0_0_50px_rgba(212,175,55,0.12)] relative z-10 flex flex-col justify-between">
+        
+        {/* Top Header */}
+        <div className="border-b border-t border-white/5 py-4 flex flex-col items-center justify-center gap-1 shrink-0">
+          <div className="flex items-center gap-3 mb-1">
+            <img src={appLogo} alt="Niners Logo" className="h-8 w-8 rounded-lg border border-[#D4AF37]/30 shadow-[0_0_15px_rgba(212,175,55,0.2)] object-cover select-none pointer-events-none" />
+            <h1 className="text-xl font-black tracking-[0.2em] text-[#D4AF37] leading-tight">{TEXT.title}</h1>
+          </div>
+          <h2 className="text-[10px] font-black text-[#F0EFE8] uppercase tracking-[0.15em]">NINE Talent Management</h2>
+          <p className="text-[9px] font-bold text-[#A09E9A]/70 italic tracking-wider mt-0.5">"The home of quality livestreamers."</p>
+>>>>>>> 2b42d3ae84c3e300e1faeb35e7009a759158d1e9
         </div>
 
         {/* Member Login Title Area */}
@@ -377,7 +397,7 @@ export const AuthGate: React.FC<AuthGateProps> = ({ children, onAuthChange }) =>
                     value={poppoId}
                     onChange={(e) => setPoppoId(e.target.value)}
                     placeholder={TEXT.enterPoppoId}
-                    className="w-full bg-[#0D0D14] border border-white/10 rounded-xl pl-12 pr-4 py-3 text-sm font-bold tracking-widest focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37]/50 outline-none transition-all text-[#F0EFE8] placeholder-white/20"
+                    className="w-full bg-[#0C0806] border border-white/10 rounded-xl pl-12 pr-4 py-3 text-sm font-bold tracking-widest focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37]/50 outline-none transition-all text-[#F0EFE8] placeholder-white/20"
                     autoFocus
                     required
                   />
@@ -406,7 +426,7 @@ export const AuthGate: React.FC<AuthGateProps> = ({ children, onAuthChange }) =>
               {/* Display current Poppo ID and option to change */}
               <div className="space-y-1.5">
                 <label className="text-[10px] font-black text-[#A09E9A]/60 uppercase tracking-[0.20em] ml-1 block">{TEXT.poppoId}</label>
-                <div className="flex items-center justify-between bg-[#0D0D14] border border-white/10 rounded-xl px-4 py-3">
+                <div className="flex items-center justify-between bg-[#0C0806] border border-white/10 rounded-xl px-4 py-3">
                   <span className="text-sm font-bold tracking-widest text-[#F0EFE8]/50">{poppoId}</span>
                   <button
                     type="button"
@@ -432,7 +452,7 @@ export const AuthGate: React.FC<AuthGateProps> = ({ children, onAuthChange }) =>
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder={TEXT.enterPassword}
-                    className="w-full bg-[#0D0D14] border border-white/10 rounded-xl pl-4 pr-12 py-3 text-sm tracking-widest focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37]/50 outline-none transition-all text-[#F0EFE8] placeholder-white/20"
+                    className="w-full bg-[#0C0806] border border-white/10 rounded-xl pl-4 pr-12 py-3 text-sm tracking-widest focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37]/50 outline-none transition-all text-[#F0EFE8] placeholder-white/20"
                     required
                   />
                   <button
@@ -454,7 +474,7 @@ export const AuthGate: React.FC<AuthGateProps> = ({ children, onAuthChange }) =>
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     placeholder={TEXT.enterConfirmPassword}
-                    className="w-full bg-[#0D0D14] border border-white/10 rounded-xl pl-4 pr-12 py-3 text-sm tracking-widest focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37]/50 outline-none transition-all text-[#F0EFE8] placeholder-white/20"
+                    className="w-full bg-[#0C0806] border border-white/10 rounded-xl pl-4 pr-12 py-3 text-sm tracking-widest focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37]/50 outline-none transition-all text-[#F0EFE8] placeholder-white/20"
                     required
                   />
                   <button
@@ -468,7 +488,7 @@ export const AuthGate: React.FC<AuthGateProps> = ({ children, onAuthChange }) =>
               </div>
 
               {/* Requirements Checklist */}
-              <div className="space-y-1.5 p-3 bg-[#0D0D14] rounded-xl border border-white/5 text-[10px]">
+              <div className="space-y-1.5 p-3 bg-[#0C0806] rounded-xl border border-white/5 text-[10px]">
                 <div className="flex items-center gap-2">
                   <CheckCircle2 size={12} className={pwdValidation.minLength ? "text-green-400" : "text-gray-500"} />
                   <span className={pwdValidation.minLength ? "text-green-300 font-bold" : "text-white/40"}>At least 8 characters</span>
@@ -509,7 +529,7 @@ export const AuthGate: React.FC<AuthGateProps> = ({ children, onAuthChange }) =>
               {/* Display current Poppo ID and option to change */}
               <div className="space-y-1.5">
                 <label className="text-[10px] font-black text-[#A09E9A]/60 uppercase tracking-[0.20em] ml-1 block">{TEXT.poppoId}</label>
-                <div className="flex items-center justify-between bg-[#0D0D14] border border-white/10 rounded-xl px-4 py-3">
+                <div className="flex items-center justify-between bg-[#0C0806] border border-white/10 rounded-xl px-4 py-3">
                   <span className="text-sm font-bold tracking-widest text-[#F0EFE8]/50">{poppoId}</span>
                   <button
                     type="button"
@@ -535,7 +555,7 @@ export const AuthGate: React.FC<AuthGateProps> = ({ children, onAuthChange }) =>
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder={TEXT.enterPassword}
-                    className="w-full bg-[#0D0D14] border border-white/10 rounded-xl pl-4 pr-12 py-3 text-sm tracking-widest focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37]/50 outline-none transition-all text-[#F0EFE8] placeholder-white/20"
+                    className="w-full bg-[#0C0806] border border-white/10 rounded-xl pl-4 pr-12 py-3 text-sm tracking-widest focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37]/50 outline-none transition-all text-[#F0EFE8] placeholder-white/20"
                     required
                   />
                   <button

@@ -22,11 +22,11 @@ const getApiKey = () => {
 
 const firebaseConfig = {
   apiKey: getApiKey(),
-  authDomain: "nine-dashboard-733997.firebaseapp.com",
-  projectId: "nine-dashboard-733997",
-  storageBucket: "nine-dashboard-733997.firebasestorage.app",
+  authDomain: "gen-lang-client-0222945352.firebaseapp.com",
+  projectId: "gen-lang-client-0222945352",
+  storageBucket: "gen-lang-client-0222945352.firebasestorage.app",
   messagingSenderId: "580294245942",
-  appId: "1:580294245942:web:fb5bb024e50843bca6e297"
+  appId: "1:580294245942:web:e339a501cfd49819a6e297"
 };
 
 // Initialize Firebase

@@ -1,11 +1,11 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { ArrowRight, Star, Trophy, Sparkles, Flame, Facebook, Instagram, ShieldCheck, FileText, FileLock2 } from 'lucide-react';
+import { ArrowRight, Star, Trophy, Sparkles, Flame, Facebook, Instagram, ShieldCheck, FileText, Lock, MessageCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 export const PublicLanding = () => {
   return (
-    <div className="w-full min-h-screen bg-[#0A0A0F] text-[#F0EFE8] flex flex-col items-center justify-center px-4 py-20 overflow-hidden relative">
+    <div className="w-full min-h-screen bg-[#0A0A0F] text-[#F0EFE8] flex flex-col items-center justify-center px-4 pt-4 pb-24 overflow-hidden relative">
       
       {/* Background Orbs */}
       <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-[#D4AF37]/20 rounded-full blur-[120px] pointer-events-none" />
@@ -32,7 +32,7 @@ export const PublicLanding = () => {
         </p>
 
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-8">
-          <Link to="/roster" className="w-full sm:w-auto px-8 py-4 rounded-2xl bg-gradient-to-br from-[#D4AF37]/80 to-[#A68725]/80 backdrop-blur-xl border border-white/20 text-white font-black uppercase tracking-widest text-xs flex items-center justify-center gap-2 transition-all shadow-[0_8px_32px_rgba(212,175,55,0.3)] hover:shadow-[0_8px_32px_rgba(212,175,55,0.5)] hover:scale-105">
+          <Link to="/roster?filter=top-niners" className="w-full sm:w-auto px-8 py-4 rounded-2xl bg-gradient-to-br from-[#D4AF37]/80 to-[#A68725]/80 backdrop-blur-xl border border-white/20 text-white font-black uppercase tracking-widest text-xs flex items-center justify-center gap-2 transition-all shadow-[0_8px_32px_rgba(212,175,55,0.3)] hover:shadow-[0_8px_32px_rgba(212,175,55,0.5)] hover:scale-105">
             <Trophy size={16} />
             View Top Roster
           </Link>
@@ -75,22 +75,50 @@ export const PublicLanding = () => {
         transition={{ duration: 0.8, delay: 0.4 }}
         className="mt-32 border-t border-white/10 w-full max-w-5xl mx-auto pt-8 pb-4 flex flex-col items-center gap-6 z-10"
       >
-        <div className="flex flex-wrap items-center justify-center gap-4 text-xs font-bold uppercase tracking-wider text-[#A09E9A]">
-          <Link to="/policy" className="hover:text-[#D4AF37] transition-colors flex items-center gap-1.5"><ShieldCheck size={14} /> Agency Policy</Link>
-          <span className="text-white/10">|</span>
-          <Link to="#" className="hover:text-[#D4AF37] transition-colors flex items-center gap-1.5"><FileLock2 size={14} /> Privacy Policy</Link>
-          <span className="text-white/10">|</span>
-          <Link to="/onboarding" className="hover:text-[#D4AF37] transition-colors flex items-center gap-1.5"><FileText size={14} /> Onboarding Process</Link>
+        <div className="flex flex-wrap items-center justify-center gap-4 text-xs font-bold uppercase tracking-widest text-[#F0EFE8] mb-2">
+          <Link to="/terms-of-service" className="hover:text-[#D4AF37] transition-colors flex items-center gap-1.5">Terms</Link>
+          <span className="text-white/20">|</span>
+          <Link to="/privacy-policy" className="hover:text-[#D4AF37] transition-colors flex items-center gap-1.5">Privacy</Link>
+          <span className="text-white/20">|</span>
+          <Link to="/agency-policy" className="hover:text-[#D4AF37] transition-colors flex items-center gap-1.5">Agency Policy</Link>
+          <span className="text-white/20">|</span>
+          <Link to="/contact" className="hover:text-[#D4AF37] transition-colors flex items-center gap-1.5">Contact Us</Link>
+          <span className="text-white/20">|</span>
+          <Link to="/blog" className="hover:text-[#D4AF37] transition-colors flex items-center gap-1.5">Resource Blog</Link>
         </div>
 
-        <div className="flex items-center gap-6">
-          <a href="https://facebook.com/9TalentManagement" target="_blank" rel="noreferrer" className="text-[#A09E9A] hover:text-[#D4AF37] transition-colors flex items-center gap-2">
+        <div className="flex flex-wrap items-center justify-center gap-4 text-[10px] font-bold uppercase tracking-wider text-white/80 mb-2">
+          <Link to="/guides/login" className="hover:text-[#D4AF37] transition-colors">Login Guide</Link>
+          <span className="text-white/20">•</span>
+          <Link to="/guides/find-poppo-id" className="hover:text-[#D4AF37] transition-colors">Find ID Guide</Link>
+          <span className="text-white/20">•</span>
+          <Link to="/guides/withdraw-earnings" className="hover:text-[#D4AF37] transition-colors">Withdrawals</Link>
+          <span className="text-white/20">•</span>
+          <Link to="/guides/how-pk-battles-work" className="hover:text-[#D4AF37] transition-colors">PK Battles</Link>
+          <span className="text-white/20">•</span>
+          <Link to="/guides/how-to-register-agent" className="hover:text-[#D4AF37] transition-colors">Agent Registration</Link>
+        </div>
+
+        <div className="flex flex-wrap items-center justify-center gap-4 text-[10px] font-bold uppercase tracking-wider text-[#D4AF37] mb-4">
+          <Link to="/region/usa" className="hover:text-white transition-colors">USA</Link>
+          <Link to="/region/india" className="hover:text-white transition-colors">India</Link>
+          <Link to="/region/indonesia" className="hover:text-white transition-colors">Indonesia</Link>
+          <Link to="/region/philippines" className="hover:text-white transition-colors">Philippines</Link>
+          <Link to="/region/malaysia" className="hover:text-white transition-colors">Malaysia</Link>
+        </div>
+
+        <div className="flex flex-wrap items-center justify-center gap-6">
+          <a href="https://www.facebook.com/share/1Bxc59ksHM/?mibextid=wwXIfr" target="_blank" rel="noopener noreferrer" className="text-[#F0EFE8] hover:text-[#D4AF37] transition-colors flex items-center gap-2">
             <Facebook size={20} />
-            <span className="text-xs font-bold tracking-wider">@9TalentManagement</span>
+            <span className="text-xs font-bold tracking-wider">Facebook</span>
           </a>
-          <a href="https://instagram.com/9TalentManagement" target="_blank" rel="noreferrer" className="text-[#A09E9A] hover:text-[#D4AF37] transition-colors flex items-center gap-2">
+          <a href="https://instagram.com/9TalentManagement" target="_blank" rel="noopener noreferrer" className="text-[#F0EFE8] hover:text-[#D4AF37] transition-colors flex items-center gap-2">
             <Instagram size={20} />
             <span className="text-xs font-bold tracking-wider">@9TalentManagement</span>
+          </a>
+          <a href="https://wa.me/message/5Y6QFQXSIEZRI1" target="_blank" rel="noopener noreferrer" className="text-[#F0EFE8] hover:text-[#D4AF37] transition-colors flex items-center gap-2">
+            <MessageCircle size={20} />
+            <span className="text-xs font-bold tracking-wider">Whatsapp +639558416320</span>
           </a>
         </div>
         

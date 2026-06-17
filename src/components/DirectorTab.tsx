@@ -4,43 +4,47 @@
 /* eslint-disable i18next/no-literal-string */
 /* eslint-disable react/jsx-no-literals */
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { 
-  Shield, 
-  FileUp, 
-  Clipboard, 
-  CheckCircle2, 
-  History, 
-  Trash2, 
-  FolderPlus, 
-  ArrowRight, 
-  Zap, 
-  AlertCircle, 
-  FileText, 
-  Loader2, 
-  Activity, 
-  UserPlus, 
-  Edit2, 
-  X, 
-  LayoutDashboard, 
-  Database, 
-  Target, 
-  Briefcase, 
-  Users, 
-  Plus, 
+import {
+  Shield,
+  FileUp,
+  Clipboard,
+  CheckCircle2,
+  History,
+  Trash2,
+  FolderPlus,
+  ArrowRight,
+  Zap,
+  AlertCircle,
+  FileText,
+  Loader2,
+  Activity,
+  UserPlus,
+  Edit2,
+  X,
+  LayoutDashboard,
+  Database,
+  Target,
+  Briefcase,
+  Users,
+  Plus,
   Lock,
   Award,
   ListTodo,
+<<<<<<< HEAD
   Search,
   Settings
+=======
+  Check
+>>>>>>> 2b42d3ae84c3e300e1faeb35e7009a759158d1e9
 } from 'lucide-react';
 import { Storage } from '../lib/storage';
-import { 
-  Host, 
-  CommissionEntry, 
-  Task, 
-  ActivityAuditLog, 
-  TopNinersEarningsSummary, 
-  EventsCalendarPublic 
+import {
+  Host,
+  CommissionEntry,
+  Task,
+  ActivityAuditLog,
+  TopNinersEarningsSummary,
+  EventsCalendarPublic
 } from '../types';
 import { cn, formatMonth, formatDate } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
@@ -50,8 +54,28 @@ import { MANAGERS, BASE_SALARY_POLICIES } from '../lib/constants';
 import { SystemLogsViewer } from './SystemLogsViewer';
 import { CreateMemberForm } from './CreateMemberForm';
 import { RosterManagementTab } from './RosterManagementTab';
+import { AwardsManager } from './AwardsManager';
+import { TasksDesk } from './TasksDesk';
+import { TasksService } from '../lib/TasksService';
 import { db } from '../lib/firebase';
-import { collection, query, where, getDocs, addDoc, deleteDoc, doc, setDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, addDoc, deleteDoc, doc, setDoc, writeBatch } from 'firebase/firestore';
+
+const PRESET_SOLIDS = [
+  { name: 'Gold', value: 'Gold', color: '#D4AF37' },
+  { name: 'Purple', value: 'Purple', color: '#A855F7' },
+  { name: 'Emerald', value: 'Emerald', color: '#10B981' },
+  { name: 'Blue', value: 'Blue', color: '#3B82F6' },
+  { name: 'Red', value: 'Red', color: '#EF4444' },
+  { name: 'Orange', value: 'Orange', color: '#F97316' },
+];
+
+const PRESET_GRADIENTS = [
+  { name: 'Sunset', value: 'linear-gradient(135deg, #FF512F 0%, #DD2476 100%)' },
+  { name: 'Ocean', value: 'linear-gradient(135deg, #2193b0 0%, #6dd5ed 100%)' },
+  { name: 'Neon', value: 'linear-gradient(135deg, #00F2FE 0%, #4FACFE 100%)' },
+  { name: 'Midnight', value: 'linear-gradient(135deg, #3A1C71 0%, #D76D77 50%, #FFAF7B 100%)' },
+  { name: 'Royal', value: 'linear-gradient(135deg, #7F00FF 0%, #E100FF 100%)' },
+];
 
 import { FirestoreManager } from './director-console/FirestoreManager';
 import { AuthManager } from './director-console/AuthManager';
@@ -84,23 +108,29 @@ export const DirectorTab = () => {
   const localAuth = Storage.getAuthState();
   const isDirector = localAuth.role?.toLowerCase() === 'director';
   const isHeadAdmin = localAuth.role?.toLowerCase() === 'head admin' || localAuth.role?.toLowerCase() === 'head_admin';
-  const hasAccess = isDirector || isHeadAdmin;
+  const isAgent = localAuth.role?.toLowerCase() === 'agent';
+  const hasAccess = isDirector || isHeadAdmin || isAgent;
 
 <<<<<<< HEAD
   // Sidebar views: overview, awards, tasks, roster_admin, financials, firestore, auth, functions, storage, settings
   const [activeView, setActiveView] = useState<'overview' | 'awards' | 'tasks' | 'roster_admin' | 'financials' | 'firestore' | 'auth' | 'functions' | 'storage' | 'settings'>('overview');
 =======
   // Sidebar views: roster_management, financials, system_logs, create_user
+<<<<<<< HEAD
   const [activeView, setActiveView] = useState<string>('roster_management');
 >>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
   
+=======
+  const [activeView, setActiveView] = useState<string>(isAgent && !isDirector && !isHeadAdmin ? 'financials' : 'roster_management');
+
+>>>>>>> 2b42d3ae84c3e300e1faeb35e7009a759158d1e9
   // Data State
   const [hosts, setHosts] = useState<Host[]>([]);
   const [commissions, setCommissions] = useState<CommissionEntry[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [auditLogs, setAuditLogs] = useState<ActivityAuditLog[]>([]);
   const [earningsSummaries, setEarningsSummaries] = useState<TopNinersEarningsSummary[]>([]);
-  
+
   // UI states
   const [selectedMonth, setSelectedMonth] = useState<string>(() => {
     const d = new Date();
@@ -109,6 +139,7 @@ export const DirectorTab = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [successMessage, setSuccessMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [agentOverride, setAgentOverride] = useState<string>('');
 
   // Operations sub-tab states
   const [operationsSubTab, setOperationsSubTab] = useState<'livehouse' | 'tasks' | 'feedback' | 'awards'>('livehouse');
@@ -117,7 +148,7 @@ export const DirectorTab = () => {
   const [proposingAltReq, setProposingAltReq] = useState<any | null>(null);
   const [altDate, setAltDate] = useState('');
   const [altTimeslot, setAltTimeslot] = useState('');
-  
+
   // Tasks desk states
   const [assigneeId, setAssigneeId] = useState('');
   const [taskTitle, setTaskTitle] = useState('');
@@ -136,9 +167,29 @@ export const DirectorTab = () => {
   const [isLoadingAwards, setIsLoadingAwards] = useState(false);
   const [newAwardName, setNewAwardName] = useState('');
   const [newAwardColor, setNewAwardColor] = useState('Gold');
+  const [customSolidColor, setCustomSolidColor] = useState('#6366F1');
+  const [gradientColorCount, setGradientColorCount] = useState<2 | 3>(2);
+  const [gradColor1, setGradColor1] = useState('#FF512F');
+  const [gradColor2, setGradColor2] = useState('#DD2476');
+  const [gradColor3, setGradColor3] = useState('#FFAF7B');
+  const [colorSelectionType, setColorSelectionType] = useState<'solid' | 'preset-gradient' | 'custom-solid' | 'custom-gradient'>('solid');
+
   const [newAwardStartDate, setNewAwardStartDate] = useState('');
   const [newAwardEndDate, setNewAwardEndDate] = useState('');
   const [isCreatingAward, setIsCreatingAward] = useState(false);
+
+  // React to custom color input changes
+  useEffect(() => {
+    if (colorSelectionType === 'custom-solid') {
+      setNewAwardColor(customSolidColor);
+    } else if (colorSelectionType === 'custom-gradient') {
+      if (gradientColorCount === 2) {
+        setNewAwardColor(`linear-gradient(135deg, ${gradColor1} 0%, ${gradColor2} 100%)`);
+      } else {
+        setNewAwardColor(`linear-gradient(135deg, ${gradColor1} 0%, ${gradColor2} 50%, ${gradColor3} 100%)`);
+      }
+    }
+  }, [colorSelectionType, customSolidColor, gradientColorCount, gradColor1, gradColor2, gradColor3]);
   const [awardCreateMode, setAwardCreateMode] = useState<'single' | 'bulk'>('single');
   const [bulkMonth, setBulkMonth] = useState('06');
   const [bulkYear, setBulkYear] = useState('2026');
@@ -226,6 +277,9 @@ export const DirectorTab = () => {
   const [weeklyLedger, setWeeklyLedger] = useState<any[]>([]);
   const [selectedRows, setSelectedRows] = useState<Record<string, boolean>>({});
   const [isSavingFinancials, setIsSavingFinancials] = useState(false);
+  const [ledgerSearch, setLedgerSearch] = useState('');
+  const [bulkEditField, setBulkEditField] = useState('month');
+  const [bulkEditValue, setBulkEditValue] = useState('');
 
   const handleCellChange = (index: number, field: string, value: any) => {
     const ledger = financialTab === 'monthly' ? monthlyLedger : weeklyLedger;
@@ -310,91 +364,160 @@ export const DirectorTab = () => {
 
   const handleBulkPaste = (text: string) => {
     if (!text.trim()) return;
-    const rows = text.split('\n').filter(r => r.trim() !== '').map(r => r.split('\t'));
+    let rows = text.split('\n').filter(r => r.trim() !== '').map(r => r.split('\t'));
     const setLedger = financialTab === 'monthly' ? setMonthlyLedger : setWeeklyLedger;
 
-    const startIdx = (rows[0] && (
-      rows[0][0]?.toLowerCase().includes('poppo') ||
-      rows[0][0]?.toLowerCase().includes('id') ||
-      rows[0][1]?.toLowerCase().includes('date') ||
-      rows[0][1]?.toLowerCase().includes('month')
-    )) ? 1 : 0;
+    if (rows.length === 0) return;
+
+    // Check if the first row is the "My Commission" row (Agent format)
+    if (rows[0][0] && rows[0][0].toLowerCase().includes('my commission')) {
+      rows = rows.slice(1);
+    }
+
+    if (rows.length === 0) return;
+
+    const headerRow = rows[0].map(h => h.toLowerCase().trim());
+    const hasHeaders = headerRow.some(h => h.includes('poppo') || h.includes('id') || h.includes('month') || h.includes('nickname') || h.includes('earnings'));
+    
+    let startIdx = hasHeaders ? 1 : 0;
+    
+    const colMap: Record<string, number> = {};
+    if (hasHeaders) {
+      headerRow.forEach((h, idx) => {
+        if (h === 'poppo id' || h === 'id' || h === 'poppoid') colMap['poppoId'] = idx;
+        else if (h.includes('nickname') || h.includes('name')) colMap['nickname'] = idx;
+        else if (h === 'month' || h.includes('from date') || h.includes('start') || h === 'date') colMap['month'] = idx;
+        else if (h === 'year' || h.includes('to date') || h.includes('end')) colMap['year'] = idx;
+        else if (h.includes('live duration')) colMap['live_duration'] = idx;
+        else if (h.includes('party host duration') || h.includes('party duration') || h.includes('party live duration')) colMap['party_host_duration'] = idx;
+        else if (h.includes('total earnings of points') || h.includes('total points') || h === 'points') colMap['total_earnings'] = idx;
+        else if (h.includes('agent commission') || h.includes('agentweb_commission_earning')) colMap['agent_commission'] = idx;
+        else if (h === 'live earnings') colMap['live_earnings'] = idx;
+        else if (h === 'party earnings') colMap['party_earnings'] = idx;
+        else if (h.includes('private chat')) colMap['private_chat'] = idx;
+        else if (h === 'tips') colMap['tips'] = idx;
+        else if (h.includes('platform reward')) colMap['platform_reward'] = idx;
+        else if (h.includes('other earnings')) colMap['other_earnings'] = idx;
+        else if (h.includes('hourly salary')) colMap['platform_hourly_salary'] = idx;
+        else if (h.includes('super salary')) colMap['super_salary'] = idx;
+        else if (h.includes('super rank')) colMap['super_rank'] = idx;
+        else if (h === 'level') colMap['level'] = idx;
+      });
+    }
+
+    const cleanNum = (val: string) => parseInt(val?.replace(/,/g, '')) || 0;
+    const cleanFloat = (val: string) => parseFloat(val?.replace(/,/g, '')) || 0;
 
     const parsed: any[] = [];
     for (let i = startIdx; i < rows.length; i++) {
       const r = rows[i];
-      if (r.length < 3) continue;
+      if (r.length < 2) continue;
 
-      const poppoId = r[0]?.trim() || '';
+      const getVal = (colName: string, fallbackIdx: number) => {
+        if (colMap[colName] !== undefined) return r[colMap[colName]];
+        return r[fallbackIdx];
+      };
+
+      const poppoId = getVal('poppoId', 0)?.trim() || '';
+      if (!poppoId) continue;
+
       const matchingHost = hosts.find(h => String(h.id).trim() === poppoId);
-      
-      // Enforce nickname if host exists, otherwise keep original but it won't be saved
-      const nickname = matchingHost ? (matchingHost.nickname || matchingHost.name) : (r[3]?.trim() || 'Pending Intake');
+      const rawNickname = getVal('nickname', 1)?.trim() || '';
+      const nickname = matchingHost ? (matchingHost.nickname || matchingHost.name) : (rawNickname || 'Pending Intake');
 
       let parsedYear = new Date().getFullYear();
       let parsedMonth = '';
-      const r1 = r[1]?.trim() || '';
-      const r2 = r[2]?.trim() || '';
-      
-      // If r2 is just a 4-digit year (e.g. "2024"), it's the old monthly format
-      if (/^20\d{2}$/.test(r2)) {
-        parsedYear = parseInt(r2);
-        parsedMonth = r1;
-      } else if (r1) {
-        // Otherwise, it's a date (e.g. "2024-05-01", "05/01/2024", or "20/05/24")
-        const d = new Date(r1);
-        if (!isNaN(d.getTime())) {
-          parsedYear = d.getFullYear();
-          parsedMonth = `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, '0')}`;
-        } else {
-          // Fallback: try to find a 4-digit year or 2-digit year at the end
-          const match4 = r1.match(/\b(20\d{2})\b/);
-          const match2 = r1.match(/\/(\d{2})$/);
-          if (match4) {
-            parsedYear = parseInt(match4[1]);
-          } else if (match2) {
-            parsedYear = 2000 + parseInt(match2[1]);
-          }
-          parsedMonth = r1;
-        }
+      const rawMonth = getVal('month', 2)?.trim() || '';
+      const rawYear = getVal('year', 3)?.trim() || '';
+
+      if (rawYear && /^\d{4}$/.test(rawYear)) {
+         parsedYear = parseInt(rawYear);
+         parsedMonth = rawMonth;
+      } else if (rawMonth && !rawYear) {
+         const d = new Date(rawMonth);
+         if (!isNaN(d.getTime())) {
+           parsedYear = d.getFullYear();
+           parsedMonth = `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, '0')}`;
+         } else {
+           const match4 = rawMonth.match(/\b(20\d{2})\b/);
+           if (match4) parsedYear = parseInt(match4[1]);
+           parsedMonth = rawMonth;
+         }
+      } else if (rawYear) {
+         parsedYear = parseInt(rawYear) || parsedYear;
+         parsedMonth = rawMonth;
+      } else {
+         // Fallback to globally selected month/year from UI
+         const [sYear, sMonth] = selectedMonth.split('-');
+         parsedYear = parseInt(sYear);
+         parsedMonth = selectedMonth;
       }
 
-      const rowObj = {
+      parsed.push({
         poppo_id: poppoId,
-        poppo_name: nickname, // Required by CommissionEntry
-        month: parsedMonth, // Required by CommissionEntry
-        year: parsedYear, // Ensure year is present
-        from_date: r1,
-        to_date: r2,
+        poppo_name: nickname,
+        month: parsedMonth,
+        year: parsedYear,
+        from_date: rawMonth,
+        to_date: rawYear,
         nickname: nickname,
-        live_duration: parseFloat(r[4]) || 0,
-        party_host_duration: parseFloat(r[5]) || 0,
-        total_points: parseInt(r[6]?.replace(/,/g, '')) || 0,
-        agent_commission: parseInt(r[7]?.replace(/,/g, '')) || 0,
-        live_earnings: parseInt(r[8]?.replace(/,/g, '')) || 0,
-        party_earnings: parseInt(r[9]?.replace(/,/g, '')) || 0,
-        private_chat: parseInt(r[10]?.replace(/,/g, '')) || 0,
-        tips: parseInt(r[11]?.replace(/,/g, '')) || 0,
-        platform_reward: parseInt(r[12]?.replace(/,/g, '')) || 0,
-        other_earnings: parseInt(r[13]?.replace(/,/g, '')) || 0,
-        platform_hourly_salary: parseInt(r[14]?.replace(/,/g, '')) || 0,
-        super_salary: parseInt(r[15]?.replace(/,/g, '')) || 0,
-        super_rank: parseInt(r[16]?.replace(/,/g, '')) || 0,
-        level: parseInt(r[17]?.replace(/,/g, '')) || 0,
-        // Legacy Required fields to satisfy TS CommissionEntry
+        live_duration: cleanFloat(getVal('live_duration', 4)),
+        party_host_duration: cleanFloat(getVal('party_host_duration', 5)),
+        total_points: cleanNum(getVal('total_earnings', 6)),
+        agent_commission: cleanNum(getVal('agent_commission', 7)),
+        live_earnings: cleanNum(getVal('live_earnings', 8)),
+        party_earnings: cleanNum(getVal('party_earnings', 9)),
+        private_chat: cleanNum(getVal('private_chat', 10)),
+        tips: cleanNum(getVal('tips', 11)),
+        platform_reward: cleanNum(getVal('platform_reward', 12)),
+        other_earnings: cleanNum(getVal('other_earnings', 13)),
+        platform_hourly_salary: cleanNum(getVal('platform_hourly_salary', 14)),
+        super_salary: cleanNum(getVal('super_salary', 15)),
+        super_rank: cleanNum(getVal('super_rank', 16)),
+        level: cleanNum(getVal('level', 17)),
         video_duration: 0,
         video_earnings: 0,
         agentweb_commission_rate: 0,
         agentweb_commission_earning: 0,
-        total_earnings: parseInt(r[6]?.replace(/,/g, '')) || 0,
-        my_commission: parseInt(r[7]?.replace(/,/g, '')) || 0,
-        _isUnknownHost: !matchingHost // Used to filter out before saving
-      };
-
-      parsed.push(rowObj);
+        total_earnings: cleanNum(getVal('total_earnings', 6)),
+        my_commission: cleanNum(getVal('agent_commission', 7)),
+        owner_id: agentOverride || localAuth.poppo_id || 'system',
+        owner_role: agentOverride ? 'Agent' : (localAuth.role === 'Director' || localAuth.role === 'Head Admin' ? 'Director' : 'Agent'),
+        _isUnknownHost: !matchingHost
+      });
     }
     setLedger(prev => [...prev, ...parsed]);
     showSuccess(`Successfully added ${parsed.length} rows locally. Click "Save Changes" to upload.`);
+  };
+
+  const handleBulkEdit = () => {
+    const isMonthly = financialTab === 'monthly';
+    const ledger = isMonthly ? [...monthlyLedger] : [...weeklyLedger];
+    const setLedger = isMonthly ? setMonthlyLedger : setWeeklyLedger;
+    let count = 0;
+    ledger.forEach((row, idx) => {
+      if (selectedRows[`${financialTab}_${idx}`]) {
+        let val: any = bulkEditValue;
+        if (['live_duration', 'party_host_duration', 'total_points', 'agent_commission', 'live_earnings', 'party_earnings', 'private_chat', 'tips', 'platform_reward', 'other_earnings', 'platform_hourly_salary', 'super_salary', 'super_rank', 'level'].includes(bulkEditField)) {
+           val = parseFloat(val) || 0;
+           ledger[idx] = { ...ledger[idx], [bulkEditField]: val };
+        } else if (bulkEditField === 'year') {
+           val = parseInt(val) || new Date().getFullYear();
+           ledger[idx] = { ...ledger[idx], year: val, to_date: val };
+        } else if (bulkEditField === 'month') {
+           ledger[idx] = { ...ledger[idx], month: val, from_date: val };
+        } else if (bulkEditField === 'to_date') {
+           ledger[idx] = { ...ledger[idx], to_date: val, year: parseInt(val) || new Date().getFullYear() };
+        } else {
+           ledger[idx] = { ...ledger[idx], [bulkEditField]: val };
+        }
+        count++;
+      }
+    });
+    if (count > 0) {
+      setLedger(ledger);
+      showSuccess(`Bulk updated ${count} rows!`);
+    }
   };
 
 
@@ -404,35 +527,35 @@ export const DirectorTab = () => {
     try {
       const type = financialTab;
       const data = type === 'monthly' ? monthlyLedger : weeklyLedger;
-      
-      // Only save rows where the poppo_id is found in the users list (hosts)
-      const validDataToSave = data.filter(row => hosts.some(h => String(h.id).trim() === String(row.poppo_id).trim()));
-      const unknownCount = data.length - validDataToSave.length;
 
-      // Save to the performance_report collection as requested
-      await FirebaseService.savePerformanceReport(validDataToSave);
-      
+      // Include all rows with poppo_id even if they are not in the users collection
+      const validDataToSave = data.filter(row => row.poppo_id && String(row.poppo_id).trim() !== "");
+      const unknownHosts = validDataToSave.filter(row => !hosts.some(h => String(h.id).trim() === String(row.poppo_id).trim()));
+
+      // Save to the performance_report / performance_weekly_reports collection as requested
+      await FirebaseService.savePerformanceReport(validDataToSave, type === 'weekly');
+
       // We also save to the original endpoint for backward compatibility (optional)
       try {
         await FirebaseService.saveFinancials(type, validDataToSave);
       } catch (e) {
         console.warn("Legacy saveFinancials failed, but performance_reports succeeded", e);
       }
-      
+
       await auditLogAction('SAVE_FINANCIALS_STORAGE', null, { type, count: validDataToSave.length });
 
       if (type === 'monthly') {
         setCommissions(validDataToSave);
       }
 
-      let successMsg = `Financials saved successfully (${validDataToSave.length} rows) to Firebase Storage.`;
-      if (unknownCount > 0) {
-        successMsg += ` Note: ${unknownCount} rows were ignored because their Poppo IDs are not in the users database.`;
+      let successMsg = `Financials saved successfully (${validDataToSave.length} rows) to cloud database.`;
+      if (unknownHosts.length > 0) {
+        successMsg += ` Note: ${unknownHosts.length} rows were saved for Poppo IDs not registered in the users collection.`;
       }
       showSuccess(successMsg);
     } catch (err) {
       console.error("Failed to save financials to storage:", err);
-      alert("Failed to save financials to Firebase Storage.");
+      alert("Failed to save financials.");
     } finally {
       setIsSavingFinancials(false);
     }
@@ -522,6 +645,7 @@ export const DirectorTab = () => {
     try {
       const docRef = doc(db, 'livehouse_requests', req.id);
       await setDoc(docRef, { ...req, status: 'Approved' }, { merge: true });
+      await FirebaseService.notifyHostIfRegistered(req.poppoId, req.date, req.timeslot);
 
       const eventId = getUUID();
       const newEvent = {
@@ -544,7 +668,7 @@ export const DirectorTab = () => {
       };
       await setDoc(doc(db, 'calendar', eventId), newEvent);
       await FirebaseService.logSystemActivity(`Approved Livehouse request for host "${req.name}" (Poppo ID: ${req.poppoId}) on ${req.date} at ${req.timeslot}`, 'Info');
-      
+
       setLivehouseRequests(prev => prev.map(r => r.id === req.id ? { ...r, status: 'Approved' } : r));
       setSuccessMessage(`Successfully approved Livehouse request for ${req.name}!`);
     } catch (err: any) {
@@ -658,161 +782,7 @@ export const DirectorTab = () => {
     }
   };
 
-  const handleCreateAward = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newAwardName.trim() || !newAwardStartDate || !newAwardEndDate) return;
-    setIsCreatingAward(true);
-    setErrorMessage(null);
-    setSuccessMessage('');
 
-    try {
-      const awardId = getUUID();
-      const newAward = {
-        id: awardId,
-        name: newAwardName.trim(),
-        color: newAwardColor,
-        startDate: newAwardStartDate,
-        endDate: newAwardEndDate,
-        createdAt: new Date().toISOString()
-      };
-      await setDoc(doc(db, 'awards', awardId), newAward);
-      await FirebaseService.logSystemActivity(`Director/Admin created new award badge "${newAward.name}" with color "${newAward.color}"`, 'Info');
-      setAwards(prev => [...prev, newAward]);
-      setNewAwardName('');
-      setNewAwardStartDate('');
-      setNewAwardEndDate('');
-      setSuccessMessage(`Award "${newAward.name}" created successfully!`);
-    } catch (err: any) {
-      console.error('Create award error:', err);
-      setErrorMessage(err.message || 'Failed to create award.');
-    } finally {
-      setIsCreatingAward(false);
-    }
-  };
-
-  const handleBulkGenerateAwards = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!bulkMonth || !bulkYear) return;
-    setIsCreatingAward(true);
-    setErrorMessage(null);
-    setSuccessMessage('');
-
-    try {
-      const months = [
-        "January", "February", "March", "April", "May", "June",
-        "July", "August", "September", "October", "November", "December"
-      ];
-      const monthIndex = parseInt(bulkMonth, 10) - 1;
-      const monthName = months[monthIndex];
-      const yearNum = parseInt(bulkYear, 10);
-
-      // Compute start and end dates
-      const pad = (n: number) => String(n).padStart(2, '0');
-      const startDateStr = `${yearNum}-${pad(bulkMonth)}-01`;
-      
-      const lastDay = new Date(yearNum, monthIndex + 1, 0).getDate();
-      const endDateStr = `${yearNum}-${pad(bulkMonth)}-${pad(lastDay)}`;
-
-      const newAwardsList: any[] = [];
-      const batch = writeBatch(db);
-
-      for (let rank = 1; rank <= 9; rank++) {
-        const awardId = getUUID();
-        
-        let color = 'Gold';
-        if (rank >= 4 && rank <= 6) color = 'Orange';
-        else if (rank >= 7) color = 'Red';
-
-        const newAward = {
-          id: awardId,
-          name: `Top ${rank} Niner - ${monthName} ${bulkYear}`,
-          color,
-          startDate: startDateStr,
-          endDate: endDateStr,
-          createdAt: new Date().toISOString()
-        };
-
-        batch.set(doc(db, 'awards', awardId), newAward);
-        newAwardsList.push(newAward);
-      }
-
-      await batch.commit();
-      await FirebaseService.logSystemActivity(`Director/Admin bulk generated Monthly Top Niners awards templates for ${monthName} ${bulkYear}`, 'Info');
-      
-      setAwards(prev => [...prev, ...newAwardsList]);
-      setSuccessMessage(`Successfully generated 9 Monthly Top Niner awards for ${monthName} ${bulkYear}!`);
-    } catch (err: any) {
-      console.error('Bulk generate awards error:', err);
-      setErrorMessage(err.message || 'Failed to bulk generate awards.');
-    } finally {
-      setIsCreatingAward(false);
-    }
-  };
-
-  const handleAssignAward = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!assignAwardId || !assignHostId || !awardStartDate || !awardEndDate) {
-      setErrorMessage('All assignment fields are required.');
-      return;
-    }
-    setIsAssigningAward(true);
-    setErrorMessage(null);
-    setSuccessMessage('');
-
-    const matchedAward = awards.find(a => a.id === assignAwardId);
-    const matchedHost = hosts.find(h => h.id === assignHostId);
-    
-    if (!matchedAward || !matchedHost) {
-      setErrorMessage('Award or Host not found.');
-      setIsAssigningAward(false);
-      return;
-    }
-
-    try {
-      const assignmentId = getUUID();
-      const newAssignment = {
-        id: assignmentId,
-        awardId: assignAwardId,
-        awardName: matchedAward.name,
-        awardColor: matchedAward.color,
-        hostId: assignHostId,
-        hostNickname: matchedHost.nickname || matchedHost.name,
-        startDate: awardStartDate,
-        endDate: awardEndDate,
-        assignedAt: new Date().toISOString()
-      };
-      await setDoc(doc(db, 'award_assignments', assignmentId), newAssignment);
-      await FirebaseService.logSystemActivity(`Director/Admin assigned award badge "${matchedAward.name}" to host "${newAssignment.hostNickname}" (Poppo ID: ${assignHostId}) from ${awardStartDate} to ${awardEndDate}`, 'Info');
-      setAwardAssignments(prev => [newAssignment, ...prev]);
-      setAssignAwardId('');
-      setAssignHostId('');
-      setAwardStartDate('');
-      setAwardEndDate('');
-      setSuccessMessage(`Assigned award "${matchedAward.name}" to host "${newAssignment.hostNickname}"!`);
-    } catch (err: any) {
-      console.error('Assign award error:', err);
-      setErrorMessage(err.message || 'Failed to assign award.');
-    } finally {
-      setIsAssigningAward(false);
-    }
-  };
-
-  const handleRevokeAssignment = async (assignmentId: string) => {
-    if (!window.confirm('Are you sure you want to revoke this award assignment?')) return;
-    const target = awardAssignments.find(a => a.id === assignmentId);
-    const awardName = target ? target.awardName : 'Unknown Award';
-    const hostNickname = target ? target.hostNickname : 'Unknown Host';
-    const hostId = target ? target.hostId : 'Unknown ID';
-    try {
-      await deleteDoc(doc(db, 'award_assignments', assignmentId));
-      setAwardAssignments(prev => prev.filter(a => a.id !== assignmentId));
-      await FirebaseService.logSystemActivity(`Director/Admin revoked award badge "${awardName}" from host "${hostNickname}" (Poppo ID: ${hostId})`, 'Warning');
-      setSuccessMessage('Award assignment revoked.');
-    } catch (err: any) {
-      console.error('Revoke assignment error:', err);
-      setErrorMessage(err.message || 'Failed to revoke assignment.');
-    }
-  };
 
   // Load all master collections
   const loadData = async () => {
@@ -835,7 +805,7 @@ export const DirectorTab = () => {
       setHosts(hList.length > 0 ? hList : Storage.getHosts());
       setTasks(tList);
       setAllUsers(uList || []);
-      
+
       // Sort logs descending
       const sortedLogs = aList.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
       setAuditLogs(sortedLogs);
@@ -1015,7 +985,7 @@ export const DirectorTab = () => {
       }
 
       showSuccess(`Account access successfully reset for Poppo ID: ${resetConfirmTarget}`);
-      
+
       // Log audit trail
       await auditLogAction('RESET_ACCOUNT_ACCESS', { poppoId: resetConfirmTarget }, { resetComplete: true });
 
@@ -1123,21 +1093,8 @@ export const DirectorTab = () => {
 
   // Convert AI Insight to Task transactional routine
   const handleConvertRecommendationToTask = async (insight: AIInsight) => {
-    const taskId = getUUID();
-    const taskItem: Task = {
-      taskId,
-      assignedToUserId: 'support_staff', // Delegate downward
-      relatedPoppoId: insight.hostId,
-      taskType: insight.ruleType === 'performance_drop' ? 'Coaching' : insight.ruleType === 'profile_gap' ? 'Complete Profile' : 'Tier Review',
-      title: `AI Recommendation: ${insight.suggestedAction}`,
-      description: `Targeting: ${insight.hostName} (${insight.hostId}). Rule details: ${insight.details}`,
-      status: 'Assigned',
-      dueDate: new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString().split('T')[0] // 7 days from now
-    };
-
     try {
-      await FirebaseService.saveTasks([taskItem]);
-      await auditLogAction('CONVERT_RECOMMENDATION_TO_TASK', insight, taskItem);
+      await TasksService.convertInsightToTask(insight, auditLogAction);
       showSuccess(`Converted AI recommendation to task for ${insight.hostName}`);
       loadData();
     } catch (err) {
@@ -1216,8 +1173,8 @@ export const DirectorTab = () => {
         if (a === 'Legacy Seeded Data') return 1;
         if (b === 'Legacy Seeded Data') return -1;
         try {
-          const da = new Date(groups[a][0].timestamp || '');
-          const db = new Date(groups[b][0].timestamp || '');
+          const da = new Date((groups[a][0] as any).timestamp || '');
+          const db = new Date((groups[b][0] as any).timestamp || '');
           return db.getTime() - da.getTime();
         } catch {
           return 0;
@@ -1269,7 +1226,7 @@ export const DirectorTab = () => {
 =======
           <div className="text-xs font-bold text-[#F0EFE8] truncate">{localAuth.name}</div>
           <div className="text-[9px] text-[#D4AF37] font-black mt-1 uppercase tracking-wider">Secure Session Active</div>
-          
+
           {isDirector && (
             <div className="mt-4 pt-4 border-t border-white/5 space-y-3">
               <div className="flex items-center justify-between">
@@ -1325,7 +1282,7 @@ export const DirectorTab = () => {
                     className="w-full bg-black/40 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-[#F0EFE8] focus:outline-none focus:border-indigo-500/50"
                     title="Search user to mock"
                   />
-                  
+
                   {/* Search Results Dropdown */}
                   {userSearchQuery.trim() !== '' && (
                     <div className="absolute left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-[#13131E] border border-white/10 rounded-lg shadow-2xl z-50 divide-y divide-white/5 custom-scrollbar">
@@ -1375,11 +1332,11 @@ export const DirectorTab = () => {
         </div>
 
         {[
-          { id: 'roster_management', label: 'Roster Management', icon: Users },
-          { id: 'operations', label: 'Operations', icon: Briefcase },
+          (isDirector || isHeadAdmin) && { id: 'roster_management', label: 'Roster Management', icon: Users },
+          isDirector && { id: 'operations', label: 'Operations', icon: Briefcase },
           isDirector && { id: 'create_user', label: 'Provision User', icon: UserPlus },
-          isDirector && { id: 'financials', label: 'Financial Data', icon: FileUp },
-          { id: 'system_logs', label: 'System Logs', icon: AlertCircle },
+          (isDirector || isAgent) && { id: 'financials', label: 'Financial Data', icon: FileUp },
+          (isDirector || isHeadAdmin) && { id: 'system_logs', label: 'System Logs', icon: AlertCircle },
         ].filter((item): item is { id: string; label: string; icon: any } => !!item).map(item => (
 >>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
           <button
@@ -1387,9 +1344,15 @@ export const DirectorTab = () => {
             onClick={() => { setActiveView(item.id as any); setErrorMessage(null); }}
             className={cn(
               "w-full flex items-center gap-4 p-4 rounded-2xl transition-all group relative cursor-pointer",
+<<<<<<< HEAD
               activeView === item.id 
                 ? "bg-[#1A1A1A] text-[#F5F5F5] border border-white/5 shadow-xl" 
                 : "text-[#B0B0B0] hover:bg-white/[0.02] hover:text-[#F5F5F5]"
+=======
+              activeView === item.id
+                ? "bg-[#1A1A28] text-[#F0EFE8] border border-white/5 shadow-xl"
+                : "text-[#A09E9A] hover:bg-white/[0.02] hover:text-[#F0EFE8]"
+>>>>>>> 2b42d3ae84c3e300e1faeb35e7009a759158d1e9
             )}
             title={`Switch to ${item.label} view`}
             aria-label={`Switch to ${item.label} view`}
@@ -1405,7 +1368,7 @@ export const DirectorTab = () => {
 
       {/* Main Control View Content Area */}
       <main className="flex-1 min-w-0 space-y-8 pb-20">
-        
+
         {/* Error/Alert Notification */}
         <AnimatePresence>
           {errorMessage && (
@@ -1438,11 +1401,11 @@ export const DirectorTab = () => {
 
         {!isLoading && (
           <AnimatePresence mode="wait">
-            
+
             {/* MODULE 1: OVERVIEW & AI RECOMMENDATIONS */}
             {activeView === 'overview' && (
               <motion.div key="overview" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
-                             {/* Dashboard Metrics */}
+                {/* Dashboard Metrics */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   <div className="p-6 rounded-3xl border border-white/5 bg-white/[0.01] tech-card">
                     <p className="text-[9px] font-black uppercase text-[#B0B0B0]/60 tracking-[0.2em]">Active Hosts Roster</p>
@@ -1480,7 +1443,7 @@ export const DirectorTab = () => {
                       <Zap size={18} className="text-[#FFB800]" />
                       System AI Recommendations Engine
                     </h3>
-                    <button 
+                    <button
                       onClick={() => runRecommendationsEngine(true)}
                       className="px-4 py-1.5 bg-[#FFB800]/10 hover:bg-[#FFB800] border border-[#FFB800]/20 text-[#FFB800] hover:text-[#111111] rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
                       title="Recalculate recommendation metrics"
@@ -1497,12 +1460,16 @@ export const DirectorTab = () => {
                       </div>
                     ) : (
                       insights.map(item => (
-                        <div 
-                          key={item.id} 
+                        <div
+                          key={item.id}
                           className={cn(
                             "p-6 rounded-3xl border flex flex-col justify-between h-56 tech-card",
                             item.priority === 'High' ? 'border-red-500/20 bg-red-500/[0.02]' :
+<<<<<<< HEAD
                             item.priority === 'Medium' ? 'border-amber-500/20 bg-amber-500/[0.02]' : 'border-[#FFB800]/20 bg-[#FFB800]/[0.02]'
+=======
+                              item.priority === 'Medium' ? 'border-amber-500/20 bg-amber-500/[0.02]' : 'border-[#D4AF37]/20 bg-[#D4AF37]/[0.02]'
+>>>>>>> 2b42d3ae84c3e300e1faeb35e7009a759158d1e9
                           )}
                         >
                           <div>
@@ -1511,12 +1478,17 @@ export const DirectorTab = () => {
                                 "text-[8px] font-black uppercase px-2 py-0.5 rounded-full",
                                 item.priority === 'High' ? 'bg-red-500/10 text-red-400 border border-red-500/20' :
 <<<<<<< HEAD
+<<<<<<< HEAD
                                 item.priority === 'Medium' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
                                 'bg-[#FFB800]/10 text-[#FFB800] border border-[#FFB800]/20'
 =======
                                 item.priority === 'Medium' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
                                 'bg-[#D4AF37]/10 text-[#D4AF37] border border-[#D4AF37]/20'
 >>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
+=======
+                                  item.priority === 'Medium' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
+                                    'bg-[#D4AF37]/10 text-[#D4AF37] border border-[#D4AF37]/20'
+>>>>>>> 2b42d3ae84c3e300e1faeb35e7009a759158d1e9
                               )}>
                                 {item.priority} Priority
                               </span>
@@ -1525,7 +1497,7 @@ export const DirectorTab = () => {
                             <h4 className="font-extrabold text-[#F5F5F5] text-sm line-clamp-1">{item.hostName}</h4>
                             <p className="text-[11px] text-[#B0B0B0] leading-relaxed mt-2 line-clamp-3">{item.details}</p>
                           </div>
-                          
+
                           <button
                             onClick={() => handleConvertRecommendationToTask(item)}
                             className="w-full mt-4 py-2 btn-gold text-[9px] font-black uppercase tracking-widest rounded-xl transition-all shadow-md active:scale-95 cursor-pointer"
@@ -1572,8 +1544,13 @@ export const DirectorTab = () => {
                                 <span className={cn(
                                   "text-[8px] font-black uppercase px-2 py-0.5 rounded-full border",
                                   item.severity === 'High' ? 'bg-red-500/10 text-red-400 border-red-500/20' :
+<<<<<<< HEAD
                                   item.severity === 'Medium' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
                                   'bg-slate-500/10 text-[#B0B0B0] border-slate-500/20'
+=======
+                                    item.severity === 'Medium' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
+                                      'bg-slate-500/10 text-[#A09E9A] border-slate-500/20'
+>>>>>>> 2b42d3ae84c3e300e1faeb35e7009a759158d1e9
                                 )}>
                                   {item.severity}
                                 </span>
@@ -1632,6 +1609,7 @@ export const DirectorTab = () => {
             {/* MODULE 2: AWARDS & BADGES */}
             {activeView === 'awards' && (
               <motion.div key="awards" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
+<<<<<<< HEAD
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div className="space-y-1">
                     <h3 className="font-bold text-xl flex items-center gap-2">
@@ -1752,12 +1730,26 @@ export const DirectorTab = () => {
                     </tbody>
                   </table>
                 </div>
+=======
+                <AwardsManager
+                  hosts={hosts}
+                  earningsSummaries={earningsSummaries}
+                  selectedMonth={selectedMonth}
+                  onMonthChange={setSelectedMonth}
+                  onAwardAssigned={async () => {
+                    const updated = await FirebaseService.getTopNinersSummary(selectedMonth);
+                    setEarningsSummaries(updated);
+                  }}
+                  auditLogAction={auditLogAction}
+                />
+>>>>>>> 2b42d3ae84c3e300e1faeb35e7009a759158d1e9
               </motion.div>
             )}
 
             {/* MODULE 3: TASKS MANAGEMENT DESK */}
             {activeView === 'tasks' && (
               <motion.div key="tasks" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
+<<<<<<< HEAD
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div className="space-y-1">
                     <h3 className="font-bold text-xl flex items-center gap-2 text-[#F5F5F5]">
@@ -1934,21 +1926,29 @@ export const DirectorTab = () => {
                     </div>
                   </div>
                 </div>
+=======
+                <TasksDesk
+                  hosts={hosts}
+                  tasks={tasks}
+                  auditLogAction={auditLogAction}
+                  onTasksUpdated={() => loadData()}
+                />
+>>>>>>> 2b42d3ae84c3e300e1faeb35e7009a759158d1e9
               </motion.div>
             )}
 
             {/* MODULE 4: GLOBAL ROSTER ADMIN */}
             {activeView === 'roster_admin' && (
               <motion.div key="roster_admin" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
-                
+
                 {/* Manual Onboarding drawer/section */}
                 <section className="space-y-4">
                   <h3 className="font-bold text-lg flex items-center gap-2">
                     <UserPlus size={18} className="text-indigo-400" />
                     Manually Onboard Talent
                   </h3>
-                  
-                  <form 
+
+                  <form
                     onSubmit={async (e) => {
                       e.preventDefault();
                       const formData = new FormData(e.currentTarget);
@@ -2073,12 +2073,12 @@ export const DirectorTab = () => {
                         try {
                           const rawText = rosterPasteText.trim();
                           const rows = rawText.split('\n').filter(line => line.trim() !== '').map(line => line.split('\t'));
-                          
+
                           // Skip header row if pasted
                           const startIdx = (rows[0] && (
-                            rows[0][0]?.toLowerCase().includes('poppo') || 
-                            rows[0][1]?.toLowerCase().includes('nick') || 
-                            rows[0][2]?.toLowerCase().includes('pos') || 
+                            rows[0][0]?.toLowerCase().includes('poppo') ||
+                            rows[0][1]?.toLowerCase().includes('nick') ||
+                            rows[0][2]?.toLowerCase().includes('pos') ||
                             rows[0][3]?.toLowerCase().includes('role')
                           )) ? 1 : 0;
 
@@ -2150,14 +2150,14 @@ export const DirectorTab = () => {
                             const firstIncoming = duplicatesToMerge[0];
                             const firstExisting = hosts.find(ex => ex.id === firstIncoming.id);
                             setDuplicateQueue(duplicatesToMerge.slice(1));
-                            
+
                             if (firstExisting) {
                               setExistingHost(firstExisting);
                               setIncomingHost(firstIncoming);
                               setResolvedFields({ ...firstIncoming });
                               setShowMergeModal(true);
                             }
-                            
+
                             showSuccess(`Successfully added ${newHostsToSave.length} new talent records. ${duplicatesToMerge.length} duplicates flagged for merge-review.`);
                           } else {
                             showSuccess(`Successfully onboarded all ${newHostsToSave.length} talent records.`);
@@ -2309,9 +2309,15 @@ export const DirectorTab = () => {
                         <tbody className="divide-y divide-white/5 bg-transparent">
                           {hosts.map(host => (
                             <tr key={host.id} className="hover:bg-white/[0.01] transition-colors group">
+<<<<<<< HEAD
                               <td className="px-6 py-4 font-mono font-bold text-indigo-400 sticky left-0 bg-[#0A0A0A] group-hover:bg-[#1A1A1A] transition-colors z-10 min-w-[100px] max-w-[100px] border-r border-white/5">{host.id}</td>
                               <td className="px-6 py-4 font-bold text-[#F5F5F5] sticky left-[100px] bg-[#0A0A0A] group-hover:bg-[#1A1A1A] transition-colors z-10 min-w-[150px] max-w-[150px] border-r border-white/5">
                                 <input 
+=======
+                              <td className="px-6 py-4 font-mono font-bold text-indigo-400 sticky left-0 bg-[#13131E] group-hover:bg-[#1A1A28] transition-colors z-10 min-w-[100px] max-w-[100px] border-r border-white/5">{host.id}</td>
+                              <td className="px-6 py-4 font-bold text-[#F0EFE8] sticky left-[100px] bg-[#13131E] group-hover:bg-[#1A1A28] transition-colors z-10 min-w-[150px] max-w-[150px] border-r border-white/5">
+                                <input
+>>>>>>> 2b42d3ae84c3e300e1faeb35e7009a759158d1e9
                                   type="text"
                                   defaultValue={host.nickname || host.name}
                                   onBlur={async (e) => {
@@ -2335,7 +2341,7 @@ export const DirectorTab = () => {
                                 />
                               </td>
                               <td className="px-4 py-4 font-mono">
-                                <select 
+                                <select
                                   value={host.role || 'Talent'}
                                   onChange={async (e) => {
                                     const val = e.target.value as any;
@@ -2354,16 +2360,24 @@ export const DirectorTab = () => {
                                   title="Select role"
                                   aria-label="Select role"
                                 >
+<<<<<<< HEAD
                                   
                                     {['Talent', 'Manager', 'Admin', 'Director', 'Agent'].map(r => (
                                       <option key={r} value={r} className="bg-[#0A0A0B] text-[#F5F5F5]">{r}</option>
                                     ))}
                                   
+=======
+
+                                  {['Talent', 'Manager', 'Admin', 'Director', 'Agent'].map(r => (
+                                    <option key={r} value={r} className="bg-[#0A0A0B] text-[#F0EFE8]">{r}</option>
+                                  ))}
+
+>>>>>>> 2b42d3ae84c3e300e1faeb35e7009a759158d1e9
                                 </select>
                               </td>
 
                               <td className="px-6 py-4">
-                                <select 
+                                <select
                                   value={host.status}
                                   onChange={async (e) => {
                                     const val = e.target.value as any;
@@ -2397,7 +2411,7 @@ export const DirectorTab = () => {
                                 </select>
                               </td>
                               <td className="px-6 py-4">
-                                <select 
+                                <select
                                   value={host.tier_pay}
                                   onChange={async (e) => {
                                     const val = e.target.value as any;
@@ -2417,12 +2431,16 @@ export const DirectorTab = () => {
                                   aria-label="Select salary category"
                                 >
                                   {['Rocket Host', 'Star Host', 'S idol', 'ESport Host'].map(s => (
+<<<<<<< HEAD
                                     <option key={s} value={s} className="bg-[#0A0A0B] text-[#F5F5F5]">{s}</option>
+=======
+                                    <option key={s} value={s} className="bg-[#0A0A0B] text-[#F0EFE8]">{s}</option>
+>>>>>>> 2b42d3ae84c3e300e1faeb35e7009a759158d1e9
                                   ))}
                                 </select>
                               </td>
                               <td className="px-6 py-4 text-right">
-                                <button 
+                                <button
                                   onClick={async () => {
                                     if (!confirm(`Are you sure you want to permanently HARD DELETE host: ${host.nickname || host.name}?`)) return;
                                     const original = { ...host };
@@ -2463,6 +2481,7 @@ export const DirectorTab = () => {
                 </div>
               ) : (
                 <motion.div key="financials" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
+<<<<<<< HEAD
                 
                 {/* Header */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -2597,28 +2616,38 @@ export const DirectorTab = () => {
                       <span className="text-[9px] text-[#A09E9A] uppercase tracking-wider font-bold">
                         Supports direct paste from Excel/Sheets
                       </span>
+=======
+
+                  {/* Header */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div className="space-y-1">
+                      <h3 className="font-bold text-xl flex items-center gap-2 text-[#F0EFE8]">
+                        <Database size={20} className="text-[#D4AF37]" />
+                        High-Volume Financial Ledger
+                      </h3>
+                      <p className="text-[10px] text-slate-400 uppercase tracking-widest font-black">
+                        Bypasses Firestore. Files saved directly as flat JSON in Firebase Storage.
+                      </p>
+>>>>>>> 2b42d3ae84c3e300e1faeb35e7009a759158d1e9
                     </div>
-                    <textarea
-                      id="bulk-ledger-paste"
-                      placeholder="Paste columns here (tab-separated)..."
-                      className="w-full h-32 glass-input font-mono text-[10px] resize-none focus:ring-1 focus:ring-[#D4AF37] text-[#F0EFE8] bg-[#0D0D14] border border-white/10 rounded-xl p-4 shadow-inner"
-                    />
+
+                    {/* Save Changes button with spinner state */}
                     <button
-                      onClick={() => {
-                        const textarea = document.getElementById('bulk-ledger-paste') as HTMLTextAreaElement;
-                        if (textarea && textarea.value.trim()) {
-                          handleBulkPaste(textarea.value);
-                          textarea.value = '';
-                        }
-                      }}
-                      className="w-full py-4 bg-[#D4AF37]/10 hover:bg-[#D4AF37] text-[#D4AF37] hover:text-[#0D0D14] transition-all font-black uppercase text-[11px] tracking-widest rounded-xl cursor-pointer shadow-lg active:scale-95"
+                      onClick={handleSaveChanges}
+                      disabled={isSavingFinancials}
+                      className="flex items-center gap-2 px-5 py-3 bg-[#D4AF37] hover:bg-[#c9a832] disabled:bg-slate-700 text-[#0D0D14] rounded-xl text-xs font-black uppercase tracking-widest transition-all cursor-pointer shadow-lg active:scale-95 shrink-0"
                     >
-                      Process & Load Data to Grid
+                      {isSavingFinancials ? (
+                        <span className="w-3.5 h-3.5 border-2 border-[#0D0D14]/20 border-t-[#0D0D14] rounded-full animate-spin" />
+                      ) : (
+                        <span>💾</span>
+                      )}
+                      {isSavingFinancials ? "Saving..." : "Save Changes"}
                     </button>
 >>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
                   </div>
-                </div>
 
+<<<<<<< HEAD
                 {/* Ledger Interactive Spreadsheet Table */}
                 <div className="tech-card !p-0 border border-white/5 overflow-hidden bg-[#0A0A0A] shadow-xl">
                   
@@ -2997,14 +3026,522 @@ export const DirectorTab = () => {
 
               </motion.div>
              )
+=======
+                  {/* Sub Tabs Selection */}
+                  <div className="flex border-b border-white/5 gap-6">
+                    <button
+                      onClick={() => { setFinancialTab('monthly'); setSelectedRows({}); }}
+                      className={cn(
+                        "pb-3 text-xs font-black uppercase tracking-widest border-b-2 transition-all cursor-pointer",
+                        financialTab === 'monthly' ? "border-[#D4AF37] text-[#F0EFE8]" : "border-transparent text-[#A09E9A] hover:text-[#F0EFE8]"
+                      )}
+                    >
+                      Monthly Financials
+                    </button>
+                    <button
+                      onClick={() => { setFinancialTab('weekly'); setSelectedRows({}); }}
+                      className={cn(
+                        "pb-3 text-xs font-black uppercase tracking-widest border-b-2 transition-all cursor-pointer",
+                        financialTab === 'weekly' ? "border-[#D4AF37] text-[#F0EFE8]" : "border-transparent text-[#A09E9A] hover:text-[#F0EFE8]"
+                      )}
+                    >
+                      Weekly Financials
+                    </button>
+                  </div>
+
+                  {/* Unified Ingestion Zone */}
+                  <div className="tech-card bg-[#1A1A28] border border-white/5 p-6 rounded-2xl">
+                    <div className="flex flex-col space-y-4">
+                      <div className="flex items-center justify-between">
+                        <label htmlFor="bulk-ledger-paste" className="text-sm font-black uppercase tracking-widest text-[#F0EFE8] flex items-center gap-2">
+                          <span className="text-[#D4AF37]">📋</span> Paste Raw Ledger Data
+                        </label>
+                        <div className="flex items-center gap-4">
+                          {(isDirector || isHeadAdmin) && (
+                            <div className="flex items-center gap-2 border-r border-white/10 pr-4">
+                              <span className="text-[10px] font-bold text-[#A09E9A] uppercase tracking-wider">Assign to Agent:</span>
+                              <select
+                                title="Assign to Agent"
+                                value={agentOverride}
+                                onChange={(e) => setAgentOverride(e.target.value)}
+                                className="bg-[#0D0D14] border border-white/10 text-white text-[10px] uppercase font-bold py-1 px-2 rounded focus:outline-none focus:border-[#D4AF37]"
+                              >
+                                <option value="">None (Upload as Nine Agency)</option>
+                                {hosts.filter(h => h.role === 'Agent' || h.role === 'Manager').map(agent => (
+                                  <option key={agent.id} value={agent.id}>{agent.nickname || agent.name}</option>
+                                ))}
+                              </select>
+                            </div>
+                          )}
+                          <span className="text-[9px] text-[#A09E9A] uppercase tracking-wider font-bold">
+                            Supports direct paste from Excel/Sheets
+                          </span>
+                        </div>
+                      </div>
+                      <textarea
+                        id="bulk-ledger-paste"
+                        placeholder="Paste columns here (tab-separated)..."
+                        className="w-full h-32 glass-input font-mono text-[10px] resize-none focus:ring-1 focus:ring-[#D4AF37] text-[#F0EFE8] bg-[#0D0D14] border border-white/10 rounded-xl p-4 shadow-inner"
+                      />
+                      <button
+                        onClick={() => {
+                          const textarea = document.getElementById('bulk-ledger-paste') as HTMLTextAreaElement;
+                          if (textarea && textarea.value.trim()) {
+                            handleBulkPaste(textarea.value);
+                            textarea.value = '';
+                          }
+                        }}
+                        className="w-full py-4 bg-[#D4AF37]/10 hover:bg-[#D4AF37] text-[#D4AF37] hover:text-[#0D0D14] transition-all font-black uppercase text-[11px] tracking-widest rounded-xl cursor-pointer shadow-lg active:scale-95"
+                      >
+                        Process & Load Data to Grid
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Ledger Interactive Spreadsheet Table */}
+                  <div className="tech-card !p-0 border border-white/5 overflow-hidden bg-[#13131E] shadow-xl">
+
+                    {/* Grid Action Bar */}
+                    <div className="flex flex-col gap-4 p-4 border-b border-white/5 bg-[#1A1A28]/40">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <button
+                            onClick={handleAddRow}
+                            className="px-3.5 py-2 bg-emerald-550 hover:bg-emerald-600 text-white rounded-lg text-[10px] font-black uppercase tracking-wider transition-all shadow-sm"
+                          >
+                            + Add Row
+                          </button>
+                          <button
+                            onClick={handleDeleteSelection}
+                            disabled={!Object.keys(selectedRows).some(key => key.startsWith(`${financialTab}_`) && selectedRows[key])}
+                            className="px-3.5 py-2 bg-red-550 hover:bg-red-655 disabled:bg-[#222235] text-white disabled:text-[#A09E9A]/40 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all shadow-sm"
+                          >
+                            🗑️ Delete Selection
+                          </button>
+                        </div>
+                        <div className="flex items-center gap-4">
+                          <input
+                            type="text"
+                            placeholder="Search Poppo ID or Name..."
+                            value={ledgerSearch}
+                            onChange={(e) => setLedgerSearch(e.target.value)}
+                            className="px-3 py-1.5 bg-[#0D0D14] border border-white/10 rounded-lg text-xs text-white focus:outline-none focus:ring-1 focus:ring-[#D4AF37] w-64"
+                          />
+                          <div className="text-[10px] font-black uppercase tracking-widest text-[#A09E9A]">
+                            {(financialTab === 'monthly' ? monthlyLedger : weeklyLedger).length} Total rows
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {Object.keys(selectedRows).some(key => key.startsWith(`${financialTab}_`) && selectedRows[key]) && (
+                        <motion.div initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} className="flex items-center gap-3 bg-[#0D0D14] p-2.5 rounded-xl border border-[#D4AF37]/30">
+                           <span className="text-[10px] font-black uppercase text-[#D4AF37] ml-2">Bulk Edit:</span>
+                           <select 
+                             title="Bulk Edit Field"
+                             value={bulkEditField} 
+                             onChange={(e) => setBulkEditField(e.target.value)}
+                             className="bg-[#1A1A28] border border-white/10 text-white text-xs rounded px-2 py-1.5 focus:outline-none focus:border-[#D4AF37]"
+                           >
+                              <option value="month">Month / From Date</option>
+                              <option value="to_date">To Date</option>
+                              <option value="year">Year</option>
+                              <option value="agent_commission">Agent Commission</option>
+                              <option value="total_points">Total Points</option>
+                              <option value="level">Level</option>
+                           </select>
+                           <input
+                             type="text"
+                             value={bulkEditValue}
+                             onChange={(e) => setBulkEditValue(e.target.value)}
+                             placeholder="New value..."
+                             className="bg-[#1A1A28] border border-white/10 text-white text-xs rounded px-2 py-1.5 focus:outline-none focus:border-[#D4AF37] w-32"
+                           />
+                           <button
+                             onClick={handleBulkEdit}
+                             className="px-3 py-1.5 bg-[#D4AF37] hover:bg-[#c9a832] text-[#0D0D14] rounded text-[10px] font-black uppercase tracking-wider transition-all shadow-md active:scale-95"
+                           >
+                             Apply to Selected
+                           </button>
+                        </motion.div>
+                      )}
+                    </div>
+
+                    {/* Spreadsheet Grid Container */}
+                    <div className="overflow-x-auto overflow-y-auto max-h-[500px] relative custom-scrollbar">
+                      <table className="w-full text-left text-xs min-w-[1800px] border-collapse">
+                        <thead>
+                          <tr className="border-b border-white/5 text-[9px] font-black text-[#A09E9A] uppercase tracking-widest bg-[#1A1A28] sticky top-0 z-20">
+                            <th className="px-3 py-3 w-12 text-center bg-[#13131E] sticky left-0 z-30 border-r border-white/5">
+                              <input
+                                type="checkbox"
+                                onChange={(e) => {
+                                  const data = financialTab === 'monthly' ? monthlyLedger : weeklyLedger;
+                                  const lowerSearch = ledgerSearch.toLowerCase();
+                                  const filtered = data.map((row, idx) => ({ row, idx })).filter(({ row }) => 
+                                    !ledgerSearch || 
+                                    String(row.poppo_id).toLowerCase().includes(lowerSearch) || 
+                                    String(row.nickname || '').toLowerCase().includes(lowerSearch)
+                                  );
+                                  const nextSelected = { ...selectedRows };
+                                  filtered.forEach(({ idx }) => {
+                                    nextSelected[`${financialTab}_${idx}`] = e.target.checked;
+                                  });
+                                  setSelectedRows(nextSelected);
+                                }}
+                                className="rounded border-white/10 text-[#D4AF37] focus:ring-[#D4AF37] cursor-pointer"
+                                title="Select all filtered rows"
+                              />
+                            </th>
+                            {/* STICKY COLUMN FOR POPPO ID */}
+                            <th className="px-4 py-3 w-36 sticky left-[48px] bg-[#13131E] z-30 border-r border-white/5">Poppo ID</th>
+                            {financialTab === 'monthly' ? (
+                              <>
+                                <th className="px-3 py-3 w-28">Month</th>
+                                <th className="px-3 py-3 w-20">Year</th>
+                              </>
+                            ) : (
+                              <>
+                                <th className="px-3 py-3 w-32">From Date</th>
+                                <th className="px-3 py-3 w-32">To Date</th>
+                              </>
+                            )}
+                            <th className="px-3 py-3 w-40">Nickname</th>
+                            <th className="px-3 py-3 w-28">Live duration</th>
+                            <th className="px-3 py-3 w-32">Party host duration</th>
+                            <th className="px-3 py-3 w-36">Total earnings of points</th>
+                            <th className="px-3 py-3 w-32">Agent Commission</th>
+                            <th className="px-3 py-3 w-28">Live earnings</th>
+                            <th className="px-3 py-3 w-28">Party Earnings</th>
+                            <th className="px-3 py-3 w-28">Private chat</th>
+                            <th className="px-3 py-3 w-24">Tips</th>
+                            <th className="px-3 py-3 w-32">Platform reward</th>
+                            <th className="px-3 py-3 w-28">Other Earnings</th>
+                            <th className="px-3 py-3 w-36">Platform hourly salary</th>
+                            <th className="px-3 py-3 w-28">Super Salary</th>
+                            <th className="px-3 py-3 w-28">Super Rank</th>
+                            <th className="px-3 py-3 w-20">Level</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-white/5 bg-transparent">
+                          {(() => {
+                             const data = financialTab === 'monthly' ? monthlyLedger : weeklyLedger;
+                             const lowerSearch = ledgerSearch.toLowerCase();
+                             const filtered = data.map((row, idx) => {
+                               const isDup = data.some((other, otherIdx) => 
+                                  otherIdx !== idx && 
+                                  other.poppo_id && other.poppo_id === row.poppo_id && 
+                                  other.month === row.month && 
+                                  other.year === row.year && 
+                                  other.total_points === row.total_points
+                               );
+                               return { row: { ...row, _isDuplicate: isDup }, idx };
+                             }).filter(({ row }) => 
+                               !ledgerSearch || 
+                               String(row.poppo_id).toLowerCase().includes(lowerSearch) || 
+                               String(row.nickname || '').toLowerCase().includes(lowerSearch)
+                             );
+                             
+                             if (filtered.length === 0) {
+                               return (
+                                 <tr>
+                                   <td colSpan={20} className="py-12 text-center text-[#A09E9A] italic">
+                                     {ledgerSearch ? "No ledger entries found matching your search." : "No ledger entries found. Click \"+ Add Row\" or paste data above."}
+                                   </td>
+                                 </tr>
+                               );
+                             }
+                             
+                             return filtered.map(({ row, idx }) => {
+                                const isChecked = !!selectedRows[`${financialTab}_${idx}`];
+                                const existsInUsers = hosts.some(h => String(h.id || h.poppo_id || h.poppoId).trim() === String(row.poppo_id).trim());
+                                const isHighlight = row.poppo_id && !existsInUsers;
+                                return (
+                                  <tr key={idx} className={cn(
+                                    "transition-colors group",
+                                    row._isDuplicate ? "bg-red-500/10 hover:bg-red-500/20" : 
+                                    isHighlight ? "bg-amber-500/10 hover:bg-amber-500/20 border-l-2 border-amber-500" :
+                                    "hover:bg-white/[0.01]"
+                                  )}>
+                                   <td className={cn(
+                                     "px-3 py-2 text-center sticky left-0 z-10 border-r border-white/5 transition-colors",
+                                     row._isDuplicate ? "bg-[#251010] group-hover:bg-[#301515]" : 
+                                     isHighlight ? "bg-[#282010] group-hover:bg-[#352a15]" :
+                                     "bg-[#13131E] group-hover:bg-[#1A1A28]"
+                                   )}>
+                                     <input
+                                       type="checkbox"
+                                       checked={isChecked}
+                                       onChange={(e) => {
+                                         setSelectedRows(prev => ({
+                                           ...prev,
+                                           [`${financialTab}_${idx}`]: e.target.checked
+                                         }));
+                                       }}
+                                       className="rounded border-white/10 text-[#D4AF37] focus:ring-[#D4AF37] cursor-pointer"
+                                       title="Select row"
+                                     />
+                                     {row._isDuplicate && (
+                                       <div className="absolute top-1/2 -translate-y-1/2 left-8 text-xs cursor-help" title="Duplicate Entry Detected">⚠️</div>
+                                     )}
+                                     {!row._isDuplicate && isHighlight && (
+                                       <div className="absolute top-1/2 -translate-y-1/2 left-8 text-xs cursor-help" title="Poppo ID not found in Users collection">⚠️</div>
+                                     )}
+                                   </td>
+
+                                   {/* STICKY POPPO ID COLUMN - MONO SPACED READ WRITE WITH COPY SELECT-ALL */}
+                                   <td className={cn(
+                                     "px-4 py-2 sticky left-[48px] transition-colors border-r border-white/5 z-10 font-mono font-bold w-36",
+                                     row._isDuplicate ? "bg-[#251010] group-hover:bg-[#301515] text-red-400" : 
+                                     isHighlight ? "bg-[#282010] group-hover:bg-[#352a15] text-amber-400" :
+                                     "bg-[#13131E] group-hover:bg-[#1A1A28] text-indigo-500"
+                                   )}>
+                                    <input
+                                      type="text"
+                                      value={row.poppo_id || ''}
+                                      onChange={(e) => handleCellChange(idx, 'poppo_id', e.target.value)}
+                                      className={cn(
+                                        "bg-transparent border-none w-full text-xs font-mono font-bold select-all focus:ring-1 focus:ring-[#D4AF37]/50 rounded px-1.5 py-0.5 outline-none",
+                                        row._isDuplicate ? "text-red-400" : "text-[#D4AF37]"
+                                      )}
+                                      placeholder="Enter Poppo ID"
+                                    />
+                                  </td>
+
+                                  {financialTab === 'monthly' ? (
+                                    <>
+                                      <td className="px-3 py-2">
+                                        <input
+                                          type="text"
+                                          value={row.month || ''}
+                                          onChange={(e) => handleCellChange(idx, 'month', e.target.value)}
+                                          className="bg-transparent border-none w-full text-xs focus:ring-1 focus:ring-[#D4AF37]/50 rounded px-1.5 py-0.5 outline-none font-medium text-[#F0EFE8]"
+                                          placeholder="YYYY-MM"
+                                        />
+                                      </td>
+                                      <td className="px-3 py-2">
+                                        <input
+                                          type="number"
+                                          value={row.year ?? ''}
+                                          onChange={(e) => handleCellChange(idx, 'year', parseInt(e.target.value) || 0)}
+                                          className="bg-transparent border-none w-full text-xs focus:ring-1 focus:ring-[#D4AF37]/50 rounded px-1.5 py-0.5 outline-none font-medium text-[#F0EFE8]"
+                                          placeholder="Year"
+                                        />
+                                      </td>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <td className="px-3 py-2">
+                                        <input
+                                          type="text"
+                                          value={row.from_date || ''}
+                                          onChange={(e) => handleCellChange(idx, 'from_date', e.target.value)}
+                                          className="bg-transparent border-none w-full text-xs focus:ring-1 focus:ring-[#D4AF37]/50 rounded px-1.5 py-0.5 outline-none font-medium text-[#F0EFE8]"
+                                          placeholder="YYYY-MM-DD"
+                                        />
+                                      </td>
+                                      <td className="px-3 py-2">
+                                        <input
+                                          type="text"
+                                          value={row.to_date || ''}
+                                          onChange={(e) => handleCellChange(idx, 'to_date', e.target.value)}
+                                          className="bg-transparent border-none w-full text-xs focus:ring-1 focus:ring-[#D4AF37]/50 rounded px-1.5 py-0.5 outline-none font-medium text-[#F0EFE8]"
+                                          placeholder="YYYY-MM-DD"
+                                        />
+                                      </td>
+                                    </>
+                                  )}
+
+                                  <td className="px-3 py-2">
+                                    <input
+                                      type="text"
+                                      value={row.nickname || ''}
+                                      onChange={(e) => handleCellChange(idx, 'nickname', e.target.value)}
+                                      className="bg-transparent border-none w-full text-xs font-semibold text-[#F0EFE8] focus:ring-1 focus:ring-[#D4AF37]/50 rounded px-1.5 py-0.5 outline-none"
+                                      placeholder="Nickname"
+                                    />
+                                  </td>
+
+                                  <td className="px-3 py-2">
+                                    <input
+                                      type="number"
+                                      step="any"
+                                      value={row.live_duration ?? ''}
+                                      onChange={(e) => handleCellChange(idx, 'live_duration', parseFloat(e.target.value) || 0)}
+                                      title="Live duration (hours)"
+                                      placeholder="0"
+                                      className="bg-transparent border-none w-full text-xs focus:ring-1 focus:ring-[#D4AF37]/50 rounded px-1.5 py-0.5 outline-none text-[#F0EFE8]"
+                                    />
+                                  </td>
+
+                                  <td className="px-3 py-2">
+                                    <input
+                                      type="number"
+                                      step="any"
+                                      value={row.party_host_duration ?? ''}
+                                      onChange={(e) => handleCellChange(idx, 'party_host_duration', parseFloat(e.target.value) || 0)}
+                                      title="Party host duration (hours)"
+                                      placeholder="0"
+                                      className="bg-transparent border-none w-full text-xs focus:ring-1 focus:ring-[#D4AF37]/50 rounded px-1.5 py-0.5 outline-none text-[#F0EFE8]"
+                                    />
+                                  </td>
+
+                                  <td className="px-3 py-2 font-semibold">
+                                    <input
+                                      type="number"
+                                      value={row.total_points ?? ''}
+                                      onChange={(e) => handleCellChange(idx, 'total_points', parseInt(e.target.value) || 0)}
+                                      title="Total earnings of points"
+                                      placeholder="0"
+                                      className="bg-transparent border-none w-full text-xs font-semibold focus:ring-1 focus:ring-[#D4AF37]/50 rounded px-1.5 py-0.5 outline-none text-[#F0EFE8]"
+                                    />
+                                  </td>
+
+                                  <td className="px-3 py-2 text-emerald-400 font-semibold">
+                                    <input
+                                      type="number"
+                                      value={row.agent_commission ?? ''}
+                                      onChange={(e) => handleCellChange(idx, 'agent_commission', parseInt(e.target.value) || 0)}
+                                      title="Agent commission"
+                                      placeholder="0"
+                                      className="bg-transparent border-none w-full text-xs text-emerald-400 font-semibold focus:ring-1 focus:ring-[#D4AF37]/50 rounded px-1.5 py-0.5 outline-none"
+                                    />
+                                  </td>
+
+                                  <td className="px-3 py-2">
+                                    <input
+                                      type="number"
+                                      value={row.live_earnings ?? ''}
+                                      onChange={(e) => handleCellChange(idx, 'live_earnings', parseInt(e.target.value) || 0)}
+                                      title="Live earnings"
+                                      placeholder="0"
+                                      className="bg-transparent border-none w-full text-xs focus:ring-1 focus:ring-[#D4AF37]/50 rounded px-1.5 py-0.5 outline-none text-[#F0EFE8]"
+                                    />
+                                  </td>
+
+                                  <td className="px-3 py-2">
+                                    <input
+                                      type="number"
+                                      value={row.party_earnings ?? ''}
+                                      onChange={(e) => handleCellChange(idx, 'party_earnings', parseInt(e.target.value) || 0)}
+                                      title="Party earnings"
+                                      placeholder="0"
+                                      className="bg-transparent border-none w-full text-xs focus:ring-1 focus:ring-[#D4AF37]/50 rounded px-1.5 py-0.5 outline-none text-[#F0EFE8]"
+                                    />
+                                  </td>
+
+                                  <td className="px-3 py-2">
+                                    <input
+                                      type="number"
+                                      value={row.private_chat ?? ''}
+                                      onChange={(e) => handleCellChange(idx, 'private_chat', parseInt(e.target.value) || 0)}
+                                      title="Private chat earnings"
+                                      placeholder="0"
+                                      className="bg-transparent border-none w-full text-xs focus:ring-1 focus:ring-[#D4AF37]/50 rounded px-1.5 py-0.5 outline-none text-[#F0EFE8]"
+                                    />
+                                  </td>
+
+                                  <td className="px-3 py-2">
+                                    <input
+                                      type="number"
+                                      value={row.tips ?? ''}
+                                      onChange={(e) => handleCellChange(idx, 'tips', parseInt(e.target.value) || 0)}
+                                      title="Tips"
+                                      placeholder="0"
+                                      className="bg-transparent border-none w-full text-xs focus:ring-1 focus:ring-[#D4AF37]/50 rounded px-1.5 py-0.5 outline-none text-[#F0EFE8]"
+                                    />
+                                  </td>
+
+                                  <td className="px-3 py-2">
+                                    <input
+                                      type="number"
+                                      value={row.platform_reward ?? ''}
+                                      onChange={(e) => handleCellChange(idx, 'platform_reward', parseInt(e.target.value) || 0)}
+                                      title="Platform reward"
+                                      placeholder="0"
+                                      className="bg-transparent border-none w-full text-xs focus:ring-1 focus:ring-[#D4AF37]/50 rounded px-1.5 py-0.5 outline-none text-[#F0EFE8]"
+                                    />
+                                  </td>
+
+                                  <td className="px-3 py-2">
+                                    <input
+                                      type="number"
+                                      value={row.other_earnings ?? row.other_earn ?? ''}
+                                      onChange={(e) => handleCellChange(idx, 'other_earnings', parseInt(e.target.value) || 0)}
+                                      title="Other earnings"
+                                      placeholder="0"
+                                      className="bg-transparent border-none w-full text-xs focus:ring-1 focus:ring-[#D4AF37]/50 rounded px-1.5 py-0.5 outline-none text-[#F0EFE8]"
+                                    />
+                                  </td>
+
+                                  <td className="px-3 py-2">
+                                    <input
+                                      type="number"
+                                      value={row.platform_hourly_salary ?? ''}
+                                      onChange={(e) => handleCellChange(idx, 'platform_hourly_salary', parseInt(e.target.value) || 0)}
+                                      title="Platform hourly salary"
+                                      placeholder="0"
+                                      className="bg-transparent border-none w-full text-xs focus:ring-1 focus:ring-[#D4AF37]/50 rounded px-1.5 py-0.5 outline-none text-[#F0EFE8]"
+                                    />
+                                  </td>
+
+                                  <td className="px-3 py-2">
+                                    <input
+                                      type="number"
+                                      value={row.super_salary ?? ''}
+                                      onChange={(e) => handleCellChange(idx, 'super_salary', parseInt(e.target.value) || 0)}
+                                      title="Super salary"
+                                      placeholder="0"
+                                      className="bg-transparent border-none w-full text-xs focus:ring-1 focus:ring-[#D4AF37]/50 rounded px-1.5 py-0.5 outline-none text-[#F0EFE8]"
+                                    />
+                                  </td>
+
+                                  <td className="px-3 py-2">
+                                    <input
+                                      type="number"
+                                      value={row.super_rank ?? ''}
+                                      onChange={(e) => handleCellChange(idx, 'super_rank', parseInt(e.target.value) || 0)}
+                                      title="Super rank"
+                                      placeholder="0"
+                                      className="bg-transparent border-none w-full text-xs focus:ring-1 focus:ring-[#D4AF37]/50 rounded px-1.5 py-0.5 outline-none text-[#F0EFE8]"
+                                    />
+                                  </td>
+
+                                  <td className="px-3 py-2 font-bold">
+                                    <input
+                                      type="number"
+                                      value={row.level ?? ''}
+                                      onChange={(e) => handleCellChange(idx, 'level', parseInt(e.target.value) || 0)}
+                                      title="Level"
+                                      placeholder="0"
+                                      className="bg-transparent border-none w-full text-xs font-bold focus:ring-1 focus:ring-[#D4AF37]/50 rounded px-1.5 py-0.5 outline-none text-[#F0EFE8]"
+                                    />
+                                  </td>
+                                </tr>
+                              );
+                            });
+                          })()}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Spreadsheet footer info */}
+                    <div className="p-3 border-t border-white/5 bg-[#1A1A28]/40 text-[10px] text-[#A09E9A] font-medium flex items-center gap-1.5">
+                      <span>💡</span>
+                      <span>Poppo ID columns support copy-paste selection. Nicknames are cross-referenced with the active roster instantly. Changes are stored in memory until you click "Save Changes".</span>
+                    </div>
+                  </div>
+
+                </motion.div>
+              )
+>>>>>>> 2b42d3ae84c3e300e1faeb35e7009a759158d1e9
             )}
 
             {activeView === 'roster_management' && (
               <motion.div key="roster_management" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
-                <RosterManagementTab 
-                  onUpdate={loadData} 
-                  auditLogAction={auditLogAction} 
-                  hosts={hosts} 
+                <RosterManagementTab
+                  onUpdate={loadData}
+                  auditLogAction={auditLogAction}
+                  hosts={hosts}
                   onResetAccountAccess={handleResetAccountAccess}
                 />
               </motion.div>
@@ -3066,8 +3603,8 @@ export const DirectorTab = () => {
                   <AlertCircle className="text-red-400" size={20} />
                   <h3 className="text-md font-black text-[#F0EFE8] uppercase tracking-wider">Reset Account Access</h3>
                 </div>
-                <button 
-                  onClick={() => !isResettingAccess && setResetConfirmTarget(null)} 
+                <button
+                  onClick={() => !isResettingAccess && setResetConfirmTarget(null)}
                   className="text-slate-400 hover:text-white transition-colors"
                   disabled={isResettingAccess}
                   title="Close modal"
@@ -3122,8 +3659,8 @@ export const DirectorTab = () => {
                   <Lock className="text-[#FFB800]" size={20} />
                   <h3 className="text-md font-black text-[#F5F5F5] uppercase tracking-wider">Duplicate Identity Conflict Detector</h3>
                 </div>
-                <button 
-                  onClick={() => processNextDuplicate(duplicateQueue)} 
+                <button
+                  onClick={() => processNextDuplicate(duplicateQueue)}
                   className="text-slate-400 hover:text-white transition-colors"
                   title="Close merge review"
                   aria-label="Close merge review"
@@ -3292,16 +3829,16 @@ export const DirectorTab = () => {
                     )}
                   >
                     {tab === 'livehouse' ? 'Livehouse Queue' :
-                     tab === 'tasks' ? 'Task Board' :
-                     tab === 'feedback' ? 'Manager Feedbacks' :
-                     'Awards Desk'}
+                      tab === 'tasks' ? 'Task Board' :
+                        tab === 'feedback' ? 'Manager Feedbacks' :
+                          'Awards Desk'}
                   </button>
                 ))}
               </div>
             </div>
 
             {/* Sub-tab Content Rendering */}
-            
+
             {/* 1. Livehouse Queue */}
             {operationsSubTab === 'livehouse' && (
               <div className="space-y-6">
@@ -3349,9 +3886,9 @@ export const DirectorTab = () => {
                                 <span className={cn(
                                   "text-[8px] font-black uppercase px-2 py-0.5 rounded-full border",
                                   req.status === 'Approved' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
-                                  req.status === 'Pending Approval' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
-                                  req.status === 'Proposal Sent' ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20' :
-                                  'bg-[#222235] text-[#A09E9A] border-transparent'
+                                    req.status === 'Pending Approval' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
+                                      req.status === 'Proposal Sent' ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20' :
+                                        'bg-[#222235] text-[#A09E9A] border-transparent'
                                 )}>
                                   {req.status}
                                 </span>
@@ -3401,7 +3938,7 @@ export const DirectorTab = () => {
                       </button>
                       <h4 className="text-sm font-black text-[#F0EFE8] uppercase tracking-wider">Propose Alternate Timeslot</h4>
                       <p className="text-xs text-[#A09E9A]">For: <strong className="text-indigo-400">{proposingAltReq.name} ({proposingAltReq.poppoId})</strong></p>
-                      
+
                       <form onSubmit={handleProposeAlternate} className="space-y-4 pt-2">
                         <div className="space-y-1.5">
                           <label className="text-[9px] font-black uppercase text-[#A09E9A] tracking-wider">New Proposed Date</label>
@@ -3446,7 +3983,7 @@ export const DirectorTab = () => {
                 {/* Task Assignment Form */}
                 <div className="lg:col-span-1 bg-[#1A1A28]/40 border border-white/5 p-6 rounded-3xl space-y-4">
                   <h4 className="text-xs font-black uppercase tracking-widest text-[#F0EFE8] pb-2 border-b border-white/5">Assign Roster Instruction</h4>
-                  
+
                   <form onSubmit={handleDirectorTaskSubmit} className="space-y-4">
                     <div className="space-y-1.5">
                       <label className="text-[9px] font-black uppercase text-[#A09E9A] tracking-wider">Select Host</label>
@@ -3525,7 +4062,7 @@ export const DirectorTab = () => {
                 {/* Tasks Roster History */}
                 <div className="lg:col-span-2 bg-[#1A1A28]/40 border border-white/5 p-6 rounded-3xl flex flex-col gap-4">
                   <h4 className="text-xs font-black uppercase tracking-widest text-[#F0EFE8] pb-2 border-b border-white/5">Active Agency Tasks</h4>
-                  
+
                   <div className="overflow-x-auto font-sans">
                     <table className="w-full text-left text-xs">
                       <thead>
@@ -3582,7 +4119,7 @@ export const DirectorTab = () => {
             {operationsSubTab === 'feedback' && (
               <div className="space-y-6">
                 <h4 className="text-xs font-black uppercase tracking-widest text-[#A09E9A]/50">Chronological Manager Feedback Logs</h4>
-                
+
                 <div className="tech-card !p-0 overflow-hidden">
                   <div className="overflow-x-auto">
                     <table className="w-full text-left text-xs">
@@ -3672,21 +4209,220 @@ export const DirectorTab = () => {
                             title="Award Title"
                           />
                         </div>
-                        <div className="space-y-1.5">
-                          <label className="text-[9px] font-black uppercase text-[#A09E9A] tracking-wider">Tag Style Color</label>
-                          <select
-                            value={newAwardColor}
-                            onChange={(e) => setNewAwardColor(e.target.value)}
-                            className="w-full bg-[#0D0D14] border border-white/10 rounded-xl px-3 py-2 text-xs text-[#F0EFE8] focus:outline-none focus:border-indigo-500 cursor-pointer"
-                            title="Style color"
-                          >
-                            <option value="Gold">🏆 Gold</option>
-                            <option value="Purple">⭐ Purple</option>
-                            <option value="Emerald">💚 Emerald</option>
-                            <option value="Blue">💙 Blue</option>
-                            <option value="Red">❤️ Red</option>
-                            <option value="Orange">🧡 Orange</option>
-                          </select>
+                        <div className="space-y-3">
+                          <label className="text-[9px] font-black uppercase text-[#A09E9A] tracking-wider block">Tag Style Color Selection</label>
+                          
+                          {/* Color Type Selector Tabs */}
+                          <div className="flex bg-black/40 p-1 rounded-xl border border-white/5 mb-3">
+                            {(['solid', 'preset-gradient', 'custom-solid', 'custom-gradient'] as const).map((type) => (
+                              <button
+                                key={type}
+                                type="button"
+                                onClick={() => {
+                                  setColorSelectionType(type);
+                                  if (type === 'solid') setNewAwardColor('Gold');
+                                  else if (type === 'preset-gradient') setNewAwardColor(PRESET_GRADIENTS[0].value);
+                                }}
+                                className={cn(
+                                  "flex-1 py-1.5 text-[8px] sm:text-[9px] font-black uppercase tracking-wider rounded-lg transition-all cursor-pointer text-center",
+                                  colorSelectionType === type 
+                                    ? "bg-indigo-600/20 text-indigo-400 border border-indigo-500/30" 
+                                    : "text-[#A09E9A]/50 hover:text-white"
+                                )}
+                              >
+                                {type === 'solid' ? 'Solid' : type === 'preset-gradient' ? 'Gradients' : type === 'custom-solid' ? 'Custom Hex' : 'Custom Gradient'}
+                              </button>
+                            ))}
+                          </div>
+
+                          {/* Solids Presets */}
+                          {colorSelectionType === 'solid' && (
+                            <div className="space-y-1">
+                              <span className="text-[8px] font-bold uppercase text-[#A09E9A]/60 tracking-wider block">Select Preset Solid</span>
+                              <div className="flex flex-wrap gap-2 pt-0.5 animate-in fade-in duration-200">
+                                {PRESET_SOLIDS.map(solid => {
+                                  const isSelected = newAwardColor === solid.value;
+                                  return (
+                                    <button // NOSONAR
+                                      key={solid.name}
+                                      type="button"
+                                      onClick={() => setNewAwardColor(solid.value)}
+                                      className={cn(
+                                        "w-7 h-7 rounded-full border transition-all relative flex items-center justify-center cursor-pointer hover:scale-110",
+                                        isSelected ? "border-white scale-105 shadow-[0_0_8px_rgba(255,255,255,0.4)]" : "border-white/10"
+                                      )}
+                                      ref={el => { if (el) el.style.backgroundColor = solid.color; }}
+                                      title={solid.name}
+                                    >
+                                      {isSelected && <Check size={12} className="text-white drop-shadow-md" />}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Gradient Presets */}
+                          {colorSelectionType === 'preset-gradient' && (
+                            <div className="space-y-1">
+                              <span className="text-[8px] font-bold uppercase text-[#A09E9A]/60 tracking-wider block">Select Preset Gradient</span>
+                              <div className="flex flex-wrap gap-2 pt-0.5 animate-in fade-in duration-200">
+                                {PRESET_GRADIENTS.map(gradient => {
+                                  const isSelected = newAwardColor === gradient.value;
+                                  return (
+                                    <button // NOSONAR
+                                      key={gradient.name}
+                                      type="button"
+                                      onClick={() => setNewAwardColor(gradient.value)}
+                                      className={cn(
+                                        "h-7 px-2.5 rounded-lg border text-[8px] font-bold uppercase tracking-wider transition-all relative flex items-center justify-center cursor-pointer hover:scale-105",
+                                        isSelected ? "border-white text-white shadow-[0_0_8px_rgba(255,255,255,0.4)] font-black" : "border-white/10 text-white/70"
+                                      )}
+                                      ref={el => { if (el) el.style.background = gradient.value; }}
+                                      title={gradient.name}
+                                    >
+                                      <span className="drop-shadow-sm">{gradient.name}</span>
+                                      {isSelected && <Check size={8} className="ml-1 text-white drop-shadow-md" />}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Custom Solid Picker */}
+                          {colorSelectionType === 'custom-solid' && (
+                            <div className="space-y-1 animate-in fade-in duration-200">
+                              <span className="text-[8px] font-bold uppercase text-[#A09E9A]/60 tracking-wider block">Custom Solid Color Block</span>
+                              <div className="flex items-center gap-3 bg-black/20 p-2 rounded-xl border border-white/5 w-fit">
+                                <div className="relative w-7 h-7 rounded-lg overflow-hidden border border-white/20 hover:scale-105 transition-transform">
+                                  <input 
+                                    type="color" 
+                                    value={customSolidColor} 
+                                    onChange={(e) => setCustomSolidColor(e.target.value)}
+                                    className="absolute inset-0 w-full h-full p-0 border-0 cursor-pointer scale-150"
+                                    title="Choose color"
+                                  />
+                                </div>
+                                <div className="flex flex-col gap-0.5">
+                                  <input 
+                                    type="text" 
+                                    value={customSolidColor}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      if (val.startsWith('#') || val === '') {
+                                        setCustomSolidColor(val || '#6366F1');
+                                      } else {
+                                        setCustomSolidColor('#' + val);
+                                      }
+                                    }}
+                                    placeholder="#HEX Code"
+                                    className="bg-transparent border-0 border-b border-white/10 text-xs font-mono py-0.5 w-24 text-[#F0EFE8] focus:border-indigo-500 focus:outline-none placeholder:text-[#A09E9A]/30"
+                                    title="Custom solid color hex code"
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Custom Gradient Picker */}
+                          {colorSelectionType === 'custom-gradient' && (
+                            <div className="space-y-3 animate-in fade-in duration-200">
+                              <div className="flex items-center justify-between">
+                                <span className="text-[8px] font-bold uppercase text-[#A09E9A]/60 tracking-wider block">Custom Gradient Designer</span>
+                                
+                                {/* Segmented control for 2 vs 3 colors */}
+                                <div className="flex gap-1 bg-[#0D0D14] p-0.5 rounded-lg border border-white/5">
+                                  {([2, 3] as const).map(num => (
+                                    <button
+                                      key={num}
+                                      type="button"
+                                      onClick={() => setGradientColorCount(num)}
+                                      className={cn("px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider transition-all cursor-pointer",
+                                        gradientColorCount === num ? "bg-indigo-600 text-white shadow-sm font-extrabold" : "text-[#A09E9A] hover:text-[#F0EFE8]")}
+                                    >
+                                      {num} Colors
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+
+                              {/* Color Picker Blocks */}
+                              <div className="flex flex-wrap gap-4 items-center bg-black/20 p-2.5 rounded-xl border border-white/5">
+                                {/* Color 1 */}
+                                <div className="flex items-center gap-2">
+                                  <div className="relative w-6 h-6 rounded-lg overflow-hidden border border-white/20 hover:scale-105 transition-transform">
+                                    <input 
+                                      type="color" 
+                                      value={gradColor1} 
+                                      onChange={(e) => setGradColor1(e.target.value)}
+                                      className="absolute inset-0 w-full h-full p-0 border-0 cursor-pointer scale-150"
+                                      title="Color 1"
+                                    />
+                                  </div>
+                                  <input 
+                                    type="text" 
+                                    value={gradColor1}
+                                    onChange={(e) => setGradColor1(e.target.value)}
+                                    className="bg-transparent border-0 border-b border-white/10 text-[10px] font-mono w-14 text-white focus:outline-none"
+                                    title="Color 1 hex code"
+                                    placeholder="#FFFFFF"
+                                  />
+                                </div>
+
+                                {/* Color 2 */}
+                                <div className="flex items-center gap-2">
+                                  <div className="relative w-6 h-6 rounded-lg overflow-hidden border border-white/20 hover:scale-105 transition-transform">
+                                    <input 
+                                      type="color" 
+                                      value={gradColor2} 
+                                      onChange={(e) => setGradColor2(e.target.value)}
+                                      className="absolute inset-0 w-full h-full p-0 border-0 cursor-pointer scale-150"
+                                      title="Color 2"
+                                    />
+                                  </div>
+                                  <input 
+                                    type="text" 
+                                    value={gradColor2}
+                                    onChange={(e) => setGradColor2(e.target.value)}
+                                    className="bg-transparent border-0 border-b border-white/10 text-[10px] font-mono w-14 text-white focus:outline-none"
+                                    title="Color 2 hex code"
+                                    placeholder="#FFFFFF"
+                                  />
+                                </div>
+
+                                {/* Color 3 */}
+                                {gradientColorCount === 3 && (
+                                  <div className="flex items-center gap-2 animate-in fade-in duration-200">
+                                    <div className="relative w-6 h-6 rounded-lg overflow-hidden border border-white/20 hover:scale-105 transition-transform">
+                                      <input 
+                                        type="color" 
+                                        value={gradColor3} 
+                                        onChange={(e) => setGradColor3(e.target.value)}
+                                        className="absolute inset-0 w-full h-full p-0 border-0 cursor-pointer scale-150"
+                                        title="Color 3"
+                                      />
+                                    </div>
+                                    <input 
+                                      type="text" 
+                                      value={gradColor3}
+                                      onChange={(e) => setGradColor3(e.target.value)}
+                                      className="bg-transparent border-0 border-b border-white/10 text-[10px] font-mono w-14 text-white focus:outline-none"
+                                      title="Color 3 hex code"
+                                      placeholder="#FFFFFF"
+                                    />
+                                  </div>
+                                )}
+                              </div>
+
+                              <div 
+                                className="h-6 rounded-lg border border-white/10 flex items-center justify-center text-[8px] font-black uppercase tracking-widest text-white shadow-inner" 
+                                ref={el => { if (el) el.style.background = newAwardColor; }}
+                              >
+                                <span className="drop-shadow-md">Gradient Preview</span>
+                              </div>
+                            </div>
+                          )}
                         </div>
                         <div className="space-y-1.5">
                           <label className="text-[9px] font-black uppercase text-[#A09E9A] tracking-wider">Effectivity Period</label>
@@ -3957,7 +4693,7 @@ export const DirectorTab = () => {
     const original = { ...c };
     const updated: CommissionEntry = {
       ...c,
-      poppo_name: editPoppoName,
+      nickname: editPoppoName,
       total_points: editTotalPoints,
       total_earnings: editTotalPoints,
       my_commission: editMyCommission
@@ -4090,7 +4826,7 @@ export const DirectorTab = () => {
       // 5. Financial & Activity metrics
       const liveDuration = parseFloat(findVal(row, ['live_duration', 'live duration', 'liveduration', 'live hours'], 0)) || 0;
       const partyHostDuration = parseFloat(findVal(row, ['party_host_duration', 'party host duration', 'partyhostduration', 'party duration', 'party hours'], 0)) || 0;
-      
+
       const totalPointsVal = findVal(row, ['total_earnings_of_points', 'total earnings of points', 'total points', 'total_points', 'points', 'totalEarningsPoints'], 0);
       const totalPoints = typeof totalPointsVal === 'number' ? totalPointsVal : parseInt(String(totalPointsVal).replace(/,/g, '')) || 0;
 
@@ -4110,7 +4846,7 @@ export const DirectorTab = () => {
 
       parsedCommissions.push({
         poppo_id: poppoId,
-        poppo_name: nickname,
+        nickname: nickname,
         month: monthKey,
         live_duration: liveDuration,
         live_earnings: liveEarnings,

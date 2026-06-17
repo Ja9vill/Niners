@@ -1,3 +1,5 @@
+import { AuthState } from "./lib/storage";
+
 export type Role = 'Talent' | 'Host' | 'Manager' | 'Admin' | 'Head Admin' | 'Director' | 'Agent';
 export type BaseSalaryTier = 'N/A' | 'Rocket Host' | 'Star Host' | 'S idol' | 'ESport Host' | 'Regular Host';
 export type HostStatus = 'Active' | 'Inconsistent' | 'Intermittent' | 'Released' | 'Inactive' | 'Releasing';
@@ -89,7 +91,7 @@ export interface Host {
   // Legacy fields for compatibility during transition
 =======
   reset_requested?: boolean;
-  
+
   // Role specific
   teamAnchor?: string;
   team_anchor?: string;
@@ -137,7 +139,10 @@ export interface PerformanceReportEntry {
   super_rank: number;
   agentweb_commission_rate: number;
   _isUnknownHost?: boolean;
-  
+  owner_id?: string;
+  owner_role?: string;
+  report_type?: 'monthly' | 'weekly';
+
   // legacy fallbacks
   total_points?: number;
   agentweb_commission_earning?: number;
@@ -225,7 +230,7 @@ export interface CalendarEvent {
   created_by_name: string;
   created_by_role: string;
   timestamp: string;
-  
+
   // Legacy alias fields mapped to frontend
   event_id?: string;
   event_host_id?: string;
@@ -238,6 +243,7 @@ export interface CalendarEvent {
   location?: string;
   participants?: string[];
   participantIds?: string[];
+  is_automated?: boolean;
 }
 
 export type ExposureEntry = CalendarEvent;
@@ -388,4 +394,51 @@ export interface ManagerNote {
   content: string;
   timestamp: string;
 }
+<<<<<<< HEAD
 >>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
+=======
+
+export interface PublicPageAsset {
+  id: string;
+  slotId: string;
+  imageUrl: string;
+  description?: string;
+  updatedAt: string;
+  updatedBy: string;
+}
+
+export interface BlogPost {
+  id: string;
+  title: string;
+  subtitle?: string;
+  slug: string;
+  content: string;
+  coverImage?: string;
+  authorName: string;
+  authorRole: string;
+  category?: string;
+  tags?: string[];
+  createdAt: string;
+  updatedAt: string;
+  isPublished: boolean;
+  readTimeMinutes?: number;
+  viewCount?: number;
+  seoMetadata?: {
+    metaTitle?: string;
+    metaDescription?: string;
+  };
+}
+
+export const emptyAuthState: AuthState = {
+  level: 0,
+  role: "",
+  name: "",
+  poppo_id: "",
+  nickname: "",
+  status: "",
+  manager_assigned: "",
+  anchor_team: "",
+  profile_photo: "",
+  token: "",
+};
+>>>>>>> 2b42d3ae84c3e300e1faeb35e7009a759158d1e9

@@ -9,6 +9,7 @@ import { body, validationResult } from "express-validator";
 import { getStaticHosts } from "../lib/staticHosts";
 import { logAuthEvent } from "./auditLogger";
 import { initFirebaseSecrets } from "./secrets";
+import { runAutoSyncLivehouseData } from "./cron";
 
 const router = Router();
 const JWT_SECRET = process.env.JWT_SECRET || "nine-dashboard-secret-key-12345";
@@ -56,7 +57,13 @@ export function getAdminStorage() {
 
 export function getAdminFirestore() {
   const app = getFirebaseAdminApp();
-  return getFirestore(app, "ai-studio-f578d03a-99b3-4c41-84dd-9901137e8386");
+  const db = getFirestore(app, "ai-studio-f578d03a-99b3-4c41-84dd-9901137e8386");
+  try {
+    db.settings({ preferRest: true });
+  } catch (err) {
+    // Ignore settings initialized warnings
+  }
+  return db;
 }
 
 export async function getCallerPoppoId(uid: string): Promise<string> {
@@ -97,8 +104,8 @@ setTimeout(async () => {
   try {
     await initFirebaseSecrets();
     const db = getAdminFirestore();
-    const snapshot = await db.collection("users").limit(5).get();
-    if (snapshot.size < 5) {
+    const snapshot = await db.collection("users").limit(50).get();
+    if (snapshot.size < 50) {
       console.log("Database has few hosts. Auto-seeding all hosts from staticHosts...");
       const staticHosts = getStaticHosts();
       const batch = db.batch();
@@ -433,6 +440,7 @@ router.post("/check-username", async (req: any, res: any) => {
     const isFirstLogin =
       data.is_first_login === true ||
       data.is_temp_password === true ||
+      data.is_first_time === true ||
       !data.password ||
       data.password === null;
 
@@ -494,6 +502,7 @@ router.post("/set-initial-password", loginRateLimiter, async (req: any, res: any
     const isFirstLogin =
       dbUser.is_first_login === true ||
       dbUser.is_temp_password === true ||
+      dbUser.is_first_time === true ||
       !dbUser.password ||
       dbUser.password === null;
 
@@ -527,7 +536,8 @@ router.post("/set-initial-password", loginRateLimiter, async (req: any, res: any
         password: hashed,
         password_hash: hashed,
         is_first_login: false,
-        is_temp_password: false // Safely deprecate legacy keys
+        is_temp_password: false,
+        is_first_time: false // Safely deprecate legacy keys and reset-login flag
       });
 
       // 3. Assign structural application roles now that the Auth target record exists
@@ -803,6 +813,35 @@ router.post("/verify", async (req, res) => {
 // ─────────────────────────────────────────────
 // ADMIN ROUTES (require JWT with level >= 3)
 // ─────────────────────────────────────────────
+
+/**
+ * POST /api/admin/livehouse/sync
+ * Manually trigger the Livehouse sync from Google Sheets
+ */
+router.post("/livehouse/sync", requireAuth(3), async (req: any, res) => {
+  try {
+    await runAutoSyncLivehouseData(true); // ignoreLock = true
+    res.json({ success: true, message: "Sync triggered successfully. The UI will update automatically." });
+  } catch (error: any) {
+    console.error("Manual Livehouse Sync Error:", error);
+    res.status(500).json({ error: error?.message || "Failed to sync Livehouse data." });
+  }
+});
+
+/**
+ * POST /api/public/livehouse/sync
+ * Public trigger to sync Livehouse data (used when anyone opens the calendar tab)
+ */
+router.post("/public/livehouse/sync", async (req, res) => {
+  try {
+    // We don't ignore lock here, so if it's already running within the interval, it skips safely
+    await runAutoSyncLivehouseData(false);
+    res.json({ success: true, message: "Sync triggered" });
+  } catch (error) {
+    console.error("Public Livehouse Sync Error:", error);
+    res.status(500).json({ error: "Failed to sync" });
+  }
+});
 
 /**
  * POST /api/admin/reset-password
@@ -1461,18 +1500,24 @@ router.delete("/delete-user/:poppoId", verifyAdminRole, async (req: any, res: an
     }
     await db.collection("users").doc(cleanPoppoId).delete();
 
-    // Delete all performance reports for this user
-    const reportsQuery = await db.collection("performance_reports")
-      .where("poppo_id", "==", cleanPoppoId)
-      .get();
+    // Delete all performance reports (monthly and weekly) for this user
+    const [reportsQuery, weeklyQuery] = await Promise.all([
+      db.collection("performance_reports").where("poppo_id", "==", cleanPoppoId).get(),
+      db.collection("performance_weekly_reports").where("poppo_id", "==", cleanPoppoId).get()
+    ]);
     
+    const batch = db.batch();
     if (!reportsQuery.empty) {
-      const batch = db.batch();
       reportsQuery.forEach(doc => {
         batch.delete(doc.ref);
       });
-      await batch.commit();
     }
+    if (!weeklyQuery.empty) {
+      weeklyQuery.forEach(doc => {
+        batch.delete(doc.ref);
+      });
+    }
+    await batch.commit();
 
     // Step B: Delete from Firebase Auth, catching errors if user doesn't exist
     try {
@@ -1941,6 +1986,10 @@ router.post("/login-with-poppo", loginRateLimiter, async (req: any, res: any) =>
     if (hostData.isActive === false || hostData.isActive === "false") {
       logAuthEvent(cleanPoppoId, "FAILURE", ipAddress, "INACTIVE_ACCOUNT");
       return res.status(403).json({ error: "Account is inactive." });
+    }
+    if (hostData.is_first_time === true) {
+      logAuthEvent(cleanPoppoId, "FAILURE", ipAddress, "RESET_PASSWORD_REQUIRED");
+      return res.status(403).json({ error: "Password reset required. Please enter your Poppo ID on the login page to set a new password." });
     }
     
     // Check password

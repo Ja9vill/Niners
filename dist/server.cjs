@@ -32,16 +32,226 @@ var import_messaging = require("firebase-admin/messaging");
 // src/server/auth.ts
 var import_express = require("express");
 var import_app = require("firebase-admin/app");
-var import_auth = require("firebase-admin/auth");
-var import_firestore = require("firebase-admin/firestore");
+var import_auth2 = require("firebase-admin/auth");
+var import_firestore2 = require("firebase-admin/firestore");
 var import_storage = require("firebase-admin/storage");
 var import_jsonwebtoken = __toESM(require("jsonwebtoken"), 1);
 var import_bcrypt = __toESM(require("bcrypt"), 1);
 var import_express_validator = require("express-validator");
 
 // src/lib/staticHosts.ts
+var RAW_LEADERS_TEXT = `
+19381364    NINE Talent Management  -   -   -   -   -   -   31907
+19157913    Miss Nine   Founder Director    -   -   -   ACTIVE  3Plus19=2007
+21821805    Miles   Head Admin  Head of Operations  S idol  MISS NINE   19157913    ACTIVE  F97BCDEB
+30747697    Ely Agency Leader   Manager S idol  NINE AGENCY 19381364    ACTIVE  F88429C8
+18980270    Jean    Agency Leader   Manager -   NINE AGENCY 19381364    ACTIVE  645FD830
+24124167    March   Agency Leader   Manager Esports NINE AGENCY 19381364    ACTIVE  B5620DC8
+6728969 Myrill  Agency Leader   Manager -   NINE AGENCY 19381364    ACTIVE  E448ADAD
+9940053 Nhiya   Agency Leader   Sub Agent   S idol  MISS NINE   19157913    ACTIVE  83F1942D
+19781046    Vine    Agency Leader   Manager S idol  NINE AGENCY 19381364    ACTIVE  EBECF48F
+18335592    Yoshi   Agency Leader   Manager S idol  NINE AGENCY 19381364    ACTIVE  CA1AEDC9
+4439877 Chief A Agency Leader   Admin   -   NINE AGENCY 19381364    INCONSISTENT    851BF76A
+11833865    Yudi    Agency Leader   Admin   -   NINE AGENCY 19381364    ACTIVE  19793CA5
+5370932 Nameless    Agency Leader   Admin   -   NINE AGENCY 19381364    ACTIVE  8666DAFC
+22143679    Dhie2x  Agency Leader   Sub Agent   -   NINE AGENCY 19381364    INCONSISTENT    59720DBD
+3003126 Lina    Agency Leader   Sub Agent   -   NINE AGENCY 19381364    ACTIVE  F910E204
+18540870    Aimee   Agency Leader   Host    -   NINE AGENCY 19381364    ACTIVE  BCE0F23B
+19841422    Armae   Agency Leader   Host    -   NINE AGENCY 19381364    ACTIVE  BFE43140
+11155826    Team Nhia   Agency Leader   Host    -   NINE AGENCY 19381364    ACTIVE  FA73C901
+54654841    Team KJP    Agency Leader   Host    -   NINE AGENCY 19381364    ACTIVE  F76BC35B
+`;
+var RAW_HOSTS_TEXT = `
+14129568    Alli    Talent  Host    S idol  Mngr. Ely   NINE AGENCY 19381364    ACTIVE  BB898D21
+2934176 Allyy   Talent  Host    Star Host   -   NINE AGENCY 19381364    INACTIVE    C2EA864B
+62652388    Amitzuke    Talent  Host    -   -   NINE AGENCY 19381364    INACTIVE    C02EBDF5
+26645601    Angel   Talent  Host    -   -   NINE AGENCY 19381364    INACTIVE    0272D3FB
+66988219    Angel.  Talent  Host    S idol  Mngr. Nhiya TEAM NHIA   11155826    ACTIVE  1CEFB494
+43798318    Anjie   Talent  Host    Star Host   Mngr. Lina  NINE AGENCY 19381364    ACTIVE  F500B90B
+9616469 April   Talent  Host    -   -   NINE AGENCY 19381364    INACTIVE    19EA7ADC
+41339005    Arnel   Talent  Host    Rocket Host Mngr. Jean  NINE AGENCY 19381364    ACTIVE  F0ACC092
+4498750 Boyeet  Talent  Host    Star Host   Mngr. Ely   NINE AGENCY 19381364    ACTIVE  4F0EF66B
+26744344    Denj    Talent  Host    S idol  Mngr. Jean  SBJ AGENCY  -   ACTIVE  FA3434F6
+2716708 Dhal    Talent  Host    -   -   NINE AGENCY 19381364    INACTIVE    69157DAF
+20901441    Erich   Talent  Host    Star Host   Mngr. Nameless  NINE AGENCY 19381364    ACTIVE  276F0D93
+23500951    Gelica  Talent  Host    S idol  Mngr. Yoshi NINE AGENCY 19381364    ACTIVE  AAA12B85
+2886088 Gracia  Talent  Host    -   -   NINE AGENCY 19381364    INACTIVE    DD1AFBED
+726356  HoneyLou    Talent  Host    Star Host   Mngr. Vine  SP AGENCY   -   ACTIVE  6E84814D
+1089154 Jaa Talent  Host    -   -   NINE AGENCY 19381364    INACTIVE    52E6490A
+8170164 Jaebum  Talent  Host    Star Host   Mngr. March NINE AGENCY 19381364    ACTIVE  307430BF
+29517964    Jake    Talent  Host    Star Host   Mngr. Yudi  NINE AGENCY 19381364    INCONSISTENT    801C8043
+14508056    Javier  Talent  Host    -   Mngr. Myrill    -   -   INACTIVE    89DD1D34
+45982313    Jey Em  Talent  Host    Star Host   Mngr. Myrill    NINE AGENCY 19381364    ACTIVE  03020D69
+10417278    JLord   Talent  Host    Rocket Host Mngr. Myrill    NINE AGENCY 19381364    ACTIVE  0E4FEB46
+68345832    Johnny  Talent  Host    Rocket Host Mngr. Nhiya TEAM NHIA   11155826    ACTIVE  8C0B50B2
+53065612    Joji    Talent  Host    Rocket Host Mngr. Nameless  NINE AGENCY 19381364    ACTIVE  8745B2A2
+51327969    Jolly   Talent  Host    Star Host   Mngr. Nhiya TEAM NHIA   11155826    ACTIVE  57EED2C0
+28207417    Junel   Talent  Host    Star Host   Mngr. Ely   BG AGENCY   -   ACTIVE  0F26A153
+8081331 Katieyow    Talent  Host    S idol  Mngr. Jean  SBJ AGENCY  -   ACTIVE  C7599129
+3613056 Katy    Talent  Host    -   Mngr. Yoshi NINE AGENCY 19381364    INCONSISTENT    60B4AD1F
+5825737 Ken Talent  Host    -   -   NINE AGENCY 19381364    INACTIVE    D4079413
+42205198    Khey Gee    Talent  Host    Star Host   Mngr. March LTMS AGENCY -   ACTIVE  17899EBC
+65340031    Kimpoy  Talent  Host    -   -   NINE AGENCY 19381364    INACTIVE    2072465E
+2711029 Kitty   Talent  Host    Star Host   Mngr. Lina  SBJ AGENCY  -   ACTIVE  E9790F3D
+2339155 Kler    Talent  Host    Star Host   Mngr. March NINE AGENCY 19381364    ACTIVE  7C693E52
+8246228 Kuya July   Talent  Host    Star Host   Mngr. Jean  TEAM KJP    54654841    ACTIVE  349C2BAC
+18898805    Lica    Talent  Host    Star Host   Mngr. Vine  NINE AGENCY 19381364    ACTIVE  BD016F81
+11836486    Lin Talent  Host    S idol  Mngr. March NINE AGENCY 19381364    ACTIVE  D3D65103
+50040181    Lyka    Talent  Host    Star Host   Mngr. Nameless  NINE AGENCY 19381364    ACTIVE  AC91F636
+17443588    Mai Talent  Host    Star Host   Mngr. Yudi  NINE AGENCY 19381364    ACTIVE  90FED491
+30333133    Martin  Talent  Host    Rocket Host Mngr. Ely   NINE AGENCY 19381364    ACTIVE  0F34F257
+2608827 Mikka   Talent  Host    -   -   NINE AGENCY 19381364    INCONSISTENT    E1CD8FFF
+40158690    Nhics   Talent  Host    S idol  Mngr. Nhiya TEAM NHIA   11155826    ACTIVE  64B627BC
+21302889    Nicky   Talent  Host    Star Host   Mngr. March NINE AGENCY 19381364    ACTIVE  D86CFF47
+4728141 Nicole  Talent  Host    -   -   NINE AGENCY 19381364    INCONSISTENT    4940531E
+2388108 Pamela  Talent  Host    S idol  Mngr. March LTMS AGENCY -   ACTIVE  5B6E0C1C
+3095610 Primo   Talent  Host    Rocket Host Mngr. Ely   NINE AGENCY 19381364    ACTIVE  65B56B0E
+30070500    Rosa    Talent  Host    S idol  Mngr. Yoshi NINE AGENCY 30070500    ACTIVE  3006D202
+41841905    Scarlet Talent  Host    Star Host   Mngr. Nameless  NINE AGENCY 19381364    ACTIVE  86AD41B6
+8724329 SexyLou Talent  Host    Star Host   Mngr. Yoshi NINE AGENCY 19381364    ACTIVE  1646F797
+19616782    Sky Talent  Host    S idol  Mngr. Nhiya TEAM NHIA   11155826    ACTIVE  20D93607
+12810014    Summer  Talent  Host    Star Host   Mngr. Yoshi NINE AGENCY 19381364    ACTIVE  EE8169CB
+4436945 TattooedMom Talent  Host    Star Host   -   NINE AGENCY 19381364    INACTIVE    AA42F20D
+10862326    Tracy   Talent  Host    -   -   NINE AGENCY 19381364    INACTIVE    72D493FF
+6545736 Uno Talent  Host    -   -   NINE AGENCY 19381364    INACTIVE    5CC75E44
+24786432    Wilab   Talent  Host    -   -   NINE AGENCY 19381364    INACTIVE    ACB760F8
+5907650 Yanica  Talent  Host    Star Host   -   NINE AGENCY 19381364    ACTIVE  3E8E4869
+15080341    Zeek    Talent  Host    Rocket Host Mngr. Jean  NINE AGENCY 15080341    INCONSISTENT    3E8E4852
+3699745 YeJoon  Talent  Host    Star Host   Mngr. Yudi  NINE AGENCY 19381364    ACTIVE  B602A181
+`;
+function parseSalaryCategory(salary) {
+  if (!salary || salary === "-" || salary === "N/A") return "N/A";
+  const s = salary.toLowerCase();
+  if (s.includes("star")) return "Star Host";
+  if (s.includes("rocket")) return "Rocket Host";
+  if (s.includes("s idol")) return "S idol";
+  if (s.includes("esport")) return "ESport Host";
+  return "N/A";
+}
+function parseStatus(status) {
+  if (!status) return "Active";
+  const s = status.toUpperCase();
+  if (s === "ACTIVE") return "Active";
+  if (s === "INACTIVE") return "Inactive";
+  if (s === "INCONSISTENT") return "Inconsistent";
+  if (s === "RELEASED") return "Released";
+  return "Active";
+}
+function parseAnchorType(teamStr) {
+  if (!teamStr || teamStr === "-") return "Nine Agency";
+  const t = teamStr.toUpperCase();
+  if (t.includes("NINE AGENCY") || t.includes("MISS NINE")) return "Nine Agency";
+  if (t.includes("AGENCY") || t.includes("TEAM") || t.includes("LTMS")) return "Sub Agency";
+  return "External";
+}
+function parseRole(pos, role) {
+  if (role && role.toLowerCase() === "manager") return "Manager";
+  if (role && role.toLowerCase() === "sub agent") return "Agent";
+  if (role && role.toLowerCase() === "admin") return "Admin";
+  if (role && role.toLowerCase() === "head admin") return "Head Admin";
+  if (pos && pos.toLowerCase().includes("director")) return "Director";
+  if (pos && pos.toLowerCase() === "head admin") return "Head Admin";
+  if (pos && pos.toLowerCase() === "manager") return "Manager";
+  if (pos && pos.toLowerCase() === "sub agent") return "Agent";
+  if (pos && pos.toLowerCase() === "admin") return "Admin";
+  return "Talent";
+}
+function getLevelForRole(role) {
+  switch (role) {
+    case "Director":
+      return 99;
+    case "Head Admin":
+      return 80;
+    case "Admin":
+      return 70;
+    case "Manager":
+      return 65;
+    case "Agent":
+      return 55;
+    default:
+      return 30;
+  }
+}
+function getTierForLevel(level) {
+  if (level >= 85) return "S";
+  if (level >= 65) return "A";
+  if (level >= 45) return "B";
+  if (level >= 25) return "C";
+  return "X";
+}
 function getStaticHosts() {
-  return [];
+  const parsedHosts = [];
+  const leaderLines = RAW_LEADERS_TEXT.trim().split("\n");
+  for (const line of leaderLines) {
+    const parts = line.split(/\t| {2,}/).map((p) => p.trim());
+    if (parts.length < 2) continue;
+    const id = parts[0];
+    const name = parts[1];
+    const positionRaw = parts[2];
+    const roleRaw = parts[3];
+    const baseSalaryRaw = parts[4];
+    const teamRaw = parts[5];
+    const managerRaw = parts[6];
+    const statusRaw = parts[7];
+    const password = parts.at(-1);
+    const role = parseRole(positionRaw, roleRaw);
+    const level = getLevelForRole(role);
+    const tier = getTierForLevel(level);
+    parsedHosts.push({
+      id: String(id),
+      name,
+      nickname: name,
+      role,
+      team: !teamRaw || teamRaw === "-" ? "Leadership" : teamRaw,
+      manager: !managerRaw || managerRaw === "-" ? "None" : managerRaw,
+      anchor_type: parseAnchorType(teamRaw),
+      base_salary_category: parseSalaryCategory(baseSalaryRaw),
+      status: parseStatus(statusRaw || "ACTIVE"),
+      level,
+      tier,
+      password: String(password),
+      is_temp_password: true,
+      isActive: true,
+      created_at: (/* @__PURE__ */ new Date()).toISOString(),
+      updated_at: (/* @__PURE__ */ new Date()).toISOString()
+    });
+  }
+  const hostLines = RAW_HOSTS_TEXT.trim().split("\n");
+  for (const line of hostLines) {
+    const parts = line.split(/\t| {2,}/).map((p) => p.trim());
+    if (parts.length < 2) continue;
+    const id = parts[0];
+    const name = parts[1];
+    const positionRaw = parts[2];
+    const roleRaw = parts[3];
+    const baseSalaryRaw = parts[4];
+    const managerRaw = parts[5] ? parts[5].replace(/^Mngr\.\s+/i, "") : "None";
+    const teamRaw = parts[6];
+    const statusRaw = parts[8];
+    const password = parts[9];
+    const role = "Talent";
+    const level = 30;
+    const tier = "B";
+    parsedHosts.push({
+      id: String(id),
+      name,
+      nickname: name,
+      role,
+      team: !teamRaw || teamRaw === "-" ? "Nine Agency" : teamRaw,
+      manager: managerRaw === "-" ? "None" : managerRaw,
+      anchor_type: parseAnchorType(teamRaw),
+      base_salary_category: parseSalaryCategory(baseSalaryRaw),
+      status: parseStatus(statusRaw || "ACTIVE"),
+      level,
+      tier,
+      password: String(password),
+      is_temp_password: true,
+      isActive: true,
+      created_at: (/* @__PURE__ */ new Date()).toISOString(),
+      updated_at: (/* @__PURE__ */ new Date()).toISOString()
+    });
+  }
+  return parsedHosts;
 }
 
 // src/server/auditLogger.ts
@@ -114,6 +324,225 @@ async function initFirebaseSecrets() {
   }
 }
 
+// src/server/cron.ts
+var import_firestore = require("firebase-admin/firestore");
+async function acquireLock(jobName, intervalMinutes) {
+  const db = getAdminFirestore();
+  const lockRef = db.collection("system").doc("cron_state");
+  try {
+    return await db.runTransaction(async (transaction) => {
+      const doc = await transaction.get(lockRef);
+      const now = Date.now();
+      if (!doc.exists) {
+        transaction.set(lockRef, { [jobName]: now });
+        return true;
+      }
+      const data = doc.data() || {};
+      const lastRun = data[jobName] || 0;
+      const intervalMs = intervalMinutes * 60 * 1e3 - 6e4;
+      if (now - lastRun < intervalMs) {
+        return false;
+      }
+      transaction.update(lockRef, { [jobName]: now });
+      return true;
+    });
+  } catch (error) {
+    console.error(`Failed to acquire lock for ${jobName}:`, error);
+    return false;
+  }
+}
+async function runAutoSyncLivehouseData(ignoreLock = false) {
+  if (!ignoreLock && !await acquireLock("autoSyncLivehouseData", 15)) return;
+  const API_URL = "https://script.google.com/macros/s/AKfycbxI-gtTa_gjoBHJZIZ1k7XYkXsEomPhBYi6oweGi_9_4GLC8YloEs72IOCj89EKBrQsfw/exec";
+  const db = getAdminFirestore();
+  try {
+    const response = await fetch(API_URL);
+    const data = await response.json();
+    if (!data || data.status === "error" || !Array.isArray(data)) {
+      console.warn("Livehouse auto-sync aborted: Invalid or error data returned from Apps Script.", data);
+      return;
+    }
+    const scheduleRows = data;
+    const maxBatchSize = 400;
+    let batch = db.batch();
+    let batchCount = 0;
+    const commitBatchIfNeeded = async () => {
+      if (batchCount >= maxBatchSize) {
+        await batch.commit();
+        batch = db.batch();
+        batchCount = 0;
+      }
+    };
+    const path2 = "livehouse_schedule";
+    const snap = await db.collection(path2).get();
+    const oldSchedule = /* @__PURE__ */ new Map();
+    for (const d of snap.docs) {
+      oldSchedule.set(d.id, d.data());
+      batch.delete(d.ref);
+      batchCount++;
+      await commitBatchIfNeeded();
+    }
+    const validCalendarEventIds = [];
+    const logsRef = db.collection("livehouse_logs");
+    for (const r of scheduleRows) {
+      if (!r.date || !r.timeslot) continue;
+      const docId = `${r.date}_${r.timeslot}`.replace(/[^a-zA-Z0-9_-]/g, "_");
+      const oldRow = oldSchedule.get(docId);
+      const newSlot1 = String(r.slot_1?.poppo_id || "").trim();
+      const oldSlot1 = String(oldRow?.slot_1?.poppo_id || "").trim();
+      if (newSlot1 && newSlot1 !== oldSlot1) {
+        const logDocRef = logsRef.doc();
+        batch.set(logDocRef, {
+          poppo_id: newSlot1,
+          date: r.date,
+          timeslot: r.timeslot,
+          timestamp: import_firestore.FieldValue.serverTimestamp(),
+          source: "auto-sync"
+        });
+        batchCount++;
+        await commitBatchIfNeeded();
+      }
+      const newSlot2 = String(r.slot_2?.poppo_id || "").trim();
+      const oldSlot2 = String(oldRow?.slot_2?.poppo_id || "").trim();
+      if (newSlot2 && newSlot2 !== oldSlot2) {
+        const logDocRef = logsRef.doc();
+        batch.set(logDocRef, {
+          poppo_id: newSlot2,
+          date: r.date,
+          timeslot: r.timeslot,
+          timestamp: import_firestore.FieldValue.serverTimestamp(),
+          source: "auto-sync"
+        });
+        batchCount++;
+        await commitBatchIfNeeded();
+      }
+      const docRef = db.collection(path2).doc(docId);
+      batch.set(docRef, r);
+      batchCount++;
+      await commitBatchIfNeeded();
+    }
+    const syncStatusRef = db.collection("system").doc("livehouse_sync");
+    batch.set(syncStatusRef, {
+      last_synced_at: import_firestore.FieldValue.serverTimestamp(),
+      last_synced_iso: (/* @__PURE__ */ new Date()).toISOString()
+    }, { merge: true });
+    batchCount++;
+    await commitBatchIfNeeded();
+    if (batchCount > 0) {
+      await batch.commit();
+    }
+    console.log(`Successfully completed automated Livehouse sync! Extracted ${scheduleRows.length} timeslots.`);
+  } catch (err) {
+    console.error("Failed to execute autoSyncLivehouseData:", err);
+  }
+}
+function parseManilaTimeToUTC(dateStr, timeStr) {
+  try {
+    const timeMatch = timeStr.match(/(\d{1,2}):(\d{2})\s+(AM|PM)/i);
+    if (!timeMatch) return 0;
+    let hours = parseInt(timeMatch[1], 10);
+    const minutes = parseInt(timeMatch[2], 10);
+    const ampm = timeMatch[3].toUpperCase();
+    if (ampm === "PM" && hours < 12) hours += 12;
+    if (ampm === "AM" && hours === 12) hours = 0;
+    const paddedHours = hours.toString().padStart(2, "0");
+    const paddedMinutes = minutes.toString().padStart(2, "0");
+    const isoString = `${dateStr}T${paddedHours}:${paddedMinutes}:00+08:00`;
+    const eventDate = new Date(isoString);
+    return eventDate.getTime();
+  } catch (e) {
+    return 0;
+  }
+}
+async function runCheckUpcomingEvents() {
+  if (!await acquireLock("checkUpcomingEvents", 5)) return;
+  const db = getAdminFirestore();
+  const now = Date.now();
+  try {
+    const calendarRef = db.collection("calendar");
+    const snapshot = await calendarRef.where("notifiedStart", "!=", true).get();
+    if (snapshot.empty) return;
+    const batch = db.batch();
+    const announcementsRef = db.collection("announcements");
+    let batchCount = 0;
+    snapshot.docs.forEach((doc) => {
+      const data = doc.data();
+      if (!data.date || !data.time) return;
+      const eventTimeMs = parseManilaTimeToUTC(data.date, data.time);
+      if (eventTimeMs === 0) return;
+      const timeDiffMins = (eventTimeMs - now) / (1e3 * 60);
+      if (!data.notified30Min && timeDiffMins > 0 && timeDiffMins <= 35 && timeDiffMins >= 25) {
+        const annRef = announcementsRef.doc();
+        batch.set(annRef, {
+          title: `Starting in 30 mins: ${data.title || "Upcoming Event"}`,
+          content: `${data.title || "The event"} starts in 30 minutes! Show up and support your co-niners. Flag the comment section to help boost their livestream. Remember, all attendance is recorded and impacts your performance scores/ratio!`,
+          type: "System",
+          priority: "high",
+          timestamp: (/* @__PURE__ */ new Date()).toISOString(),
+          createdAt: import_firestore.FieldValue.serverTimestamp()
+        });
+        batch.update(doc.ref, { notified30Min: true });
+        batchCount += 2;
+      }
+      if (!data.notifiedStart && timeDiffMins <= 5 && timeDiffMins >= -5) {
+        const annRef = announcementsRef.doc();
+        batch.set(annRef, {
+          title: `Event Starting NOW: ${data.title || "Live Event"}`,
+          content: `${data.title || "The event"} is starting right now! Join the stream, drop your comments, and support the agency!`,
+          type: "System",
+          priority: "urgent",
+          timestamp: (/* @__PURE__ */ new Date()).toISOString(),
+          createdAt: import_firestore.FieldValue.serverTimestamp()
+        });
+        batch.update(doc.ref, { notifiedStart: true, notified30Min: true });
+        batchCount += 2;
+      }
+    });
+    if (batchCount > 0) {
+      await batch.commit();
+      console.log(`Committed ${batchCount} operations for upcoming events.`);
+    }
+  } catch (err) {
+    console.error("Failed to check upcoming events:", err);
+  }
+}
+async function runCleanupOldSystemLogs() {
+  if (!await acquireLock("cleanupOldSystemLogs", 24 * 60)) return;
+  const db = getAdminFirestore();
+  const thirtyDaysAgo = /* @__PURE__ */ new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  const cutoffTimestamp = thirtyDaysAgo.toISOString();
+  try {
+    const logsRef = db.collection("system_logs");
+    const oldLogsQuery = logsRef.where("timestamp", "<", cutoffTimestamp).limit(500);
+    let deletedCount = 0;
+    while (true) {
+      const snapshot = await oldLogsQuery.get();
+      if (snapshot.empty) break;
+      const batch = db.batch();
+      snapshot.docs.forEach((doc) => {
+        batch.delete(doc.ref);
+      });
+      await batch.commit();
+      deletedCount += snapshot.size;
+    }
+    if (deletedCount > 0) {
+      console.log(`Successfully deleted ${deletedCount} old system_logs.`);
+    }
+  } catch (err) {
+    console.error("Failed to clean up old system_logs:", err);
+  }
+}
+function startCronJobs() {
+  console.log("Starting backend cron jobs...");
+  runAutoSyncLivehouseData().catch(console.error);
+  runCheckUpcomingEvents();
+  runCleanupOldSystemLogs();
+  setInterval(runAutoSyncLivehouseData, 15 * 60 * 1e3);
+  setInterval(runCheckUpcomingEvents, 5 * 60 * 1e3);
+  setInterval(runCleanupOldSystemLogs, 24 * 60 * 60 * 1e3);
+}
+
 // src/server/auth.ts
 var router = (0, import_express.Router)();
 var JWT_SECRET = process.env.JWT_SECRET || "nine-dashboard-secret-key-12345";
@@ -146,7 +575,12 @@ function getFirebaseAdminApp() {
 }
 function getAdminFirestore() {
   const app = getFirebaseAdminApp();
-  return (0, import_firestore.getFirestore)(app, "ai-studio-f578d03a-99b3-4c41-84dd-9901137e8386");
+  const db = (0, import_firestore2.getFirestore)(app, "ai-studio-f578d03a-99b3-4c41-84dd-9901137e8386");
+  try {
+    db.settings({ preferRest: true });
+  } catch (err) {
+  }
+  return db;
 }
 async function getCallerPoppoId(uid) {
   if (!uid) return "";
@@ -167,7 +601,7 @@ async function getCallerPoppoId(uid) {
 }
 async function syncCustomClaims(poppoId, role, tempPasswordRequired) {
   try {
-    const authInstance = (0, import_auth.getAuth)(getFirebaseAdminApp());
+    const authInstance = (0, import_auth2.getAuth)(getFirebaseAdminApp());
     const claims = {
       role: role || "host",
       isSuperAdmin: (role || "").toLowerCase() === "director",
@@ -183,8 +617,8 @@ setTimeout(async () => {
   try {
     await initFirebaseSecrets();
     const db = getAdminFirestore();
-    const snapshot = await db.collection("users").limit(5).get();
-    if (snapshot.size < 5) {
+    const snapshot = await db.collection("users").limit(50).get();
+    if (snapshot.size < 50) {
       console.log("Database has few hosts. Auto-seeding all hosts from staticHosts...");
       const staticHosts = getStaticHosts();
       const batch = db.batch();
@@ -495,7 +929,7 @@ router.post("/check-username", async (req, res) => {
     if (data.isActive === false || data.isActive === "false") {
       return res.json({ exists: true, is_first_login: false, blocked: true });
     }
-    const isFirstLogin = data.is_first_login === true || data.is_temp_password === true || !data.password || data.password === null;
+    const isFirstLogin = data.is_first_login === true || data.is_temp_password === true || data.is_first_time === true || !data.password || data.password === null;
     return res.json({ exists: true, is_first_login: isFirstLogin });
   } catch (err) {
     console.error("[check-username] failed:", err);
@@ -533,11 +967,11 @@ router.post("/set-initial-password", loginRateLimiter, async (req, res) => {
     if (!/[0-9]/.test(newPassword)) {
       return res.status(400).json({ error: "Password must contain at least one number." });
     }
-    const isFirstLogin = dbUser.is_first_login === true || dbUser.is_temp_password === true || !dbUser.password || dbUser.password === null;
+    const isFirstLogin = dbUser.is_first_login === true || dbUser.is_temp_password === true || dbUser.is_first_time === true || !dbUser.password || dbUser.password === null;
     if (!isFirstLogin) {
       return res.status(403).json({ error: "This account is not eligible for password setup." });
     }
-    const adminAuth = (0, import_auth.getAuth)(getFirebaseAdminApp());
+    const adminAuth = (0, import_auth2.getAuth)(getFirebaseAdminApp());
     const hashPassword = async (pwd) => import_bcrypt.default.hash(pwd, BCRYPT_ROUNDS);
     try {
       try {
@@ -557,8 +991,9 @@ router.post("/set-initial-password", loginRateLimiter, async (req, res) => {
         password: hashed,
         password_hash: hashed,
         is_first_login: false,
-        is_temp_password: false
-        // Safely deprecate legacy keys
+        is_temp_password: false,
+        is_first_time: false
+        // Safely deprecate legacy keys and reset-login flag
       });
       const userRole2 = dbUser?.role || "agent";
       const accessLevel = getRoleLevel(userRole2);
@@ -594,7 +1029,7 @@ router.post("/google-login", async (req, res) => {
     if (!idToken) {
       return res.status(400).json({ error: "idToken is required" });
     }
-    const auth = (0, import_auth.getAuth)(getFirebaseAdminApp());
+    const auth = (0, import_auth2.getAuth)(getFirebaseAdminApp());
     const decoded = await auth.verifyIdToken(idToken);
     const uid = decoded.uid;
     const email = decoded.email || "";
@@ -689,7 +1124,7 @@ router.post("/google-register", async (req, res) => {
     if (!/^\d+$/.test(cleanPoppoId)) {
       return res.status(400).json({ error: "Poppo ID must be a numeric value" });
     }
-    const auth = (0, import_auth.getAuth)(getFirebaseAdminApp());
+    const auth = (0, import_auth2.getAuth)(getFirebaseAdminApp());
     const decoded = await auth.verifyIdToken(idToken);
     const uid = decoded.uid;
     const email = decoded.email || "";
@@ -772,7 +1207,7 @@ router.post("/verify", async (req, res) => {
     if (!idToken) {
       return res.status(400).json({ error: "idToken is required" });
     }
-    const auth = (0, import_auth.getAuth)(getFirebaseAdminApp());
+    const auth = (0, import_auth2.getAuth)(getFirebaseAdminApp());
     const decoded = await auth.verifyIdToken(idToken);
     return res.json({
       uid: decoded.uid,
@@ -784,6 +1219,24 @@ router.post("/verify", async (req, res) => {
   } catch (error) {
     console.error("Token verification failed:", error);
     return res.status(401).json({ error: error?.message || "Unauthorized" });
+  }
+});
+router.post("/livehouse/sync", requireAuth(3), async (req, res) => {
+  try {
+    await runAutoSyncLivehouseData(true);
+    res.json({ success: true, message: "Sync triggered successfully. The UI will update automatically." });
+  } catch (error) {
+    console.error("Manual Livehouse Sync Error:", error);
+    res.status(500).json({ error: error?.message || "Failed to sync Livehouse data." });
+  }
+});
+router.post("/public/livehouse/sync", async (req, res) => {
+  try {
+    await runAutoSyncLivehouseData(false);
+    res.json({ success: true, message: "Sync triggered" });
+  } catch (error) {
+    console.error("Public Livehouse Sync Error:", error);
+    res.status(500).json({ error: "Failed to sync" });
   }
 });
 router.post("/reset-password", requireAuth(3), async (req, res) => {
@@ -1076,7 +1529,7 @@ router.post(
       if (userSnap.exists) {
         return res.status(400).json({ error: `User with Poppo ID '${poppoId}' already exists.` });
       }
-      const authInstance = (0, import_auth.getAuth)(getFirebaseAdminApp());
+      const authInstance = (0, import_auth2.getAuth)(getFirebaseAdminApp());
       try {
         await authInstance.getUser(poppoId);
         return res.status(400).json({ error: `User with Poppo ID '${poppoId}' already exists in Authentication.` });
@@ -1186,16 +1639,24 @@ router.delete("/delete-user/:poppoId", verifyAdminRole, async (req, res) => {
       }
     }
     await db.collection("users").doc(cleanPoppoId).delete();
-    const reportsQuery = await db.collection("performance_reports").where("poppo_id", "==", cleanPoppoId).get();
+    const [reportsQuery, weeklyQuery] = await Promise.all([
+      db.collection("performance_reports").where("poppo_id", "==", cleanPoppoId).get(),
+      db.collection("performance_weekly_reports").where("poppo_id", "==", cleanPoppoId).get()
+    ]);
+    const batch = db.batch();
     if (!reportsQuery.empty) {
-      const batch = db.batch();
       reportsQuery.forEach((doc) => {
         batch.delete(doc.ref);
       });
-      await batch.commit();
     }
+    if (!weeklyQuery.empty) {
+      weeklyQuery.forEach((doc) => {
+        batch.delete(doc.ref);
+      });
+    }
+    await batch.commit();
     try {
-      const authInstance = (0, import_auth.getAuth)(getFirebaseAdminApp());
+      const authInstance = (0, import_auth2.getAuth)(getFirebaseAdminApp());
       await authInstance.deleteUser(cleanPoppoId);
       console.log(`\u{1F525} Deleted Firebase Auth user: ${cleanPoppoId}`);
     } catch (authErr) {
@@ -1260,7 +1721,7 @@ router.get("/verify-claims/:uid", verifyAdminRole, async (req, res) => {
     return res.status(400).json({ error: "User UID is required." });
   }
   try {
-    const authInstance = (0, import_auth.getAuth)(getFirebaseAdminApp());
+    const authInstance = (0, import_auth2.getAuth)(getFirebaseAdminApp());
     const userRecord = await authInstance.getUser(uid);
     console.log(`
 === SECURITY DIAGNOSTIC: Custom Claims for UID: ${uid} ===`);
@@ -1427,7 +1888,7 @@ async function verifyFirebaseIdToken(req, res, next) {
   }
   const idToken = authHeader.split("Bearer ")[1];
   try {
-    const auth = (0, import_auth.getAuth)(getFirebaseAdminApp());
+    const auth = (0, import_auth2.getAuth)(getFirebaseAdminApp());
     const decodedToken = await auth.verifyIdToken(idToken);
     await resolveTokenRole(decodedToken);
     req.firebaseUser = decodedToken;
@@ -1444,7 +1905,7 @@ async function verifyAdminRole(req, res, next) {
   }
   const idToken = authHeader.split("Bearer ")[1];
   try {
-    const auth = (0, import_auth.getAuth)(getFirebaseAdminApp());
+    const auth = (0, import_auth2.getAuth)(getFirebaseAdminApp());
     const decodedToken = await auth.verifyIdToken(idToken);
     await resolveTokenRole(decodedToken);
     const isSuperAdmin = decodedToken.isSuperAdmin === true;
@@ -1508,7 +1969,7 @@ router.post("/login-with-poppo", loginRateLimiter, async (req, res) => {
       }
       if (hostData2) {
         await syncCustomClaims("19157913", "director", false);
-        const authInstance = (0, import_auth.getAuth)(getFirebaseAdminApp());
+        const authInstance = (0, import_auth2.getAuth)(getFirebaseAdminApp());
         const customToken2 = await authInstance.createCustomToken("19157913", { tempPasswordRequired: false, role: "director", isSuperAdmin: true });
         const userPayload2 = buildUserPayload(hostData2);
         const token2 = import_jsonwebtoken.default.sign(userPayload2, JWT_SECRET, { expiresIn: "7d" });
@@ -1542,6 +2003,10 @@ router.post("/login-with-poppo", loginRateLimiter, async (req, res) => {
       logAuthEvent(cleanPoppoId, "FAILURE", ipAddress, "INACTIVE_ACCOUNT");
       return res.status(403).json({ error: "Account is inactive." });
     }
+    if (hostData.is_first_time === true) {
+      logAuthEvent(cleanPoppoId, "FAILURE", ipAddress, "RESET_PASSWORD_REQUIRED");
+      return res.status(403).json({ error: "Password reset required. Please enter your Poppo ID on the login page to set a new password." });
+    }
     const bcryptRegex = /^\$2[ayb]\$\d{2}\$[./A-Za-z0-9]{53}$/;
     const storedPassword = String(hostData.password || "");
     const isBcrypt = bcryptRegex.test(storedPassword);
@@ -1562,7 +2027,7 @@ router.post("/login-with-poppo", loginRateLimiter, async (req, res) => {
     await syncCustomClaims(cleanPoppoId, hostData.role, tempPasswordRequired);
     let customToken;
     try {
-      const authInstance = (0, import_auth.getAuth)(getFirebaseAdminApp());
+      const authInstance = (0, import_auth2.getAuth)(getFirebaseAdminApp());
       const developerClaims = {
         tempPasswordRequired,
         role: hostData.role || "host",
@@ -1641,7 +2106,7 @@ router.post("/change-password", verifyFirebaseIdToken, async (req, res) => {
       console.warn("Optional users collection update failed/skipped:", usersErr);
     }
     try {
-      const authInstance = (0, import_auth.getAuth)(getFirebaseAdminApp());
+      const authInstance = (0, import_auth2.getAuth)(getFirebaseAdminApp());
       const role = req.firebaseUser.role || "host";
       const isSuperAdmin = req.firebaseUser.isSuperAdmin === true || role === "director";
       await authInstance.setCustomUserClaims(poppoId, {
@@ -1972,7 +2437,7 @@ var auth_default = router;
 // src/server/auditRouter.ts
 var import_express2 = require("express");
 var import_firebase_admin = __toESM(require("firebase-admin"), 1);
-var import_auth2 = require("firebase-admin/auth");
+var import_auth3 = require("firebase-admin/auth");
 var router2 = (0, import_express2.Router)();
 var financialFields = [
   "agentCommission",
@@ -1996,7 +2461,7 @@ async function verifyFirebaseToken(req, res, next) {
   }
   const idToken = authHeader.split("Bearer ")[1];
   try {
-    const auth = (0, import_auth2.getAuth)(getFirebaseAdminApp());
+    const auth = (0, import_auth3.getAuth)(getFirebaseAdminApp());
     const decodedToken = await auth.verifyIdToken(idToken);
     req.firebaseUser = decodedToken;
     next();
@@ -2360,7 +2825,22 @@ async function sendCriticalAlert(log) {
 
 // server.ts
 var import_net = __toESM(require("net"), 1);
+var import_web_push = __toESM(require("web-push"), 1);
+var import_fs = __toESM(require("fs"), 1);
+var import_firebase_admin2 = __toESM(require("firebase-admin"), 1);
+var import_jsonwebtoken2 = __toESM(require("jsonwebtoken"), 1);
+var import_url = require("url");
+var import_meta = {};
+var getDirname = () => {
+  try {
+    return import_path.default.dirname((0, import_url.fileURLToPath)(import_meta.url));
+  } catch (e) {
+    return process.cwd();
+  }
+};
+var resolvedDirname = getDirname();
 import_dotenv.default.config();
+var JWT_SECRET2 = process.env.JWT_SECRET || "nine-dashboard-secret-key-12345";
 function findFreePort(start) {
   return new Promise((resolve) => {
     const server = import_net.default.createServer();
@@ -2371,14 +2851,470 @@ function findFreePort(start) {
     server.on("error", () => resolve(findFreePort(start + 1)));
   });
 }
+async function withTimeout2(promise, timeoutMs) {
+  return Promise.race([
+    promise,
+    new Promise(
+      (_, reject) => setTimeout(() => reject(new Error("Database lookup timed out")), timeoutMs)
+    )
+  ]);
+}
 async function startServer() {
   await initFirebaseSecrets();
   const app = (0, import_express3.default)();
   const PORT = Number(process.env.PORT || 3e3);
+  startCronJobs();
   app.use(import_express3.default.json({ limit: "100mb" }));
   app.use(import_express3.default.urlencoded({ limit: "100mb", extended: true }));
   app.use("/api/auth", auth_default);
   app.use("/api/admin", auth_default);
+  function normalizeRoleTypographyBackend(r) {
+    const norm = String(r || "").trim().toLowerCase();
+    if (norm === "host" || norm === "talent") return "Host";
+    if (norm === "admin") return "Admin";
+    if (norm === "manager") return "Manager";
+    if (norm === "agent") return "Agent";
+    if (norm === "head admin" || norm === "head_admin") return "Head Admin";
+    if (norm === "director") return "Director";
+    return r.split(/[\s_-]+/).map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(" ");
+  }
+  function getSafeRoleCollectionBackend(r) {
+    const norm = String(r || "").trim().toLowerCase();
+    if (norm === "host" || norm === "talent") return "host";
+    if (norm === "admin") return "admin";
+    if (norm === "manager") return "manager";
+    if (norm === "agent") return "agent";
+    if (norm === "head admin" || norm === "head_admin") return "head_admin";
+    if (norm === "director") return "director";
+    return "host";
+  }
+  async function updateManagerHostFieldsBackend(managerId, hostIdToAdd, hostIdToRemove) {
+    const db = getAdminFirestore();
+    let managerRef = db.collection("manager").doc(managerId);
+    let managerSnap = await withTimeout2(managerRef.get(), 3e3);
+    let currentRole = "manager";
+    if (!managerSnap.exists) {
+      managerRef = db.collection("agent").doc(managerId);
+      managerSnap = await withTimeout2(managerRef.get(), 3e3);
+      currentRole = "agent";
+      if (!managerSnap.exists) {
+        const userSnap = await withTimeout2(db.collection("users").doc(managerId).get(), 3e3);
+        if (!userSnap.exists) return;
+        const uRole = String(userSnap.data()?.role || "").toLowerCase();
+        currentRole = uRole === "agent" ? "agent" : "manager";
+        managerRef = db.collection(currentRole).doc(managerId);
+        managerSnap = await withTimeout2(managerRef.get(), 3e3);
+      }
+    }
+    const mgrData = managerSnap.exists ? managerSnap.data() : {};
+    let assignedHosts = mgrData.assignedHosts || [];
+    if (hostIdToAdd && !assignedHosts.includes(hostIdToAdd)) {
+      assignedHosts.push(hostIdToAdd);
+    }
+    if (hostIdToRemove) {
+      assignedHosts = assignedHosts.filter((id) => id !== hostIdToRemove);
+    }
+    const updateData = {
+      assignedHosts
+    };
+    const deleteField = import_firebase_admin2.default.firestore.FieldValue.delete;
+    Object.keys(mgrData).forEach((key) => {
+      if (key.startsWith("Assigned Host") || key.startsWith("Assigned host")) {
+        updateData[key] = deleteField();
+      }
+    });
+    assignedHosts.forEach((hId, index) => {
+      updateData[`Assigned Host ${index + 1}`] = hId;
+    });
+    const batch = db.batch();
+    batch.set(managerRef, updateData, { merge: true });
+    batch.set(db.collection("users").doc(managerId), { updated_at: (/* @__PURE__ */ new Date()).toISOString() }, { merge: true });
+    await withTimeout2(batch.commit(), 4e3);
+  }
+  async function syncHostManagerRelationshipBackend(hostId, newManagerId) {
+    const db = getAdminFirestore();
+    let oldManagerId = null;
+    const hostSnap = await withTimeout2(db.collection("host").doc(hostId).get(), 3e3);
+    if (hostSnap.exists) {
+      const hostData = hostSnap.data();
+      oldManagerId = hostData.assignedManagerId || hostData.assigned_manager_poppo_id || null;
+    }
+    let newManagerName = "";
+    if (newManagerId) {
+      const newManagerSnap = await withTimeout2(db.collection("users").doc(newManagerId).get(), 3e3);
+      if (newManagerSnap.exists) {
+        const mgrData = newManagerSnap.data();
+        newManagerName = mgrData.nickname || mgrData.name || "";
+      }
+    }
+    const hostFieldsToUpdate = {
+      manager: newManagerName || null,
+      assigned_manager: newManagerName || null,
+      assigned_manager_nickname: newManagerName || null,
+      assigned_manager_poppo_id: newManagerId || null,
+      assignedManagerId: newManagerId || null,
+      updated_at: (/* @__PURE__ */ new Date()).toISOString()
+    };
+    const batch = db.batch();
+    batch.set(db.collection("users").doc(hostId), { updated_at: hostFieldsToUpdate.updated_at }, { merge: true });
+    batch.set(db.collection("host").doc(hostId), hostFieldsToUpdate, { merge: true });
+    await withTimeout2(batch.commit(), 4e3);
+    if (newManagerId) {
+      await updateManagerHostFieldsBackend(newManagerId, hostId, null);
+    }
+    if (oldManagerId && oldManagerId !== newManagerId) {
+      await updateManagerHostFieldsBackend(oldManagerId, null, hostId);
+    }
+  }
+  async function verifyHeadAdminOrDirector(req, res, next) {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return res.status(401).json({ error: "Access Denied: Missing or malformed Authorization Bearer header." });
+    }
+    const token = authHeader.split("Bearer ")[1];
+    try {
+      const decodedToken = import_jsonwebtoken2.default.verify(token, JWT_SECRET2);
+      const db = getAdminFirestore();
+      const poppoId = decodedToken.poppo_id || decodedToken.uid;
+      let role = String(decodedToken.role || "").toLowerCase();
+      try {
+        const userDoc = await withTimeout2(db.collection("users").doc(poppoId).get(), 3e3);
+        if (userDoc.exists) {
+          role = String(userDoc.data()?.role || "").toLowerCase();
+        }
+      } catch (dbErr) {
+        console.warn("verifyHeadAdminOrDirector Firestore lookup failed, falling back to token claims:", dbErr.message || dbErr);
+      }
+      const isDirector = role === "director" || decodedToken.isSuperAdmin === true;
+      const isHeadAdmin = role === "head admin" || role === "head_admin";
+      if (!isDirector && !isHeadAdmin) {
+        return res.status(403).json({ error: "Forbidden: Only Head Admins or Directors can perform this action." });
+      }
+      req.user = decodedToken;
+      req.userRole = role;
+      next();
+    } catch (error) {
+      console.error("verifyHeadAdminOrDirector failed:", error.message);
+      return res.status(401).json({ error: "Access Denied: Invalid or expired token." });
+    }
+  }
+  app.get("/api/roster-management/search", verifyHeadAdminOrDirector, async (req, res) => {
+    try {
+      const queryStr = String(req.query.query || "").toLowerCase().trim();
+      const db = getAdminFirestore();
+      let users = [];
+      try {
+        const snapshot = await withTimeout2(db.collection("users").get(), 1500);
+        for (const doc of snapshot.docs) {
+          const data = doc.data();
+          const role = String(data.role || "host").toLowerCase();
+          if (role === "director") continue;
+          const poppoId = doc.id;
+          const nickname = String(data.nickname || data.name || "");
+          const name = String(data.name || "");
+          if (queryStr) {
+            const match = poppoId.includes(queryStr) || nickname.toLowerCase().includes(queryStr) || name.toLowerCase().includes(queryStr);
+            if (!match) continue;
+          }
+          users.push({
+            poppo_id: poppoId,
+            nickname: nickname || name || "Unknown",
+            name: name || nickname || "Unknown",
+            role: data.role || "host",
+            photoUrl: data.photoUrl || data.profile_photo || ""
+          });
+        }
+      } catch (dbErr) {
+        console.warn("Firestore collection query failed, using static fallback:", dbErr);
+      }
+      if (users.length === 0) {
+        const staticHosts = getStaticHosts();
+        for (const host of staticHosts) {
+          const role = String(host.role || "host").toLowerCase();
+          if (role === "director") continue;
+          const poppoId = host.id;
+          const nickname = String(host.nickname || host.name || "");
+          const name = String(host.name || "");
+          if (queryStr) {
+            const match = poppoId.includes(queryStr) || nickname.toLowerCase().includes(queryStr) || name.toLowerCase().includes(queryStr);
+            if (!match) continue;
+          }
+          users.push({
+            poppo_id: poppoId,
+            nickname: nickname || name || "Unknown",
+            name: name || nickname || "Unknown",
+            role: host.role || "host",
+            photoUrl: host.photoUrl || ""
+          });
+        }
+      }
+      return res.json(users);
+    } catch (err) {
+      console.error("Search endpoint failed:", err);
+      return res.status(500).json({ error: err.message || "Search failed." });
+    }
+  });
+  app.get("/api/roster-management/user/:poppoId", verifyHeadAdminOrDirector, async (req, res) => {
+    try {
+      const { poppoId } = req.params;
+      const db = getAdminFirestore();
+      let userData = null;
+      let userDocExists = false;
+      try {
+        const userDoc = await withTimeout2(db.collection("users").doc(poppoId).get(), 3e3);
+        if (userDoc.exists) {
+          userData = userDoc.data();
+          userDocExists = true;
+        }
+      } catch (dbErr) {
+        console.warn("Firestore lookup failed for details, using static fallback:", dbErr);
+      }
+      if (!userData) {
+        const staticHosts = getStaticHosts();
+        const staticHost = staticHosts.find((h) => String(h.id) === String(poppoId));
+        if (!staticHost) {
+          return res.status(404).json({ error: "User not found" });
+        }
+        userData = {
+          role: staticHost.role,
+          name: staticHost.name,
+          nickname: staticHost.nickname,
+          poppo_id: staticHost.id,
+          level: staticHost.level,
+          status: staticHost.status,
+          manager: staticHost.manager,
+          team: staticHost.team
+        };
+      }
+      const role = String(userData.role || "host").toLowerCase();
+      if (role === "director" && req.userRole !== "director") {
+        return res.status(403).json({ error: "Access to Director data is restricted." });
+      }
+      let collectionName = "host";
+      if (role === "admin") collectionName = "admin";
+      else if (role === "manager") collectionName = "manager";
+      else if (role === "agent") collectionName = "agent";
+      else if (role === "head admin" || role === "head_admin") collectionName = "head_admin";
+      let roleData = {};
+      if (userDocExists) {
+        try {
+          const roleDoc = await withTimeout2(db.collection(collectionName).doc(poppoId).get(), 3e3);
+          roleData = roleDoc.exists ? roleDoc.data() : {};
+        } catch (roleErr) {
+          console.warn("Firestore lookup failed for role document:", roleErr);
+        }
+      }
+      const mergedData = {
+        ...roleData,
+        ...userData,
+        poppo_id: poppoId,
+        role: userData.role || "Host"
+      };
+      return res.json(mergedData);
+    } catch (err) {
+      console.error("Get user details failed:", err);
+      return res.status(500).json({ error: err.message || "Failed to fetch user details." });
+    }
+  });
+  app.patch("/api/roster-management/update", verifyHeadAdminOrDirector, async (req, res) => {
+    try {
+      const { poppo_id, role, ...updateFields } = req.body;
+      if (!poppo_id || !role) {
+        return res.status(400).json({ error: "poppo_id and role are required." });
+      }
+      const db = getAdminFirestore();
+      const cleanId = String(poppo_id).trim();
+      const userRole = String(role).trim();
+      if (userRole.toLowerCase() === "director" && req.userRole !== "director") {
+        return res.status(403).json({ error: "Only Directors can edit Director accounts." });
+      }
+      let collectionName = "host";
+      const roleLower = userRole.toLowerCase();
+      if (roleLower === "admin") collectionName = "admin";
+      else if (roleLower === "manager") collectionName = "manager";
+      else if (roleLower === "agent") collectionName = "agent";
+      else if (roleLower === "head admin" || roleLower === "head_admin") collectionName = "head_admin";
+      else if (roleLower === "director") collectionName = "director";
+      const baseData = {
+        ...updateFields,
+        updated_at: (/* @__PURE__ */ new Date()).toISOString()
+      };
+      const teamAnchor = baseData.teamAnchor || baseData.team || baseData.team_anchor || "";
+      if (teamAnchor) {
+        baseData.teamAnchor = teamAnchor;
+        baseData.team = teamAnchor;
+        baseData.team_anchor = teamAnchor;
+      }
+      const managerName = baseData.manager || baseData.assigned_manager || baseData.assigned_manager_nickname || "";
+      const managerId = baseData.assignedManagerId || baseData.assigned_manager_poppo_id || "";
+      if (managerName) {
+        baseData.manager = managerName;
+        baseData.assigned_manager = managerName;
+        baseData.assigned_manager_nickname = managerName;
+      }
+      if (managerId) {
+        baseData.assignedManagerId = managerId;
+        baseData.assigned_manager_poppo_id = managerId;
+      }
+      const tierPay = baseData.tier_pay || baseData.tierPay || baseData.base_salary_category || "";
+      if (tierPay) {
+        baseData.tier_pay = tierPay;
+      }
+      const batch = db.batch();
+      const roleDocRef = db.collection(collectionName).doc(cleanId);
+      batch.set(roleDocRef, baseData, { merge: true });
+      const userUpdate = {
+        updated_at: baseData.updated_at
+      };
+      if (baseData.nickname !== void 0) userUpdate.nickname = baseData.nickname;
+      if (baseData.name !== void 0) userUpdate.name = baseData.name;
+      if (baseData.photoUrl !== void 0) userUpdate.photoUrl = baseData.photoUrl;
+      if (baseData.profile_photo !== void 0) userUpdate.photoUrl = baseData.profile_photo;
+      if (baseData.status !== void 0) userUpdate.status = baseData.status;
+      if (baseData.teamAnchor !== void 0) userUpdate.teamAnchor = baseData.teamAnchor;
+      if (baseData.level !== void 0) userUpdate.level = baseData.level;
+      const userDocRef = db.collection("users").doc(cleanId);
+      batch.set(userDocRef, userUpdate, { merge: true });
+      await withTimeout2(batch.commit(), 4e3);
+      if (roleLower === "host" && managerId !== void 0) {
+        await syncHostManagerRelationshipBackend(cleanId, managerId || null);
+      }
+      return res.json({ success: true, message: "User updated successfully." });
+    } catch (err) {
+      console.error("Update fields failed:", err);
+      return res.status(500).json({ error: err.message || "Failed to update user." });
+    }
+  });
+  app.patch("/api/roster-management/assign-host", verifyHeadAdminOrDirector, async (req, res) => {
+    try {
+      const { manager_id, host_id, action } = req.body;
+      if (!manager_id || !host_id || !action) {
+        return res.status(400).json({ error: "manager_id, host_id, and action are required." });
+      }
+      if (action === "assign") {
+        await syncHostManagerRelationshipBackend(host_id, manager_id);
+      } else if (action === "unassign") {
+        await syncHostManagerRelationshipBackend(host_id, null);
+      } else {
+        return res.status(400).json({ error: "Invalid action. Must be 'assign' or 'unassign'." });
+      }
+      return res.json({ success: true, message: `Host successfully ${action}ed.` });
+    } catch (err) {
+      console.error("Assign host failed:", err);
+      return res.status(500).json({ error: err.message || "Failed to assign host." });
+    }
+  });
+  app.patch("/api/roster-management/change-role", verifyHeadAdminOrDirector, async (req, res) => {
+    try {
+      const { poppo_id, old_role, new_role } = req.body;
+      if (!poppo_id || !old_role || !new_role) {
+        return res.status(400).json({ error: "poppo_id, old_role, and new_role are required." });
+      }
+      const cleanId = String(poppo_id).trim();
+      const oldRole = String(old_role).trim();
+      const newRole = String(new_role).trim();
+      if ((oldRole.toLowerCase() === "director" || newRole.toLowerCase() === "director") && req.userRole !== "director") {
+        return res.status(403).json({ error: "Forbidden: Only Directors can change Director roles." });
+      }
+      const db = getAdminFirestore();
+      const oldNormRole = normalizeRoleTypographyBackend(oldRole);
+      const newNormRole = normalizeRoleTypographyBackend(newRole);
+      const oldRoleCol = getSafeRoleCollectionBackend(oldNormRole);
+      const newRoleCol = getSafeRoleCollectionBackend(newNormRole);
+      let docData = {};
+      if (oldRoleCol !== newRoleCol) {
+        const oldDocRef = db.collection(oldRoleCol).doc(cleanId);
+        const oldDocSnap = await withTimeout2(oldDocRef.get(), 3e3);
+        if (oldDocSnap.exists) {
+          docData = oldDocSnap.data();
+          await withTimeout2(oldDocRef.delete(), 3e3);
+        }
+        docData.role = newNormRole;
+        docData.updated_at = (/* @__PURE__ */ new Date()).toISOString();
+        const newDocRef = db.collection(newRoleCol).doc(cleanId);
+        await withTimeout2(newDocRef.set(docData, { merge: true }), 3e3);
+      }
+      await withTimeout2(db.collection("users").doc(cleanId).update({
+        role: newNormRole,
+        updated_at: (/* @__PURE__ */ new Date()).toISOString()
+      }), 3e3);
+      const userSnap = await withTimeout2(db.collection("users").doc(cleanId).get(), 3e3);
+      const tempPasswordRequired = userSnap.exists ? userSnap.data()?.is_temp_password || false : false;
+      await syncCustomClaims(cleanId, newNormRole, tempPasswordRequired);
+      return res.json({ success: true, message: `Role changed successfully from ${oldRole} to ${newRole}.` });
+    } catch (err) {
+      console.error("Change role failed:", err);
+      return res.status(500).json({ error: err.message || "Failed to change role." });
+    }
+  });
+  app.patch("/api/users/reset-login", verifyHeadAdminOrDirector, async (req, res) => {
+    try {
+      const { poppo_id, is_first_time } = req.body;
+      if (!poppo_id) {
+        return res.status(400).json({ error: "poppo_id is required." });
+      }
+      if (is_first_time !== true) {
+        return res.status(400).json({ error: "is_first_time must be true." });
+      }
+      const db = getAdminFirestore();
+      const cleanId = String(poppo_id).trim();
+      const userDocRef = db.collection("users").doc(cleanId);
+      const userDocSnap = await withTimeout2(userDocRef.get(), 3e3);
+      if (!userDocSnap.exists) {
+        return res.status(404).json({ error: "User not found." });
+      }
+      await withTimeout2(userDocRef.update({
+        is_first_time: true,
+        updated_at: (/* @__PURE__ */ new Date()).toISOString()
+      }), 4e3);
+      console.log(`\u{1F504} Reset login state for Poppo ID: ${cleanId}`);
+      return res.json({ success: true, message: "Reset login state successful." });
+    } catch (err) {
+      console.error("Reset login state endpoint failed:", err);
+      return res.status(500).json({ error: err.message || "Failed to reset login state." });
+    }
+  });
+  app.post("/api/push/send-to-user", verifyHeadAdminOrDirector, async (req, res) => {
+    try {
+      const { poppo_id, title, body: body2, url } = req.body;
+      if (!poppo_id || !title || !body2) {
+        return res.status(400).json({ error: "Missing required fields: poppo_id, title, body" });
+      }
+      const userSubs = pushSubscriptions.filter((sub) => String(sub.poppo_id).trim() === String(poppo_id).trim());
+      if (userSubs.length === 0) {
+        return res.status(404).json({ error: "User has not enabled notifications" });
+      }
+      const payload = JSON.stringify({
+        title,
+        body: body2,
+        url: url || "/dashboard",
+        icon: "/logo.jpg",
+        badge: "/logo.jpg"
+      });
+      let successCount = 0;
+      const sendPromises = userSubs.map(async (sub) => {
+        try {
+          await import_web_push.default.sendNotification(sub, payload);
+          successCount++;
+        } catch (err) {
+          if (err.statusCode === 410 || err.statusCode === 404) {
+            pushSubscriptions = pushSubscriptions.filter((s) => s.endpoint !== sub.endpoint);
+            saveSubscriptions();
+          } else {
+            console.error(`Error sending push to ${sub.endpoint}:`, err.message);
+          }
+        }
+      });
+      await Promise.all(sendPromises);
+      if (successCount === 0) {
+        return res.status(404).json({ error: "User has not enabled notifications" });
+      }
+      res.json({ success: true, message: "Notification sent" });
+    } catch (error) {
+      console.error("Single user push notify error:", error);
+      return res.status(500).json({ error: error?.message || "Notification dispatch failed" });
+    }
+  });
   app.get("/api/health", (req, res) => {
     res.json({
       status: "ok",
@@ -2399,12 +3335,11 @@ async function startServer() {
       if (!privateKey || !clientEmail || !bucketName) {
         return res.status(500).json({ error: "Missing Firebase service account credentials" });
       }
-      const auth = new import_googleapis.google.auth.JWT(
-        clientEmail,
-        void 0,
-        privateKey,
-        ["https://www.googleapis.com/auth/devstorage.read_write"]
-      );
+      const auth = new import_googleapis.google.auth.JWT({
+        email: clientEmail,
+        key: privateKey,
+        scopes: ["https://www.googleapis.com/auth/devstorage.read_write"]
+      });
       const tokenResponse = await auth.getAccessToken();
       const accessToken = tokenResponse.token;
       if (!accessToken) throw new Error("Failed to obtain GCS access token");
@@ -2607,6 +3542,214 @@ Rules:
       return res.status(500).json({ error: error?.message || "Extraction failed" });
     }
   });
+  app.post("/api/extract-pk-report", async (req, res) => {
+    try {
+      const { fileData, mimeType } = req.body;
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey) {
+        return res.status(500).json({ error: "GEMINI_API_KEY is not configured" });
+      }
+      if (!fileData || !mimeType) {
+        return res.status(400).json({ error: "fileData and mimeType are required" });
+      }
+      const ai = new import_genai.GoogleGenAI({
+        apiKey,
+        httpOptions: { headers: { "User-Agent": "aistudio-build" } }
+      });
+      const base64DataRaw = fileData.includes("base64,") ? fileData.split("base64,")[1] : fileData;
+      const prompt = `
+PK REPORTING (Random PK / Friend PK / Team PK)
+Extract ONLY these fields:
+
+start_date
+end_date
+win_percent
+pk_score
+sessions
+
+Ignore everything else.
+
+\u{1F6AB} IGNORE EVERYTHING THAT IS NOT A VALID FIELD
+This includes:
+Full Scoop
+Level icons
+Profile pictures
+Tabs (Daily / Weekly / Monthly)
+Buttons
+Graph labels
+Ads
+Emojis
+Decorative text
+Any number or text not matching the valid field list
+
+If it is not in the valid field list, discard it.
+
+\u{1F3AF} BEHAVIOR RULES
+Never extract extra fields
+Never rename fields
+Never guess missing values
+Never mix fields from different screenshot types
+Only return fields that match the screenshot type
+If a field is missing in the screenshot, return it as empty
+If the screenshot does not match any known type, return an error message
+
+Return ONLY the raw JSON object, no markdown blocks.`;
+      let attempts = 0;
+      let extractedData = {};
+      while (attempts < 3) {
+        try {
+          const response = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: [
+              { inlineData: { mimeType, data: base64DataRaw } },
+              { text: prompt }
+            ],
+            config: {
+              responseMimeType: "application/json"
+            }
+          });
+          extractedData = JSON.parse(response.text || "{}");
+          break;
+        } catch (err) {
+          attempts += 1;
+          const maybeRetryable = err?.status === 503 || String(err?.message || "").includes("503") || String(err?.message || "").toLowerCase().includes("high demand");
+          if (maybeRetryable && attempts < 3) {
+            await new Promise((resolve) => setTimeout(resolve, 2e3 * attempts));
+            continue;
+          }
+          throw err;
+        }
+      }
+      return res.json({ data: extractedData });
+    } catch (error) {
+      console.error("PK extraction error:", error);
+      logSystemEvent({ severity: "Error", actionDescription: "PK Report Extraction failed", stackTrace: error?.stack || error?.message });
+      return res.status(500).json({ error: error?.message || "Extraction failed" });
+    }
+  });
+  app.post("/api/extract-stream-report", async (req, res) => {
+    try {
+      const { fileData, mimeType, reportType } = req.body;
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey) {
+        return res.status(500).json({ error: "GEMINI_API_KEY is not configured" });
+      }
+      if (!fileData || !mimeType || !reportType) {
+        return res.status(400).json({ error: "fileData, mimeType, and reportType are required" });
+      }
+      const ai = new import_genai.GoogleGenAI({
+        apiKey,
+        httpOptions: { headers: { "User-Agent": "aistudio-build" } }
+      });
+      let fieldsToExtract = "";
+      if (reportType === "daily") {
+        fieldsToExtract = `DAILY STREAMING DATA
+Extract ONLY:
+
+date
+won_points
+live_duration
+live_earnings
+avg_online_users_today
+party_duration
+party_earnings
+party_crown_duration
+new_fans
+new_fan_club_members
+
+Ignore everything else.`;
+      } else if (reportType === "weekly") {
+        fieldsToExtract = `WEEKLY STREAMING DATA
+Extract ONLY:
+
+dates
+live_duration
+points
+total_duration
+total_earnings
+avg_online_users_week
+new_fans
+new_fan_club_members
+gifting_this_week
+unfollowers_this_week
+
+Ignore everything else.`;
+      } else if (reportType === "monthly") {
+        fieldsToExtract = `MONTHLY STREAMING DATA
+Extract ONLY:
+
+dates
+points
+live_duration
+total_duration
+total_earnings
+three_month_earnings_excl_rewards
+last_live_broadcast_date
+
+Ignore everything else.`;
+      }
+      const prompt = `
+${fieldsToExtract}
+
+\u{1F6AB} IGNORE EVERYTHING THAT IS NOT A VALID FIELD
+This includes:
+Full Scoop
+Level icons
+Profile pictures
+Tabs (Daily / Weekly / Monthly)
+Buttons
+Graph labels
+Ads
+Emojis
+Decorative text
+Any number or text not matching the valid field list
+
+If it is not in the valid field list, discard it.
+
+\u{1F3AF} BEHAVIOR RULES
+Never extract extra fields
+Never rename fields
+Never guess missing values
+Never mix fields from different screenshot types
+Only return fields that match the screenshot type
+If a field is missing in the screenshot, return it as empty
+If the screenshot does not match any known type, return an error message
+
+Return ONLY the raw JSON object, no markdown blocks.`;
+      const base64DataRaw = fileData.includes("base64,") ? fileData.split("base64,")[1] : fileData;
+      let attempts = 0;
+      let extractedData = {};
+      while (attempts < 3) {
+        try {
+          const response = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: [
+              { inlineData: { mimeType, data: base64DataRaw } },
+              { text: prompt }
+            ],
+            config: {
+              responseMimeType: "application/json"
+            }
+          });
+          extractedData = JSON.parse(response.text || "{}");
+          break;
+        } catch (err) {
+          attempts += 1;
+          const maybeRetryable = err?.status === 503 || String(err?.message || "").includes("503") || String(err?.message || "").toLowerCase().includes("high demand");
+          if (maybeRetryable && attempts < 3) {
+            await new Promise((resolve) => setTimeout(resolve, 2e3 * attempts));
+            continue;
+          }
+          throw err;
+        }
+      }
+      return res.json({ data: extractedData });
+    } catch (error) {
+      console.error("Stream report extraction error:", error);
+      logSystemEvent({ severity: "Error", actionDescription: "Stream Report Extraction failed", stackTrace: error?.stack || error?.message });
+      return res.status(500).json({ error: error?.message || "Extraction failed" });
+    }
+  });
   app.post("/api/verify-recaptcha", async (req, res) => {
     try {
       const { token, action } = req.body;
@@ -2680,6 +3823,226 @@ Rules:
     } catch (error) {
       console.error("FCM Notify error:", error);
       return res.status(500).json({ error: error?.message || "Notification dispatch failed" });
+    }
+  });
+  const DEFAULT_NOTIFICATION_TYPES = [
+    { id: "booking_request", label: "Booking Requests", description: "When a new Livehouse booking request is submitted.", targets: ["director", "manager"], when: "immediately", active: true },
+    { id: "pk_report", label: "PK Reports", description: "When a host submits a PK battle performance report.", targets: ["director", "admin"], when: "immediately", active: true },
+    { id: "fanbase_report", label: "Fanbase Health Reports", description: "When a fanbase health status report is submitted.", targets: ["director", "manager"], when: "immediately", active: true },
+    { id: "host_sos", label: "Host SOS Emergency Alerts", description: "Critical SOS or emergency alerts triggered by hosts.", targets: ["director", "admin", "manager"], when: "immediately", active: true },
+    { id: "roster_update", label: "Roster Updates", description: "When a host profile is updated, provisioned, or terminated.", targets: ["director", "admin"], when: "immediately", active: true },
+    { id: "commission_upload", label: "Commission Sheet Uploads", description: "When new monthly commission sheets are processed and uploaded.", targets: ["host"], when: "immediately", active: true }
+  ];
+  const VAPID_KEYS_FILE = import_path.default.join(resolvedDirname, "vapid_keys_fallback.json");
+  let vapidPublicKey = process.env.VAPID_PUBLIC_KEY || "";
+  let vapidPrivateKey = process.env.VAPID_PRIVATE_KEY || "";
+  if (!vapidPublicKey || !vapidPrivateKey) {
+    if (import_fs.default.existsSync(VAPID_KEYS_FILE)) {
+      try {
+        const savedKeys = JSON.parse(import_fs.default.readFileSync(VAPID_KEYS_FILE, "utf8"));
+        vapidPublicKey = savedKeys.publicKey;
+        vapidPrivateKey = savedKeys.privateKey;
+      } catch (e) {
+        console.error("Failed to parse saved VAPID keys fallback:", e);
+      }
+    }
+    if (!vapidPublicKey || !vapidPrivateKey) {
+      try {
+        const generated = import_web_push.default.generateVAPIDKeys();
+        vapidPublicKey = generated.publicKey;
+        vapidPrivateKey = generated.privateKey;
+        import_fs.default.writeFileSync(VAPID_KEYS_FILE, JSON.stringify(generated), "utf8");
+        console.log("=== DYNAMIC FALLBACK VAPID KEYS GENERATED & PERSISTED ===");
+        console.log("Public Key:", vapidPublicKey);
+        console.log("=========================================================");
+      } catch (err) {
+        console.error("Failed to dynamically generate VAPID keys. Ensure web-push is installed.");
+      }
+    }
+  }
+  if (vapidPublicKey && vapidPrivateKey) {
+    try {
+      import_web_push.default.setVapidDetails(
+        "mailto:admin@9poppo.com",
+        vapidPublicKey,
+        vapidPrivateKey
+      );
+    } catch (err) {
+      console.error("Failed to set VAPID details:", err.message);
+    }
+  }
+  const SUBSCRIPTIONS_FILE = import_path.default.join(resolvedDirname, "push_subscriptions.json");
+  const NOTIFICATION_TYPES_FILE = import_path.default.join(resolvedDirname, "notification_types.json");
+  let pushSubscriptions = [];
+  if (import_fs.default.existsSync(SUBSCRIPTIONS_FILE)) {
+    try {
+      pushSubscriptions = JSON.parse(import_fs.default.readFileSync(SUBSCRIPTIONS_FILE, "utf8"));
+    } catch (e) {
+      console.error("Failed to read push subscriptions file:", e);
+    }
+  }
+  let notificationTypes = [...DEFAULT_NOTIFICATION_TYPES];
+  if (import_fs.default.existsSync(NOTIFICATION_TYPES_FILE)) {
+    try {
+      const loaded = JSON.parse(import_fs.default.readFileSync(NOTIFICATION_TYPES_FILE, "utf8"));
+      notificationTypes = DEFAULT_NOTIFICATION_TYPES.map((def) => {
+        const found = loaded.find((l) => l.id === def.id);
+        return found ? {
+          ...def,
+          active: found.active !== void 0 ? found.active : def.active,
+          targets: found.targets || def.targets,
+          when: found.when || def.when
+        } : def;
+      });
+    } catch (e) {
+      console.error("Failed to read notification types file:", e);
+    }
+  }
+  function saveSubscriptions() {
+    try {
+      import_fs.default.writeFileSync(SUBSCRIPTIONS_FILE, JSON.stringify(pushSubscriptions, null, 2), "utf8");
+    } catch (e) {
+      console.error("Failed to save push subscriptions:", e);
+    }
+  }
+  function saveNotificationTypes() {
+    try {
+      import_fs.default.writeFileSync(NOTIFICATION_TYPES_FILE, JSON.stringify(notificationTypes, null, 2), "utf8");
+    } catch (e) {
+      console.error("Failed to save notification types:", e);
+    }
+  }
+  app.get("/api/push/public-key", (req, res) => {
+    res.json({ publicKey: vapidPublicKey });
+  });
+  app.post("/api/push/subscribe", async (req, res) => {
+    const { subscription, poppo_id } = req.body;
+    const subObj = subscription || req.body;
+    const poppoId = poppo_id || null;
+    if (!subObj || !subObj.endpoint) {
+      return res.status(400).json({ error: "Invalid subscription payload" });
+    }
+    const index = pushSubscriptions.findIndex((sub) => sub.endpoint === subObj.endpoint);
+    if (index > -1) {
+      if (poppoId) {
+        pushSubscriptions[index].poppo_id = poppoId;
+        saveSubscriptions();
+      }
+    } else {
+      pushSubscriptions.push({
+        ...subObj,
+        poppo_id: poppoId
+      });
+      saveSubscriptions();
+    }
+    if (poppoId) {
+      const db = getAdminFirestore();
+      try {
+        await db.collection("users").doc(poppoId).update({ notificationRequestedByDirector: false });
+      } catch (err) {
+        console.warn(`Failed to clear notificationRequestedByDirector for user ${poppoId}:`, err.message);
+      }
+    }
+    res.status(201).json({ status: "success", message: "Subscription registered." });
+  });
+  app.post("/api/push/send", async (req, res) => {
+    const { title, body: body2, url, type } = req.body;
+    if (!title || !body2 || !type) {
+      return res.status(400).json({ error: "Missing title, body, or type fields" });
+    }
+    const notifType = notificationTypes.find((t) => t.id === type);
+    if (!notifType || !notifType.active) {
+      return res.json({
+        status: "ignored",
+        message: `Notification type '${type}' is currently inactive.`
+      });
+    }
+    const payload = JSON.stringify({
+      title,
+      body: body2,
+      url: url || "/dashboard",
+      icon: "/logo.jpg",
+      badge: "/logo.jpg"
+    });
+    const sendPromises = pushSubscriptions.map(async (sub) => {
+      try {
+        await import_web_push.default.sendNotification(sub, payload);
+      } catch (err) {
+        if (err.statusCode === 410 || err.statusCode === 404) {
+          pushSubscriptions = pushSubscriptions.filter((s) => s.endpoint !== sub.endpoint);
+          saveSubscriptions();
+        } else {
+          console.error(`Error sending push to ${sub.endpoint}:`, err.message);
+        }
+      }
+    });
+    await Promise.all(sendPromises);
+    res.json({
+      status: "success",
+      message: `Notification sent to active subscribers. Total active subscriptions: ${pushSubscriptions.length}`
+    });
+  });
+  app.patch("/api/notifications/update-rule", verifyHeadAdminOrDirector, (req, res) => {
+    const { id, active, targets, when } = req.body;
+    if (!id) {
+      return res.status(400).json({ error: "Missing rule ID" });
+    }
+    const rule = notificationTypes.find((t) => t.id === id);
+    if (!rule) {
+      return res.status(404).json({ error: "Notification type not found" });
+    }
+    if (active !== void 0) rule.active = active;
+    if (targets !== void 0) rule.targets = targets;
+    if (when !== void 0) rule.when = when;
+    saveNotificationTypes();
+    res.json({ status: "success", item: rule });
+  });
+  app.get("/api/notifications", (req, res) => {
+    res.json(notificationTypes);
+  });
+  app.get("/api/notifications/users", verifyHeadAdminOrDirector, async (req, res) => {
+    try {
+      const db = getAdminFirestore();
+      const snapshot = await withTimeout2(db.collection("users").get(), 3e3);
+      const usersList = snapshot.docs.map((doc) => {
+        const data = doc.data();
+        const poppoId = doc.id;
+        const hasWebPush = pushSubscriptions.some((sub) => String(sub.poppo_id).trim() === String(poppoId).trim());
+        const fcmTokens = data.fcmTokens || [];
+        const hasFcm = Array.isArray(fcmTokens) && fcmTokens.length > 0;
+        return {
+          poppoId,
+          nickname: data.nickname || data.name || "",
+          role: data.role || "host",
+          hasWebPush,
+          hasFcm,
+          hasAllowed: hasWebPush || hasFcm,
+          notificationRequestedByDirector: data.notificationRequestedByDirector === true
+        };
+      });
+      return res.json(usersList);
+    } catch (error) {
+      console.error("Failed to get notification users:", error);
+      return res.status(500).json({ error: error?.message || "Internal server error" });
+    }
+  });
+  app.post("/api/notifications/request-device", verifyHeadAdminOrDirector, async (req, res) => {
+    try {
+      const { targetPoppoId } = req.body;
+      if (!targetPoppoId) {
+        return res.status(400).json({ error: "Missing targetPoppoId" });
+      }
+      const db = getAdminFirestore();
+      const userRef = db.collection("users").doc(targetPoppoId);
+      const userSnap = await userRef.get();
+      if (!userSnap.exists) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      await userRef.update({ notificationRequestedByDirector: true });
+      return res.json({ status: "success", message: `Device notification request sent to user ${targetPoppoId}` });
+    } catch (error) {
+      console.error("Failed to send notification request:", error);
+      return res.status(500).json({ error: error?.message || "Internal server error" });
     }
   });
   const isDev = process.env.NODE_ENV !== "production";

@@ -26,5 +26,6 @@
   "editor.experimental.preferTreeSitter.typescript": true,
   "editor.gotoLocation.alternativeReferenceCommand": "editor.action.goToReferences",
   "editor.selectionHighlightMultiline": true,
-  "editor.smoothScrolling": true
+  "editor.smoothScrolling": true,
+  "github-actions.workflows.pinned.refresh.enabled": true
 }

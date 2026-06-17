@@ -180,7 +180,7 @@ export const RosterManagementTab: React.FC<RosterManagementTabProps> = ({ hosts,
       const hostId = String(h.poppo_id || h.poppoId || h.id || '');
       const hostName = String(h.nickname || h.name || '');
       const matchesSearch = (hostName.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                             hostId.includes(searchTerm));
+                             hostId.toLowerCase().includes(searchTerm.toLowerCase()));
       
       const matchesRole = roleFilter === 'All' || (h.role || '').toLowerCase() === roleFilter.toLowerCase();
 
@@ -532,7 +532,7 @@ export const RosterManagementTab: React.FC<RosterManagementTabProps> = ({ hosts,
                           onChange={(e) => handleFieldChange(host.id, 'role', e.target.value)}
                           className="bg-transparent border border-transparent hover:border-white/10 focus:border-indigo-500 rounded px-2 py-1 outline-none text-[#F0EFE8] w-28 font-bold"
                         >
-                          {['Host', 'Manager', 'Agent', 'Head Admin', 'Admin', 'Director', 'Talent'].map(r => (
+                          {['Host', 'Manager', 'Agent', 'Admin', 'Director', 'Talent'].map(r => (
                             <option key={r} value={r} className="bg-[#1A1A28]">{r}</option>
                           ))}
                         </select>

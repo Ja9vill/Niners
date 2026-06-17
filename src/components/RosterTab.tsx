@@ -7,8 +7,13 @@ import { Host, Role, BaseSalaryTier, HostStatus, AnchorType, Tier } from '../typ
 import { Storage } from '../lib/storage';
 =======
 import React, { useState, useEffect, useMemo } from 'react';
+<<<<<<< HEAD
 import { Search, Filter, Loader2, Star, Users, LayoutGrid } from 'lucide-react';
 >>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
+=======
+import { createPortal } from 'react-dom';
+import { Search, Filter, Loader2, Star, Users, LayoutGrid, Medal, Ribbon, Gamepad2, Rocket } from 'lucide-react';
+>>>>>>> 2b42d3ae84c3e300e1faeb35e7009a759158d1e9
 import { FirebaseService } from '../lib/firebaseService';
 import { cn } from '../lib/utils';
 import { Host } from '../types';
@@ -17,72 +22,50 @@ import { HostProfileView } from './HostProfileView';
 const getTierBlockStyles = (tierInput: string) => {
   const norm = String(tierInput || '').toLowerCase();
   if (norm.includes('star')) {
-    return {
-      border: 'border-[#D4AF37]/20 hover:border-[#D4AF37]/50',
-      bg: 'bg-gradient-to-br from-[#D4AF37]/8 via-transparent to-transparent'
-    };
+    return "global-tier-3";
   }
   if (norm.includes('s idol') || norm.includes('idol')) {
-    return {
-      border: 'border-[#ec4899]/20 hover:border-[#ec4899]/50',
-      bg: 'bg-gradient-to-br from-[#ec4899]/8 via-transparent to-transparent'
-    };
+    return "global-tier-1";
   }
   if (norm.includes('rocket')) {
-    return {
-      border: 'border-[#3b82f6]/20 hover:border-[#3b82f6]/50',
-      bg: 'bg-gradient-to-br from-[#3b82f6]/8 via-transparent to-transparent'
-    };
+    return "global-tier-4";
   }
   if (norm.includes('esports') || norm.includes('esport')) {
-    return {
-      border: 'border-[#a855f7]/20 hover:border-[#a855f7]/50',
-      bg: 'bg-gradient-to-br from-[#a855f7]/8 via-transparent to-transparent'
-    };
+    return "global-tier-2";
   }
   if (norm.includes('regular')) {
-    return {
-      border: 'border-[#10b981]/20 hover:border-[#10b981]/50',
-      bg: 'bg-gradient-to-br from-[#10b981]/8 via-transparent to-transparent'
-    };
+    return "bg-green-600/20 text-green-300 border border-green-600/50 shadow-[0_0_10px_rgba(22,163,74,0.2)]";
   }
-  return {
-    border: 'border-white/5 hover:border-indigo-500/30',
-    bg: 'bg-[#1A1A28]'
-  };
+  return "bg-[#1A1A28] border border-white/5 hover:border-indigo-500/30";
 };
 
 const getTierFilterStyle = (tierInput: string, isSelected: boolean) => {
-  if (!isSelected) {
-    return "bg-black/20 text-[#A09E9A] border-white/10 hover:border-white/30 hover:text-[#F0EFE8]";
-  }
-  
   const lower = String(tierInput || '').toLowerCase();
   
-  // star host - gold to yellow gold
-  if (lower.includes('star')) return "bg-yellow-500/20 text-yellow-300 border-yellow-500/50 shadow-[0_0_10px_rgba(234,179,8,0.2)]";
-  
-  // rocket host- blue to dark blue
-  if (lower.includes('rocket')) return "bg-blue-600/20 text-blue-300 border-blue-600/50 shadow-[0_0_10px_rgba(37,99,235,0.2)]";
-  
-  // s idol- pink to dark pink
-  if (lower.includes('idol')) return "bg-pink-600/20 text-pink-300 border-pink-600/50 shadow-[0_0_10px_rgba(219,39,119,0.2)]";
-  
-  // esports- purple to violet
-  if (lower.includes('esport')) return "bg-purple-600/20 text-purple-300 border-purple-600/50 shadow-[0_0_10px_rgba(147,51,234,0.2)]";
-  
-  // regular host - green
-  if (lower.includes('regular')) return "bg-green-600/20 text-green-300 border-green-600/50 shadow-[0_0_10px_rgba(22,163,74,0.2)]";
-  
-  // influencer is light yellow and white
-  if (lower.includes('influencer')) return "bg-yellow-100/20 text-yellow-100 border-yellow-100/50 shadow-[0_0_10px_rgba(254,240,138,0.2)]";
+  let baseClass = "";
+  if (lower.includes('star')) baseClass = "text-[#FFEA00] bg-[#FFEA00]/20 border-[#FFEA00]/50 shadow-[0_0_12px_rgba(255,234,0,0.5)]";
+  else if (lower.includes('s idol') || lower.includes('idol')) baseClass = "text-[#FF007F] bg-[#FF007F]/20 border-[#FF007F]/50 shadow-[0_0_12px_rgba(255,0,127,0.5)]";
+  else if (lower.includes('rocket')) baseClass = "text-[#60A5FA] bg-[#1E3A8A]/60 border-[#60A5FA]/60 shadow-[0_0_12px_rgba(96,165,250,0.5)]";
+  else if (lower.includes('esports') || lower.includes('esport')) baseClass = "text-[#B026FF] bg-[#B026FF]/20 border-[#B026FF]/50 shadow-[0_0_12px_rgba(176,38,255,0.5)]";
+  else if (lower.includes('regular')) baseClass = "text-[#34D399] bg-[#34D399]/20 border-[#34D399]/50 shadow-[0_0_12px_rgba(52,211,153,0.5)]";
+  else baseClass = "text-white bg-white/10 border-white/20";
 
-  // Default fallback
-  return "bg-indigo-500/20 text-indigo-300 border-indigo-500/50 shadow-[0_0_10px_rgba(99,102,241,0.2)]";
+  if (!isSelected) {
+    const unselectedClass = baseClass
+      .replace(/shadow-\[.*?\]/, 'shadow-none')
+      .replace(/border-\[.*?\]\/\d+/, 'border-transparent');
+    return `${unselectedClass} opacity-50 hover:opacity-80 cursor-pointer`;
+  }
+  
+  return `${baseClass} opacity-100 ring-1 ring-white/30`;
 };
 
 const formatBadgeTitle = (title: string) => {
   if (!title) return '';
+  const match = title.match(/Top (\d+) Niner/i);
+  if (match) {
+    return `Top ${match[1]} Niner`;
+  }
   return title
     .replace(/\bJanuary\b/i, 'Jan')
     .replace(/\bFebruary\b/i, 'Feb')
@@ -167,7 +150,11 @@ export const RosterTab: React.FC<RosterTabProps> = ({ isReadOnly = false }) => {
   const [selectedHost, setSelectedHost] = useState<Host | null>(null);
 
   // Dynamic portal target setup to resolve iframe/mobile layout clipping
+<<<<<<< HEAD
   const containerRef = useRef<HTMLDivElement>(null);
+=======
+  const containerRef = React.useRef<HTMLDivElement>(null);
+>>>>>>> 2b42d3ae84c3e300e1faeb35e7009a759158d1e9
   const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
 
   useEffect(() => {
@@ -176,14 +163,71 @@ export const RosterTab: React.FC<RosterTabProps> = ({ isReadOnly = false }) => {
     } else {
       setPortalTarget(document.body);
     }
+<<<<<<< HEAD
   }, [spotlightHost]);
+=======
+  }, [selectedHost]);
+
+  // Top Niners & Badges
+  const [allAwards, setAllAwards] = useState<any[]>([]);
+
+  const [allReports, setAllReports] = useState<any[]>([]);
+
+  const top9NinerData = useMemo(() => {
+    if (!allReports || allReports.length === 0) return [];
+    
+    // Find the latest month
+    let maxYear = 0;
+    let maxMonth = 0;
+    allReports.forEach(r => {
+      if (r.year > maxYear) {
+        maxYear = r.year;
+        maxMonth = r.month;
+      } else if (r.year === maxYear && r.month > maxMonth) {
+        maxMonth = r.month;
+      }
+    });
+
+    if (maxYear === 0) return [];
+
+    // Filter to latest month
+    const latestReports = allReports.filter(r => r.year === maxYear && r.month === maxMonth);
+    
+    // Aggregate by poppoId
+    const commByHost: Record<string, number> = {};
+    latestReports.forEach(r => {
+      const comm = Number(r.agentCommission || r.agent_commission || r.agentComm || r.commission || r.Commission || 0);
+      const id = String(r.poppoId || r.poppo_id);
+      commByHost[id] = (commByHost[id] || 0) + comm;
+    });
+
+    // Sort by commission descending and take top 9
+    const sorted = Object.entries(commByHost)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 9)
+      .map(([id, comm], index) => ({ id, rank: index + 1 }));
+
+    return sorted;
+  }, [allReports]);
+
+  const top9NinerIds = useMemo(() => top9NinerData.map(d => d.id), [top9NinerData]);
+  const [showTopNiners, setShowTopNiners] = useState(() => {
+    return window.location.search.includes('filter=top-niners');
+  });
+>>>>>>> 2b42d3ae84c3e300e1faeb35e7009a759158d1e9
 
   useEffect(() => {
     const fetchUsers = async () => {
       setIsLoading(true);
       try {
-        const users = await FirebaseService.getAllRoleMetadata();
+        const [users, awards, reports] = await Promise.all([
+          FirebaseService.getAllRoleMetadata(),
+          FirebaseService.getAllAssignedAwards(),
+          FirebaseService.getAllPerformanceReports()
+        ]);
         setHosts(users.map(u => ({ ...u, id: u.poppo_id || u.poppoId || u.id } as Host)));
+        setAllAwards(awards);
+        setAllReports(reports);
       } catch (err: any) {
         console.error("Failed to load users from Firebase:", err);
         setError(err.message || 'Failed to connect to Database');
@@ -204,6 +248,11 @@ export const RosterTab: React.FC<RosterTabProps> = ({ isReadOnly = false }) => {
 
   const filteredHosts = useMemo(() => {
     return hosts.filter(host => {
+      // 0. Top Niners Filter
+      if (showTopNiners) {
+        if (!top9NinerIds.includes(String(host.id))) return false;
+      }
+
       // 1. Search Filter
       if (searchTerm.trim()) {
         const searchStr = searchTerm.toLowerCase();
@@ -229,8 +278,41 @@ export const RosterTab: React.FC<RosterTabProps> = ({ isReadOnly = false }) => {
       }
 
       return true;
+    }).sort((a, b) => {
+      // Top Niners Sort overrides everything
+      if (showTopNiners) {
+        const indexA = top9NinerIds.indexOf(String(a.id));
+        const indexB = top9NinerIds.indexOf(String(b.id));
+        return indexA - indexB;
+      }
+
+      // 0. Active first
+      const aIsActive = (a.status || '').toLowerCase() === 'active';
+      const bIsActive = (b.status || '').toLowerCase() === 'active';
+      if (aIsActive !== bIsActive) {
+        return aIsActive ? -1 : 1;
+      }
+
+      // 1. Role 'host' first
+      const aIsHost = ['host', 'talent'].includes((a.role || '').toLowerCase().trim());
+      const bIsHost = ['host', 'talent'].includes((b.role || '').toLowerCase().trim());
+      if (aIsHost !== bIsHost) {
+        return aIsHost ? -1 : 1;
+      }
+
+      // 2. Photo presence (photo first)
+      const aHasPhoto = !!a.photoUrl;
+      const bHasPhoto = !!b.photoUrl;
+      if (aHasPhoto !== bHasPhoto) {
+        return aHasPhoto ? -1 : 1;
+      }
+      
+      // 3. Alphabetical by nickname/name
+      const aName = (a.nickname || a.name || '').toLowerCase();
+      const bName = (b.nickname || b.name || '').toLowerCase();
+      return aName.localeCompare(bName);
     });
-  }, [hosts, searchTerm, roleFilter, selectedTiers]);
+  }, [hosts, searchTerm, roleFilter, selectedTiers, showTopNiners, top9NinerIds]);
 
   if (isLoading) {
     return (
@@ -661,45 +743,52 @@ export const RosterTab: React.FC<RosterTabProps> = ({ isReadOnly = false }) => {
   }
 
   return (
-    <div className="space-y-6 relative">
+    <div ref={containerRef} className="space-y-6 relative">
       {/* FILTER MENU BLOCKS */}
-      <div className="bg-[#1A1A28]/80 backdrop-blur-md p-5 rounded-2xl border border-[#D4AF37]/40 shadow-[0_0_15px_rgba(212,175,55,0.15)] sticky top-0 z-10 flex flex-col gap-4 relative overflow-hidden">
+      <div className="global-block-1 relative z-10 flex flex-col gap-2.5 overflow-hidden p-4">
         {/* Subtle background glow for the filter section */}
         <div className="absolute -top-24 -left-24 w-48 h-48 bg-indigo-500/10 blur-3xl rounded-full pointer-events-none"></div>
         <div className="absolute -bottom-24 -right-24 w-48 h-48 bg-[#D4AF37]/5 blur-3xl rounded-full pointer-events-none"></div>
 
         {/* Search & Role Filter Row */}
-        <div className="flex flex-row gap-3 items-center z-10 w-full">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-indigo-400/50" size={16} />
+        <div className="global-placeholder flex w-full items-center justify-between gap-2 bg-gradient-to-br from-[#FFB800]/10 to-transparent border border-[#FFB800]/20 border-t-[#FFB800]/40 rounded-xl px-4 py-2 backdrop-blur-xl shadow-[0_8px_32px_rgba(0,0,0,0.5),inset_0_1px_1px_rgba(255,184,0,0.3)] relative z-10 overflow-hidden">
+          <div className="relative flex-1 flex items-center">
+            <Search className="text-[#FFB700] drop-shadow-[0_0_8px_rgba(255,184,0,0.5)] mr-3 shrink-0" size={18} />
             <input
               type="text"
               placeholder="Search Host ID or Nickname..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-9 pr-4 py-3 bg-black/30 border border-white/10 rounded-xl text-xs text-[#F0EFE8] focus:outline-none focus:border-indigo-500/50 focus:bg-black/50 transition-all w-full shadow-inner"
+              className="w-full bg-transparent border-none text-sm text-[#F0EFE8] placeholder:text-[#A09E9A]/60 focus:outline-none focus:ring-0"
             />
           </div>
           
-          <div className="w-32 sm:w-48 shrink-0">
+          <div className="w-32 sm:w-48 shrink-0 flex items-center justify-end border-l border-[#FFB800]/20 pl-4">
             <select
               value={roleFilter}
               onChange={(e) => setRoleFilter(e.target.value as any)}
               title="Filter by Role"
-              className="w-full py-3 px-4 bg-[#0D0D14] border border-white/10 rounded-xl text-xs text-[#F0EFE8] focus:outline-none focus:border-indigo-500/50 focus:bg-black/50 transition-all cursor-pointer shadow-inner font-bold"
+              className="w-full bg-transparent border-none text-xs text-[#FFB700] font-bold focus:outline-none cursor-pointer uppercase tracking-wider text-right appearance-none text-align-last-right"
             >
-              <option value="all" className="bg-[#1A1A28] text-[#F0EFE8]">All Members</option>
-              <option value="hosts" className="bg-[#1A1A28] text-[#F0EFE8]">Hosts</option>
-              <option value="team_leaders" className="bg-[#1A1A28] text-[#F0EFE8]">Team Leaders</option>
+              <option value="all" className="bg-black text-[#FFB700]">All Members</option>
+              <option value="hosts" className="bg-black text-[#FFB700]">Hosts</option>
+              <option value="team_leaders" className="bg-black text-[#FFB700]">Team Leaders</option>
             </select>
           </div>
         </div>
 
-        {/* Tier Pay Category */}
+        {/* Tier Pay Category & Top Niners */}
         <div className="w-full z-10">
-          <h3 className="text-[10px] font-black uppercase tracking-widest text-[#A09E9A]/50 mb-2 flex items-center gap-1.5"><Star size={12}/> Tier Pay Category</h3>
-          <div className="flex flex-wrap gap-2">
-            {['Star Host', 'Rocket Host', 'S idol', 'Esports', 'Influencer', 'Regular Host'].map(tier => {
+          <div className="flex flex-wrap gap-1.5 items-center">
+            {[
+              { name: 'S idol', icon: Ribbon },
+              { name: 'Esports', icon: Gamepad2 },
+              { name: 'Star Host', icon: Star },
+              { name: 'Rocket Host', icon: Rocket },
+              { name: 'Regular Host', icon: Users }
+            ].map(tierObj => {
+              const tier = tierObj.name;
+              const Icon = tierObj.icon;
               const isSelected = selectedTiers.includes(tier);
               return (
                 <button
@@ -709,14 +798,42 @@ export const RosterTab: React.FC<RosterTabProps> = ({ isReadOnly = false }) => {
                     else setSelectedTiers(prev => [...prev, tier]);
                   }}
                   className={cn(
-                    "px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all border",
+                    "px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider border backdrop-blur-sm shadow-sm flex items-center gap-1 transition-all",
                     getTierFilterStyle(tier, isSelected)
                   )}
                 >
+                  <Star size={8} />
                   {tier}
                 </button>
               );
             })}
+            
+            <div className="w-[1px] h-6 bg-white/10 mx-1"></div>
+            
+            <button
+              onClick={() => {
+                const newValue = !showTopNiners;
+                setShowTopNiners(newValue);
+                if (newValue) {
+                  const url = new URL(window.location.href);
+                  url.searchParams.set('filter', 'top-niners');
+                  window.history.replaceState({}, '', url);
+                } else {
+                  const url = new URL(window.location.href);
+                  url.searchParams.delete('filter');
+                  window.history.replaceState({}, '', url);
+                }
+              }}
+              className={cn(
+                "px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider border backdrop-blur-sm shadow-sm flex items-center gap-1 transition-all",
+                showTopNiners
+                  ? "text-[#D4AF37] bg-[#D4AF37]/20 border-[#D4AF37]/50 shadow-[0_0_12px_rgba(212,175,55,0.5)] opacity-100 ring-1 ring-white/30"
+                  : "text-[#D4AF37] bg-[#D4AF37]/20 border-transparent shadow-none opacity-50 hover:opacity-80 cursor-pointer"
+              )}
+            >
+              <Medal size={8} />
+              TOP NINERS
+            </button>
           </div>
         </div>
       </div>
@@ -742,15 +859,16 @@ export const RosterTab: React.FC<RosterTabProps> = ({ isReadOnly = false }) => {
         <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
           {filteredHosts.map(host => {
             const tierPay = String(host.tier_pay || 'N/A');
-            const blockStyles = getTierBlockStyles(tierPay);
+            const getTierStyle = () => {
+              return 'border-[#D4AF37]/40 bg-gradient-to-br from-[#FF6B00]/20 via-[#D4AF37]/10 to-transparent shadow-[0_4px_15px_rgba(0,0,0,0.5),0_0_15px_rgba(212,175,55,0.2)]';
+            };
             return (
               <div
                 key={host.id}
                 onClick={() => openSpotlight(host)}
                 className={cn(
-                  "aspect-square relative rounded-2xl overflow-hidden cursor-pointer hover:-translate-y-1 transition-all duration-300 shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] border backdrop-blur-md bg-white/[0.01] hover:bg-white/[0.03] group flex flex-col justify-between",
-                  blockStyles.border,
-                  blockStyles.bg
+                  "aspect-square relative rounded-xl overflow-hidden cursor-pointer transition-all duration-300 group flex flex-col justify-between border",
+                  getTierStyle()
                 )}
               >
                 {/* Background Photo */}
@@ -758,49 +876,127 @@ export const RosterTab: React.FC<RosterTabProps> = ({ isReadOnly = false }) => {
                   <img 
                     src={host.photoUrl} 
                     alt="" 
-                    className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" 
-                    style={{ zIndex: 0 }}
+                    className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-110 z-0" 
                   />
                 ) : (
-                  <div className="absolute inset-0 flex items-center justify-center text-[#A09E9A]/20 bg-gradient-to-br from-[#1A1A28] to-[#0D0D14]" style={{ zIndex: 0 }}>
+                  <div className="absolute inset-0 flex items-center justify-center text-[#A09E9A]/20 bg-gradient-to-br from-[#1A1A28] to-[#0D0D14] z-0">
                     <Users size={40} className="opacity-30" />
                   </div>
                 )}
 
                 {/* Top Overlay (17% total height, top 12% is solid black, remaining 5% fades) */}
-                <div className="absolute top-0 inset-x-0 h-[17%] pointer-events-none" style={{ background: 'linear-gradient(to bottom, #000000 0%, #000000 70.6%, transparent 100%)', zIndex: 1 }} />
+                <div className="absolute top-0 inset-x-0 h-[17%] pointer-events-none roster-top-overlay" />
                 
                 {/* Bottom Overlay (30% total height, bottom 20% is solid black, remaining 10% fades) */}
-                <div className="absolute bottom-0 inset-x-0 h-[30%] pointer-events-none" style={{ background: 'linear-gradient(to top, #000000 0%, #000000 66.7%, transparent 100%)', zIndex: 1 }} />
+                <div className="absolute bottom-0 inset-x-0 h-[30%] pointer-events-none roster-bottom-overlay" />
 
                 {/* Top Labels */}
-                <div className="relative z-10 w-full px-3 pt-1.5 pb-3 flex justify-between items-center pointer-events-none">
-                  {/* Status indicator on top-left */}
-                  {host.status === 'Active' ? (
-                    <div className="flex items-center gap-1 bg-black/40 backdrop-blur-md px-1.5 py-0.5 rounded-full border border-emerald-500/30">
-                      <span className="w-1 h-1 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)] animate-pulse"></span>
-                      <span className="text-[6.5px] font-black text-emerald-400 uppercase tracking-widest">Active</span>
-                    </div>
-                  ) : (
-                    <div></div>
-                  )}
+                <div className="relative z-10 w-full px-3 pt-1.5 pb-3 flex justify-between items-start pointer-events-none">
+                  {/* Status indicator or Badge on top-left */}
+                  <div className="flex flex-col gap-1 items-start">
+                    {/* Top Niner (Dynamic Share%) and Manual Badges (Active or Last Month) */}
+                    {(() => {
+                      const dynamicTopNiner = top9NinerData.find(d => String(d.id) === String(host.id));
 
-                  {/* Tier Pay badge top right (excluding Regular Host) */}
-                  {host.tier_pay && host.tier_pay !== 'Regular Host' && (() => {
+                      const now = new Date();
+                      const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1).getTime();
+                      const current = now.getTime();
+
+                      const hostAwards = allAwards.filter(a => {
+                        if (String(a.hostId || a.poppoId) !== String(host.id)) return false;
+                        
+                        let isActive = false;
+                        if (a.startDate && a.endDate) {
+                          const start = new Date(a.startDate).getTime();
+                          const end = new Date(a.endDate).getTime();
+                          if (current >= start && current <= end + 86400000) isActive = true;
+                        }
+                        
+                        let isRecentlyAssigned = false;
+                        const assignedDate = new Date(a.awardedAt || a.dateAwarded || a.assignedAt || 0).getTime();
+                        if (assignedDate >= lastMonthStart) {
+                          isRecentlyAssigned = true;
+                        }
+
+                        return isActive || isRecentlyAssigned;
+                      });
+
+                      // Filter out any manual awards that are Top Niner badges (since Top Niner badge is dynamically rendered)
+                      const manualAwards = hostAwards.filter(a => {
+                        const title = String(a.title || a.awardName || a.name || '');
+                        return !/Top (\d+) Niner/i.test(title);
+                      });
+
+                      // Sort manual awards by time period descending (most recent first)
+                      const sortedManualAwards = [...manualAwards].sort((a, b) => {
+                        const dateA = a.startDate || a.awardedAt || a.dateAwarded || a.assignedAt || '';
+                        const dateB = b.startDate || b.awardedAt || b.dateAwarded || b.assignedAt || '';
+                        return dateB.localeCompare(dateA);
+                      });
+
+                      if (!dynamicTopNiner && sortedManualAwards.length === 0) return null;
+
+                      return (
+                        <>
+                          {dynamicTopNiner && (() => {
+                            const rank = dynamicTopNiner.rank;
+                            let badgeColorStyle = 'text-[#D4AF37] bg-[#D4AF37]/20 border-[#D4AF37]/50 shadow-[0_0_12px_rgba(212,175,55,0.5)]'; // Gold for Top 1-3
+                            if (rank >= 4 && rank <= 6) badgeColorStyle = 'text-[#F97316] bg-[#F97316]/20 border-[#F97316]/50 shadow-[0_0_12px_rgba(249,115,22,0.5)]'; // Orange for Top 4-6
+                            else if (rank >= 7) badgeColorStyle = 'text-[#EF4444] bg-[#EF4444]/20 border-[#EF4444]/50 shadow-[0_0_12px_rgba(239,68,68,0.5)]'; // Red for Top 7-9
+
+                            return (
+                              <div className={cn("px-1 py-0.5 sm:px-1.5 sm:py-0.5 rounded text-[6.5px] sm:text-[8px] font-black uppercase tracking-wider border backdrop-blur-sm shadow-sm flex items-center gap-0.5 sm:gap-1", badgeColorStyle)}>
+                                <Medal className="w-1.5 h-1.5 sm:w-2 sm:h-2 shrink-0" />
+                                Top {rank} Niner
+                              </div>
+                            );
+                          })()}
+
+                          {sortedManualAwards.map(a => {
+                            let badgeColorStyle = 'border-amber-500 text-amber-200 bg-amber-500/30 shadow-[0_0_8px_rgba(245,158,11,0.6)]';
+                            if (a.awardColor === 'Purple' || a.color === 'Purple') badgeColorStyle = 'border-purple-500 text-purple-200 bg-purple-500/30 shadow-[0_0_8px_rgba(168,85,247,0.6)]';
+                            else if (a.awardColor === 'Emerald' || a.color === 'Emerald') badgeColorStyle = 'border-emerald-500 text-emerald-200 bg-emerald-500/30 shadow-[0_0_8px_rgba(16,185,129,0.6)]';
+                            else if (a.awardColor === 'Blue' || a.color === 'Blue') badgeColorStyle = 'border-blue-500 text-blue-200 bg-blue-500/30 shadow-[0_0_8px_rgba(59,130,246,0.6)]';
+                            else if (a.awardColor === 'Red' || a.color === 'Red') badgeColorStyle = 'border-red-500 text-red-200 bg-red-500/30 shadow-[0_0_8px_rgba(239,68,68,0.6)]';
+                            else if (a.awardColor === 'Orange' || a.color === 'Orange') badgeColorStyle = 'border-orange-500 text-orange-200 bg-orange-500/30 shadow-[0_0_8px_rgba(249,115,22,0.6)]';
+
+                            return (
+                              <div key={a.id} className={cn("px-1 py-0.5 sm:px-1.5 sm:py-0.5 rounded text-[6px] sm:text-[7.5px] font-black uppercase tracking-wider border backdrop-blur-sm flex items-center gap-0.5 sm:gap-1", badgeColorStyle)}>
+                                <Star className="w-1.5 h-1.5 sm:w-2 sm:h-2 shrink-0 drop-shadow-md" />
+                                {formatBadgeTitle(a.title || a.awardName || a.name)}
+                              </div>
+                            );
+                          })}
+                        </>
+                      );
+                    })()}
+                    
+                    {/* Status */}
+                    {host.status && String(host.status).toLowerCase() !== 'active' && (
+                      <div className="flex items-center gap-0.5 sm:gap-1 bg-black/40 backdrop-blur-md px-1 sm:px-1.5 py-0.5 rounded-full border border-red-500/30">
+                        <span className="w-1 h-1 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.8)] animate-pulse"></span>
+                        <span className="text-[5.5px] sm:text-[6.5px] font-black text-red-400 uppercase tracking-widest">{host.status}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Tier Pay badge top right */}
+                  {host.tier_pay && (() => {
                     const tier = String(host.tier_pay);
+                    if (tier.toLowerCase().includes('regular')) return null;
                     const getTierStyle = (t: string) => {
                       const lower = t.toLowerCase();
-                      if (lower.includes('star')) return 'text-yellow-400 bg-yellow-400/20 border-yellow-400/45';
-                      if (lower.includes('rocket')) return 'text-cyan-400 bg-cyan-400/20 border-cyan-400/45';
-                      if (lower.includes('s idol')) return 'text-pink-300 bg-pink-500/20 border-pink-500/45';
-                      if (lower.includes('esports')) return 'text-[#00f2fe] bg-[#00f2fe]/20 border-[#00f2fe]/45 shadow-[0_0_8px_rgba(0,242,254,0.4)]';
-                      if (lower.includes('regular')) return 'text-emerald-400 bg-emerald-400/20 border-emerald-400/45';
+                      if (lower.includes('star')) return 'text-[#FFEA00] bg-[#FFEA00]/20 border-[#FFEA00]/50 shadow-[0_0_12px_rgba(255,234,0,0.5)]';
+                      if (lower.includes('rocket')) return 'text-[#60A5FA] bg-[#1E3A8A]/60 border-[#60A5FA]/60 shadow-[0_0_12px_rgba(96,165,250,0.5)]';
+                      if (lower.includes('s idol')) return 'text-[#FF007F] bg-[#FF007F]/20 border-[#FF007F]/50 shadow-[0_0_12px_rgba(255,0,127,0.5)]';
+                      if (lower.includes('esports')) return 'text-[#B026FF] bg-[#B026FF]/20 border-[#B026FF]/50 shadow-[0_0_12px_rgba(176,38,255,0.5)]';
+                      if (lower.includes('regular')) return 'text-[#34D399] bg-[#34D399]/20 border-[#34D399]/50 shadow-[0_0_12px_rgba(52,211,153,0.5)]';
                       return 'text-white bg-white/10 border-white/20';
                     };
 
                     return (
-                      <div className={cn("px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider border backdrop-blur-sm shadow-sm flex items-center gap-1", getTierStyle(tier))}>
-                        <Star size={8} />
+                      <div className={cn("px-1 py-0.5 sm:px-1.5 sm:py-0.5 rounded text-[6.5px] sm:text-[8px] font-black uppercase tracking-wider border backdrop-blur-sm shadow-sm flex items-center gap-0.5 sm:gap-1", getTierStyle(tier))}>
+                        <Star className="w-1.5 h-1.5 sm:w-2 sm:h-2 shrink-0" />
                         {tier}
                       </div>
                     );
@@ -816,8 +1012,8 @@ export const RosterTab: React.FC<RosterTabProps> = ({ isReadOnly = false }) => {
                   {/* ID and Role Split Badge */}
                   <div className="flex items-center rounded-md overflow-hidden border border-[#D4AF37]/45 text-[8.5px] font-black shadow-md mt-0.5">
                     {/* Left side: ID (gold font with black fill background and gold border) */}
-                    <div className="px-2 py-0.5 bg-black text-[#D4AF37] border-r border-[#D4AF37]/45 font-mono">
-                      ID: {host.id}
+                    <div className="px-2 py-0.5 bg-black text-[#D4AF37] border-r border-[#D4AF37]/45 font-mono font-bold">
+                      {host.id}
                     </div>
                     {/* Right side: Role (black font and background is filled gold) */}
                     <div className="px-2 py-0.5 bg-[#D4AF37] text-black uppercase tracking-wider">
@@ -832,15 +1028,21 @@ export const RosterTab: React.FC<RosterTabProps> = ({ isReadOnly = false }) => {
       )}
 
       {/* SPOTLIGHT MODAL */}
-      {selectedHost && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm overflow-y-auto">
-          <HostProfileView 
-            host={selectedHost} 
-            isReadOnly={isReadOnly} 
-            onClose={closeSpotlight} 
-            hidePerformanceStats={true}
-          />
-        </div>
+      {selectedHost && portalTarget && createPortal(
+        <div className="fixed inset-0 z-[9999]">
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={closeSpotlight}></div>
+          <div className="absolute inset-0 overflow-y-auto p-4 py-10 pb-24">
+            <div className="w-full mx-auto flex justify-center min-h-full relative z-10">
+              <HostProfileView 
+                host={selectedHost} 
+                isReadOnly={isReadOnly} 
+                onClose={closeSpotlight} 
+                hidePerformanceStats={true}
+              />
+            </div>
+          </div>
+        </div>,
+        portalTarget
       )}
 >>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
     </div>

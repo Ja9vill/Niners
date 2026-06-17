@@ -94,8 +94,11 @@ export default function ChangePassword() {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center p-6 min-h-[60vh] select-none text-[#F0EFE8]">
-      <div className="w-full max-w-md bg-[#1A1A28] border border-[#D4AF37]/20 p-8 rounded-3xl shadow-xl space-y-6">
+    <div className="flex flex-col items-center justify-center p-6 min-h-[60vh] select-none text-[#F0EFE8] relative">
+      <div className="absolute inset-0 pointer-events-none">
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] rounded-full bg-[#D4AF37]/5 blur-[120px]" />
+      </div>
+      <div className="w-full max-w-md border border-[#D4AF37]/40 rounded-[24px] p-8 space-y-6 bg-[#1A140A]/80 backdrop-blur-xl shadow-[0_0_40px_rgba(212,175,55,0.15)] relative z-10">
         <div className="flex flex-col items-center gap-2">
           <div className="w-12 h-12 rounded-full bg-[#D4AF37]/10 flex items-center justify-center border border-[#D4AF37]/20">
             <Key className="text-[#D4AF37]" size={24} />
@@ -118,9 +121,9 @@ export default function ChangePassword() {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-1">
-            <label className="text-[10px] uppercase font-bold text-[#A09E9A]">New Password</label>
+        <form onSubmit={handleSubmit} className="space-y-5">
+          <div className="space-y-1.5">
+            <label className="text-[10px] font-black text-[#D4AF37]/80 uppercase tracking-[0.20em] ml-1 block">New Password</label>
             <div className="relative">
               <input
                 type={showPassword ? 'text' : 'password'}
@@ -129,7 +132,7 @@ export default function ChangePassword() {
                 onChange={(e) => setNewPassword(e.target.value)}
                 disabled={isLoading}
                 required
-                className="w-full pl-3 pr-10 py-2 bg-[#0D0D14] border border-white/10 rounded-xl text-sm outline-none text-[#F0EFE8] focus:border-[#D4AF37]/50"
+                className="w-full pl-4 pr-10 py-3 bg-[#0F0A06]/80 border border-[#D4AF37]/20 rounded-xl text-sm outline-none text-[#F0EFE8] focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37]/50 focus:shadow-[0_0_15px_rgba(212,175,55,0.15)] placeholder-[#A09E9A]/40 backdrop-blur-sm transition-all"
               />
               <button
                 type="button"
@@ -141,8 +144,8 @@ export default function ChangePassword() {
             </div>
           </div>
 
-          <div className="space-y-1">
-            <label className="text-[10px] uppercase font-bold text-[#A09E9A]">Confirm New Password</label>
+          <div className="space-y-1.5">
+            <label className="text-[10px] font-black text-[#D4AF37]/80 uppercase tracking-[0.20em] ml-1 block">Confirm New Password</label>
             <input
               type={showPassword ? 'text' : 'password'}
               placeholder="Re-enter new password"
@@ -150,7 +153,7 @@ export default function ChangePassword() {
               onChange={(e) => setConfirmPassword(e.target.value)}
               disabled={isLoading}
               required
-              className="w-full px-3 py-2 bg-[#0D0D14] border border-white/10 rounded-xl text-sm outline-none text-[#F0EFE8] focus:border-[#D4AF37]/50"
+              className="w-full px-4 py-3 bg-[#0F0A06]/80 border border-[#D4AF37]/20 rounded-xl text-sm outline-none text-[#F0EFE8] focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37]/50 focus:shadow-[0_0_15px_rgba(212,175,55,0.15)] placeholder-[#A09E9A]/40 backdrop-blur-sm transition-all"
             />
           </div>
 
@@ -182,7 +185,7 @@ export default function ChangePassword() {
           <button
             type="submit"
             disabled={isLoading || !isPasswordValid}
-            className="w-full py-3 bg-[#D4AF37] hover:bg-[#bfa032] disabled:bg-[#1A1A28] disabled:border-white/5 disabled:text-[#A09E9A]/30 text-[#0D0D14] rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer shadow-lg shadow-[#D4AF37]/10 disabled:shadow-none border border-transparent transition-all flex items-center justify-center gap-2"
+            className="w-full mt-2 py-3.5 rounded-xl bg-gradient-to-r from-[#D4AF37] to-[#F3E5AB] text-[#0A0A0F] text-xs font-black uppercase tracking-[0.25em] transition-all flex items-center justify-center gap-2 active:scale-95 shadow-[0_0_20px_rgba(212,175,55,0.4)] hover:shadow-[0_0_30px_rgba(212,175,55,0.6)] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isLoading ? <Loader2 className="animate-spin" size={16} /> : 'Change Password'}
           </button>

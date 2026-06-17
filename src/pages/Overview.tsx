@@ -10,6 +10,44 @@ import { BarChart, Bar, AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContai
 
 const MONTH_ORDER = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
+const MONTH_MAP: Record<string, string> = {
+  jan: 'January', feb: 'February', mar: 'March', apr: 'April',
+  may: 'May', jun: 'June', jul: 'July', aug: 'August',
+  sep: 'September', oct: 'October', nov: 'November', dec: 'December'
+};
+
+const normalizeMonthYear = (monthStr: string, yearVal?: any): { monthName: string; year: string; key: string } | null => {
+  if (!monthStr) return null;
+  let cleanStr = String(monthStr).replace(/[-_]/g, ' ').trim();
+  let year = String(yearVal || '').trim();
+  const yearMatch = cleanStr.match(/\b(20\d{2})\b/);
+  if (yearMatch) {
+    year = yearMatch[1];
+    cleanStr = cleanStr.replace(year, '').trim();
+  }
+  const monthMatch = cleanStr.match(/^([A-Za-z]+)/);
+  if (!monthMatch) return null;
+  const rawMonth = monthMatch[1].toLowerCase();
+  let fullMonth = '';
+  for (const [abbr, full] of Object.entries(MONTH_MAP)) {
+    if (rawMonth.startsWith(abbr)) {
+      fullMonth = full;
+      break;
+    }
+  }
+  if (!fullMonth) {
+    fullMonth = rawMonth.charAt(0).toUpperCase() + rawMonth.slice(1);
+  }
+  if (!year || year === '0') {
+    year = new Date().getFullYear().toString();
+  }
+  return {
+    monthName: fullMonth,
+    year: year,
+    key: `${fullMonth} ${year}`
+  };
+};
+
 function formatPts(n: number) {
   if (!n || n === 0) return '—';
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
@@ -57,6 +95,58 @@ const getPlatformHourly = (r: any) => f(r, 'platformHourlySalary','platform_hour
 const getSuperSalary   = (r: any) => f(r, 'superSalary','super_salary','Super Salary','supersalary');
 const getSuperRank     = (r: any) => f(r, 'superRank','super_rank','Super Rank','superrank');
 
+const GlassDropdown = ({ value, onChange, options, title }: any) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const ref = React.useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (ref.current && !ref.current.contains(event.target as Node)) setIsOpen(false);
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  return (
+    <div className="relative h-full" ref={ref}>
+      <div 
+        className="flex items-center gap-3 bg-[rgba(10,5,5,0.5)] border border-[#FFB800]/20 rounded-lg px-4 py-2 backdrop-blur-md shadow-[0_4px_10px_rgba(0,0,0,0.3)] text-xs sm:text-sm font-black text-[#FFB800] outline-none hover:bg-white/5 transition-all cursor-pointer select-none h-full"
+        onClick={() => setIsOpen(!isOpen)}
+        title={title}
+      >
+        <span>{options.find((o: any) => String(o.value) === String(value))?.label || value}</span>
+        <svg className={`w-3 h-3 transition-transform ${isOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+      </div>
+      
+      {isOpen && (
+        <div className="absolute top-full right-0 mt-2 w-max min-w-[120px] glass-card rounded-lg overflow-hidden flex flex-col py-1 z-50 transition-all duration-300" ref={el => {
+          if (el) {
+            el.style.background = 'linear-gradient(to bottom right, rgba(20, 10, 5, 0.95), rgba(0, 0, 0, 0.98))';
+            el.style.backdropFilter = 'blur(40px)';
+            el.style.borderTop = '1px solid rgba(250, 204, 21, 0.3)';
+            el.style.borderLeft = '1px solid rgba(250, 204, 21, 0.1)';
+            el.style.borderColor = 'rgba(234, 179, 8, 0.2)';
+            el.style.boxShadow = '0 20px 40px rgba(0,0,0,0.9), inset 0 0 15px rgba(250, 204, 21, 0.1)';
+          }
+        }}>
+          {options.map((o: any) => (
+            <div 
+              key={o.value}
+              className={`px-4 py-2 text-xs font-bold cursor-pointer transition-all ${String(value) === String(o.value) ? 'bg-[#FFB800]/20 text-[#FFB800]' : 'text-[#A09E9A] hover:bg-[#FFB800]/10 hover:text-white'}`}
+              onClick={() => {
+                onChange(o.value);
+                setIsOpen(false);
+              }}
+            >
+              {o.label}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 export const Overview = () => {
   const [reports, setReports] = useState<any[]>([]);
   const [hosts, setHosts] = useState<Host[]>([]);
@@ -66,8 +156,7 @@ export const Overview = () => {
   const [selectedMonth, setSelectedMonth] = useState<string>('all');
   const [chartType, setChartType] = useState<'area' | 'bar'>('area');
   const [selectedMonthData, setSelectedMonthData] = useState<any | null>(null);
-  const [lbYear, setLbYear] = useState<string>('all');
-  const [lbMonth, setLbMonth] = useState<string>('all');
+  const [lbPeriod, setLbPeriod] = useState<string>('all');
   const [spotlightHost, setSpotlightHost] = useState<Host | null>(null);
   const [showRecords, setShowRecords] = useState<boolean>(false);
   const [recordsSortOption, setRecordsSortOption] = useState<'default' | 'name' | 'share'>('default');
@@ -166,15 +255,25 @@ export const Overview = () => {
 
   // Available years from reports
   const availableYears = useMemo(() => {
-    const years = Array.from(new Set(reports.map(r => String(r.year)).filter(Boolean)));
-    return years.sort().reverse();
+    const years = new Set<string>();
+    reports.forEach(r => {
+      if (r.report_type === 'weekly') return;
+      const norm = normalizeMonthYear(r.monthName, r.year);
+      if (norm) {
+        years.add(norm.year);
+      }
+    });
+    return Array.from(years).sort().reverse();
   }, [reports]);
 
   // Filtered reports
   const filteredReports = useMemo(() => {
     return reports.filter(r => {
-      if (selectedYear !== 'all' && String(r.year) !== selectedYear) return false;
-      if (selectedMonth !== 'all' && r.monthName !== selectedMonth) return false;
+      if (r.report_type === 'weekly') return false; // Prevent duplicating weekly into monthly totals
+      const norm = normalizeMonthYear(r.monthName, r.year);
+      if (!norm) return false;
+      if (selectedYear !== 'all' && norm.year !== selectedYear) return false;
+      if (selectedMonth !== 'all' && norm.monthName !== selectedMonth) return false;
       return true;
     });
   }, [reports, selectedYear, selectedMonth]);
@@ -182,11 +281,33 @@ export const Overview = () => {
   // Leaderboard specific filtered reports
   const lbReports = useMemo(() => {
     return reports.filter(r => {
-      if (lbYear !== 'all' && String(r.year) !== lbYear) return false;
-      if (lbMonth !== 'all' && r.monthName !== lbMonth) return false;
+      if (r.report_type === 'weekly') return false; // Prevent duplicating weekly into monthly totals
+      if (lbPeriod !== 'all') {
+        const norm = normalizeMonthYear(r.monthName, r.year);
+        if (!norm || norm.key !== lbPeriod) return false;
+      }
       return true;
     });
-  }, [reports, lbYear, lbMonth]);
+  }, [reports, lbPeriod]);
+
+  // Dynamic period options for the leaderboard dropdown
+  const lbPeriodOptions = useMemo(() => {
+    const periods = new Set<string>();
+    reports.forEach(r => {
+      if (r.report_type === 'weekly') return;
+      const norm = normalizeMonthYear(r.monthName, r.year);
+      if (norm) {
+        periods.add(norm.key);
+      }
+    });
+    return Array.from(periods).sort((a, b) => {
+      const [aM, aY] = a.split(' ');
+      const [bM, bY] = b.split(' ');
+      const yearDiff = Number(bY) - Number(aY);
+      if (yearDiff !== 0) return yearDiff;
+      return MONTH_ORDER.indexOf(bM) - MONTH_ORDER.indexOf(aM);
+    });
+  }, [reports]);
 
   // Agency-wide KPIs
   const totalPoints = useMemo(() =>
@@ -226,21 +347,38 @@ export const Overview = () => {
       byHost[id].points += getPoints(r);
       byHost[id].liveHrs += getLiveDuration(r);
       byHost[id].months += 1;
+      
+      // Only include top-level commission for leaderboard? Or all commission? 
+      // User says: "that commission was theirs (the agent) and not to the agency"
+      // Wait, if it's the *host's* commission leaderboard, we should show whatever agent commission they generated, regardless of who owns it, OR we only show Nine Agency.
+      // Let's just include all commission here for the host's performance, but split the totals.
       byHost[id].commission += getAgentComm(r);
     });
-    return Object.values(byHost).sort((a, b) => b.points - a.points);
+    return Object.values(byHost).sort((a, b) => b.commission - a.commission);
   }, [lbReports, hostLookup]);
 
   const lbTotalPeriodCommission = useMemo(() => {
-    return lbReports.reduce((sum, r) => sum + getAgentComm(r), 0);
+    return lbReports.reduce((sum, r) => sum + (r.owner_role !== 'Agent' ? getAgentComm(r) : 0), 0);
   }, [lbReports]);
+
+  // Splits for top KPI row
+  const totalAgencyCommission = useMemo(() => {
+    return filteredReports.reduce((sum, r) => sum + (r.owner_role !== 'Agent' ? getAgentComm(r) : 0), 0);
+  }, [filteredReports]);
+
+  const totalAgentCommission = useMemo(() => {
+    return filteredReports.reduce((sum, r) => sum + (r.owner_role === 'Agent' ? getAgentComm(r) : 0), 0);
+  }, [filteredReports]);
 
   // Monthly trend data
   const monthlyTrend = useMemo(() => {
     const grouped: Record<string, number> = {};
     reports.forEach(r => {
-      if (selectedYear !== 'all' && String(r.year) !== selectedYear) return;
-      const key = `${r.monthName} ${r.year}`;
+      if (r.report_type === 'weekly') return;
+      const norm = normalizeMonthYear(r.monthName, r.year);
+      if (!norm) return;
+      if (selectedYear !== 'all' && norm.year !== selectedYear) return;
+      const key = norm.key;
       grouped[key] = (grouped[key] || 0) + getPoints(r);
     });
     return Object.entries(grouped)
@@ -257,7 +395,10 @@ export const Overview = () => {
   const monthlyTotalCommission = useMemo(() => {
     const map = new Map<string, number>();
     reports.forEach(r => {
-      const key = `${r.monthName} ${r.year}`;
+      if (r.report_type === 'weekly') return;
+      const norm = normalizeMonthYear(r.monthName, r.year);
+      if (!norm) return;
+      const key = norm.key;
       const comm = getAgentComm(r);
       map.set(key, (map.get(key) || 0) + comm);
     });
@@ -274,12 +415,14 @@ export const Overview = () => {
       });
     } else if (recordsSortOption === 'share') {
       data.sort((a, b) => {
-        const keyA = `${a.monthName} ${a.year}`;
+        const normA = normalizeMonthYear(a.monthName, a.year);
+        const keyA = normA ? normA.key : `${a.monthName} ${a.year}`;
         const totalA = monthlyTotalCommission.get(keyA) || 0;
         const hostCommA = getAgentComm(a);
         const pctA = totalA > 0 ? (hostCommA / totalA) : 0;
 
-        const keyB = `${b.monthName} ${b.year}`;
+        const normB = normalizeMonthYear(b.monthName, b.year);
+        const keyB = normB ? normB.key : `${b.monthName} ${b.year}`;
         const totalB = monthlyTotalCommission.get(keyB) || 0;
         const hostCommB = getAgentComm(b);
         const pctB = totalB > 0 ? (hostCommB / totalB) : 0;
@@ -293,8 +436,14 @@ export const Overview = () => {
       });
     } else {
       data.sort((a, b) => {
-        if (a.year !== b.year) return Number(b.year) - Number(a.year);
-        return MONTH_ORDER.indexOf(b.monthName) - MONTH_ORDER.indexOf(a.monthName);
+        const normA = normalizeMonthYear(a.monthName, a.year);
+        const normB = normalizeMonthYear(b.monthName, b.year);
+        const yA = normA ? Number(normA.year) : Number(a.year);
+        const yB = normB ? Number(normB.year) : Number(b.year);
+        const mA = normA ? normA.monthName : a.monthName;
+        const mB = normB ? normB.monthName : b.monthName;
+        if (yA !== yB) return yB - yA;
+        return MONTH_ORDER.indexOf(mB) - MONTH_ORDER.indexOf(mA);
       });
     }
     return data;
@@ -354,10 +503,6 @@ export const Overview = () => {
   if (reports.length === 0) {
     return (
       <div className="flex flex-col gap-6">
-        <div className="flex items-center gap-3">
-          <LayoutDashboard className="text-[#D4AF37]" size={24} />
-          <h2 className="text-2xl font-black text-white uppercase tracking-widest">Dashboard Overview</h2>
-        </div>
         <OverviewTab commissions={commissions} hosts={hosts} />
       </div>
     );
@@ -371,82 +516,266 @@ export const Overview = () => {
   const CHART_COLORS = ['#D4AF37','#6366f1','#ec4899','#10b981','#f59e0b','#06b6d4','#a78bfa'];
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-3">
       {/* INJECTED DYNAMIC CSS TO BYPASS INLINE STYLES LINTER */}
       <style>{`
-        .global-block-1 {
-          background: linear-gradient(to bottom right, #3A2A18, #221A15);
-          border: 1px solid rgba(255, 184, 0, 0.12);
-        }
-        .global-block-1:hover {
-          border-color: rgba(255, 184, 0, 0.35);
-        }
-        .global-block-2 {
-          background: linear-gradient(to bottom right, #3D221C, #221515);
-          border: 1px solid rgba(255, 123, 0, 0.12);
-        }
-        .global-block-2:hover {
-          border-color: rgba(255, 123, 0, 0.35);
-        }
-        .global-block-3 {
-          background: linear-gradient(to bottom right, #3A1C28, #20131A);
-          border: 1px solid rgba(255, 59, 92, 0.12);
-        }
-        .global-block-3:hover {
-          border-color: rgba(255, 59, 92, 0.35);
+        .global-block-1, .global-block-2, .global-block-3 {
+          transform: perspective(1000px) translateZ(0);
+          transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
 
+        .global-block-1 {
+          background: 
+            radial-gradient(circle at 10% 10%, rgba(250,204,21,0.15) 0%, transparent 50%),
+            linear-gradient(135deg, rgba(133, 77, 14, 0.15) 0%, rgba(66, 32, 6, 0.3) 100%);
+          backdrop-filter: blur(40px) saturate(200%);
+          -webkit-backdrop-filter: blur(40px) saturate(200%);
+          border: 1px solid rgba(250, 204, 21, 0.1);
+          border-top: 1px solid rgba(250, 204, 21, 0.6);
+          border-left: 1px solid rgba(250, 204, 21, 0.4);
+          box-shadow: 
+            inset 0 0 20px rgba(250, 204, 21, 0.15),
+            inset 0 2px 6px rgba(250, 204, 21, 0.4),
+            0 15px 35px rgba(0, 0, 0, 0.7),
+            0 0 30px rgba(234, 179, 8, 0.3);
+        }
+        .global-block-1:hover {
+          transform: perspective(1000px) translateY(-6px) scale(1.02) rotateX(4deg);
+          border-top-color: rgba(250, 204, 21, 0.9);
+          box-shadow: 
+            inset 0 0 30px rgba(250, 204, 21, 0.3),
+            inset 0 4px 10px rgba(250, 204, 21, 0.6),
+            0 25px 50px rgba(0, 0, 0, 0.9),
+            0 0 50px rgba(234, 179, 8, 0.6);
+        }
+        
+        .global-block-2 {
+          background: 
+            radial-gradient(circle at 10% 10%, rgba(249,115,22,0.15) 0%, transparent 50%),
+            linear-gradient(135deg, rgba(194, 65, 12, 0.15) 0%, rgba(124, 45, 18, 0.3) 100%);
+          backdrop-filter: blur(40px) saturate(200%);
+          -webkit-backdrop-filter: blur(40px) saturate(200%);
+          border: 1px solid rgba(249, 115, 22, 0.1);
+          border-top: 1px solid rgba(249, 115, 22, 0.6);
+          border-left: 1px solid rgba(249, 115, 22, 0.4);
+          box-shadow: 
+            inset 0 0 20px rgba(249, 115, 22, 0.15),
+            inset 0 2px 6px rgba(249, 115, 22, 0.4),
+            0 15px 35px rgba(0, 0, 0, 0.7),
+            0 0 30px rgba(249, 115, 22, 0.3);
+        }
+        .global-block-2:hover {
+          transform: perspective(1000px) translateY(-6px) scale(1.02) rotateX(4deg);
+          border-top-color: rgba(249, 115, 22, 0.9);
+          box-shadow: 
+            inset 0 0 30px rgba(249, 115, 22, 0.3),
+            inset 0 4px 10px rgba(249, 115, 22, 0.6),
+            0 25px 50px rgba(0, 0, 0, 0.9),
+            0 0 50px rgba(249, 115, 22, 0.6);
+        }
+        
+        .global-block-3 {
+          background: 
+            radial-gradient(circle at 10% 10%, rgba(225,29,72,0.15) 0%, transparent 50%),
+            linear-gradient(135deg, rgba(190, 18, 60, 0.15) 0%, rgba(136, 19, 55, 0.3) 100%);
+          backdrop-filter: blur(40px) saturate(200%);
+          -webkit-backdrop-filter: blur(40px) saturate(200%);
+          border: 1px solid rgba(225, 29, 72, 0.1);
+          border-top: 1px solid rgba(225, 29, 72, 0.6);
+          border-left: 1px solid rgba(225, 29, 72, 0.4);
+          box-shadow: 
+            inset 0 0 20px rgba(225, 29, 72, 0.15),
+            inset 0 2px 6px rgba(225, 29, 72, 0.4),
+            0 15px 35px rgba(0, 0, 0, 0.7),
+            0 0 30px rgba(225, 29, 72, 0.3);
+        }
+        .global-block-3:hover {
+          transform: perspective(1000px) translateY(-6px) scale(1.02) rotateX(4deg);
+          border-top-color: rgba(225, 29, 72, 0.9);
+          box-shadow: 
+            inset 0 0 30px rgba(225, 29, 72, 0.3),
+            inset 0 4px 10px rgba(225, 29, 72, 0.6),
+            0 25px 50px rgba(0, 0, 0, 0.9),
+            0 0 50px rgba(225, 29, 72, 0.6);
+        }
+
+        /* 4D Sheen Effect */
+        .global-block-1::after, .global-block-2::after, .global-block-3::after, .global-placeholder::after {
+          content: '';
+          position: absolute;
+          top: 0; left: -100%;
+          width: 50%; height: 100%;
+          background: linear-gradient(to right, transparent, rgba(255,255,255,0.3), transparent);
+          transform: skewX(-20deg);
+          transition: 0.5s ease-out;
+          pointer-events: none;
+        }
+        .global-block-1:hover::after, .global-block-2:hover::after, .global-block-3:hover::after, .global-placeholder:hover::after {
+          left: 200%;
+        }
+
+        .global-placeholder {
+          transform: perspective(1000px) translateZ(0);
+          transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        .global-placeholder:hover {
+          transform: perspective(1000px) translateY(-4px) scale(1.01) rotateX(2deg);
+          border-top-color: rgba(255, 184, 0, 0.8);
+          box-shadow: 
+            inset 0 0 30px rgba(255, 184, 0, 0.2),
+            inset 0 4px 10px rgba(255, 184, 0, 0.4),
+            0 15px 40px rgba(0, 0, 0, 0.8),
+            0 0 40px rgba(255, 184, 0, 0.4);
+        }
+
+        .global-tier-1, .global-tier-2, .global-tier-3, .global-tier-4 {
+          transform: perspective(1000px) translateZ(0);
+          transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        
         .global-tier-1 {
-          background: linear-gradient(to bottom right, #3B1B3A, #1A101C);
-          border: 1px solid rgba(245, 0, 87, 0.15);
+          background: 
+            radial-gradient(circle at 10% 10%, rgba(244,114,182,0.2) 0%, transparent 50%),
+            linear-gradient(135deg, rgba(244, 114, 182, 0.2) 0%, rgba(159, 18, 57, 0.4) 100%);
+          backdrop-filter: blur(40px) saturate(200%);
+          -webkit-backdrop-filter: blur(40px) saturate(200%);
+          border: 1px solid rgba(244, 114, 182, 0.1);
+          border-top: 1px solid rgba(244, 114, 182, 0.6);
+          border-left: 1px solid rgba(244, 114, 182, 0.4);
+          box-shadow: 
+            inset 0 0 20px rgba(244, 114, 182, 0.15),
+            inset 0 2px 6px rgba(244, 114, 182, 0.4),
+            0 15px 35px rgba(0, 0, 0, 0.7),
+            0 0 30px rgba(244, 114, 182, 0.4);
         }
         .global-tier-1:hover, .global-tier-1.active-tier {
-          border-color: rgba(245, 0, 87, 0.45);
-          box-shadow: 0 0 10px rgba(245, 0, 87, 0.1);
+          transform: perspective(1000px) translateY(-6px) scale(1.02) rotateX(4deg);
+          border-top-color: rgba(244, 114, 182, 0.9);
+          box-shadow: 
+            inset 0 0 30px rgba(244, 114, 182, 0.3),
+            inset 0 4px 10px rgba(244, 114, 182, 0.6),
+            0 25px 50px rgba(0, 0, 0, 0.9),
+            0 0 50px rgba(244, 114, 182, 0.8);
         }
+
         .global-tier-2 {
-          background: linear-gradient(to bottom right, #2E203B, #17111E);
-          border: 1px solid rgba(213, 0, 249, 0.15);
+          background: 
+            radial-gradient(circle at 10% 10%, rgba(168,85,247,0.2) 0%, transparent 50%),
+            linear-gradient(135deg, rgba(167, 139, 250, 0.2) 0%, rgba(88, 28, 135, 0.4) 100%);
+          backdrop-filter: blur(40px) saturate(200%);
+          -webkit-backdrop-filter: blur(40px) saturate(200%);
+          border: 1px solid rgba(168, 85, 247, 0.1);
+          border-top: 1px solid rgba(168, 85, 247, 0.6);
+          border-left: 1px solid rgba(168, 85, 247, 0.4);
+          box-shadow: 
+            inset 0 0 20px rgba(168, 85, 247, 0.15),
+            inset 0 2px 6px rgba(168, 85, 247, 0.4),
+            0 15px 35px rgba(0, 0, 0, 0.7),
+            0 0 30px rgba(168, 85, 247, 0.4);
         }
         .global-tier-2:hover, .global-tier-2.active-tier {
-          border-color: rgba(213, 0, 249, 0.45);
-          box-shadow: 0 0 10px rgba(213, 0, 249, 0.1);
+          transform: perspective(1000px) translateY(-6px) scale(1.02) rotateX(4deg);
+          border-top-color: rgba(168, 85, 247, 0.9);
+          box-shadow: 
+            inset 0 0 30px rgba(168, 85, 247, 0.3),
+            inset 0 4px 10px rgba(168, 85, 247, 0.6),
+            0 25px 50px rgba(0, 0, 0, 0.9),
+            0 0 50px rgba(168, 85, 247, 0.8);
         }
+
         .global-tier-3 {
-          background: linear-gradient(to bottom right, #373322, #1B1A12);
-          border: 1px solid rgba(255, 234, 0, 0.15);
+          background: 
+            radial-gradient(circle at 10% 10%, rgba(250,204,21,0.2) 0%, transparent 50%),
+            linear-gradient(135deg, rgba(253, 224, 71, 0.2) 0%, rgba(161, 98, 7, 0.4) 100%);
+          backdrop-filter: blur(40px) saturate(200%);
+          -webkit-backdrop-filter: blur(40px) saturate(200%);
+          border: 1px solid rgba(250, 204, 21, 0.1);
+          border-top: 1px solid rgba(250, 204, 21, 0.6);
+          border-left: 1px solid rgba(250, 204, 21, 0.4);
+          box-shadow: 
+            inset 0 0 20px rgba(250, 204, 21, 0.15),
+            inset 0 2px 6px rgba(250, 204, 21, 0.4),
+            0 15px 35px rgba(0, 0, 0, 0.7),
+            0 0 30px rgba(250, 204, 21, 0.4);
         }
         .global-tier-3:hover, .global-tier-3.active-tier {
-          border-color: rgba(255, 234, 0, 0.45);
-          box-shadow: 0 0 10px rgba(255, 234, 0, 0.1);
+          transform: perspective(1000px) translateY(-6px) scale(1.02) rotateX(4deg);
+          border-top-color: rgba(250, 204, 21, 0.9);
+          box-shadow: 
+            inset 0 0 30px rgba(250, 204, 21, 0.3),
+            inset 0 4px 10px rgba(250, 204, 21, 0.6),
+            0 25px 50px rgba(0, 0, 0, 0.9),
+            0 0 50px rgba(250, 204, 21, 0.8);
         }
+
         .global-tier-4 {
-          background: linear-gradient(to bottom right, #1E2838, #0E131C);
-          border: 1px solid rgba(0, 229, 255, 0.15);
+          background: 
+            radial-gradient(circle at 10% 10%, rgba(59, 130, 246, 0.3) 0%, transparent 50%),
+            linear-gradient(135deg, rgba(96, 165, 250, 0.2) 0%, rgba(30, 58, 138, 0.5) 100%);
+          backdrop-filter: blur(40px) saturate(200%);
+          -webkit-backdrop-filter: blur(40px) saturate(200%);
+          border: 1px solid rgba(59, 130, 246, 0.2);
+          border-top: 1px solid rgba(59, 130, 246, 0.7);
+          border-left: 1px solid rgba(59, 130, 246, 0.5);
+          box-shadow: 
+            inset 0 0 20px rgba(59, 130, 246, 0.2),
+            inset 0 2px 6px rgba(59, 130, 246, 0.5),
+            0 15px 35px rgba(0, 0, 0, 0.7),
+            0 0 30px rgba(59, 130, 246, 0.5);
         }
         .global-tier-4:hover, .global-tier-4.active-tier {
-          border-color: rgba(0, 229, 255, 0.45);
-          box-shadow: 0 0 10px rgba(0, 229, 255, 0.1);
+          transform: perspective(1000px) translateY(-6px) scale(1.02) rotateX(4deg);
+          border-top-color: rgba(59, 130, 246, 1);
+          box-shadow: 
+            inset 0 0 30px rgba(59, 130, 246, 0.4),
+            inset 0 4px 10px rgba(59, 130, 246, 0.7),
+            0 25px 50px rgba(0, 0, 0, 0.9),
+            0 0 50px rgba(59, 130, 246, 0.9);
+        }
+
+        /* 4D Sheen Effect */
+        .global-tier-1::after, .global-tier-2::after, .global-tier-3::after, .global-tier-4::after {
+          content: '';
+          position: absolute;
+          top: 0; left: -100%;
+          width: 50%; height: 100%;
+          background: linear-gradient(to right, transparent, rgba(255,255,255,0.4), transparent);
+          transform: skewX(-20deg);
+          transition: 0.5s ease-out;
+          pointer-events: none;
+        }
+        .global-tier-1:hover::after, .global-tier-2:hover::after, .global-tier-3:hover::after, .global-tier-4:hover::after {
+          left: 200%;
         }
       `}</style>
 
       {/* Base Salary Tiers Block */}
-      <div className="bg-[#1A1A28]/80 backdrop-blur-md border border-[#D4AF37]/15 shadow-2xl rounded-2xl p-5 relative overflow-hidden">
+      <div className="glass-card relative overflow-hidden transition-all duration-500" ref={el => {
+        if (el) {
+          el.style.background = 'linear-gradient(to bottom right, rgba(20, 10, 5, 0.4), rgba(40, 10, 15, 0.5))';
+          el.style.backdropFilter = 'blur(20px)';
+          el.style.borderTop = '1px solid rgba(250, 204, 21, 0.3)';
+          el.style.borderLeft = '1px solid rgba(250, 204, 21, 0.1)';
+          el.style.borderColor = 'rgba(234, 179, 8, 0.2)';
+          el.style.boxShadow = 'inset 0 1px 1px rgba(250, 204, 21, 0.2), 0 10px 30px rgba(0,0,0,0.5), 0 0 15px rgba(250, 204, 21, 0.05)';
+        }
+      }}>
         {/* Subtle background glow for the entire section */}
         <div className="absolute -top-24 -left-24 w-48 h-48 bg-[#D4AF37]/5 blur-3xl rounded-full pointer-events-none"></div>
         <div className="absolute -bottom-24 -right-24 w-48 h-48 bg-indigo-500/5 blur-3xl rounded-full pointer-events-none"></div>
         
-        <p className="text-[9px] font-black text-[#A09E9A] uppercase tracking-[0.2em] mb-4 relative z-10 flex items-center gap-2">
-          <span className="w-1.5 h-1.5 rounded-full bg-[#D4AF37] animate-pulse"></span>
-          BASE SALARY TIERS
-        </p>
+        <div className="global-placeholder flex w-full items-center justify-center gap-2 bg-gradient-to-br from-[#FFB800]/10 to-transparent border border-[#FFB800]/20 border-t-[#FFB800]/40 rounded-xl px-4 py-3 backdrop-blur-xl shadow-[0_8px_32px_rgba(0,0,0,0.5),inset_0_1px_1px_rgba(255,184,0,0.3)] mb-4 relative z-10 overflow-hidden cursor-pointer">
+          <p className="w-full text-center font-['Lexend'] text-xs sm:text-sm md:text-base font-bold text-[#FFB700] drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)] [-webkit-text-stroke:0.3px_black] uppercase tracking-[0.1em] sm:tracking-[0.15em] flex justify-center items-center gap-2 m-0 whitespace-nowrap">
+            AGENCY DASHBOARD OVERVIEW
+          </p>
+        </div>
 
         <div className="grid grid-cols-4 gap-3 relative z-10">
           {[
-            { label: 'S idol', key: 'S idol', class: 'global-tier-1', color: '#F50057' },
-            { label: 'Esports', key: 'Esports', class: 'global-tier-2', color: '#D500F9' },
-            { label: 'Star Host', key: 'Star Host', class: 'global-tier-3', color: '#FFEA00' },
-            { label: 'Rocket Host', key: 'Rocket Host', class: 'global-tier-4', color: '#00E5FF' }
+            { label: 'S idol', key: 'S idol', class: 'global-tier-1', color: '#F50057', Icon: Award },
+            { label: 'Esports', key: 'Esports', class: 'global-tier-2', color: '#D500F9', Icon: Zap },
+            { label: 'Star Host', key: 'Star Host', class: 'global-tier-3', color: '#FFEA00', Icon: Star },
+            { label: 'Rocket Host', key: 'Rocket Host', class: 'global-tier-4', color: '#3B82F6', Icon: TrendingUp }
           ].map((item, idx) => {
             const dataVal = baseSalaryTiersData[item.key];
             const isActive = selectedTierForList === item.key;
@@ -455,23 +784,119 @@ export const Overview = () => {
                 key={idx}
                 onClick={() => setSelectedTierForList(isActive ? null : item.key)}
                 className={cn(
-                  "relative overflow-hidden flex flex-col items-center justify-center text-center rounded-xl px-2 py-3 transition-all duration-300 group cursor-pointer border select-none hover:-translate-y-0.5",
+                  "relative overflow-hidden rounded-xl p-2.5 sm:p-4 flex flex-col justify-between min-h-[84px] sm:min-h-[104px] transition-all duration-300 group cursor-pointer shadow-lg border hover:-translate-y-0.5 select-none text-left",
                   item.class,
                   isActive && "active-tier"
                 )}
               >
-                <p className="text-[8px] sm:text-[10px] font-black uppercase tracking-widest leading-tight mb-2 text-[#A09E9A] drop-shadow-md z-10 transition-colors group-hover:text-white">
+                <item.Icon className="absolute top-2 right-2 w-4 h-4 opacity-[0.07] pointer-events-none" style={{ color: item.color }} />
+                <p className="text-[8px] sm:text-[10px] font-black uppercase tracking-wider text-[#E8E6E3] leading-tight pr-4 relative z-10">
                   {item.label}
                 </p>
-                <p
-                  className="text-sm sm:text-2xl md:text-3xl font-black leading-none drop-shadow-md z-10"
-                  style={{ color: item.color }}
+                <p 
+                  className="text-sm sm:text-2xl md:text-3xl font-black leading-none mt-2 truncate relative z-10" 
+                  ref={el => { if (el) el.style.color = item.color; }}
                 >
                   {dataVal?.count || 0}
                 </p>
               </div>
             );
           })}
+        </div>
+
+        <div className="grid grid-cols-3 gap-3 relative z-10 mt-3">
+          {/* COLUMN 1: REVENUE */}
+          <div className="flex flex-col gap-2.5 min-w-0">
+            {/* Row 1 Block 1: Total Agency Pts. */}
+            <div className="global-block-1 relative overflow-hidden rounded-xl p-2.5 sm:p-4 flex flex-col justify-between min-h-[84px] sm:min-h-[104px] transition-all duration-300 group hover:-translate-y-0.5 shadow-lg border">
+              <Star className="absolute top-2 right-2 w-4 h-4 opacity-[0.07] pointer-events-none" color="#FFB800" />
+              <p className="text-[8px] sm:text-[10px] font-black uppercase tracking-wider text-[#E8E6E3] leading-tight pr-4 relative z-10">
+                Total Agency Pts.
+              </p>
+              <p 
+                className="text-sm sm:text-2xl md:text-3xl font-black leading-none mt-2 truncate" 
+                ref={el => { if (el) el.style.color = '#FFB800'; }}
+              >
+                {formatPts(sum(getPoints))}
+              </p>
+            </div>
+
+            {/* Row 2 Block 1: Agency Commission */}
+            <div className="global-block-1 relative overflow-hidden rounded-xl p-2.5 sm:p-4 flex flex-col justify-between min-h-[84px] sm:min-h-[104px] transition-all duration-300 group hover:-translate-y-0.5 shadow-lg border">
+              <Award className="absolute top-2 right-2 w-4 h-4 opacity-[0.07] pointer-events-none" color="#FFB800" />
+              <p className="text-[8px] sm:text-[10px] font-black uppercase tracking-wider text-[#E8E6E3] leading-tight pr-4 relative z-10">
+                AGENCY COMMISSION
+              </p>
+              <p 
+                className="text-sm sm:text-2xl md:text-3xl font-black leading-none mt-2 truncate" 
+                ref={el => { if (el) el.style.color = '#FFB800'; }}
+              >
+                {formatPts(totalAgencyCommission)}
+              </p>
+            </div>
+          </div>
+
+          {/* COLUMN 2: INCENTIVES */}
+          <div className="flex flex-col gap-2.5 min-w-0">
+            {/* Row 1 Block 2: Super Salary */}
+            <div className="global-block-2 relative overflow-hidden rounded-xl p-2.5 sm:p-4 flex flex-col justify-between min-h-[84px] sm:min-h-[104px] transition-all duration-300 group hover:-translate-y-0.5 shadow-lg border">
+              <Zap className="absolute top-2 right-2 w-4 h-4 opacity-[0.07] pointer-events-none" color="#FF7B00" />
+              <p className="text-[8px] sm:text-[10px] font-black uppercase tracking-wider text-[#E8E6E3] leading-tight pr-4 relative z-10">
+                Super Salary
+              </p>
+              <p 
+                className="text-sm sm:text-2xl md:text-3xl font-black leading-none mt-2 truncate" 
+                ref={el => { if (el) el.style.color = '#FF7B00'; }}
+              >
+                {formatPts(sum(getSuperSalary))}
+              </p>
+            </div>
+
+            {/* Row 2 Block 2: Super Rank */}
+            <div className="global-block-2 relative overflow-hidden rounded-xl p-2.5 sm:p-4 flex flex-col justify-between min-h-[84px] sm:min-h-[104px] transition-all duration-300 group hover:-translate-y-0.5 shadow-lg border">
+              <TrendingUp className="absolute top-2 right-2 w-4 h-4 opacity-[0.07] pointer-events-none" color="#FF7B00" />
+              <p className="text-[8px] sm:text-[10px] font-black uppercase tracking-wider text-[#E8E6E3] leading-tight pr-4 relative z-10">
+                Super Rank
+              </p>
+              <p 
+                className="text-sm sm:text-2xl md:text-3xl font-black leading-none mt-2 truncate" 
+                ref={el => { if (el) el.style.color = '#FF7B00'; }}
+              >
+                {formatPts(sum(getSuperRank))}
+              </p>
+            </div>
+          </div>
+
+          {/* COLUMN 3: ACTIVE MEMBERS */}
+          <div className="flex flex-col gap-2.5 min-w-0">
+            {/* Row 1 Block 3: Active Host */}
+            <div className="global-block-3 relative overflow-hidden rounded-xl p-2.5 sm:p-4 flex flex-col justify-between min-h-[84px] sm:min-h-[104px] transition-all duration-300 group hover:-translate-y-0.5 shadow-lg border">
+              <Users className="absolute top-2 right-2 w-4 h-4 opacity-[0.07] pointer-events-none" color="#FF3B5C" />
+              <p className="text-[8px] sm:text-[10px] font-black uppercase tracking-wider text-[#E8E6E3] leading-tight pr-4 relative z-10">
+                Active Host
+              </p>
+              <p 
+                className="text-sm sm:text-2xl md:text-3xl font-black leading-none mt-2 truncate" 
+                ref={el => { if (el) el.style.color = '#FF3B5C'; }}
+              >
+                {String(uniqueHosts)}
+              </p>
+            </div>
+
+            {/* Row 2 Block 3: Total Live Hours */}
+            <div className="global-block-3 relative overflow-hidden rounded-xl p-2.5 sm:p-4 flex flex-col justify-between min-h-[84px] sm:min-h-[104px] transition-all duration-300 group hover:-translate-y-0.5 shadow-lg border">
+              <Clock className="absolute top-2 right-2 w-4 h-4 opacity-[0.07] pointer-events-none" color="#FF3B5C" />
+              <p className="text-[8px] sm:text-[10px] font-black uppercase tracking-wider text-[#E8E6E3] leading-tight pr-4 relative z-10">
+                Total Live Hours
+              </p>
+              <p 
+                className="text-sm sm:text-2xl md:text-3xl font-black leading-none mt-2 truncate" 
+                ref={el => { if (el) el.style.color = '#FF3B5C'; }}
+              >
+                {fmtH(sum(getLiveDuration))}
+              </p>
+            </div>
+          </div>
         </div>
 
         {/* Expanded Tier Members List */}
@@ -492,7 +917,14 @@ export const Overview = () => {
               <p className="text-xs text-[#A09E9A]/50 italic py-2">No members in this tier category.</p>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 max-h-48 overflow-y-auto pr-1">
-                {baseSalaryTiersData[selectedTierForList]?.hosts.map((h, idx) => {
+                {baseSalaryTiersData[selectedTierForList]?.hosts
+                  .slice()
+                  .sort((a, b) => {
+                    const nameA = (a.nickname || a.name || 'Unnamed').toLowerCase();
+                    const nameB = (b.nickname || b.name || 'Unnamed').toLowerCase();
+                    return nameA.localeCompare(nameB);
+                  })
+                  .map((h, idx) => {
                   const nickname = h.nickname || h.name || 'Unnamed';
                   return (
                     <div
@@ -513,172 +945,45 @@ export const Overview = () => {
         )}
       </div>
 
-      {/* Header with Filters */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div className="flex items-center gap-3">
-          <LayoutDashboard className="text-[#D4AF37]" size={24} />
-          <div>
-            <h2 className="text-2xl font-black text-white uppercase tracking-widest">Dashboard Overview</h2>
-            <p className="text-xs text-[#A09E9A] font-mono">{reports.length} performance records loaded</p>
-          </div>
-        </div>
-        
-        <div className="flex items-center gap-2">
-          <select
-            title="Filter by Year"
-            value={selectedYear}
-            onChange={e => setSelectedYear(e.target.value)}
-            className="bg-[#0D0D14] border border-[#D4AF37]/20 rounded-lg px-3 py-1.5 text-xs font-bold text-[#F0EFE8] outline-none focus:border-[#D4AF37] cursor-pointer shadow-inner"
-          >
-            <option value="all">All Years</option>
-            {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
-          </select>
-          <select
-            title="Filter by Month"
-            value={selectedMonth}
-            onChange={e => setSelectedMonth(e.target.value)}
-            className="bg-[#0D0D14] border border-[#D4AF37]/20 rounded-lg px-3 py-1.5 text-xs font-bold text-[#F0EFE8] outline-none focus:border-[#D4AF37] cursor-pointer shadow-inner"
-          >
-            <option value="all">All Months</option>
-            {MONTH_ORDER.map(m => <option key={m} value={m}>{m}</option>)}
-          </select>
-        </div>
-      </div>
-
-      {/* Agency Performance Metrics */}
-      <div className="bg-[#1A1A28]/80 backdrop-blur-md border border-[#D4AF37]/15 shadow-2xl rounded-2xl p-4 sm:p-5 relative overflow-hidden">
-        {/* Subtle background glow for the entire section */}
-        <div className="absolute -top-24 -right-24 w-48 h-48 bg-[#D4AF37]/5 blur-3xl rounded-full pointer-events-none"></div>
-        <p className="text-[9px] font-black text-[#A09E9A] uppercase tracking-[0.2em] mb-4 sm:mb-5 relative z-10 flex items-center gap-2">
-          <span className="w-1.5 h-1.5 rounded-full bg-[#D4AF37] animate-pulse"></span>
-          AGENCY PERFORMANCE METRICS
-        </p>
-
-        <div className="grid grid-cols-3 gap-3 relative z-10">
-          {/* COLUMN 1: REVENUE */}
-          <div className="flex flex-col gap-2.5 min-w-0">
-            <h4 className="text-[9px] sm:text-[10px] font-bold text-[#A09E9A] uppercase tracking-widest pl-2 border-l-2 border-[#FFB800]/40 mb-1">
-              REVENUE
-            </h4>
-            
-            {/* Row 1 Block 1: Total Agency Pts. */}
-            <div className="global-block-1 relative overflow-hidden rounded-xl p-2.5 sm:p-4 flex flex-col justify-between min-h-[84px] sm:min-h-[104px] transition-all duration-300 group hover:-translate-y-0.5 shadow-lg border">
-              <Star className="absolute top-2 right-2 w-4 h-4 opacity-[0.07] pointer-events-none" style={{ color: '#FFB800' }} />
-              <p className="text-[8px] sm:text-[10px] font-black uppercase tracking-wider text-[#A09E9A] leading-tight pr-4">
-                Total Agency Pts.
-              </p>
-              <p className="text-sm sm:text-2xl md:text-3xl font-black leading-none mt-2 truncate" style={{ color: '#FFB800' }}>
-                {formatPts(sum(getPoints))}
-              </p>
-            </div>
-
-            {/* Row 2 Block 1: Agency Commission */}
-            <div className="global-block-1 relative overflow-hidden rounded-xl p-2.5 sm:p-4 flex flex-col justify-between min-h-[84px] sm:min-h-[104px] transition-all duration-300 group hover:-translate-y-0.5 shadow-lg border">
-              <Award className="absolute top-2 right-2 w-4 h-4 opacity-[0.07] pointer-events-none" style={{ color: '#FFB800' }} />
-              <p className="text-[8px] sm:text-[10px] font-black uppercase tracking-wider text-[#A09E9A] leading-tight pr-4">
-                Agency Commission
-              </p>
-              <p className="text-sm sm:text-2xl md:text-3xl font-black leading-none mt-2 truncate" style={{ color: '#FFB800' }}>
-                {formatPts(sum(getAgentComm))}
-              </p>
-            </div>
-          </div>
-
-          {/* COLUMN 2: INCENTIVES */}
-          <div className="flex flex-col gap-2.5 min-w-0">
-            <h4 className="text-[9px] sm:text-[10px] font-bold text-[#A09E9A] uppercase tracking-widest pl-2 border-l-2 border-[#FF7B00]/40 mb-1">
-              INCENTIVES
-            </h4>
-
-            {/* Row 1 Block 2: Super Salary */}
-            <div className="global-block-2 relative overflow-hidden rounded-xl p-2.5 sm:p-4 flex flex-col justify-between min-h-[84px] sm:min-h-[104px] transition-all duration-300 group hover:-translate-y-0.5 shadow-lg border">
-              <Zap className="absolute top-2 right-2 w-4 h-4 opacity-[0.07] pointer-events-none" style={{ color: '#FF7B00' }} />
-              <p className="text-[8px] sm:text-[10px] font-black uppercase tracking-wider text-[#A09E9A] leading-tight pr-4">
-                Super Salary
-              </p>
-              <p className="text-sm sm:text-2xl md:text-3xl font-black leading-none mt-2 truncate" style={{ color: '#FF7B00' }}>
-                {formatPts(sum(getSuperSalary))}
-              </p>
-            </div>
-
-            {/* Row 2 Block 2: Super Rank */}
-            <div className="global-block-2 relative overflow-hidden rounded-xl p-2.5 sm:p-4 flex flex-col justify-between min-h-[84px] sm:min-h-[104px] transition-all duration-300 group hover:-translate-y-0.5 shadow-lg border">
-              <TrendingUp className="absolute top-2 right-2 w-4 h-4 opacity-[0.07] pointer-events-none" style={{ color: '#FF7B00' }} />
-              <p className="text-[8px] sm:text-[10px] font-black uppercase tracking-wider text-[#A09E9A] leading-tight pr-4">
-                Super Rank
-              </p>
-              <p className="text-sm sm:text-2xl md:text-3xl font-black leading-none mt-2 truncate" style={{ color: '#FF7B00' }}>
-                {formatPts(sum(getSuperRank))}
-              </p>
-            </div>
-          </div>
-
-          {/* COLUMN 3: ACTIVE MEMBERS */}
-          <div className="flex flex-col gap-2.5 min-w-0">
-            <h4 className="text-[9px] sm:text-[10px] font-bold text-[#A09E9A] uppercase tracking-widest pl-2 border-l-2 border-[#FF3B5C]/40 mb-1">
-              ACTIVE MEMBERS
-            </h4>
-
-            {/* Row 1 Block 3: Active Host */}
-            <div className="global-block-3 relative overflow-hidden rounded-xl p-2.5 sm:p-4 flex flex-col justify-between min-h-[84px] sm:min-h-[104px] transition-all duration-300 group hover:-translate-y-0.5 shadow-lg border">
-              <Users className="absolute top-2 right-2 w-4 h-4 opacity-[0.07] pointer-events-none" style={{ color: '#FF3B5C' }} />
-              <p className="text-[8px] sm:text-[10px] font-black uppercase tracking-wider text-[#A09E9A] leading-tight pr-4">
-                Active Host
-              </p>
-              <p className="text-sm sm:text-2xl md:text-3xl font-black leading-none mt-2 truncate" style={{ color: '#FF3B5C' }}>
-                {String(uniqueHosts)}
-              </p>
-            </div>
-
-            {/* Row 2 Block 3: Total Live Hours */}
-            <div className="global-block-3 relative overflow-hidden rounded-xl p-2.5 sm:p-4 flex flex-col justify-between min-h-[84px] sm:min-h-[104px] transition-all duration-300 group hover:-translate-y-0.5 shadow-lg border">
-              <Clock className="absolute top-2 right-2 w-4 h-4 opacity-[0.07] pointer-events-none" style={{ color: '#FF3B5C' }} />
-              <p className="text-[8px] sm:text-[10px] font-black uppercase tracking-wider text-[#A09E9A] leading-tight pr-4">
-                Total Live Hours
-              </p>
-              <p className="text-sm sm:text-2xl md:text-3xl font-black leading-none mt-2 truncate" style={{ color: '#FF3B5C' }}>
-                {fmtH(sum(getLiveDuration))}
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
 
 
       {monthlyTrend.length > 0 && (
-        <div className="bg-[#1A1A28] border border-[#D4AF37]/10 rounded-2xl p-5">
-          <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-            <div className="flex items-center gap-2">
-              <TrendingUp size={16} className="text-[#D4AF37]" />
-              <h3 className="font-bold text-[#F0EFE8] text-sm uppercase tracking-widest">Monthly Points Trend</h3>
-            </div>
+        <div className="glass-card p-5 relative overflow-hidden transition-all duration-500" ref={el => {
+          if (el) {
+            el.style.background = 'linear-gradient(to bottom right, rgba(20, 10, 5, 0.4), rgba(40, 10, 15, 0.5))';
+            el.style.backdropFilter = 'blur(20px)';
+            el.style.borderTop = '1px solid rgba(250, 204, 21, 0.3)';
+            el.style.borderLeft = '1px solid rgba(250, 204, 21, 0.1)';
+            el.style.borderColor = 'rgba(234, 179, 8, 0.2)';
+            el.style.boxShadow = 'inset 0 1px 1px rgba(250, 204, 21, 0.2), 0 10px 30px rgba(0,0,0,0.5), 0 0 15px rgba(250, 204, 21, 0.05)';
+          }
+        }}>
+          <div className="global-placeholder flex w-full items-center justify-between gap-2 bg-gradient-to-br from-[#FFB800]/10 to-transparent border border-[#FFB800]/20 border-t-[#FFB800]/40 rounded-xl px-4 py-2 backdrop-blur-xl shadow-[0_8px_32px_rgba(0,0,0,0.5),inset_0_1px_1px_rgba(255,184,0,0.3)] mb-4 relative z-10 overflow-hidden cursor-pointer">
+            <p className="font-['Lexend'] text-sm sm:text-base font-bold text-[#FFB700] drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)] [-webkit-text-stroke:0.3px_black] uppercase tracking-[0.2em] m-0">MONTHLY TRENDS</p>
             
-            <div className="flex items-center gap-3">
-              <span className="text-[10px] text-[#A09E9A] font-mono hidden sm:inline">All hosts combined</span>
-              <div className="flex bg-[#0D0D14] p-0.5 rounded-lg border border-[#D4AF37]/15">
-                <button
-                  onClick={() => setChartType('area')}
-                  className={cn(
-                    "px-2.5 py-1 rounded-md text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer",
-                    chartType === 'area'
-                      ? "bg-[#D4AF37] text-[#0D0D14] shadow-sm"
-                      : "text-[#A09E9A] hover:text-[#F0EFE8]"
-                  )}
-                >
-                  Area
-                </button>
-                <button
-                  onClick={() => setChartType('bar')}
-                  className={cn(
-                    "px-2.5 py-1 rounded-md text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer",
-                    chartType === 'bar'
-                      ? "bg-[#D4AF37] text-[#0D0D14] shadow-sm"
-                      : "text-[#A09E9A] hover:text-[#F0EFE8]"
-                  )}
-                >
-                  Bar
-                </button>
-              </div>
+            <div className="flex justify-end items-center gap-1.5 relative z-20">
+              <button
+                onClick={() => setChartType('area')}
+                className={cn(
+                  "px-5 py-2 text-xs font-black uppercase tracking-wider rounded-lg transition-all duration-300 relative overflow-hidden group cursor-pointer select-none",
+                  chartType === 'area'
+                    ? "global-block-2 text-white opacity-100 scale-105"
+                    : "global-block-2 text-white/50 opacity-50 hover:opacity-80"
+                )}
+              >
+                <span className="relative z-10 drop-shadow-md">Area</span>
+              </button>
+              <button
+                onClick={() => setChartType('bar')}
+                className={cn(
+                  "px-5 py-2 text-xs font-black uppercase tracking-wider rounded-lg transition-all duration-300 relative overflow-hidden group cursor-pointer select-none",
+                  chartType === 'bar'
+                    ? "global-block-1 text-white opacity-100 scale-105"
+                    : "global-block-1 text-white/50 opacity-50 hover:opacity-80"
+                )}
+              >
+                <span className="relative z-10 drop-shadow-md">Bar</span>
+              </button>
             </div>
           </div>
 
@@ -723,6 +1028,18 @@ export const Overview = () => {
                     }
                   }}
                 >
+                  <defs>
+                    <linearGradient id="barGlassGold" x1="0" y1="0" x2="1" y2="1">
+                      <stop offset="0%" stopColor="#FFB800" stopOpacity={0.8}/>
+                      <stop offset="50%" stopColor="#D4AF37" stopOpacity={0.4}/>
+                      <stop offset="100%" stopColor="#854D0E" stopOpacity={0.8}/>
+                    </linearGradient>
+                    <filter id="barGlassGlow" x="-20%" y="-20%" width="140%" height="140%">
+                      <feDropShadow dx="0" dy="4" stdDeviation="6" floodColor="#000000" floodOpacity="0.8" />
+                      <feDropShadow dx="0" dy="0" stdDeviation="10" floodColor="#FFB800" floodOpacity="0.3" />
+                      <feDropShadow dx="0" dy="0" stdDeviation="2" floodColor="#FFFFFF" floodOpacity="0.4" />
+                    </filter>
+                  </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="#ffffff03" vertical={false} />
                   <XAxis dataKey="label" tickFormatter={formatXAxisLabel} tick={{ fontSize: 9, fill: '#A09E9A', fontWeight: 'bold' }} axisLine={false} tickLine={false} />
                   <YAxis tick={{ fontSize: 9, fill: '#A09E9A' }} axisLine={false} tickLine={false} tickFormatter={v => formatPts(v)} />
@@ -732,15 +1049,15 @@ export const Overview = () => {
                     formatter={(v: number) => [`${formatPts(v)} pts`, 'Points']}
                     labelStyle={{ color: '#D4AF37', fontWeight: 'bold', marginBottom: '4px' }}
                   />
-                  <Bar dataKey="points" radius={[4, 4, 0, 0]}>
-                    {monthlyTrend.map((_, idx) => (
-                      <Cell
-                        key={idx}
-                        fill={CHART_COLORS[idx % CHART_COLORS.length]}
-                        fillOpacity={0.8}
-                      />
-                    ))}
-                  </Bar>
+                  <Bar 
+                    dataKey="points" 
+                    radius={[6, 6, 0, 0]} 
+                    fill="url(#barGlassGold)" 
+                    filter="url(#barGlassGlow)"
+                    stroke="#FFB800"
+                    strokeWidth={1}
+                    strokeOpacity={0.5}
+                  />
                 </BarChart>
               </ResponsiveContainer>
             )}
@@ -750,35 +1067,33 @@ export const Overview = () => {
       )}
 
       {/* Merged Agency Leaderboard & Spotlight Block */}
-      <div className="bg-[#1A1A28]/80 backdrop-blur-md border border-[#D4AF37]/15 rounded-2xl p-5 relative overflow-hidden flex flex-col gap-4">
+      <div className="glass-card relative overflow-hidden flex flex-col gap-4 transition-all duration-500" ref={el => {
+        if (el) {
+          el.style.background = 'linear-gradient(to bottom right, rgba(20, 10, 5, 0.4), rgba(40, 10, 15, 0.5))';
+          el.style.backdropFilter = 'blur(20px)';
+          el.style.borderTop = '1px solid rgba(250, 204, 21, 0.3)';
+          el.style.borderLeft = '1px solid rgba(250, 204, 21, 0.1)';
+          el.style.borderColor = 'rgba(234, 179, 8, 0.2)';
+          el.style.boxShadow = 'inset 0 1px 1px rgba(250, 204, 21, 0.2), 0 10px 30px rgba(0,0,0,0.5), 0 0 15px rgba(250, 204, 21, 0.05)';
+        }
+      }}>
         <div className="absolute -top-10 -right-10 w-32 h-32 bg-indigo-500/10 blur-3xl rounded-full pointer-events-none"></div>
         
         {/* Combined Header */}
-        <div className="flex items-center justify-between flex-wrap gap-4 border-b border-[#D4AF37]/10 pb-4">
-          <div className="flex items-center gap-2">
-            <Award size={16} className="text-[#D4AF37]" />
-            <h3 className="font-bold text-[#F0EFE8] text-sm uppercase tracking-widest whitespace-nowrap">Host Leaderboard & Contribution</h3>
-          </div>
-          <div className="flex items-center gap-2 relative z-10">
+        <div className="global-placeholder flex w-full items-center justify-between gap-2 bg-gradient-to-br from-[#FFB800]/10 to-transparent border border-[#FFB800]/20 border-t-[#FFB800]/40 rounded-xl px-4 py-2 backdrop-blur-xl shadow-[0_8px_32px_rgba(0,0,0,0.5),inset_0_1px_1px_rgba(255,184,0,0.3)] relative z-10 overflow-hidden cursor-pointer">
+          <p className="font-['Lexend'] text-sm sm:text-base font-bold text-[#FFB700] drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)] [-webkit-text-stroke:0.3px_black] uppercase tracking-[0.2em] flex items-center gap-2 m-0">
+            NINERS LEADERBOARD
+          </p>
+          <div className="flex items-center gap-2 relative z-20">
             <select
-              value={lbYear}
-              onChange={e => setLbYear(e.target.value)}
-              className="bg-[#0D0D14] border border-[#D4AF37]/20 rounded-lg px-3 py-1.5 text-xs font-bold text-[#F0EFE8] outline-none focus:border-[#D4AF37] cursor-pointer shadow-inner"
+              title="Leaderboard Period"
+              value={lbPeriod}
+              onChange={e => setLbPeriod(e.target.value)}
+              className="bg-[#0D0D14] border border-[#D4AF37]/20 rounded-lg px-3 py-1.5 text-xs font-bold text-[#FFB700] outline-none focus:border-[#D4AF37] cursor-pointer shadow-inner"
             >
-              <option value="all">All Years</option>
-              {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
+              <option value="all">All Time</option>
+              {lbPeriodOptions.map(p => <option key={p} value={p}>{p}</option>)}
             </select>
-            <select
-              value={lbMonth}
-              onChange={e => setLbMonth(e.target.value)}
-              className="bg-[#0D0D14] border border-[#D4AF37]/20 rounded-lg px-3 py-1.5 text-xs font-bold text-[#F0EFE8] outline-none focus:border-[#D4AF37] cursor-pointer shadow-inner"
-            >
-              <option value="all">All Months</option>
-              {MONTH_ORDER.map(m => <option key={m} value={m}>{m}</option>)}
-            </select>
-            <span className="text-[10px] text-[#A09E9A] font-mono whitespace-nowrap ml-1">
-              ({topPerformers.length} hosts)
-            </span>
           </div>
         </div>
 
@@ -794,7 +1109,7 @@ export const Overview = () => {
           const hasContribution = userComm > 0;
           
           return (
-            <div className="bg-[#0D0D14] border border-[#D4AF37]/15 rounded-xl p-4 flex flex-row justify-between items-center gap-4 transition-all">
+            <div className="bg-[#0D0D14] border border-[#D4AF37]/15 rounded-xl p-4 pt-6 -mt-4 flex flex-row justify-between items-center gap-4 transition-all relative z-0">
               <div className="flex flex-col">
                 <p className="text-base font-black text-[#D4AF37]">{lbTotalPeriodCommission.toLocaleString()} Pts</p>
                 <p className="text-[10px] font-bold text-[#A09E9A]/60 uppercase tracking-widest mt-0.5">Agency Commission</p>
@@ -812,18 +1127,18 @@ export const Overview = () => {
         {/* Leaderboard Section */}
         <div className="mt-2">
           {/* Column Headers */}
-          <div className="grid grid-cols-[auto_1fr_auto_auto_auto] gap-x-1.5 sm:gap-x-4 items-center px-3 mb-2 text-[9px] font-black uppercase tracking-widest text-[#A09E9A]/50">
+          <div className="grid grid-cols-[auto_1fr] sm:grid-cols-[auto_1fr_auto_auto_auto] gap-x-2 sm:gap-x-4 items-center px-3 mb-2 text-[9px] font-black uppercase tracking-widest text-[#A09E9A]/50">
             <span className="w-5 sm:w-6 text-center">#</span>
             <span>Nickname</span>
-            <span className="text-right w-12 sm:w-20">Live Hrs</span>
-            <span className="text-right w-16 sm:w-24">Points</span>
-            <span className="text-right w-14 sm:w-20">Share %</span>
+            <span className="text-right w-12 sm:w-20 hidden sm:block">Live Hrs</span>
+            <span className="text-right w-16 sm:w-24 hidden sm:block">Points</span>
+            <span className="text-right w-14 sm:w-20 hidden sm:block">Share %</span>
           </div>
 
           <div className="space-y-1.5">
             {topPerformers.slice(0, 15).map((h, idx) => {
-              const maxPts = topPerformers[0]?.points || 1;
-              const pct = (h.points / maxPts) * 100;
+              const maxComm = topPerformers[0]?.commission || 1;
+              const pct = (h.commission / maxComm) * 100;
               const medals = ['🥇', '🥈', '🥉'];
               
               // Define fading colors for Top 9: Light Yellow -> Gold -> Orange -> Red
@@ -849,54 +1164,76 @@ export const Overview = () => {
                   ? "bg-gradient-to-r from-[#D4AF37]/8 via-transparent to-transparent border-[#D4AF37]/15"
                   : "bg-transparent border-[#D4AF37]/5 hover:bg-white/[0.02]";
 
+              const sharePct = lbTotalPeriodCommission > 0 ? (h.commission / lbTotalPeriodCommission) * 100 : 0;
+
               return (
                 <div
                   key={h.poppoId}
                   onClick={() => { if(idx < 9) handleSpotlightClick(h.poppoId); }}
                   className={cn(
-                    "grid grid-cols-[auto_1fr_auto_auto_auto] gap-x-1.5 sm:gap-x-4 items-center rounded-xl p-2 sm:p-3 transition-all border",
+                    "grid grid-cols-[auto_1fr] sm:grid-cols-[auto_1fr_auto_auto_auto] gap-x-2 sm:gap-x-4 items-center rounded-xl p-2 sm:p-3 transition-all border",
                     rowStyle,
                     idx < 9 && "cursor-pointer hover:scale-[1.01] hover:brightness-110"
                   )}
                 >
-                  <span className="text-sm font-black text-[#A09E9A]/50 w-5 sm:w-6 text-center shrink-0">
+                  <span className="text-sm sm:text-base font-black text-[#A09E9A]/80 w-5 sm:w-6 text-center shrink-0">
                     {medals[idx] || `#${idx + 1}`}
                   </span>
 
-                  <div className="min-w-0">
-                    <div className="flex flex-col mb-1">
-                      <span className="text-sm font-black text-[#F0EFE8] truncate">{h.name}</span>
-                      <span className="text-[9px] text-[#A09E9A]/40 font-mono mt-0.5">ID: {h.poppoId}</span>
+                  <div className="min-w-0 pr-1 sm:pr-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-sm sm:text-base font-black text-[#F0EFE8] truncate">{h.name}</span>
+                      <span className="text-[8px] sm:text-[9px] text-[#A09E9A]/40 font-mono bg-white/5 px-1.5 py-0.5 rounded-md shrink-0">ID: {h.poppoId}</span>
                     </div>
-                    <div className="h-1 bg-white/5 rounded-full overflow-hidden">
+
+                    {/* Stats visible ONLY on mobile, placed UNDER the name */}
+                    <div className="flex sm:hidden items-center gap-3 mt-1.5 mb-2 overflow-x-auto custom-scrollbar pb-1">
+                      <div className="flex items-center gap-1.5 bg-white/5 px-2 py-0.5 rounded-md shrink-0">
+                        <span className="text-[9px] font-bold text-[#A09E9A]/70 uppercase">Pts</span>
+                        <span className="text-xs font-black text-[#D4AF37]">{formatPts(h.points)}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 bg-white/5 px-2 py-0.5 rounded-md shrink-0">
+                        <span className="text-[9px] font-bold text-[#A09E9A]/70 uppercase">Live</span>
+                        <span className="text-xs font-black text-purple-400">{fmtH(h.liveHrs)}h</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 bg-white/5 px-2 py-0.5 rounded-md shrink-0">
+                        <span className="text-[9px] font-bold text-[#A09E9A]/70 uppercase">Share</span>
+                        <span className="text-xs font-black text-cyan-400">{sharePct.toFixed(1)}%</span>
+                      </div>
+                    </div>
+
+                    <div className="h-1.5 sm:h-2 bg-black/60 rounded-full overflow-hidden shadow-inner border border-white/5">
                       <div
-                        className="h-full rounded-full"
+                        className="h-full rounded-full relative overflow-hidden transition-all duration-1000 ease-out"
                         {...({ style: {
-                          width: `${pct}%`,
-                          background: idx < 9 ? top9Colors[idx] : '#374151'
+                          width: `${Math.max(1, pct)}%`,
+                          background: idx < 9 
+                            ? `linear-gradient(90deg, ${top9Colors[idx]}40, ${top9Colors[idx]})` 
+                            : '#374151',
+                          boxShadow: idx < 9 ? `0 0 10px ${top9Colors[idx]}60, inset 0 1px 1px rgba(255,255,255,0.4)` : 'none'
                         } })}
-                      />
+                      >
+                        <div className="absolute inset-0 bg-gradient-to-b from-white/40 to-transparent"></div>
+                      </div>
                     </div>
                   </div>
 
-                  <div className="text-right w-12 sm:w-20 shrink-0">
-                    <p className="text-xs font-black text-purple-400">{fmtH(h.liveHrs)}</p>
-                    <p className="text-[9px] text-[#A09E9A]/40 uppercase tracking-wider hidden sm:block">Live</p>
+                  {/* These 3 columns hidden on mobile, visible on sm and up */}
+                  <div className="text-right w-12 sm:w-20 shrink-0 hidden sm:block">
+                    <p className="text-sm font-black text-purple-400">{fmtH(h.liveHrs)}</p>
+                    <p className="text-[9px] text-[#A09E9A]/50 uppercase tracking-wider">Live</p>
                   </div>
 
-                  <div className="text-right w-16 sm:w-24 shrink-0">
-                    <p className="text-sm font-black text-[#D4AF37]">{formatPts(h.points)}</p>
-                    <p className="text-[9px] text-[#A09E9A]/40 uppercase tracking-wider hidden sm:block">{h.months} mo</p>
+                  <div className="text-right w-16 sm:w-24 shrink-0 hidden sm:block">
+                    <p className="text-[15px] font-black text-[#D4AF37]">{formatPts(h.points)}</p>
+                    <p className="text-[9px] text-[#A09E9A]/50 uppercase tracking-wider">{h.months} mo</p>
                   </div>
 
-                  <div className="text-right w-14 sm:w-20 shrink-0">
-                    <p className="text-xs font-black text-cyan-400">
-                      {(() => {
-                        const sharePct = lbTotalPeriodCommission > 0 ? (h.commission / lbTotalPeriodCommission) * 100 : 0;
-                        return `${sharePct.toFixed(2)}%`;
-                      })()}
+                  <div className="text-right w-14 sm:w-20 shrink-0 hidden sm:block">
+                    <p className="text-sm font-black text-cyan-400">
+                      {sharePct.toFixed(2)}%
                     </p>
-                    <p className="text-[9px] text-[#A09E9A]/40 uppercase tracking-wider hidden sm:block">Share</p>
+                    <p className="text-[9px] text-[#A09E9A]/50 uppercase tracking-wider">Share</p>
                   </div>
                 </div>
               );
@@ -909,30 +1246,40 @@ export const Overview = () => {
 
       {/* Breakdown Table */}
       {reports.length > 0 && (
-        <div className="border border-[#D4AF37]/15 rounded-2xl p-5 relative overflow-hidden backdrop-blur-md shadow-2xl" style={{ background: 'linear-gradient(to bottom right, #1E1C24, #121017)' }}>
+        <div className="glass-card p-5 relative overflow-hidden transition-all duration-500 mt-12 mb-6" ref={el => {
+          if (el) {
+            el.style.background = 'linear-gradient(to bottom right, rgba(20, 10, 5, 0.4), rgba(40, 10, 15, 0.5))';
+            el.style.backdropFilter = 'blur(20px)';
+            el.style.borderTop = '1px solid rgba(250, 204, 21, 0.3)';
+            el.style.borderLeft = '1px solid rgba(250, 204, 21, 0.1)';
+            el.style.borderColor = 'rgba(234, 179, 8, 0.2)';
+            el.style.borderBottom = '1px solid rgba(250, 204, 21, 0.2)';
+            el.style.boxShadow = 'inset 0 1px 1px rgba(250, 204, 21, 0.2), 0 10px 30px rgba(0,0,0,0.5), 0 0 15px rgba(250, 204, 21, 0.05)';
+          }
+        }}>
           <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-            <div className="flex items-center gap-2">
-              <LayoutDashboard size={16} className="text-emerald-400" />
-              <h3 className="font-bold text-[#F0EFE8] text-sm uppercase tracking-widest">All Records</h3>
-              <span className="text-[10px] text-[#A09E9A] font-mono">({reports.length} entries)</span>
+            <div className="inline-flex items-center gap-2 bg-[rgba(10,5,5,0.5)] border border-[#FFB800]/20 rounded-lg px-4 py-2 backdrop-blur-md shadow-[0_4px_10px_rgba(0,0,0,0.3)]">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#FFB800] animate-pulse shadow-[0_0_8px_rgba(255,184,0,0.8)] shrink-0"></span>
+              <h3 className="font-black text-[#FFB800] drop-shadow-[0_0_8px_rgba(255,184,0,0.5)] text-sm uppercase tracking-widest m-0">All Records</h3>
+              <span className="text-[10px] text-[#A09E9A] font-mono ml-1">({reports.length} entries)</span>
             </div>
             
             <div className="flex items-center gap-3">
               {showRecords && (
-                <select
+                <GlassDropdown
                   title="Sort Records"
                   value={recordsSortOption}
-                  onChange={e => setRecordsSortOption(e.target.value as any)}
-                  className="bg-[#0D0D14] border border-[#D4AF37]/20 rounded-lg px-3 py-1.5 text-xs font-bold text-[#F0EFE8] outline-none focus:border-[#D4AF37] cursor-pointer shadow-inner"
-                >
-                  <option value="default">Default Sort</option>
-                  <option value="name">Name A-Z</option>
-                  <option value="share">Share % (High to Low)</option>
-                </select>
+                  onChange={(val: any) => setRecordsSortOption(val)}
+                  options={[
+                    { value: 'default', label: 'Default Sort' },
+                    { value: 'name', label: 'Name A-Z' },
+                    { value: 'share', label: 'Share % (High to Low)' }
+                  ]}
+                />
               )}
               <button
                 onClick={() => setShowRecords(!showRecords)}
-                className="bg-[#0D0D14] border border-[#D4AF37]/20 hover:border-[#D4AF37] px-4 py-1.5 rounded-lg text-xs font-bold text-[#F0EFE8] transition-all cursor-pointer hover:bg-white/[0.02] shadow-sm select-none"
+                className="bg-[#0D0D14]/80 border border-[#FFB800]/30 hover:bg-white/5 hover:border-[#FFB800]/60 px-4 py-1.5 rounded-lg text-xs font-black text-[#FFB800] transition-all cursor-pointer shadow-[inset_0_0_10px_rgba(255,184,0,0.1)] select-none uppercase tracking-wider"
               >
                 {showRecords ? 'Hide Records' : 'Show Records'}
               </button>
@@ -943,7 +1290,7 @@ export const Overview = () => {
             <div className="overflow-x-auto transition-all duration-300">
               <table className="w-full text-xs text-left border-collapse">
                 <thead>
-                  <tr className="border-b border-[#D4AF37]/10 text-[#A09E9A] uppercase tracking-wider text-[10px] font-bold" style={{ background: 'linear-gradient(to right, rgba(212, 175, 55, 0.08), transparent)' }}>
+                  <tr className="border-b border-[#D4AF37]/10 text-[#A09E9A] uppercase tracking-wider text-[10px] font-bold" ref={el => { if (el) el.style.background = 'linear-gradient(to right, rgba(212, 175, 55, 0.08), transparent)'; }}>
                     <th className="py-2 px-2">Host</th>
                     <th className="py-2 px-2">Period</th>
                     <th className="py-2 px-2">Live Hrs</th>
@@ -964,11 +1311,17 @@ export const Overview = () => {
                             <p className="text-[9px] text-[#A09E9A]/50 font-mono">{r.poppoId}</p>
                           </div>
                         </td>
-                        <td className="py-2 px-2 text-[#A09E9A]">{r.monthName} {r.year}</td>
+                        <td className="py-2 px-2 text-[#A09E9A]">
+                          {(() => {
+                            const norm = normalizeMonthYear(r.monthName, r.year);
+                            return norm ? norm.key : `${r.monthName} ${r.year}`;
+                          })()}
+                        </td>
                         <td className="py-2 px-2 text-cyan-400 font-mono">{fmtH(getLiveDuration(r))}</td>
                         <td className="py-2 px-2 text-purple-400 font-mono">
                           {(() => {
-                            const key = `${r.monthName} ${r.year}`;
+                            const norm = normalizeMonthYear(r.monthName, r.year);
+                            const key = norm ? norm.key : `${r.monthName} ${r.year}`;
                             const total = monthlyTotalCommission.get(key) || 0;
                             const hostComm = getAgentComm(r);
                             const pct = total > 0 ? (hostComm / total) * 100 : 0;
@@ -992,14 +1345,17 @@ export const Overview = () => {
 
       {/* SPOTLIGHT MODAL */}
       {spotlightHost && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm overflow-y-auto">
-          <HostProfileView 
-            host={spotlightHost} 
+        <div className="fixed inset-0 z-[100] flex items-start justify-center p-4 sm:p-10 bg-black/80 backdrop-blur-sm overflow-y-auto">
+          <div className="w-full max-w-7xl relative my-auto">
+            <HostProfileView 
+              host={spotlightHost} 
             isReadOnly={false} 
             onClose={() => setSpotlightHost(null)} 
             onProfileUpdated={() => {}}
             isSpotlight={true}
+            hidePerformanceStats={true}
           />
+          </div>
         </div>
       )}
     </div>

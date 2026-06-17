@@ -2,12 +2,36 @@ import { auth, db, storage } from './firebase';
 import { ref, uploadString, getBytes, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { Storage } from './storage';
 <<<<<<< HEAD
+<<<<<<< HEAD
 import { doc, setDoc, getDoc, collection, query, where, getDocs, deleteDoc, writeBatch, Timestamp, onSnapshot, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
 import { CommissionEntry, Host, PKEntry, ExposureEntry, FanbaseHealthEntry, WeeklyLiveDataEntry, MonthlyLiveDataEntry, TopNinersEarningsSummary, EventsCalendarPublic, ReportingSubmission, Task, ActivityAuditLog, CalendarEvent, LivehouseRequest, AwardBadge, AwardAssignment } from '../types';
 =======
 import { doc, setDoc, getDoc, collection, query, where, getDocs, deleteDoc, writeBatch, Timestamp, onSnapshot, updateDoc, arrayUnion, arrayRemove, deleteField } from 'firebase/firestore';
 import { CommissionEntry, Host, PKEntry, ExposureEntry, FanbaseHealthEntry, WeeklyLiveDataEntry, MonthlyLiveDataEntry, TopNinersEarningsSummary, EventsCalendarPublic, Task, ActivityAuditLog, CalendarEvent, LivehouseRequest, AwardBadge, AwardAssignment, ManagerNote } from '../types';
 >>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
+=======
+import { doc, setDoc, getDoc, collection, query, where, getDocs, deleteDoc, writeBatch, Timestamp, onSnapshot, updateDoc, arrayUnion, arrayRemove, deleteField, orderBy, limit } from 'firebase/firestore';
+import { CommissionEntry, Host, PKEntry, ExposureEntry, FanbaseHealthEntry, WeeklyLiveDataEntry, MonthlyLiveDataEntry, TopNinersEarningsSummary, EventsCalendarPublic, Task, ActivityAuditLog, CalendarEvent, LivehouseRequest, AwardBadge, AwardAssignment, ManagerNote } from '../types';
+import { LivehouseDataRow } from '../types/livehouse';
+
+export const generateSubmissionId = (reporterId: string, role: string, name: string): string => {
+  const safeId = reporterId || 'Unknown';
+  const safeRole = role || 'Unknown';
+  const safeName = name || 'Unknown';
+  
+  const now = new Date();
+  const dateStr = `${now.getMonth() + 1}-${now.getDate()}-${now.getFullYear()}`;
+  let hours = now.getHours();
+  const ampm = hours >= 12 ? 'PM' : 'AM';
+  hours = hours % 12;
+  hours = hours ? hours : 12;
+  const minutes = now.getMinutes().toString().padStart(2, '0');
+  const timeStr = `${hours}:${minutes}${ampm}`;
+  const timestamp = `${dateStr}-${timeStr}`;
+  
+  return `${safeId}_${safeRole}_${safeName}_${timestamp}`.replace(/\s+/g, '');
+};
+>>>>>>> 2b42d3ae84c3e300e1faeb35e7009a759158d1e9
 
 export enum OperationType {
   CREATE = 'create',
@@ -212,6 +236,101 @@ export const FirebaseService = {
     }
   },
 
+  // === CMS: Public Page Assets ===
+  async getPublicPageAssets(): Promise<any[]> {
+    const path = 'public_page_assets';
+    try {
+      const snapshot = await getDocs(collection(db, path));
+      return snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.LIST, path);
+      return [];
+    }
+  },
+
+  async savePublicPageAsset(asset: any): Promise<void> {
+    const path = `public_page_assets/${asset.slotId}`;
+    try {
+      await setDoc(doc(db, 'public_page_assets', asset.slotId), {
+        ...asset,
+        updatedAt: new Date().toISOString()
+      }, { merge: true });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, path);
+    }
+  },
+
+  // === CMS: Blogs ===
+  async getBlogs(): Promise<any[]> {
+    const path = 'blogs';
+    try {
+      const snapshot = await getDocs(collection(db, path));
+      return snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.LIST, path);
+      return [];
+    }
+  },
+
+  async getBlogBySlug(slug: string): Promise<any | null> {
+    const path = `blogs (slug: ${slug})`;
+    try {
+      const q = query(collection(db, 'blogs'), where('slug', '==', slug));
+      const snapshot = await getDocs(q);
+      if (snapshot.empty) return null;
+      const doc = snapshot.docs[0];
+      return { id: doc.id, ...doc.data() };
+    } catch (error) {
+      handleFirestoreError(error, OperationType.GET, path);
+      return null;
+    }
+  },
+
+  async saveBlog(blog: any): Promise<void> {
+    const path = `blogs/${blog.id}`;
+    try {
+      await setDoc(doc(db, 'blogs', blog.id), {
+        ...blog,
+        updatedAt: new Date().toISOString(),
+        createdAt: blog.createdAt || new Date().toISOString()
+      }, { merge: true });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, path);
+    }
+  },
+
+  async incrementBlogViewCount(blogId: string): Promise<void> {
+    const path = `blogs/${blogId}`;
+    try {
+      const docRef = doc(db, 'blogs', blogId);
+      const snapshot = await getDocs(query(collection(db, 'blogs'), where('id', '==', blogId)));
+      // Note: In a production app, use increment() from firestore. But we are working with the simple generic wrapper here.
+      if (!snapshot.empty) {
+        const currentData = snapshot.docs[0].data();
+        await setDoc(docRef, { viewCount: (currentData.viewCount || 0) + 1 }, { merge: true });
+      }
+    } catch (error) {
+      console.error('Failed to increment view count', error);
+    }
+  },
+
+  async uploadBlogImage(file: File): Promise<string> {
+    const { storage } = await import('./firebase');
+    const { ref, uploadBytes, getDownloadURL } = await import('firebase/storage');
+    const storageRef = ref(storage, `blog-images/${Date.now()}_${file.name}`);
+    await uploadBytes(storageRef, file);
+    return await getDownloadURL(storageRef);
+  },
+
+  async deleteBlog(blogId: string): Promise<void> {
+    const path = `blogs/${blogId}`;
+    try {
+      await deleteDoc(doc(db, 'blogs', blogId));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, path);
+    }
+  },
+
   async updateRoleMetadata(role: string, id: string, data: any): Promise<void> {
     try {
       if (!id) throw new Error("ID is required for role metadata updates.");
@@ -340,13 +459,28 @@ export const FirebaseService = {
       const batch = writeBatch(db);
       requests.forEach(r => batch.set(doc(db, 'livehouse_requests', r.id), r, { merge: true }));
       await batch.commit();
+
+      // Notify registered hosts whose requests are approved
+      for (const r of requests) {
+        if (r.status === 'Approved') {
+          FirebaseService.notifyHostIfRegistered(r.poppoId, r.date || r.proposedDate, r.timeslot || r.proposedTimeslot).catch(console.error);
+        }
+      }
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, 'livehouse_requests');
     }
   },
   async updateLivehouseStatus(id: string, status: string) {
     try {
-      await updateDoc(doc(db, 'livehouse_requests', id), { status });
+      const docRef = doc(db, 'livehouse_requests', id);
+      await updateDoc(docRef, { status });
+      if (status === 'Approved') {
+        const snap = await getDoc(docRef);
+        if (snap.exists()) {
+          const req = snap.data();
+          FirebaseService.notifyHostIfRegistered(req.poppoId, req.date || req.proposedDate, req.timeslot || req.proposedTimeslot).catch(console.error);
+        }
+      }
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, `livehouse_requests/${id}`);
     }
@@ -516,30 +650,114 @@ export const FirebaseService = {
     return allMetadata;
   },
 
-
-
-  async submitRpkReport(hostId: string, fromDate: string, toDate: string, data: any) {
-    const docId = `${hostId}_${fromDate}_${toDate}`;
-    const path = `pk_reports/${docId}`;
+  // ---------------------------------------------------------
+  // DATABASE VAULT & STAGING QUEUE (Safeguard Mechanism)
+  // ---------------------------------------------------------
+  async submitToStaging(originalCollection: string, docId: string, data: any) {
+    const path = `staging_queue/${docId}`;
     try {
-      const docRef = doc(db, 'pk_reports', docId);
-      await setDoc(docRef, { ...data, poppo_id: hostId, timestamp: new Date().toISOString() });
+      const payload = {
+        id: docId,
+        isBulk: false,
+        originalCollection,
+        data,
+        status: 'PENDING',
+        tags: [],
+        timestamp: new Date().toISOString()
+      };
+      await setDoc(doc(db, 'staging_queue', docId), payload);
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, path);
     }
   },
 
-
-
-  async submitFanbaseReport(hostId: string, fromDate: string, toDate: string, data: any) {
-    const docId = `${hostId}_${fromDate}_${toDate}`;
-    const path = `fanbase_reports/${docId}`;
+  async submitBulkToStaging(originalCollection: string, uploadId: string, items: any[], submitterName: string = 'Admin') {
+    const docId = `BULK_${originalCollection}_${uploadId}`;
+    const path = `staging_queue/${docId}`;
     try {
-      const docRef = doc(db, 'fanbase_reports', docId);
-      await setDoc(docRef, { ...data, poppo_id: hostId, timestamp: new Date().toISOString() });
+      const payload = {
+        id: docId,
+        isBulk: true,
+        originalCollection,
+        items,
+        status: 'PENDING',
+        tags: [],
+        submittedBy: submitterName,
+        timestamp: new Date().toISOString()
+      };
+      await setDoc(doc(db, 'staging_queue', docId), payload);
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, path);
     }
+  },
+
+  async getPendingStagingData() {
+    try {
+      const q = query(collection(db, 'staging_queue'), where('status', '==', 'PENDING'));
+      const snap = await getDocs(q);
+      return snap.docs.map(d => ({ ...d.data(), id: d.id }));
+    } catch (error) {
+      console.error("Error fetching staging data:", error);
+      return [];
+    }
+  },
+
+  async approveStagingData(stagingDoc: any) {
+    const { id: stagingId, originalCollection, isBulk, data, items } = stagingDoc;
+    try {
+      if (isBulk && items) {
+        // Bulk approval: Write all items via batch
+        const batch = writeBatch(db);
+        items.forEach((item: any) => {
+          // Attempt to extract an ID from the item, or generate a random one
+          const itemId = item.poppo_id ? `${item.poppo_id}_${item.month || item.from_date || item.id || Math.random().toString(36).substring(2,9)}` : Math.random().toString(36).substring(2, 15);
+          const lockedData = { ...item, isLocked: true, lockedAt: new Date().toISOString() };
+          const docRef = doc(db, originalCollection, itemId);
+          batch.set(docRef, lockedData);
+        });
+        await batch.commit();
+      } else {
+        // Single approval
+        const lockedData = { ...data, isLocked: true, lockedAt: new Date().toISOString() };
+        await setDoc(doc(db, originalCollection, stagingId), lockedData);
+      }
+      
+      // Mark staging as APPROVED
+      await updateDoc(doc(db, 'staging_queue', stagingId), { status: 'APPROVED', approvedAt: new Date().toISOString() });
+    } catch (error) {
+      console.error("Error approving staging data:", error);
+      throw error;
+    }
+  },
+
+  async rejectStagingData(stagingId: string) {
+    try {
+      await updateDoc(doc(db, 'staging_queue', stagingId), { status: 'REJECTED', rejectedAt: new Date().toISOString() });
+    } catch (error) {
+      console.error("Error rejecting staging data:", error);
+      throw error;
+    }
+  },
+
+  async updateStagingTags(stagingId: string, tags: string[]) {
+    try {
+      await updateDoc(doc(db, 'staging_queue', stagingId), { tags });
+    } catch (error) {
+      console.error("Error updating staging tags:", error);
+      throw error;
+    }
+  },
+
+  async submitRpkReport(hostId: string, fromDate: string, toDate: string, data: any) {
+    const docId = generateSubmissionId(data.reporter_id, data.reporter_role, data.reporter_name);
+    const finalData = { ...data, poppo_id: hostId, timestamp: new Date().toISOString() };
+    await this.submitToStaging('pk_reports', docId, finalData);
+  },
+
+  async submitFanbaseReport(hostId: string, fromDate: string, toDate: string, data: any) {
+    const docId = generateSubmissionId(data.reporter_id, data.reporter_role, data.reporter_name);
+    const finalData = { ...data, poppo_id: hostId, timestamp: new Date().toISOString() };
+    await this.submitToStaging('fanbase_reports', docId, finalData);
   },
 
   // Hosts management
@@ -579,6 +797,7 @@ export const FirebaseService = {
   },
 
 <<<<<<< HEAD
+<<<<<<< HEAD
   async syncHostManagerRelationship(hostId: string, newManagerId: string | null): Promise<void> {
     const hostUserRef = doc(db, 'users', hostId);
     const hostHostsRef = doc(db, 'host', hostId);
@@ -597,6 +816,21 @@ export const FirebaseService = {
           oldManagerId = hostData?.assignedManagerId || hostData?.assigned_manager_poppo_id || null;
         }
 =======
+=======
+  async saveAgentCommissions(commissions: CommissionEntry[], agentId: string, isWeekly: boolean = false, submitterName: string = 'Agent') {
+    const uploadId = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 15);
+    
+    // Tag data with Agent identifiers
+    const taggedCommissions = commissions.map(c => ({
+      ...c,
+      isAgentData: true,
+      uploadedById: agentId
+    }));
+    
+    await this.submitBulkToStaging('performance_reports', uploadId, taggedCommissions, submitterName);
+  },
+
+>>>>>>> 2b42d3ae84c3e300e1faeb35e7009a759158d1e9
   async updateManagerHostFields(managerId: string, hostIdToAdd: string | null, hostIdToRemove: string | null, forceHosts?: string[]): Promise<void> {
     // Get current manager data from role collection first, since it contains the profile fields
     const normRoleCol = 'manager';
@@ -957,19 +1191,10 @@ export const FirebaseService = {
   },
 
   // Performance Reports Management
-  async saveCommissions(commissions: CommissionEntry[]) {
-    const path = 'performance_reports';
-    try {
-      const batch = writeBatch(db);
-      commissions.forEach(c => {
-        const id = `${c.poppo_id}_${c.month}`;
-        const docRef = doc(db, path, id);
-        batch.set(docRef, c);
-      });
-      await batch.commit();
-    } catch (error) {
-      handleFirestoreError(error, OperationType.WRITE, path);
-    }
+  async saveCommissions(commissions: CommissionEntry[], submitterName: string = 'Admin', isWeekly: boolean = false) {
+    const uploadId = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 15);
+    const collectionName = isWeekly ? 'performance_weekly_reports' : 'performance_reports';
+    await this.submitBulkToStaging(collectionName, uploadId, commissions, submitterName);
   },
 
   async getCommissionsByMonth(month: string): Promise<CommissionEntry[]> {
@@ -977,7 +1202,9 @@ export const FirebaseService = {
     try {
       const q = query(collection(db, path), where('month', '==', month));
       const snapshot = await getDocs(q);
-      return snapshot.docs.map(d => d.data() as CommissionEntry);
+      const all = snapshot.docs.map(d => d.data() as CommissionEntry);
+      // Filter out agent data for directors
+      return all.filter(c => !c.isAgentData);
     } catch (error) {
       handleFirestoreError(error, OperationType.LIST, path);
       return [];
@@ -985,10 +1212,31 @@ export const FirebaseService = {
   },
 
   async getAllCommissions(): Promise<CommissionEntry[]> {
-    const path = 'performance_reports';
+    try {
+      const [monthlySnap, weeklySnap] = await Promise.all([
+        getDocs(collection(db, 'performance_reports')),
+        getDocs(collection(db, 'performance_weekly_reports'))
+      ]);
+      const monthly = monthlySnap.docs.map(d => d.data() as CommissionEntry);
+      const weekly = weeklySnap.docs.map(d => d.data() as CommissionEntry);
+      return [...monthly, ...weekly].filter(c => !c.isAgentData);
+    } catch (error) {
+      console.error("Error getting all commissions:", error);
+      return [];
+    }
+  },
+
+  async getAgentCommissions(agentId: string, isWeekly: boolean = false): Promise<CommissionEntry[]> {
+    const path = isWeekly ? 'performance_weekly_reports' : 'performance_reports';
     try {
       const snapshot = await getDocs(collection(db, path));
-      return snapshot.docs.map(d => d.data() as CommissionEntry);
+      const all = snapshot.docs.map(d => d.data() as CommissionEntry);
+      
+      return all.filter(c => 
+        c.isAgentData === true && 
+        c.uploadedById === agentId && 
+        (isWeekly ? (c.from_date && c.to_date) : c.month)
+      );
     } catch (error) {
       handleFirestoreError(error, OperationType.LIST, path);
       return [];
@@ -1010,15 +1258,17 @@ export const FirebaseService = {
     }
   },
 
-  async deleteCommission(poppoId: string, month: string) {
-    const path = `performance_reports/${poppoId}_${month}`;
+  async deleteCommission(poppoId: string, monthOrRange: string, isWeekly: boolean = false) {
+    const colName = isWeekly ? 'performance_weekly_reports' : 'performance_reports';
+    const path = `${colName}/${poppoId}_${monthOrRange}`;
     try {
-      await deleteDoc(doc(db, 'performance_reports', `${poppoId}_${month}`));
+      await deleteDoc(doc(db, colName, `${poppoId}_${monthOrRange}`));
     } catch (error) {
       handleFirestoreError(error, OperationType.DELETE, path);
     }
   },
 
+<<<<<<< HEAD
   // Agent-Specific Team Financials
   async saveAgentCommissions(commissions: CommissionEntry[], agentId: string, isWeekly: boolean = false) {
     const collectionName = isWeekly ? 'agent_financials_weekly' : 'agent_financials_monthly';
@@ -1060,8 +1310,33 @@ export const FirebaseService = {
 
   async updateCommission(commission: CommissionEntry) {
     const path = `performance_reports/${commission.poppo_id}_${commission.month}`;
+=======
+  async deleteAgentCommission(poppoId: string, monthOrRange: string, agentId: string, isWeekly: boolean = false) {
+    const colName = isWeekly ? 'performance_weekly_reports' : 'performance_reports';
+    const path = `${colName}/${poppoId}_${monthOrRange}`;
+>>>>>>> 2b42d3ae84c3e300e1faeb35e7009a759158d1e9
     try {
-      const docRef = doc(db, 'performance_reports', `${commission.poppo_id}_${commission.month}`);
+      const docRef = doc(db, colName, `${poppoId}_${monthOrRange}`);
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        if (data.isAgentData && data.uploadedById === agentId) {
+          await deleteDoc(docRef);
+        } else {
+          console.error("Agent tried to delete a non-agent or unauthorized commission row.");
+        }
+      }
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, path);
+    }
+  },
+
+  async updateCommission(commission: CommissionEntry, isWeekly: boolean = false) {
+    const colName = isWeekly ? 'performance_weekly_reports' : 'performance_reports';
+    const monthOrRange = isWeekly ? `${commission.from_date}_${commission.to_date}` : commission.month;
+    const path = `${colName}/${commission.poppo_id}_${monthOrRange}`;
+    try {
+      const docRef = doc(db, colName, `${commission.poppo_id}_${monthOrRange}`);
       await setDoc(docRef, commission, { merge: true });
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, path);
@@ -1263,6 +1538,50 @@ export const FirebaseService = {
     }
   },
 
+  async getAllAssignedAwards(): Promise<any[]> {
+    try {
+      let legacyAwards: any[] = [];
+      try {
+        const topSnap = await getDocs(collection(db, 'host_awards'));
+        legacyAwards = topSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+      } catch (err) {
+        console.warn('[FirebaseService] Failed to load top-level host_awards for all hosts', err);
+      }
+
+      let assignedAwards: any[] = [];
+      try {
+        const assignSnap = await getDocs(collection(db, 'award_assignments'));
+        assignedAwards = assignSnap.docs.map(d => {
+          const data = d.data();
+          return {
+            id: d.id,
+            title: data.awardName,
+            description: `Effectivity Period: ${data.startDate} to ${data.endDate}`,
+            dateAwarded: data.startDate || data.assignedAt,
+            awardedAt: data.assignedAt,
+            color: data.awardColor,
+            hostId: data.hostId || data.poppoId,
+            poppoId: data.hostId || data.poppoId,
+            ...data
+          };
+        });
+      } catch (err) {
+        console.warn('[FirebaseService] Failed to load award_assignments for all hosts', err);
+      }
+
+      const allAwards = [...legacyAwards, ...assignedAwards];
+      const seen = new Set<string>();
+      return allAwards.filter(a => {
+        if (seen.has(a.id)) return false;
+        seen.add(a.id);
+        return true;
+      });
+    } catch (error) {
+      console.warn('[FirebaseService] getAllAssignedAwards failed', error);
+      return [];
+    }
+  },
+
   async assignAward(hostId: string, awardData: any): Promise<void> {
     try {
       // We will write to the top-level host_awards collection
@@ -1308,6 +1627,232 @@ export const FirebaseService = {
     }
   },
 
+  async saveLivehouseSchedule(scheduleRows: LivehouseDataRow[]) {
+    const path = 'livehouse_schedule';
+    try {
+      // Chunk batches because of Firestore's 500 operation limit per batch
+      const maxBatchSize = 400;
+      let batch = writeBatch(db);
+      let batchCount = 0;
+      
+      const commitBatchIfNeeded = async () => {
+        if (batchCount >= maxBatchSize) {
+          await batch.commit();
+          batch = writeBatch(db);
+          batchCount = 0;
+        }
+      };
+      
+      // 1. Clear existing Livehouse schedule but keep in memory for diffing
+      const snap = await getDocs(collection(db, path));
+      const oldSchedule = new Map<string, any>();
+      for (const d of snap.docs) {
+        oldSchedule.set(d.id, d.data());
+        batch.delete(d.ref);
+        batchCount++;
+        await commitBatchIfNeeded();
+      }
+
+      // 2. Set new Livehouse schedule & generate calendar events and logs
+      const validCalendarEventIds: string[] = [];
+      const logsRef = collection(db, 'livehouse_logs');
+
+      // Fetch all users to match poppo_id quickly
+      const usersSnap = await getDocs(collection(db, 'users'));
+      const existingUserIds = new Set(usersSnap.docs.map(doc => doc.id.trim()));
+
+      for (const r of scheduleRows) {
+        if (!r.date || !r.timeslot) continue;
+        const docId = `${r.date}_${r.timeslot}`.replace(/[^a-zA-Z0-9_-]/g, '_');
+        
+        const oldRow = oldSchedule.get(docId);
+        
+        const newSlot1 = String(r.slot_1?.poppo_id || '').trim();
+        const oldSlot1 = String(oldRow?.slot_1?.poppo_id || '').trim();
+        
+        if (newSlot1 && newSlot1 !== oldSlot1) {
+          const logDocRef = doc(logsRef);
+          batch.set(logDocRef, {
+            poppo_id: newSlot1,
+            date: r.date,
+            timeslot: r.timeslot,
+            timestamp: new Date().toISOString(),
+            source: 'manual-sync'
+          });
+          batchCount++;
+          await commitBatchIfNeeded();
+
+          // Create notification if matched user in 'users'
+          if (existingUserIds.has(newSlot1)) {
+            const notifId = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 15);
+            const notifRef = doc(db, 'user_notifications', notifId);
+            batch.set(notifRef, {
+              id: notifId,
+              poppoId: newSlot1,
+              title: 'Livehouse Event Scheduled',
+              message: `Your Livehouse Event is scheduled on ${r.date} at ${r.timeslot}.`,
+              type: 'success',
+              timestamp: new Date().toISOString(),
+              read: false
+            });
+            batchCount++;
+            await commitBatchIfNeeded();
+          }
+        }
+        
+        const newSlot2 = String(r.slot_2?.poppo_id || '').trim();
+        const oldSlot2 = String(oldRow?.slot_2?.poppo_id || '').trim();
+        
+        if (newSlot2 && newSlot2 !== oldSlot2) {
+          const logDocRef = doc(logsRef);
+          batch.set(logDocRef, {
+            poppo_id: newSlot2,
+            date: r.date,
+            timeslot: r.timeslot,
+            timestamp: new Date().toISOString(),
+            source: 'manual-sync'
+          });
+          batchCount++;
+          await commitBatchIfNeeded();
+
+          // Create notification if matched user in 'users'
+          if (existingUserIds.has(newSlot2)) {
+            const notifId = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 15);
+            const notifRef = doc(db, 'user_notifications', notifId);
+            batch.set(notifRef, {
+              id: notifId,
+              poppoId: newSlot2,
+              title: 'Livehouse Event Scheduled',
+              message: `Your Livehouse Event is scheduled on ${r.date} at ${r.timeslot}.`,
+              type: 'success',
+              timestamp: new Date().toISOString(),
+              read: false
+            });
+            batchCount++;
+            await commitBatchIfNeeded();
+          }
+        }
+
+        const docRef = doc(db, path, docId);
+        batch.set(docRef, r);
+        batchCount++;
+        await commitBatchIfNeeded();
+      }
+      
+      const syncStatusRef = doc(db, 'system', 'livehouse_sync');
+      batch.set(syncStatusRef, {
+        last_synced_iso: new Date().toISOString()
+      }, { merge: true });
+      batchCount++;
+      await commitBatchIfNeeded();
+
+      if (batchCount > 0) {
+        await batch.commit();
+      }
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, path);
+    }
+  },
+
+  async getLivehouseSchedule(): Promise<LivehouseDataRow[]> {
+    const path = 'livehouse_schedule';
+    try {
+      const snap = await getDocs(collection(db, path));
+      return snap.docs.map(d => d.data() as LivehouseDataRow);
+    } catch (error) {
+      console.warn('[FirebaseService] getLivehouseSchedule failed', error);
+      return [];
+    }
+  },
+
+  async getLivehouseLogs(limitCount: number = 50, startAfterDoc?: any): Promise<{ logs: any[], lastVisible: any }> {
+    try {
+      let q = query(
+        collection(db, 'livehouse_logs'),
+        orderBy('timestamp', 'desc'),
+        limit(limitCount)
+      );
+      if (startAfterDoc) {
+        const { startAfter } = await import('firebase/firestore');
+        q = query(q, startAfter(startAfterDoc));
+      }
+      const snapshot = await getDocs(q);
+      const logs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const lastVisible = snapshot.docs[snapshot.docs.length - 1];
+      return { logs, lastVisible };
+    } catch (error) {
+      console.warn('[FirebaseService] getLivehouseLogs failed', error);
+      return { logs: [], lastVisible: null };
+    }
+  },
+
+  async getLivehouseSyncStatus(): Promise<string | null> {
+    try {
+      const docRef = doc(db, 'system', 'livehouse_sync');
+      const snap = await getDoc(docRef);
+      if (snap.exists()) {
+        return snap.data().last_synced_iso || null;
+      }
+      return null;
+    } catch (error) {
+      console.warn('[FirebaseService] getLivehouseSyncStatus failed', error);
+      return null;
+    }
+  },
+
+  async getAllCalendarEvents(): Promise<any[]> {
+    try {
+      const snap = await getDocs(collection(db, 'calendar'));
+      return snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    } catch (error) {
+      console.warn('[FirebaseService] getAllCalendarEvents failed', error);
+      return [];
+    }
+  },
+
+  async deleteOldLivehouseLogs(count: number): Promise<void> {
+    try {
+      const q = query(
+        collection(db, 'livehouse_logs'),
+        orderBy('timestamp', 'asc'),
+        limit(count)
+      );
+      const snapshot = await getDocs(q);
+      const batch = writeBatch(db);
+      snapshot.docs.forEach((doc) => {
+        batch.delete(doc.ref);
+      });
+      await batch.commit();
+    } catch (error) {
+      console.warn('[FirebaseService] deleteOldLivehouseLogs failed', error);
+      throw error;
+    }
+  },
+
+
+
+  async notifyHostIfRegistered(poppoId: string, date: string, timeslot: string) {
+    if (!poppoId) return;
+    try {
+      const cleanId = String(poppoId).trim();
+      const userDocRef = doc(db, 'users', cleanId);
+      const userDoc = await getDoc(userDocRef);
+      if (userDoc.exists()) {
+        const notifId = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 15);
+        await setDoc(doc(db, 'user_notifications', notifId), {
+          id: notifId,
+          poppoId: cleanId,
+          title: 'Livehouse Event Scheduled',
+          message: `Your Livehouse Event is scheduled on ${date} at ${timeslot}.`,
+          type: 'success',
+          timestamp: new Date().toISOString(),
+          read: false
+        });
+      }
+    } catch (err) {
+      console.error('[FirebaseService] notifyHostIfRegistered failed:', err);
+    }
+  },
 
   async saveLivehouseRequests(requests: LivehouseRequest[]) {
     const path = 'livehouse_requests';
@@ -1319,6 +1864,13 @@ export const FirebaseService = {
         batch.set(docRef, r);
       });
       await batch.commit();
+
+      // Notify registered hosts whose requests are approved
+      for (const r of requests) {
+        if (r.status === 'Approved') {
+          FirebaseService.notifyHostIfRegistered(r.poppoId, r.date, r.timeslot).catch(console.error);
+        }
+      }
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, path);
     }
@@ -1420,6 +1972,33 @@ export const FirebaseService = {
       const q = query(collection(db, path), where('periodKey', '==', periodKey));
       const snapshot = await getDocs(q);
       return snapshot.docs.map(d => d.data() as TopNinersEarningsSummary);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.LIST, path);
+      return [];
+    }
+  },
+
+  async getLatestTopNinersSummaries(): Promise<TopNinersEarningsSummary[]> {
+    const path = 'top_niners_earnings_summary';
+    try {
+      const q = query(collection(db, path));
+      const snapshot = await getDocs(q);
+      const allSummaries = snapshot.docs.map(d => d.data() as TopNinersEarningsSummary);
+      
+      if (allSummaries.length === 0) return [];
+      
+      let maxYear = 0;
+      let maxMonth = 0;
+      allSummaries.forEach(s => {
+        if (s.year > maxYear) {
+          maxYear = s.year;
+          maxMonth = s.month;
+        } else if (s.year === maxYear && s.month > maxMonth) {
+          maxMonth = s.month;
+        }
+      });
+      
+      return allSummaries.filter(s => s.year === maxYear && s.month === maxMonth).sort((a, b) => b.totalPoints - a.totalPoints);
     } catch (error) {
       handleFirestoreError(error, OperationType.LIST, path);
       return [];
@@ -1532,20 +2111,16 @@ export const FirebaseService = {
   },
 
   async saveFinancials(type: 'monthly' | 'weekly', data: any[]): Promise<void> {
+    const colName = type === 'weekly' ? 'performance_weekly_reports' : 'performance_reports';
     try {
-      const authState = Storage.getAuthState();
-      const res = await fetch("/api/admin/financials", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(authState.token ? { Authorization: `Bearer ${authState.token}` } : {}),
-        },
-        body: JSON.stringify({ type, data }),
+      const batch = writeBatch(db);
+      data.forEach(r => {
+        const dateKey = type === 'weekly' ? `${r.from_date || ''}_${r.to_date || ''}` : (r.month || '');
+        const id = `${r.poppo_id}_${dateKey}`;
+        const docRef = doc(db, colName, id);
+        batch.set(docRef, r, { merge: true });
       });
-      if (!res.ok) {
-        const errData = await res.json();
-        throw new Error(errData?.error || "Failed to save financials to backend");
-      }
+      await batch.commit();
     } catch (error) {
       console.error(`[FirebaseService] Error saving financials for ${type}:`, error);
       throw error;
@@ -1553,26 +2128,17 @@ export const FirebaseService = {
   },
 
   async fetchFinancials(type: 'monthly' | 'weekly'): Promise<any[]> {
+    const colName = type === 'weekly' ? 'performance_weekly_reports' : 'performance_reports';
     try {
-      const authState = Storage.getAuthState();
-      const res = await fetch(`/api/admin/financials?type=${type}`, {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-          ...(authState.token ? { Authorization: `Bearer ${authState.token}` } : {}),
-        },
-      });
-      if (!res.ok) {
-        const errData = await res.json();
-        throw new Error(errData?.error || "Failed to fetch financials from backend");
-      }
-      return await res.json();
-    } catch (error: any) {
+      const snapshot = await getDocs(collection(db, colName));
+      return snapshot.docs.map(d => d.data());
+    } catch (error) {
       console.error(`[FirebaseService] Error fetching financials for ${type}:`, error);
       return [];
     }
   },
 
+<<<<<<< HEAD
 <<<<<<< HEAD
   // Hosts alias (some callers use getHosts, others use getAllHosts)
   async getHosts(): Promise<Host[]> {
@@ -1601,10 +2167,15 @@ export const FirebaseService = {
 =======
   async savePerformanceReport(data: any[]): Promise<void> {
     const path = 'performance_reports';
+=======
+  async savePerformanceReport(data: any[], isWeekly: boolean = false): Promise<void> {
+    const path = isWeekly ? 'performance_weekly_reports' : 'performance_reports';
+>>>>>>> 2b42d3ae84c3e300e1faeb35e7009a759158d1e9
     try {
       const batch = writeBatch(db);
       data.forEach(r => {
-        const id = `${r.poppo_id}_${r.from_date || ''}_${r.to_date || ''}`;
+        const dateKey = isWeekly ? `${r.from_date || ''}_${r.to_date || ''}` : (r.month || '');
+        const id = `${r.poppo_id}_${dateKey}`;
         const docRef = doc(db, path, id);
         batch.set(docRef, r, { merge: true });
 >>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93

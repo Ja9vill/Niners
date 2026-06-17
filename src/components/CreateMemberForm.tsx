@@ -612,7 +612,6 @@ export const CreateMemberForm = () => {
                   <option value="agent">Agent</option>
                   <option value="manager">Manager</option>
                   <option value="admin">Admin</option>
-                  <option value="head admin">Head Admin</option>
                   <option value="director">Director</option>
                 </select>
                 <Shield className="absolute right-4 top-1/2 -translate-y-1/2 text-[#A09E9A]/50 pointer-events-none" size={16} />
@@ -838,7 +837,6 @@ export const CreateMemberForm = () => {
                   <option value="manager">Manager</option>
                   <option value="agent">Agent</option>
                   <option value="admin">Admin</option>
-                  <option value="head admin">Head Admin</option>
                 </select>
               </div>
 

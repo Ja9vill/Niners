@@ -1,4 +1,4 @@
-import { Host, CommissionEntry, PKEntry, ExposureEntry, DirectorNote, CalendarEvent, ActivityLog, FileEntry, FanbaseHealthEntry, AppNotification, HostTask, PerformanceGoal, LivehouseRequest } from '../types';
+import { Host, CommissionEntry, PKEntry, ExposureEntry, DirectorNote, CalendarEvent, ActivityLog, FileEntry, FanbaseHealthEntry, AppNotification, HostTask, PerformanceGoal, LivehouseRequest, emptyAuthState } from '../types';
 
 export interface AuthState {
   level: number;
@@ -13,22 +13,11 @@ export interface AuthState {
   token: string;
   mockRole?: string;
   originalRole?: string;
+  poppoId?: string;
+  id?: string;
 }
 
 const PREFIX = "nine_";
-
-const emptyAuthState: AuthState = {
-  level: 0,
-  role: "",
-  name: "",
-  poppo_id: "",
-  nickname: "",
-  status: "",
-  manager_assigned: "",
-  anchor_team: "",
-  profile_photo: "",
-  token: "",
-};
 
 export const Storage = {
   getHosts: (): Host[] => JSON.parse(localStorage.getItem(`${PREFIX}hosts`) || '[]'),

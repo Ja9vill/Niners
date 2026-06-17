@@ -6,6 +6,7 @@ import { Host, Tier, BaseSalaryTier, HostStatus, AnchorType, PerformanceGoal, Ro
 import { Storage } from '../lib/storage';
 =======
 import React, { useState, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { Search, Filter, Loader2, Star, Users, LayoutGrid } from 'lucide-react';
 >>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
 import { FirebaseService } from '../lib/firebaseService';
@@ -123,6 +124,10 @@ const getTierBlockStyles = (tierInput: string) => {
 >>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
 };
 
+interface ProfilesTabProps {
+  isReadOnly?: boolean;
+}
+
 export const ProfilesTab: React.FC<ProfilesTabProps> = ({ isReadOnly = false }) => {
   const [hosts, setHosts] = useState<Host[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -170,6 +175,18 @@ export const ProfilesTab: React.FC<ProfilesTabProps> = ({ isReadOnly = false }) 
 
   // Spotlight State
   const [selectedHost, setSelectedHost] = useState<Host | null>(null);
+
+  // Dynamic portal target setup to resolve iframe/mobile layout clipping
+  const containerRef = React.useRef<HTMLDivElement>(null);
+  const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
+
+  useEffect(() => {
+    if (containerRef.current) {
+      setPortalTarget(containerRef.current.ownerDocument.body);
+    } else {
+      setPortalTarget(document.body);
+    }
+  }, [selectedHost]);
 
   const fetchUsers = async () => {
     setIsLoading(true);
@@ -402,6 +419,18 @@ export const ProfilesTab: React.FC<ProfilesTabProps> = ({ isReadOnly = false }) 
       }
 
       return true;
+    }).sort((a, b) => {
+      // 1. Photo presence (photo first)
+      const aHasPhoto = !!a.photoUrl;
+      const bHasPhoto = !!b.photoUrl;
+      if (aHasPhoto !== bHasPhoto) {
+        return aHasPhoto ? -1 : 1;
+      }
+      
+      // 2. Alphabetical by nickname/name
+      const aName = (a.nickname || a.name || '').toLowerCase();
+      const bName = (b.nickname || b.name || '').toLowerCase();
+      return aName.localeCompare(bName);
     });
   }, [hosts, searchTerm, roleFilter, tierFilter]);
 
@@ -435,6 +464,7 @@ export const ProfilesTab: React.FC<ProfilesTabProps> = ({ isReadOnly = false }) 
 
   return (
 <<<<<<< HEAD
+<<<<<<< HEAD
     <div ref={containerRef} className="space-y-6">
       {/* ── Row 1: Search + Role filter ── */}
       <div className="flex gap-3 items-center">
@@ -451,6 +481,9 @@ export const ProfilesTab: React.FC<ProfilesTabProps> = ({ isReadOnly = false }) 
         <div className="relative">
 =======
     <div className="space-y-6 relative">
+=======
+    <div ref={containerRef} className="space-y-6 relative">
+>>>>>>> 2b42d3ae84c3e300e1faeb35e7009a759158d1e9
       {/* FILTER MENU BLOCKS */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-[#1A1A28] p-4 rounded-2xl border border-white/5 sticky top-0 z-10">
         
@@ -533,7 +566,6 @@ export const ProfilesTab: React.FC<ProfilesTabProps> = ({ isReadOnly = false }) 
             <option value="Rocket Host">Rocket Host</option>
             <option value="S idol">S idol</option>
             <option value="Esports">Esports</option>
-            <option value="Influencer">Influencer</option>
             <option value="Regular Host">Regular Host</option>
           </select>
 >>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
@@ -668,8 +700,10 @@ export const ProfilesTab: React.FC<ProfilesTabProps> = ({ isReadOnly = false }) 
                     <Star size={10} />
                     {host.tier_pay || 'N/A'}
                   </div>
-                  {host.status === 'Active' && (
-                    <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"></div>
+                  {host.status && host.status !== 'Active' && (
+                    <div className="text-[10px] text-red-400 font-bold bg-red-400/10 px-2 py-1 rounded-md border border-red-400/20">
+                      {host.status}
+                    </div>
                   )}
                 </div>
               </div>
@@ -1268,15 +1302,21 @@ export const ProfilesTab: React.FC<ProfilesTabProps> = ({ isReadOnly = false }) 
       </AnimatePresence>
 =======
       {/* SPOTLIGHT MODAL */}
-      {selectedHost && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm overflow-y-auto">
-          <HostProfileView 
-            host={selectedHost} 
-            isReadOnly={isReadOnly} 
-            onClose={closeSpotlight} 
-            onProfileUpdated={handleProfileUpdated}
-          />
-        </div>
+      {selectedHost && portalTarget && createPortal(
+        <div className="fixed inset-0 z-[100]">
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={closeSpotlight}></div>
+          <div className="absolute inset-0 overflow-y-auto p-4 py-10 pointer-events-none">
+            <div className="pointer-events-auto w-full mx-auto flex justify-center min-h-full">
+              <HostProfileView 
+                host={selectedHost} 
+                isReadOnly={isReadOnly} 
+                onClose={closeSpotlight} 
+                hidePerformanceStats={false}
+              />
+            </div>
+          </div>
+        </div>,
+        portalTarget
       )}
 >>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
     </div>
