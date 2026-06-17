@@ -9,7 +9,7 @@ $ImageTag = "us-central1-docker.pkg.dev/$ProjectID/nine-repository/nine-dashboar
 
 # Build image using Cloud Build with custom staging dir
 Write-Host "Submitting build to Cloud Build..." -ForegroundColor Cyan
-gcloud builds submit --tag=$ImageTag --gcs-source-staging-dir="$StagingBucket/stage" --project=$ProjectID .
+gcloud builds submit --gcs-source-staging-dir="$StagingBucket/stage" --project=$ProjectID .
 
 # Deploy image to Cloud Run
 Write-Host "Deploying image to Cloud Run..." -ForegroundColor Cyan

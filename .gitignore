@@ -14,3 +14,21 @@ gcp-key.json
 auth-service-account.js
 db-dump.json
 firebase-debug.log
+
+# IDE / Agent internals — never commit
+.agents/
+skills-lock.json
+
+# One-off debug / scratch scripts
+check_col.js
+check_syntax.js
+fix_cors.ts
+run_tsc.js
+
+
+
+
+# Temporary scratch folder
+scratch/
+.antigravity/
+

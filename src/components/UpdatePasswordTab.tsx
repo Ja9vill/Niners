@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { ShieldCheck, Eye, EyeOff, Loader2, Key } from 'lucide-react';
 import { PoppoAuthService } from '../lib/customAuth';
 import { auth } from '../lib/firebase';
+import { FirebaseService } from '../lib/firebaseService';
 
 interface UpdatePasswordTabProps {
   onMigrationComplete: () => void;
@@ -42,11 +43,13 @@ export const UpdatePasswordTab: React.FC<UpdatePasswordTabProps> = ({ onMigratio
     }
 
     setIsLoading(true);
+    await FirebaseService.logSystemActivity(`User submitted password migration request (Poppo ID: ${auth.currentUser?.uid || 'Unknown'})`, 'Info');
 
     try {
       const result = await poppoAuthService.finalizePasswordMigration(newPassword);
       if (result.success) {
         setSuccess('Password updated successfully! Redirecting...');
+        await FirebaseService.logSystemActivity(`User successfully finalized permanent password migration (Poppo ID: ${auth.currentUser?.uid || 'Unknown'})`, 'Info');
         setTimeout(() => {
           onMigrationComplete();
         }, 2000);
@@ -57,10 +60,12 @@ export const UpdatePasswordTab: React.FC<UpdatePasswordTabProps> = ({ onMigratio
       // Check for requires-recent-login edge case
       if (errMsg.includes('requires a recent login')) {
         setError('Security action required: Please re-authenticate below.');
+        await FirebaseService.logSystemActivity(`User password migration prompt: requires recent login re-authentication (Poppo ID: ${auth.currentUser?.uid || 'Unknown'})`, 'Warning');
         setReAuthPoppoId(auth.currentUser?.uid || '');
         setShowReAuthModal(true);
       } else {
         setError(errMsg);
+        await FirebaseService.logSystemActivity(`User password migration failed: ${errMsg} (Poppo ID: ${auth.currentUser?.uid || 'Unknown'})`, 'Error');
       }
     } finally {
       setIsLoading(false);
@@ -72,6 +77,7 @@ export const UpdatePasswordTab: React.FC<UpdatePasswordTabProps> = ({ onMigratio
     if (isReAuthing) return;
     setReAuthError('');
     setIsReAuthing(true);
+    await FirebaseService.logSystemActivity(`User initiated security re-authentication for password migration (Poppo ID: ${reAuthPoppoId})`, 'Info');
 
     try {
       // Call authentication to fetch a fresh custom token and re-login
@@ -80,22 +86,26 @@ export const UpdatePasswordTab: React.FC<UpdatePasswordTabProps> = ({ onMigratio
         setShowReAuthModal(false);
         setReAuthPassword('');
         setSuccess('Successfully re-authenticated! Retrying password update...');
+        await FirebaseService.logSystemActivity(`User successfully re-authenticated credentials for password migration (Poppo ID: ${reAuthPoppoId})`, 'Info');
         
         // Immediately retry the password upgrade with the fresh session
         try {
           const finalResult = await poppoAuthService.finalizePasswordMigration(newPassword);
           if (finalResult.success) {
             setSuccess('Password updated successfully! Redirecting...');
+            await FirebaseService.logSystemActivity(`User successfully finalized password migration after re-auth retry (Poppo ID: ${reAuthPoppoId})`, 'Info');
             setTimeout(() => {
               onMigrationComplete();
             }, 2000);
           }
         } catch (retryErr: any) {
           setError(retryErr.message || 'Re-authentication succeeded, but password update failed.');
+          await FirebaseService.logSystemActivity(`User password migration retry after re-auth failed: ${retryErr.message || 'Error'} (Poppo ID: ${reAuthPoppoId})`, 'Error');
         }
       }
     } catch (reAuthErr: any) {
       setReAuthError(reAuthErr.message || 'Invalid Poppo ID or Password.');
+      await FirebaseService.logSystemActivity(`User credentials re-authentication for password migration failed: ${reAuthErr.message || 'Error'} (Poppo ID: ${reAuthPoppoId})`, 'Error');
     } finally {
       setIsReAuthing(false);
     }
@@ -106,8 +116,13 @@ export const UpdatePasswordTab: React.FC<UpdatePasswordTabProps> = ({ onMigratio
       {/* Re-Authentication Modal */}
       {showReAuthModal && (
         <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm">
+<<<<<<< HEAD
           <div className="bg-[#1A1A1A] border border-white/10 p-6 rounded-2xl w-full max-w-sm space-y-4">
             <div className="flex items-center gap-2 text-[#FFB800]">
+=======
+          <div className="bg-[#1A1A28] border border-[#D4AF37]/15 p-6 rounded-2xl w-full max-w-sm space-y-4">
+            <div className="flex items-center gap-2 text-[#D4AF37]">
+>>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
               <Key size={20} />
               <h3 className="font-bold text-md tracking-wider uppercase">Re-Authenticate Session</h3>
             </div>
@@ -126,9 +141,15 @@ export const UpdatePasswordTab: React.FC<UpdatePasswordTabProps> = ({ onMigratio
                 <label className="text-[10px] uppercase font-bold text-[#B0B0B0]">Poppo ID</label>
                 <input
                   type="text"
+                  title="Poppo ID"
+                  placeholder="Poppo ID"
                   value={reAuthPoppoId}
                   disabled={true}
+<<<<<<< HEAD
                   className="w-full px-3 py-2 bg-[#111111] border border-white/5 rounded-xl text-sm outline-none text-[#B0B0B0]"
+=======
+                  className="w-full px-3 py-2 bg-[#0D0D14] border border-[#D4AF37]/15 rounded-xl text-sm outline-none text-[#A09E9A]"
+>>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
                 />
               </div>
               <div className="space-y-1">
@@ -140,7 +161,11 @@ export const UpdatePasswordTab: React.FC<UpdatePasswordTabProps> = ({ onMigratio
                   onChange={(e) => setReAuthPassword(e.target.value)}
                   disabled={isReAuthing}
                   required
+<<<<<<< HEAD
                   className="w-full px-3 py-2 bg-[#111111] border border-white/10 rounded-xl text-sm outline-none text-[#F5F5F5] focus:border-[#FFB800]/50"
+=======
+                  className="w-full px-3 py-2 bg-[#0D0D14] border border-[#D4AF37]/15 rounded-xl text-sm outline-none text-[#F0EFE8] focus:border-[#D4AF37]/50"
+>>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
                 />
               </div>
 
@@ -200,7 +225,11 @@ export const UpdatePasswordTab: React.FC<UpdatePasswordTabProps> = ({ onMigratio
                 onChange={(e) => setNewPassword(e.target.value)}
                 disabled={isLoading}
                 required
+<<<<<<< HEAD
                 className="w-full pl-3 pr-10 py-2 bg-[#111111] border border-white/10 rounded-xl text-sm outline-none text-[#F5F5F5] focus:border-[#FFB800]/50"
+=======
+                className="w-full pl-3 pr-10 py-2 bg-[#0D0D14] border border-[#D4AF37]/15 rounded-xl text-sm outline-none text-[#F0EFE8] focus:border-[#D4AF37]/50"
+>>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
               />
               <button
                 type="button"
@@ -221,12 +250,20 @@ export const UpdatePasswordTab: React.FC<UpdatePasswordTabProps> = ({ onMigratio
               onChange={(e) => setConfirmPassword(e.target.value)}
               disabled={isLoading}
               required
+<<<<<<< HEAD
               className="w-full px-3 py-2 bg-[#111111] border border-white/10 rounded-xl text-sm outline-none text-[#F5F5F5] focus:border-[#FFB800]/50"
+=======
+              className="w-full px-3 py-2 bg-[#0D0D14] border border-[#D4AF37]/15 rounded-xl text-sm outline-none text-[#F0EFE8] focus:border-[#D4AF37]/50"
+>>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
             />
           </div>
 
           {/* Strength Indicators */}
+<<<<<<< HEAD
           <div className="p-4 bg-[#111111] border border-white/5 rounded-2xl space-y-2 text-xs text-[#B0B0B0]">
+=======
+          <div className="p-4 bg-[#0D0D14] border border-[#D4AF37]/10 rounded-2xl space-y-2 text-xs text-[#A09E9A]">
+>>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
             <p className="font-bold text-[10px] uppercase tracking-wider text-white/50">Requirements:</p>
             <div className="flex items-center gap-2">
               <span className={hasMinLength ? 'text-green-400' : 'text-white/20'}>●</span>
@@ -245,7 +282,11 @@ export const UpdatePasswordTab: React.FC<UpdatePasswordTabProps> = ({ onMigratio
           <button
             type="submit"
             disabled={isLoading || !hasMinLength || !hasUppercase || !hasNumber}
+<<<<<<< HEAD
             className="w-full py-3 bg-[#FFB800] hover:bg-[#bfa032] disabled:bg-[#1A1A1A] disabled:border-white/5 disabled:text-[#B0B0B0]/30 text-[#111111] rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer shadow-lg shadow-[#FFB800]/10 disabled:shadow-none border border-transparent transition-all flex items-center justify-center gap-2"
+=======
+            className="w-full py-3 bg-[#D4AF37] hover:bg-[#bfa032] disabled:bg-[#1A1A28] disabled:border-[#D4AF37]/10 disabled:text-[#A09E9A]/30 text-[#0D0D14] rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer shadow-lg shadow-[#D4AF37]/10 disabled:shadow-none border border-transparent transition-all flex items-center justify-center gap-2"
+>>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
           >
             {isLoading ? <Loader2 className="animate-spin" size={16} /> : 'Secure My Account'}
           </button>

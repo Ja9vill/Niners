@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Storage } from '../lib/storage';
 import { auth } from '../lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
+import { Navigate } from 'react-router-dom';
 
 interface RoleGuardProps {
   roles: string[];
@@ -37,6 +38,7 @@ function parseJwt(token: string) {
 export function useUserRole() {
   const [role, setRole] = useState<string>(() => {
     const authState = Storage.getAuthState();
+    if (authState.mockRole) return String(authState.role || '').toLowerCase();
     if (authState.token) {
       const claims = parseJwt(authState.token);
       if (claims?.role) return String(claims.role).toLowerCase();
@@ -46,6 +48,7 @@ export function useUserRole() {
 
   const [isSuperAdmin, setIsSuperAdmin] = useState<boolean>(() => {
     const authState = Storage.getAuthState();
+    if (authState.mockRole) return String(authState.role || '').toLowerCase() === 'director';
     if (authState.token) {
       const claims = parseJwt(authState.token);
       if (claims) {
@@ -57,6 +60,12 @@ export function useUserRole() {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      const authState = Storage.getAuthState();
+      if (authState.mockRole) {
+        setRole(String(authState.role || '').toLowerCase());
+        setIsSuperAdmin(String(authState.role || '').toLowerCase() === 'director');
+        return;
+      }
       if (user) {
         try {
           const tokenResult = await user.getIdTokenResult();
@@ -101,7 +110,7 @@ export const RoleGuard: React.FC<RoleGuardProps> = ({ roles, children }) => {
     return <>{children}</>;
   }
 
-  return null;
+  return <Navigate to="/unauthorized" replace />;
 };
 
 /**

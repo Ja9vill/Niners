@@ -132,7 +132,7 @@ export const SheetsService = {
 
     const headers = [
       'Poppo ID', 'Nickname', 'Position', 'Role', 'Status', 
-      'Manager Assigned', 'Anchor / Team', 'Tier', 'Level', 'Biography'
+      'Manager Assigned', 'Anchor / Team', 'Level', 'Biography'
     ];
 
     const rows = hosts.map(h => [
@@ -143,7 +143,7 @@ export const SheetsService = {
       h.status || 'Active',
       h.manager || 'Unassigned',
       h.team || 'Unassigned',
-      h.tier || 'X',
+      h.team || 'Unassigned',
       String(h.level || 1),
       h.description || ''
     ]);
@@ -214,7 +214,7 @@ export const SheetsService = {
       const status = (findVal(['Status', 'status']) || 'Active') as any;
       const manager = String(findVal(['Manager Assigned', 'manager_assigned', 'manager', 'Manager']) || 'Unassigned').trim();
       const team = String(findVal(['Anchor / Team', 'anchor_team', 'team', 'Team', 'Anchor']) || 'Alpha').trim();
-      const tier = (findVal(['Tier', 'tier']) || 'X') as any;
+
       const level = Number(findVal(['Level', 'level', 'lvl']) || 1);
       const bio = String(findVal(['Biography', 'biography', 'Bio', 'Profile Bio', 'description']) || '').trim();
 
@@ -226,11 +226,10 @@ export const SheetsService = {
         status,
         manager,
         team,
-        tier,
         level,
         description: bio,
         anchor_type: (team.includes('External') ? 'External' : team.includes('Sub') ? 'Sub Agency' : 'Nine Agency') as any,
-        base_salary_category: (tier === 'Star Host' ? 'Star Host' : tier === 'Rocket Host' ? 'Rocket Host' : tier === 'S idol' ? 'S idol' : tier === 'Esports Host' ? 'ESport Host' : 'N/A') as any,
+        tier_pay: (findVal(['Tier Pay', 'tier_pay', 'Tier']) || 'N/A') as any,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
         password: '1234',

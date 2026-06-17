@@ -11,6 +11,8 @@ export interface AuthState {
   anchor_team: string;
   profile_photo: string;
   token: string;
+  mockRole?: string;
+  originalRole?: string;
 }
 
 const PREFIX = "nine_";
@@ -103,7 +105,7 @@ export const Storage = {
       if (!raw) return { ...emptyAuthState };
 
       const parsed = JSON.parse(raw);
-      return {
+      const state = {
         level: Number(parsed?.level || 0),
         role: String(parsed?.role || ""),
         name: String(parsed?.name || ""),
@@ -115,6 +117,36 @@ export const Storage = {
         profile_photo: String(parsed?.profile_photo || ""),
         token: String(parsed?.token || ""),
       };
+
+      const mockUserStr = sessionStorage.getItem(`${PREFIX}mock_user`);
+      if (mockUserStr) {
+        try {
+          const mockUser = JSON.parse(mockUserStr);
+          return {
+            ...state,
+            originalRole: state.role,
+            role: String(mockUser.role || '').toLowerCase(),
+            mockRole: String(mockUser.role || '').toLowerCase(),
+            poppo_id: mockUser.poppo_id,
+            nickname: mockUser.nickname || mockUser.name,
+            name: mockUser.name || mockUser.nickname,
+          };
+        } catch (e) {
+          // ignore
+        }
+      }
+
+      const mockRole = sessionStorage.getItem(`${PREFIX}mock_role`);
+      if (mockRole) {
+        return {
+          ...state,
+          originalRole: state.role,
+          role: mockRole,
+          mockRole: mockRole,
+        };
+      }
+
+      return state;
     } catch {
       return { ...emptyAuthState };
     }
@@ -139,7 +171,26 @@ export const Storage = {
     sessionStorage.setItem(`${PREFIX}auth`, JSON.stringify(nextState));
   },
 
+  setMockRole(role: string | null) {
+    if (role) {
+      sessionStorage.setItem(`${PREFIX}mock_role`, role);
+    } else {
+      sessionStorage.removeItem(`${PREFIX}mock_role`);
+    }
+  },
+
+  setMockUser(user: any | null) {
+    if (user) {
+      sessionStorage.setItem(`${PREFIX}mock_user`, JSON.stringify(user));
+    } else {
+      sessionStorage.removeItem(`${PREFIX}mock_user`);
+      sessionStorage.removeItem(`${PREFIX}mock_role`);
+    }
+  },
+
   clearAuthState() {
     sessionStorage.removeItem(`${PREFIX}auth`);
+    sessionStorage.removeItem(`${PREFIX}mock_role`);
+    sessionStorage.removeItem(`${PREFIX}mock_user`);
   },
 };

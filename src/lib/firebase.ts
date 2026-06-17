@@ -3,6 +3,7 @@ import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider, signInWithPopup } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
+import { getMessaging, getToken } from "firebase/messaging";
 
 // Dynamically reconstruct client-side identification token to avoid static security analyzer alerts
 const getApiKey = () => {
@@ -38,6 +39,33 @@ export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
 export const db = getFirestore(app, "ai-studio-f578d03a-99b3-4c41-84dd-9901137e8386");
 export const storage = getStorage(app);
+
+// Initialize Messaging (only on supported platforms)
+let messagingInstance: any = null;
+if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+  try {
+    messagingInstance = getMessaging(app);
+  } catch (err) {
+    console.warn('Firebase Messaging not supported:', err);
+  }
+}
+export const messaging = messagingInstance;
+
+export async function requestNotificationPermission() {
+  if (!messaging) return null;
+  try {
+    const permission = await Notification.requestPermission();
+    if (permission === 'granted') {
+      const token = await getToken(messaging, { 
+        vapidKey: import.meta.env.VITE_FIREBASE_VAPID_KEY || 'BEl62iUYgUivxIkv69yViEuiBIa-Ib9-uU8fF_nO7F_N_f_HhQ0Ue_I0I-_H_I_0' 
+      });
+      return token;
+    }
+  } catch (err) {
+    console.error('Failed to get push token', err);
+  }
+  return null;
+}
 
 export async function signInWithGoogle() {
   return signInWithPopup(auth, googleProvider);

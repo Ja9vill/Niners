@@ -67,14 +67,18 @@ router.post("/reports/fanbase", verifyFirebaseToken, async (req: any, res: any) 
       return res.status(403).json({ error: "Forbidden: User profile not found in users collection" });
     }
     const userData = userDoc.data() || {};
-    const nickname = userData.nickname || "Unknown";
+    const nickname = userData.nickname || userData.name || "Unknown";
     const role = userData.role || "Host";
+    const roleLower = String(role).toLowerCase();
+
+    const isElevatedStaff = ["admin", "head admin", "head_admin", "director"].includes(roleLower);
+    const isManagerAgent = ["manager", "agent"].includes(roleLower);
+    const isHostUser = ["host", "talent"].includes(roleLower);
 
     const {
       fromDate,
       toDate,
       poppoId,
-      nickname: inputNickname,
       currentFollowers,
       fanclubSubscribers,
       fanclubGcMembers,
@@ -82,41 +86,105 @@ router.post("/reports/fanbase", verifyFirebaseToken, async (req: any, res: any) 
       gcUpdatesFans
     } = req.body;
 
-    // Validation checks
+    // Validation checks for fields in rows 1-3
     if (
-      !fromDate || !toDate || !poppoId || !inputNickname ||
-      currentFollowers === undefined || fanclubSubscribers === undefined ||
-      fanclubGcMembers === undefined || gcUpdatesHost === undefined || gcUpdatesFans === undefined
+      !poppoId ||
+      currentFollowers === undefined ||
+      fanclubSubscribers === undefined ||
+      fanclubGcMembers === undefined
     ) {
       return res.status(403).json({ error: "Forbidden: Missing required fields" });
     }
 
     if (
-      typeof poppoId !== "string" || typeof inputNickname !== "string" ||
+      typeof poppoId !== "string" ||
       typeof currentFollowers !== "number" || currentFollowers < 0 ||
       typeof fanclubSubscribers !== "number" || fanclubSubscribers < 0 ||
-      typeof fanclubGcMembers !== "number" || fanclubGcMembers < 0 ||
-      typeof gcUpdatesHost !== "number" || gcUpdatesHost < 0 ||
-      typeof gcUpdatesFans !== "number" || gcUpdatesFans < 0
+      typeof fanclubGcMembers !== "number" || fanclubGcMembers < 0
     ) {
       return res.status(403).json({ error: "Forbidden: Invalid field values" });
     }
 
-    // Auto-populate: ignore any client-sent reporter information
+    // Verify existence of host in database
+    const hostDoc = await db.collection("users").doc(poppoId).get();
+    if (!hostDoc.exists) {
+      return res.status(403).json({ error: "Forbidden: Host profile not found in database" });
+    }
+    const hostData = hostDoc.data() || {};
+    const hostNickname = hostData.nickname || hostData.name || "Unknown";
+
+    // Enforce submission authorization
+    if (isHostUser) {
+      if (poppoId !== uid) {
+        return res.status(403).json({ error: "Forbidden: Hosts can only submit reports for themselves." });
+      }
+    } else if (isManagerAgent) {
+      const hostManagerId = hostData.assignedManagerId || hostData.assigned_manager_poppo_id || null;
+      if (String(hostManagerId) !== String(uid)) {
+        return res.status(403).json({ error: "Forbidden: You are not the assigned manager for this host." });
+      }
+    } else if (!isElevatedStaff) {
+      return res.status(403).json({ error: "Forbidden: Unauthorized role." });
+    }
+
+    let finalFromDate: admin.firestore.Timestamp;
+    let finalToDate: admin.firestore.Timestamp;
+    let finalGcHost: number;
+    let finalGcFans: number;
+
+    if (isElevatedStaff) {
+      // Validate that elevated fields are present
+      if (!fromDate || !toDate || gcUpdatesHost === undefined || gcUpdatesFans === undefined) {
+        return res.status(403).json({ error: "Forbidden: Missing elevated required fields" });
+      }
+      if (
+        typeof gcUpdatesHost !== "number" || gcUpdatesHost < 0 ||
+        typeof gcUpdatesFans !== "number" || gcUpdatesFans < 0
+      ) {
+        return res.status(403).json({ error: "Forbidden: Invalid elevated field values" });
+      }
+      finalFromDate = admin.firestore.Timestamp.fromDate(new Date(fromDate));
+      finalToDate = admin.firestore.Timestamp.fromDate(new Date(toDate));
+      finalGcHost = gcUpdatesHost;
+      finalGcFans = gcUpdatesFans;
+    } else {
+      // Overwrite/ignore client input for non-elevated submitters
+      finalFromDate = admin.firestore.Timestamp.now();
+      finalToDate = admin.firestore.Timestamp.now();
+      finalGcHost = 0;
+      finalGcFans = 0;
+    }
+
+    // Auto-populate all fields and store both camelCase and snake_case schemas for consistency
     const reportData = {
-      fromDate: admin.firestore.Timestamp.fromDate(new Date(fromDate)),
-      toDate: admin.firestore.Timestamp.fromDate(new Date(toDate)),
+      // camelCase schema
+      fromDate: finalFromDate,
+      toDate: finalToDate,
       poppoId,
-      nickname: inputNickname,
+      nickname: hostNickname,
       currentFollowers,
       fanclubSubscribers,
       fanclubGcMembers,
-      gcUpdatesHost,
-      gcUpdatesFans,
+      gcUpdatesHost: finalGcHost,
+      gcUpdatesFans: finalGcFans,
       reporterId: uid,
       reporterName: nickname,
       reporterRole: role,
-      submittedAt: admin.firestore.Timestamp.now()
+      submittedAt: admin.firestore.Timestamp.now(),
+
+      // snake_case schema (compatible with subcollection / fallback queries)
+      from_date: finalFromDate.toDate().toISOString(),
+      to_date: finalToDate.toDate().toISOString(),
+      poppo_id: poppoId,
+      total_followers: currentFollowers,
+      fanclub_subscribers: fanclubSubscribers,
+      fanclub_gc_members: fanclubGcMembers,
+      gc_activity_count_host: finalGcHost,
+      gc_activity_count_fans: finalGcFans,
+      reporter_id: uid,
+      reporter_name: nickname,
+      reporter_role: role,
+      timestamp: new Date().toISOString()
     };
 
     const docRef = await db.collection("fanbase_reports").add(reportData);
@@ -267,8 +335,8 @@ router.post("/reports/performance", verifyFirebaseToken, async (req: any, res: a
   }
 });
 
-// POST: events
-router.post("/events", verifyFirebaseToken, async (req: any, res: any) => {
+// POST: attendance
+router.post("/attendance", verifyFirebaseToken, async (req: any, res: any) => {
   try {
     const db = getAdminFirestore();
     const uid = req.firebaseUser.uid;
@@ -322,10 +390,10 @@ router.post("/events", verifyFirebaseToken, async (req: any, res: any) => {
       attendanceSubmittedBy
     };
 
-    const docRef = await db.collection("events").add(eventData);
+    const docRef = await db.collection("attendance").add(eventData);
     return res.json({ ok: true, id: docRef.id });
   } catch (error: any) {
-    console.error("Error writing event:", error);
+    console.error("Error writing attendance:", error);
     return res.status(403).json({ error: error?.message || "Forbidden: Failed to process request" });
   }
 });
@@ -335,7 +403,7 @@ router.get("/metrics/activeness", verifyFirebaseToken, async (req: any, res: any
   try {
     const db = getAdminFirestore();
     const performanceSnap = await db.collection("performance_reports").get();
-    const eventsSnap = await db.collection("events").get();
+    const eventsSnap = await db.collection("attendance").get();
     
     const directorId = "19157913";
     let totalLiveMinutes = 0;

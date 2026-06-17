@@ -181,8 +181,8 @@ async function runInitialization() {
   await db.collection("pk_reports").doc("_schema_template").set(pkTemplate);
   console.log("✅ Initialized 'pk_reports' collection template.");
 
-  // events template
-  const eventsTemplate = {
+  // attendance template
+  const attendanceTemplate = {
     eventDate: admin.firestore.Timestamp.now(),
     timeslot: "",
     eventType: "",
@@ -194,8 +194,8 @@ async function runInitialization() {
     createdBy: "",
     attendanceSubmittedBy: {}
   };
-  await db.collection("events").doc("_schema_template").set(eventsTemplate);
-  console.log("✅ Initialized 'events' collection template.");
+  await db.collection("attendance").doc("_schema_template").set(attendanceTemplate);
+  console.log("✅ Initialized 'attendance' collection template.");
 
   // tasks template
   const tasksTemplate = {

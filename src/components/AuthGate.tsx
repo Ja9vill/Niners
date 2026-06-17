@@ -4,6 +4,8 @@ import { Lock, User, CheckCircle2, Loader2, Shield, ShieldCheck, Eye, EyeOff } f
 import { Storage } from '../lib/storage';
 import { motion } from 'motion/react';
 import { PoppoAuthService } from '../lib/customAuth';
+import { UpdatePasswordTab } from './UpdatePasswordTab';
+import { FirebaseService } from '../lib/firebaseService';
 import appLogo from '../logo.jpg';
 
 const TEXT = {
@@ -18,6 +20,10 @@ const TEXT = {
   contactAgency: 'Contact Agency.',
   enterPoppoId: 'Enter Poppo ID...',
   enterPassword: 'Enter Password...',
+  confirmPassword: 'Confirm Password...',
+  enterConfirmPassword: 'Re-enter Password...',
+  continue: 'CONTINUE',
+  setPassword: 'SET PASSWORD & LOGIN',
 };
 
 interface AuthGateProps {
@@ -25,14 +31,25 @@ interface AuthGateProps {
   onAuthChange: () => void;
 }
 
+type Phase = 'USERNAME_CHECK' | 'SET_PASSWORD' | 'ENTER_PASSWORD';
+
 export const AuthGate: React.FC<AuthGateProps> = ({ children, onAuthChange }) => {
+  const [systemError, setSystemError] = useState<string | null>(null);
   const [authState, setAuthState] = useState(Storage.getAuthState());
-  const [password, setPassword] = useState('');
-  const [poppoId, setPoppoId] = useState('');
-  const [error, setError] = useState('');
   const [initializing, setInitializing] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [requiresMigration, setRequiresMigration] = useState(false);
+  
+  // Phase state
+  const [phase, setPhase] = useState<Phase>('USERNAME_CHECK');
+  
+  // Form states
+  const [poppoId, setPoppoId] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   useEffect(() => {
     const current = Storage.getAuthState();
@@ -40,6 +57,110 @@ export const AuthGate: React.FC<AuthGateProps> = ({ children, onAuthChange }) =>
     setInitializing(false);
   }, []);
 
+  // Phase 1: Check Poppo ID existence & login state
+  const handleCheckUsername = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setSystemError(null);
+    setIsSubmitting(true);
+
+    const trimmedPoppoId = poppoId.trim();
+    if (!trimmedPoppoId) {
+      setError('Poppo ID is required.');
+      setIsSubmitting(false);
+      return;
+    }
+    if (!/^\d+$/.test(trimmedPoppoId)) {
+      setError('Poppo ID must contain only numbers.');
+      setIsSubmitting(false);
+      return;
+    }
+
+    try {
+      const authService = new PoppoAuthService();
+      const res = await authService.checkUsername(trimmedPoppoId);
+      
+      if (!res.exists) {
+        setError(`Poppo ID '${trimmedPoppoId}' not found.`);
+        setIsSubmitting(false);
+        return;
+      }
+      
+      if (res.blocked) {
+        setError('Account is inactive.');
+        setIsSubmitting(false);
+        return;
+      }
+
+      if (res.is_first_login) {
+        setPhase('SET_PASSWORD');
+      } else {
+        setPhase('ENTER_PASSWORD');
+      }
+    } catch (err: any) {
+      setError(err?.message || 'Failed to check username. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Phase 2a: Set initial password and login
+  const handleSetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setIsSubmitting(true);
+
+    const trimmedPoppoId = poppoId.trim();
+    const pwd = password.trim();
+    const conf = confirmPassword.trim();
+
+    if (pwd.length < 8) {
+      setError('Password must be at least 8 characters long.');
+      setIsSubmitting(false);
+      return;
+    }
+    if (!/[A-Z]/.test(pwd)) {
+      setError('Password must contain at least one uppercase letter.');
+      setIsSubmitting(false);
+      return;
+    }
+    if (!/[0-9]/.test(pwd)) {
+      setError('Password must contain at least one number.');
+      setIsSubmitting(false);
+      return;
+    }
+    if (pwd !== conf) {
+      setError('Passwords do not match.');
+      setIsSubmitting(false);
+      return;
+    }
+
+    try {
+      const authService = new PoppoAuthService();
+      const res = await authService.setInitialPassword(trimmedPoppoId, pwd, conf);
+      
+      if (res.status === 'SUCCESS') {
+        const newState = Storage.getAuthState();
+        setAuthState(newState);
+        Storage.addLog('Auth', `Registered and logged in as ${newState.nickname} (${newState.role})`, newState.nickname);
+        await FirebaseService.logSystemActivity(`User set initial password and logged in: ${newState.nickname} (Poppo ID: ${newState.poppo_id}, Role: ${newState.role})`, 'Info');
+        onAuthChange();
+      } else {
+        setError('Password setup completed, but login session could not be verified.');
+        setSystemError('Password setup succeeded but login verification failed');
+      }
+    } catch (err: any) {
+      const errMsg = err?.message || 'Failed to set password.';
+        console.error('Set password error:', err);
+        await FirebaseService.logSystemActivity(`Set password error: ${errMsg}`, 'Error');
+        setSystemError(errMsg);
+        setError(errMsg);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Phase 2b: Standard login
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -60,43 +181,39 @@ export const AuthGate: React.FC<AuthGateProps> = ({ children, onAuthChange }) =>
       let errorMsg = '';
 
       try {
-        await authService.authenticateWithPoppo(trimmedPoppoId, trimmedPassword);
+        const result = await authService.authenticateWithPoppo(trimmedPoppoId, trimmedPassword);
+        
+        if (result.status === 'MIGRATION_REQUIRED') {
+          setRequiresMigration(true);
+          return;
+        }
+        
         success = true;
       } catch (err: any) {
         errorMsg = err.message || 'Invalid Poppo ID or Password';
-        
-        // Retry with leading zeros logic
-        if (trimmedPassword.startsWith('0')) {
-          const stripped = trimmedPassword.replace(/^0+/, '');
-          if (stripped !== '') {
-            try {
-              await authService.authenticateWithPoppo(trimmedPoppoId, stripped);
-              success = true;
-            } catch (err2: any) {
-              errorMsg = err2.message || 'Invalid Poppo ID or Password';
-            }
-          }
-        } else {
-          try {
-            await authService.authenticateWithPoppo(trimmedPoppoId, '0' + trimmedPassword);
-            success = true;
-          } catch (err3: any) {
-            errorMsg = err3.message || 'Invalid Poppo ID or Password';
-          }
+        if (errorMsg.includes('Too many login attempts')) {
+          errorMsg = 'Too many login attempts. Please wait 15 minutes before trying again.';
         }
+        // Log the error
+        await FirebaseService.logSystemActivity(`Login error for ${trimmedPoppoId}: ${errorMsg}`, 'Warning');
       }
 
       if (success) {
         const newState = Storage.getAuthState();
         setAuthState(newState);
         Storage.addLog('Auth', `Logged in as ${newState.nickname} (${newState.role})`, newState.nickname);
+        await FirebaseService.logSystemActivity(`User logged in: ${newState.nickname} (Poppo ID: ${newState.poppo_id}, Role: ${newState.role})`, 'Info');
         onAuthChange();
       } else {
         setError(errorMsg);
+        setSystemError(errorMsg);
       }
     } catch (err: any) {
       console.error('Login error:', err);
-      setError(err?.message || 'Login failed. Please verify connection and try again.');
+      const errMsg = err?.message || 'Login failed. Please verify connection and try again.';
+      await FirebaseService.logSystemActivity(`Unexpected login error: ${errMsg}`, 'Error');
+      setSystemError(errMsg);
+      setError(errMsg);
     } finally {
       setIsSubmitting(false);
     }
@@ -120,7 +237,37 @@ export const AuthGate: React.FC<AuthGateProps> = ({ children, onAuthChange }) =>
     );
   }
 
+  if (requiresMigration) {
+    return (
+      <div className="w-full min-h-[80vh] flex items-center justify-center bg-transparent">
+        <UpdatePasswordTab 
+          onMigrationComplete={async () => {
+            const newState = Storage.getAuthState();
+            setAuthState(newState);
+            Storage.addLog('Auth', `Logged in and migrated password as ${newState.nickname}`, newState.nickname);
+            await FirebaseService.logSystemActivity(`User logged in and migrated password: ${newState.nickname} (Poppo ID: ${newState.poppo_id}, Role: ${newState.role})`, 'Info');
+            onAuthChange();
+          }} 
+        />
+      </div>
+    );
+  }
+
+  // Password complexity helper for SET_PASSWORD Phase
+  const pwdValidation = {
+    minLength: password.length >= 8,
+    hasUppercase: /[A-Z]/.test(password),
+    hasNumber: /[0-9]/.test(password),
+    match: password === confirmPassword && password.length > 0,
+  };
+
   return (
+  <>
+    {systemError && (
+      <div className="w-full mb-4 p-3 bg-red-900/30 text-red-200 rounded-xl text-sm text-center">
+        {systemError}
+      </div>
+    )}
     <div className="w-full flex flex-col items-center justify-center p-4 bg-transparent relative overflow-hidden min-h-[80vh]">
       <div className="w-full max-w-sm border border-[#FFB800]/20 rounded-[24px] p-6 space-y-6 glass-card shadow-2xl relative z-10 flex flex-col justify-between">
         
@@ -136,6 +283,7 @@ export const AuthGate: React.FC<AuthGateProps> = ({ children, onAuthChange }) =>
             <Shield className="text-[#FFB800] w-6 h-6" strokeWidth={2} />
             <h1 className="text-lg font-black tracking-widest uppercase text-[#F5F5F5]">{TEXT.memberLogin}</h1>
           </div>
+<<<<<<< HEAD
           <p className="text-[#B0B0B0]/80 text-xs px-4 leading-relaxed font-medium">
             {TEXT.loginDescription}
           </p>
@@ -203,6 +351,223 @@ export const AuthGate: React.FC<AuthGateProps> = ({ children, onAuthChange }) =>
         {/* Links */}
         <div className="flex flex-col items-center space-y-2 pt-2 text-[10px] font-bold text-[#B0B0B0]/60 tracking-wider">
           <button type="button" className="hover:text-[#FFB800] hover:underline transition-all">{TEXT.forgotPassword}</button>
+=======
+          <p className="text-[#A09E9A]/80 text-xs px-4 leading-relaxed font-medium">
+            {phase === 'SET_PASSWORD' 
+              ? 'Welcome! Please set a secure password for your first login.' 
+              : phase === 'ENTER_PASSWORD'
+              ? 'Please enter your password to continue.'
+              : TEXT.loginDescription
+            }
+          </p>
+        </div>
+
+        {/* ==================== Phase 1: USERNAME_CHECK ==================== */}
+        {phase === 'USERNAME_CHECK' && (
+          <form onSubmit={handleCheckUsername} className="space-y-6">
+            <div className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black text-[#A09E9A]/60 uppercase tracking-[0.20em] ml-1 block">{TEXT.poppoId}</label>
+                <div className="relative">
+                  <div className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30 flex items-center">
+                    <ShieldCheck size={16} className="text-[#D4AF37]" />
+                  </div>
+                  <input 
+                    type="text" 
+                    value={poppoId}
+                    onChange={(e) => setPoppoId(e.target.value)}
+                    placeholder={TEXT.enterPoppoId}
+                    className="w-full bg-[#0D0D14] border border-white/10 rounded-xl pl-12 pr-4 py-3 text-sm font-bold tracking-widest focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37]/50 outline-none transition-all text-[#F0EFE8] placeholder-white/20"
+                    autoFocus
+                    required
+                  />
+                </div>
+              </div>
+            </div>
+
+            {error && <p className="text-red-400 text-xs text-center font-bold animate-pulse">{error}</p>}
+            
+            <button 
+              type="submit" 
+              disabled={isSubmitting}
+              className="w-full btn-gold py-3.5 rounded-xl text-xs font-black uppercase tracking-[0.25em] transition-all flex items-center justify-center gap-2 active:scale-95 shadow-[0_2px_12px_rgba(212,175,55,0.25)] cursor-pointer"
+            >
+              {isSubmitting && <Loader2 size={14} className="animate-spin text-[#0D0D14]" />}
+              {TEXT.continue}
+            </button>
+          </form>
+        )}
+
+        {/* ==================== Phase 2a: SET_PASSWORD ==================== */}
+        {phase === 'SET_PASSWORD' && (
+          <form onSubmit={handleSetPassword} className="space-y-6">
+            <div className="space-y-4">
+              
+              {/* Display current Poppo ID and option to change */}
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black text-[#A09E9A]/60 uppercase tracking-[0.20em] ml-1 block">{TEXT.poppoId}</label>
+                <div className="flex items-center justify-between bg-[#0D0D14] border border-white/10 rounded-xl px-4 py-3">
+                  <span className="text-sm font-bold tracking-widest text-[#F0EFE8]/50">{poppoId}</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPhase('USERNAME_CHECK');
+                      setPassword('');
+                      setConfirmPassword('');
+                      setError('');
+                    }}
+                    className="text-[10px] font-black text-[#D4AF37] hover:underline uppercase tracking-wider"
+                  >
+                    Change
+                  </button>
+                </div>
+              </div>
+
+              {/* Password */}
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black text-[#A09E9A]/60 uppercase tracking-[0.20em] ml-1 block">{TEXT.password}</label>
+                <div className="relative">
+                  <input 
+                    type={showPassword ? "text" : "password"} 
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder={TEXT.enterPassword}
+                    className="w-full bg-[#0D0D14] border border-white/10 rounded-xl pl-4 pr-12 py-3 text-sm tracking-widest focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37]/50 outline-none transition-all text-[#F0EFE8] placeholder-white/20"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-[#A09E9A] hover:text-[#F0EFE8] transition-colors"
+                  >
+                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+              </div>
+
+              {/* Confirm Password */}
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black text-[#A09E9A]/60 uppercase tracking-[0.20em] ml-1 block">{TEXT.confirmPassword}</label>
+                <div className="relative">
+                  <input 
+                    type={showConfirmPassword ? "text" : "password"} 
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    placeholder={TEXT.enterConfirmPassword}
+                    className="w-full bg-[#0D0D14] border border-white/10 rounded-xl pl-4 pr-12 py-3 text-sm tracking-widest focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37]/50 outline-none transition-all text-[#F0EFE8] placeholder-white/20"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-[#A09E9A] hover:text-[#F0EFE8] transition-colors"
+                  >
+                    {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+              </div>
+
+              {/* Requirements Checklist */}
+              <div className="space-y-1.5 p-3 bg-[#0D0D14] rounded-xl border border-white/5 text-[10px]">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 size={12} className={pwdValidation.minLength ? "text-green-400" : "text-gray-500"} />
+                  <span className={pwdValidation.minLength ? "text-green-300 font-bold" : "text-white/40"}>At least 8 characters</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 size={12} className={pwdValidation.hasUppercase ? "text-green-400" : "text-gray-500"} />
+                  <span className={pwdValidation.hasUppercase ? "text-green-300 font-bold" : "text-white/40"}>At least 1 uppercase letter</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 size={12} className={pwdValidation.hasNumber ? "text-green-400" : "text-gray-500"} />
+                  <span className={pwdValidation.hasNumber ? "text-green-300 font-bold" : "text-white/40"}>At least 1 number</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 size={12} className={pwdValidation.match ? "text-green-400" : "text-gray-500"} />
+                  <span className={pwdValidation.match ? "text-green-300 font-bold" : "text-white/40"}>Passwords match</span>
+                </div>
+              </div>
+            </div>
+
+            {error && <p className="text-red-400 text-xs text-center font-bold animate-pulse">{error}</p>}
+            
+            <button 
+              type="submit" 
+              disabled={isSubmitting}
+              className="w-full btn-gold py-3.5 rounded-xl text-xs font-black uppercase tracking-[0.25em] transition-all flex items-center justify-center gap-2 active:scale-95 shadow-[0_2px_12px_rgba(212,175,55,0.25)] cursor-pointer"
+            >
+              {isSubmitting && <Loader2 size={14} className="animate-spin text-[#0D0D14]" />}
+              {TEXT.setPassword}
+            </button>
+          </form>
+        )}
+
+        {/* ==================== Phase 2b: ENTER_PASSWORD ==================== */}
+        {phase === 'ENTER_PASSWORD' && (
+          <form onSubmit={handleLogin} className="space-y-6">
+            <div className="space-y-4">
+              
+              {/* Display current Poppo ID and option to change */}
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black text-[#A09E9A]/60 uppercase tracking-[0.20em] ml-1 block">{TEXT.poppoId}</label>
+                <div className="flex items-center justify-between bg-[#0D0D14] border border-white/10 rounded-xl px-4 py-3">
+                  <span className="text-sm font-bold tracking-widest text-[#F0EFE8]/50">{poppoId}</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPhase('USERNAME_CHECK');
+                      setPassword('');
+                      setConfirmPassword('');
+                      setError('');
+                    }}
+                    className="text-[10px] font-black text-[#D4AF37] hover:underline uppercase tracking-wider"
+                  >
+                    Change
+                  </button>
+                </div>
+              </div>
+
+              {/* Password */}
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black text-[#A09E9A]/60 uppercase tracking-[0.20em] ml-1 block">{TEXT.password}</label>
+                <div className="relative">
+                  <input 
+                    type={showPassword ? "text" : "password"} 
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder={TEXT.enterPassword}
+                    className="w-full bg-[#0D0D14] border border-white/10 rounded-xl pl-4 pr-12 py-3 text-sm tracking-widest focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37]/50 outline-none transition-all text-[#F0EFE8] placeholder-white/20"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-[#A09E9A] hover:text-[#F0EFE8] transition-colors"
+                  >
+                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {error && <p className="text-red-400 text-xs text-center font-bold animate-pulse">{error}</p>}
+            
+            <button 
+              type="submit" 
+              disabled={isSubmitting}
+              className="w-full btn-gold py-3.5 rounded-xl text-xs font-black uppercase tracking-[0.25em] transition-all flex items-center justify-center gap-2 active:scale-95 shadow-[0_2px_12px_rgba(212,175,55,0.25)] cursor-pointer"
+            >
+              {isSubmitting && <Loader2 size={14} className="animate-spin text-[#0D0D14]" />}
+              {TEXT.logIn}
+            </button>
+          </form>
+        )}
+
+        {/* Links */}
+        <div className="flex flex-col items-center space-y-2 pt-2 text-[10px] font-bold text-[#A09E9A]/60 tracking-wider">
+          {phase !== 'SET_PASSWORD' && (
+            <button type="button" className="hover:text-[#D4AF37] hover:underline transition-all">{TEXT.forgotPassword}</button>
+          )}
+>>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
           <div className="flex items-center gap-1">
             <span>{TEXT.noAccount}</span>
             <button type="button" className="text-[#B0B0B0] hover:text-[#FFB800] hover:underline transition-all">{TEXT.contactAgency}</button>
@@ -238,5 +603,6 @@ export const AuthGate: React.FC<AuthGateProps> = ({ children, onAuthChange }) =>
         <div className="border-b border-t border-white/5 py-1 text-center shrink-0" />
       </div>
     </div>
+  </>
   );
 };

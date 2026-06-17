@@ -1,13 +1,19 @@
+<<<<<<< HEAD
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Search, Filter, TrendingUp, BarChart3, PieChart, Info, UserPen, Target, Plus, ChevronRight, X, Shield, Edit2, Loader2, Fingerprint, Star } from 'lucide-react';
 import { Host, Tier, BaseSalaryTier, HostStatus, AnchorType, PerformanceGoal, Role, CommissionEntry, DirectorNote, NoteType } from '../types';
 import { Storage } from '../lib/storage';
+=======
+import React, { useState, useEffect, useMemo } from 'react';
+import { Search, Filter, Loader2, Star, Users, LayoutGrid } from 'lucide-react';
+>>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
 import { FirebaseService } from '../lib/firebaseService';
-import { cn, formatNumber } from '../lib/utils';
-import { motion, AnimatePresence } from 'motion/react';
-import { MANAGERS, BASE_SALARY_POLICIES } from '../lib/constants';
+import { Host } from '../types';
+import { HostProfileView } from './HostProfileView';
+import { cn } from '../lib/utils';
 
+<<<<<<< HEAD
 const ROLES: Role[] = ['Talent', 'Manager', 'Admin', 'Director', 'Agent'];
 const STATUSES: HostStatus[] = ['Active', 'Inconsistent', 'Released', 'Inactive'];
 const ANCHORS: AnchorType[] = ['Nine Agency', 'Sub Agency', 'External'];
@@ -77,28 +83,52 @@ const TEXT = {
   tier: 'TIER',
   roleModelRatio: 'Role Model Ratio',
   roleModelRatioUppercase: 'ROLE MODEL RATIO',
+=======
+const getTierBlockStyles = (tierInput: string) => {
+  const norm = String(tierInput || '').toLowerCase();
+  if (norm.includes('star')) {
+    return {
+      border: 'border-[#D4AF37]/20 hover:border-[#D4AF37]/50',
+      bg: 'bg-gradient-to-br from-[#D4AF37]/8 via-transparent to-transparent'
+    };
+  }
+  if (norm.includes('s idol') || norm.includes('idol')) {
+    return {
+      border: 'border-[#ec4899]/20 hover:border-[#ec4899]/50',
+      bg: 'bg-gradient-to-br from-[#ec4899]/8 via-transparent to-transparent'
+    };
+  }
+  if (norm.includes('rocket')) {
+    return {
+      border: 'border-[#3b82f6]/20 hover:border-[#3b82f6]/50',
+      bg: 'bg-gradient-to-br from-[#3b82f6]/8 via-transparent to-transparent'
+    };
+  }
+  if (norm.includes('esports') || norm.includes('esport')) {
+    return {
+      border: 'border-[#a855f7]/20 hover:border-[#a855f7]/50',
+      bg: 'bg-gradient-to-br from-[#a855f7]/8 via-transparent to-transparent'
+    };
+  }
+  if (norm.includes('regular')) {
+    return {
+      border: 'border-[#10b981]/20 hover:border-[#10b981]/50',
+      bg: 'bg-gradient-to-br from-[#10b981]/8 via-transparent to-transparent'
+    };
+  }
+  return {
+    border: 'border-white/5 hover:border-indigo-500/30',
+    bg: 'bg-[#1A1A28]'
+  };
+>>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
 };
 
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ResponsiveContainer,
-} from 'recharts';
-
-export const ProfilesTab = () => {
+export const ProfilesTab: React.FC<ProfilesTabProps> = ({ isReadOnly = false }) => {
   const [hosts, setHosts] = useState<Host[]>([]);
-  const [exposuresList, setExposuresList] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedHostId, setSelectedHostId] = useState<string | null>(null);
-  const [isManagingGoals, setIsManagingGoals] = useState(false);
-  const [isEditingHost, setIsEditingHost] = useState(false);
-  const [uploadedPhoto, setUploadedPhoto] = useState<string | null>(null);
-  const [isProcessingPhoto, setIsProcessingPhoto] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   
+<<<<<<< HEAD
   // Dynamic portal target setup to resolve iframe/mobile layout clipping
   const containerRef = useRef<HTMLDivElement>(null);
   const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
@@ -131,49 +161,38 @@ export const ProfilesTab = () => {
   }, [hosts]);
   
   const auth = Storage.getAuthState();
+=======
+  // Filters
+  const [roleFilter, setRoleFilter] = useState<'All Members' | 'Show hosts' | 'Show team leaders'>('All Members');
+  const [tierFilter, setTierFilter] = useState<string>('All Tiers');
+  const [searchTerm, setSearchTerm] = useState('');
+>>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
 
-  React.useEffect(() => {
-    const load = async () => {
-      setIsLoading(true);
-      try {
-        const fetchPromise = Promise.all([
-          FirebaseService.getAllHosts(),
-          FirebaseService.getAllExposures()
-        ]);
-        const timeoutPromise = new Promise<[Host[], any[]]>((_, reject) =>
-          setTimeout(() => reject(new Error("Profiles fetch timed out")), 5000)
-        );
-        const [hostsData, exposuresData] = await Promise.race([fetchPromise, timeoutPromise]);
-        setHosts(hostsData);
-        setExposuresList(exposuresData);
-      } catch (err) {
-        console.error("Failed to load profiles:", err);
-        const cachedHosts = Storage.getHosts();
-        if (cachedHosts && cachedHosts.length > 0) {
-          setHosts(cachedHosts);
-        }
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    load();
+  // Spotlight State
+  const [selectedHost, setSelectedHost] = useState<Host | null>(null);
 
-    const handleDataUpdate = () => {
-      load();
-    };
-
-    window.addEventListener('data-updated', handleDataUpdate);
-    return () => window.removeEventListener('data-updated', handleDataUpdate);
-  }, []);
-
-  const checkPassword = (type: 'Director' | 'Leadership') => {
-    const password = prompt(`Which password are you using: 031907 or 19381364?`);
-    const expected = type === 'Director' ? '031907' : '19381364';
-    if (password === expected) return true;
-    alert('Access Denied: Incorrect password for this role.');
-    return false;
+  const fetchUsers = async () => {
+    setIsLoading(true);
+    try {
+      const users = await FirebaseService.getAllRoleMetadata();
+      setHosts(users.map(u => ({ ...u, id: u.poppo_id || u.poppoId || u.id } as Host)));
+    } catch (err: any) {
+      console.error("Failed to load users from Firebase:", err);
+      setError(err.message || 'Failed to connect to Database');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
+  const openSpotlight = (host: Host) => {
+    setSelectedHost(host);
+  };
+
+<<<<<<< HEAD
   const filteredGrid = useMemo(() => {
     return hosts.filter(h => {
       // Search
@@ -200,20 +219,15 @@ export const ProfilesTab = () => {
       return tiers.indexOf(a.tier) - tiers.indexOf(b.tier);
     });
   }, [hosts, searchTerm, roleFilter, tierPayFilter]);
+=======
+  const closeSpotlight = () => {
+    setSelectedHost(null);
+  };
+>>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
 
-  const selectedHost = useMemo(() => hosts.find(h => h.id === selectedHostId), [hosts, selectedHostId]);
-  const goals = useMemo(() => selectedHost ? Storage.getGoals(selectedHost.id) : [], [selectedHost, selectedHostId]);
-  const [commissions, setCommissions] = useState<CommissionEntry[]>([]);
-  const [isLoadingCommissions, setIsLoadingCommissions] = useState(false);
-  const [hostNotes, setHostNotes] = useState<DirectorNote[]>([]);
-  const [isLoadingNotes, setIsLoadingNotes] = useState(false);
-  const [newNoteContent, setNewNoteContent] = useState('');
-  const [newNoteType, setNewNoteType] = useState<NoteType>('Note');
-  const [isAddingNote, setIsAddingNote] = useState(false);
-
-  const loadNotes = async (id: string) => {
-    setIsLoadingNotes(true);
+  const handleProfileUpdated = async () => {
     try {
+<<<<<<< HEAD
       const data = await FirebaseService.getNotesByHost(id);
       setHostNotes(data as DirectorNote[]);
     } catch (err) {
@@ -351,90 +365,63 @@ export const ProfilesTab = () => {
     try {
       await FirebaseService.updateHost(updatedHost);
       const updatedHosts = hosts.map(h => h.id === selectedHost.id ? updatedHost : h);
+=======
+      const users = await FirebaseService.getAllRoleMetadata();
+      const updatedHosts = users.map(u => ({ ...u, id: u.poppo_id || u.poppoId || u.id } as Host));
+>>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
       setHosts(updatedHosts);
-      Storage.addLog('Profiles', `Updated profile for ${updatedHost.name} (#${updatedHost.id})`, auth.name);
-      setIsEditingHost(false);
-      setUploadedPhoto(null);
+      if (selectedHost) {
+        const updated = updatedHosts.find(h => h.id === selectedHost.id);
+        if (updated) {
+          setSelectedHost(updated);
+        }
+      }
     } catch (err) {
-      alert("Failed to update profile to cloud database.");
+      console.error("Failed to refresh users after profile update:", err);
     }
   };
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const filteredHosts = useMemo(() => {
+    return hosts.filter(host => {
+      // 1. Search Filter
+      const searchStr = searchTerm.toLowerCase();
+      const hostName = (host.nickname || host.name || '').toLowerCase();
+      const hostIdStr = String(host.id || '');
+      const matchesSearch = hostName.includes(searchStr) || hostIdStr.includes(searchStr);
+      if (!matchesSearch) return false;
 
-    if (file.size > 5 * 1024 * 1024) {
-      alert('Photo too large. Max 5MB.');
-      return;
-    }
+      // 2. Role Filter
+      const roleStr = (host.role || '').toLowerCase();
+      if (roleFilter === 'Show hosts' && roleStr !== 'host') return false;
+      if (roleFilter === 'Show team leaders' && roleStr === 'host') return false;
 
-    setIsProcessingPhoto(true);
-    try {
-      const base64 = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => {
-          const img = new Image();
-          img.onload = () => {
-            const canvas = document.createElement('canvas');
-            let width = img.width;
-            let height = img.height;
-            const MAX_SIZE = 400;
+      // 3. Tier Pay Filter
+      if (tierFilter !== 'All Tiers') {
+        const tierPay = (host.tier_pay || '').toLowerCase();
+        if (tierPay !== tierFilter.toLowerCase()) return false;
+      }
 
-            if (width > height) {
-              if (width > MAX_SIZE) {
-                height *= MAX_SIZE / width;
-                width = MAX_SIZE;
-              }
-            } else {
-              if (height > MAX_SIZE) {
-                width *= MAX_SIZE / height;
-                height = MAX_SIZE;
-              }
-            }
+      return true;
+    });
+  }, [hosts, searchTerm, roleFilter, tierFilter]);
 
-            canvas.width = width;
-            canvas.height = height;
-            const ctx = canvas.getContext('2d');
-            ctx?.drawImage(img, 0, 0, width, height);
-            resolve(canvas.toDataURL('image/jpeg', 0.7));
-          };
-          img.onerror = reject;
-          img.src = reader.result as string;
-        };
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-      });
-      setUploadedPhoto(base64);
-    } catch (err) {
-      console.error('File upload failed:', err);
-      alert('Failed to process image');
-    } finally {
-      setIsProcessingPhoto(false);
-    }
-  };
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
+        <Loader2 size={48} className="animate-spin text-indigo-500" />
+        <p className="text-[#A09E9A] text-sm animate-pulse">Loading Roster from Database...</p>
+      </div>
+    );
+  }
 
-  const getGoalColor = (type: string) => {
-    switch (type) {
-      case 'fanbase': return 'bg-indigo-500 shadow-[0_0_10px_rgba(99,102,241,0.5)]';
-      case 'fanclub_gc': return 'bg-cyan-500 shadow-[0_0_10px_rgba(6,182,212,0.5)]';
-      case 'hours': return 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]';
-      case 'pk': return 'bg-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.5)]';
-      case 'song_requests': return 'bg-pink-500 shadow-[0_0_10px_rgba(236,72,153,0.5)]';
-      default: return 'bg-slate-500';
-    }
-  };
-
-  const getLabel = (type: string) => {
-    switch (type) {
-      case 'fanbase': return TEXT.weeklyFanbaseGrowth;
-      case 'fanclub_gc': return TEXT.fanclubGcUpdates;
-      case 'hours': return TEXT.hoursStreamed;
-      case 'pk': return TEXT.randomPkSessions;
-      case 'song_requests': return TEXT.songRequests;
-      default: return type;
-    }
-  };
+  if (error) {
+    return (
+      <div className="bg-red-500/10 border border-red-500/20 p-6 rounded-2xl text-center">
+        <h3 className="text-red-400 font-bold mb-2">System Error</h3>
+        <p className="text-sm text-[#A09E9A]">{error}</p>
+      </div>
+    );
+  }
 
   const getTierPayBadge = (tierPay: string): { label: string; cls: string } => {
     const norm = (tierPay || '').toLowerCase();
@@ -447,6 +434,7 @@ export const ProfilesTab = () => {
   };
 
   return (
+<<<<<<< HEAD
     <div ref={containerRef} className="space-y-6">
       {/* ── Row 1: Search + Role filter ── */}
       <div className="flex gap-3 items-center">
@@ -461,11 +449,33 @@ export const ProfilesTab = () => {
           />
         </div>
         <div className="relative">
+=======
+    <div className="space-y-6 relative">
+      {/* FILTER MENU BLOCKS */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-[#1A1A28] p-4 rounded-2xl border border-white/5 sticky top-0 z-10">
+        
+        {/* Search Block */}
+        <div className="relative w-full">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[#A09E9A]/50" size={16} />
+          <input
+            type="text"
+            placeholder="Search Host ID or Nickname..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-9 pr-4 py-2 bg-black/20 border border-white/10 rounded-xl text-xs text-[#F0EFE8] focus:outline-none focus:border-indigo-500/50 w-full"
+          />
+        </div>
+
+        {/* Role Filter Block */}
+        <div className="relative w-full">
+          <Filter className="absolute left-3 top-1/2 -translate-y-1/2 text-[#A09E9A]/50" size={16} />
+>>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
           <select
             value={roleFilter}
             onChange={(e) => setRoleFilter(e.target.value as any)}
             title="Filter by Role"
             aria-label="Filter by Role"
+<<<<<<< HEAD
             className="px-4 py-3 bg-black/30 border border-[#FFB800]/20 rounded-xl text-sm text-[#F5F5F5] focus:outline-none focus:border-[#FFB800]/50 appearance-none cursor-pointer transition-all pr-8"
           >
             <option value="All Members">All Members</option>
@@ -499,18 +509,52 @@ export const ProfilesTab = () => {
               </button>
             );
           })}
+=======
+            className="pl-9 pr-4 py-2 bg-black/20 border border-white/10 rounded-xl text-xs text-[#F0EFE8] focus:outline-none focus:border-indigo-500/50 w-full appearance-none"
+          >
+            <option value="All Members">All Members</option>
+            <option value="Show hosts">Show hosts</option>
+            <option value="Show team leaders">Show team leaders</option>
+          </select>
+        </div>
+
+        {/* Tier Pay Filter Block */}
+        <div className="relative w-full">
+          <Star className="absolute left-3 top-1/2 -translate-y-1/2 text-[#A09E9A]/50" size={16} />
+          <select
+            value={tierFilter}
+            onChange={(e) => setTierFilter(e.target.value)}
+            title="Filter by Tier"
+            aria-label="Filter by Tier"
+            className="pl-9 pr-4 py-2 bg-black/20 border border-white/10 rounded-xl text-xs text-[#F0EFE8] focus:outline-none focus:border-indigo-500/50 w-full appearance-none"
+          >
+            <option value="All Tiers">All Tiers</option>
+            <option value="Star Host">Star Host</option>
+            <option value="Rocket Host">Rocket Host</option>
+            <option value="S idol">S idol</option>
+            <option value="Esports">Esports</option>
+            <option value="Influencer">Influencer</option>
+            <option value="Regular Host">Regular Host</option>
+          </select>
+>>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
         </div>
       </div>
 
-      {isLoading ? (
-        <div className="p-20 text-center text-white/20 italic">{TEXT.loadingProfiles}</div>
-      ) : hosts.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-32 text-center space-y-4">
-          <UserPen size={48} className="text-white/5" />
-          <h3 className="text-lg font-bold text-white/40">{TEXT.noProfilesAvailable}</h3>
-          <p className="text-xs text-white/20 max-w-xs leading-relaxed font-medium">{TEXT.initializeRoster}</p>
+      <div className="flex justify-between items-center px-2">
+        <h2 className="text-[#F0EFE8] font-black text-lg tracking-wider flex items-center gap-2">
+          <LayoutGrid className="text-indigo-500" size={20} />
+          ROSTER DIRECTORY
+        </h2>
+        <span className="text-[#A09E9A] text-xs font-mono">{filteredHosts.length} profiles found</span>
+      </div>
+
+      {/* 2-BLOCK PER ROW GRID UNDER THE FILTERS */}
+      {filteredHosts.length === 0 ? (
+        <div className="py-20 text-center text-[#A09E9A]/40">
+          No hosts match the selected filters.
         </div>
       ) : (
+<<<<<<< HEAD
         <div className="space-y-4">
           {/* Count label */}
           <div className="flex items-center justify-between px-1">
@@ -583,12 +627,61 @@ export const ProfilesTab = () => {
                   </div>
                 </div>
               </motion.div>
+=======
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {filteredHosts.map(host => {
+            const tierPay = String(host.tier_pay || 'N/A');
+            const blockStyles = getTierBlockStyles(tierPay);
+            return (
+              <div
+                key={host.id}
+                onClick={() => openSpotlight(host)}
+                className={cn(
+                  "border rounded-2xl p-4 flex items-center gap-4 cursor-pointer hover:bg-white/[0.02] transition-all hover:scale-[1.01] shadow-lg shadow-black/20",
+                  blockStyles.border,
+                  blockStyles.bg
+                )}
+              >
+              <div className="relative w-16 h-16 rounded-2xl overflow-hidden bg-black/40 border border-white/10 flex-shrink-0">
+                {host.photoUrl ? (
+                  <img src={host.photoUrl} alt="" className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-[#A09E9A]/30">
+                    <Users size={24} />
+                  </div>
+                )}
+              </div>
+              
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1">
+                  <h3 className="text-[#F0EFE8] font-bold text-lg truncate">
+                    {host.nickname || host.name}
+                  </h3>
+                  <span className="px-2 py-0.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-[9px] font-black uppercase tracking-wider">
+                    {host.role || 'Host'}
+                  </span>
+                </div>
+                <div className="text-[#A09E9A] text-xs font-mono">ID: {host.id}</div>
+                
+                <div className="mt-2 flex items-center gap-3">
+                  <div className="flex items-center gap-1 text-[10px] text-amber-400 font-bold bg-amber-400/10 px-2 py-1 rounded-md border border-amber-400/20">
+                    <Star size={10} />
+                    {host.tier_pay || 'N/A'}
+                  </div>
+                  {host.status === 'Active' && (
+                    <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"></div>
+                  )}
+                </div>
+              </div>
+              </div>
+>>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
             );
           })}
         </div>
       </div>
       )}
 
+<<<<<<< HEAD
       {/* Details View Modal */}
       <AnimatePresence>
         {selectedHost && portalTarget && createPortal(
@@ -1173,6 +1266,19 @@ export const ProfilesTab = () => {
           portalTarget
         )}
       </AnimatePresence>
+=======
+      {/* SPOTLIGHT MODAL */}
+      {selectedHost && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm overflow-y-auto">
+          <HostProfileView 
+            host={selectedHost} 
+            isReadOnly={isReadOnly} 
+            onClose={closeSpotlight} 
+            onProfileUpdated={handleProfileUpdated}
+          />
+        </div>
+      )}
+>>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
     </div>
   );
 };

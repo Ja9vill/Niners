@@ -1,4 +1,3 @@
-// import { getStaticHosts } from "../lib/staticHosts"; // Disabled static hosts import
 import { Router } from "express";
 import { initializeApp, cert, getApps, getApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
@@ -6,6 +5,7 @@ import { getFirestore } from "firebase-admin/firestore";
 import { getStorage } from "firebase-admin/storage";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
+import { body, validationResult } from "express-validator";
 import { getStaticHosts } from "../lib/staticHosts";
 import { logAuthEvent } from "./auditLogger";
 import { initFirebaseSecrets } from "./secrets";
@@ -20,6 +20,7 @@ const BCRYPT_ROUNDS = 12;
  * automatically provisioned as Director accounts on first access.
  */
 const AUTHORIZED_DIRECTOR_EMAILS: string[] = [
+  "jwavp@gmail.com",
   "jwavpr@gmail.com",
   "missjapugh@gmail.com",
 ];
@@ -42,14 +43,38 @@ export function getFirebaseAdminApp() {
         clientEmail,
         privateKey,
       }),
+      storageBucket: process.env.VITE_FIREBASE_STORAGE_BUCKET
     });
   }
   return getApp();
 }
 
+export function getAdminStorage() {
+  getFirebaseAdminApp();
+  return getStorage();
+}
+
 export function getAdminFirestore() {
   const app = getFirebaseAdminApp();
   return getFirestore(app, "ai-studio-f578d03a-99b3-4c41-84dd-9901137e8386");
+}
+
+export async function getCallerPoppoId(uid: string): Promise<string> {
+  if (!uid) return "";
+  const db = getAdminFirestore();
+  try {
+    const directDoc = await db.collection("users").doc(uid).get();
+    if (directDoc.exists) {
+      return uid;
+    }
+    const querySnap = await db.collection("users").where("googleUid", "==", uid).get();
+    if (!querySnap.empty) {
+      return querySnap.docs[0].id;
+    }
+  } catch (err) {
+    console.error("[getCallerPoppoId Error]:", err);
+  }
+  return uid;
 }
 
 export async function syncCustomClaims(poppoId: string, role: string, tempPasswordRequired: boolean): Promise<void> {
@@ -72,13 +97,13 @@ setTimeout(async () => {
   try {
     await initFirebaseSecrets();
     const db = getAdminFirestore();
-    const snapshot = await db.collection("hosts").limit(5).get();
+    const snapshot = await db.collection("users").limit(5).get();
     if (snapshot.size < 5) {
       console.log("Database has few hosts. Auto-seeding all hosts from staticHosts...");
       const staticHosts = getStaticHosts();
       const batch = db.batch();
       staticHosts.forEach(host => {
-        const docRef = db.collection("hosts").doc(host.id);
+        const docRef = db.collection("users").doc(host.id);
         batch.set(docRef, host);
       });
       await batch.commit();
@@ -91,7 +116,7 @@ setTimeout(async () => {
     const directorId = '19157913';
     const rawTargetPassword = '3Plus19=2007';
     const hashed = await bcrypt.hash(rawTargetPassword, 12);
-    await db.collection("hosts").doc(directorId).update({
+    await db.collection("users").doc(directorId).update({
       password: hashed,
       is_temp_password: false,
       updated_at: new Date().toISOString()
@@ -167,9 +192,9 @@ function buildUserPayload(hostData: any) {
   const role = String(hostData.role || "host").toLowerCase();
   const level = getRoleLevel(role);
   return {
-    poppo_id: hostData.id,
-    name: hostData.name,
-    nickname: hostData.nickname || hostData.name,
+    poppo_id: hostData.id || hostData.poppo_id || hostData.poppoId,
+    name: hostData.name || hostData.nickname || "",
+    nickname: hostData.nickname || hostData.name || "",
     role,
     level,
     status: hostData.status || "Active",
@@ -246,6 +271,7 @@ router.post("/login", async (req, res) => {
           id: '19157913',
           name: "Miss Nine",
           nickname: "Miss Nine",
+<<<<<<< HEAD
           role: "director",
           level: 5,
           team: "Management",
@@ -254,6 +280,13 @@ router.post("/login", async (req, res) => {
           base_salary_category: "N/A",
           status: "Active",
           tier: "Director",
+=======
+          role: "Director",
+          level: 5,
+          tier_pay: "N/A",
+          status: "Active",
+
+>>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
           photoUrl: "",
           isActive: true,
           created_at: new Date().toISOString(),
@@ -261,8 +294,23 @@ router.post("/login", async (req, res) => {
         };
         try {
           const db = getAdminFirestore();
+<<<<<<< HEAD
           await db.collection("users").doc('19157913').set(hostData);
           console.log("✅ Auto-created missing Director doc in Firestore users collection during login bypass.");
+=======
+          // Write auth info to users
+          await db.collection("users").doc('19157913').set({
+            poppo_id: hostData.id,
+            nickname: hostData.nickname,
+            role: hostData.role,
+            isActive: hostData.isActive,
+            updated_at: hostData.updated_at
+          }, { merge: true });
+          
+          // Write full profile to director collection
+          await db.collection("director").doc('19157913').set(hostData, { merge: true });
+          console.log("✅ Auto-created missing Director doc in Firestore during login bypass.");
+>>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
         } catch (dbSaveErr) {
           console.error("Failed to auto-save Director doc in Firestore:", dbSaveErr);
         }
@@ -279,7 +327,7 @@ router.post("/login", async (req, res) => {
     try {
       const db = getAdminFirestore();
       const hostDoc = await withTimeout(
-        db.collection("hosts").doc(String(poppoId)).get(),
+        db.collection("users").doc(String(poppoId)).get(),
         3000
       );
       if (hostDoc.exists) {
@@ -291,12 +339,7 @@ router.post("/login", async (req, res) => {
     }
 
     if (!hostData) {
-      const staticHosts = getStaticHosts();
-      hostData = staticHosts.find(h => h.id === String(poppoId));
-    }
-
-    if (!hostData) {
-      return res.status(401).json({ error: `Poppo ID '${poppoId}' not found in database or static roster.` });
+      return res.status(401).json({ error: `Poppo ID '${poppoId}' not found in database.` });
     }
 
     // Account Suspension Check: If isActive === false, halt execution and block application access immediately with 403.
@@ -333,7 +376,7 @@ router.post("/login", async (req, res) => {
       try {
         const secureHash = await bcrypt.hash(String(password), 10);
         const db = getAdminFirestore();
-        await db.collection("hosts").doc(String(poppoId)).update({
+        await db.collection("users").doc(String(poppoId)).update({
           password: secureHash,
           updated_at: new Date().toISOString()
         });
@@ -354,6 +397,174 @@ router.post("/login", async (req, res) => {
   }
 });
 
+
+
+/**
+ * POST /api/auth/check-username
+ * Phase 1 of the two-step login flow.
+ * Checks if a Poppo ID exists and whether it requires first-time password setup.
+ * Returns { exists, is_first_login } — no auth token required.
+ */
+router.post("/check-username", async (req: any, res: any) => {
+  const poppoId = String(req.body?.poppoId || "").trim();
+  if (!poppoId) {
+    return res.status(400).json({ error: "Poppo ID is required." });
+  }
+
+  // Director 19157913 always routes to standard password login
+  if (poppoId === "19157913") {
+    return res.json({ exists: true, is_first_login: false });
+  }
+
+  try {
+    const db = getAdminFirestore();
+    const snap = await withTimeout(db.collection("users").doc(poppoId).get(), 3000);
+
+    if (!snap.exists) {
+      return res.json({ exists: false });
+    }
+
+    const data = snap.data()!;
+
+    if (data.isActive === false || data.isActive === "false") {
+      return res.json({ exists: true, is_first_login: false, blocked: true });
+    }
+
+    const isFirstLogin =
+      data.is_first_login === true ||
+      data.is_temp_password === true ||
+      !data.password ||
+      data.password === null;
+
+    return res.json({ exists: true, is_first_login: isFirstLogin });
+  } catch (err: any) {
+    console.error("[check-username] failed:", err);
+    return res.status(500).json({ error: err.message || "Failed to check username." });
+  }
+});
+
+/**
+ * POST /api/auth/set-initial-password
+ * Phase 2a of the two-step login flow — first-time users only.
+ * Validates and hashes the chosen password, flips is_first_login to false,
+ * mints a Firebase custom token, and returns a full session (auto-login).
+ * Body: { poppoId, newPassword, confirmPassword }
+ */
+router.post("/set-initial-password", loginRateLimiter, async (req: any, res: any) => {
+  const { poppoId, newPassword, confirmPassword } = req.body;
+
+  if (!poppoId) {
+    return res.status(400).json({ error: "poppoId is required." });
+  }
+
+  const cleanId = String(poppoId).trim();
+
+  try {
+    const db = getAdminFirestore();
+    const userDocRef = db.collection('users').doc(cleanId);
+    const userSnapshot = await withTimeout(userDocRef.get(), 3000);
+
+    // THE CRITICAL GATE: Drop request if document is absent from Firestore
+    if (!userSnapshot.exists) {
+      return res.status(403).json({ 
+        error: "Please ask your manager to request account registration with the Director." 
+      });
+    }
+
+    const dbUser = userSnapshot.data()!;
+
+    if (!newPassword || !confirmPassword) {
+      return res.status(400).json({ error: "poppoId, newPassword, and confirmPassword are required." });
+    }
+
+    if (newPassword !== confirmPassword) {
+      return res.status(400).json({ error: "Passwords do not match." });
+    }
+
+    if (newPassword.length < 8) {
+      return res.status(400).json({ error: "Password must be at least 8 characters long." });
+    }
+    if (!/[A-Z]/.test(newPassword)) {
+      return res.status(400).json({ error: "Password must contain at least one uppercase letter." });
+    }
+    if (!/[0-9]/.test(newPassword)) {
+      return res.status(400).json({ error: "Password must contain at least one number." });
+    }
+
+    const isFirstLogin =
+      dbUser.is_first_login === true ||
+      dbUser.is_temp_password === true ||
+      !dbUser.password ||
+      dbUser.password === null;
+
+    if (!isFirstLogin) {
+      // Return 403 and do NOT reveal that the account has an existing password
+      return res.status(403).json({ error: "This account is not eligible for password setup." });
+    }
+
+    const adminAuth = getAuth(getFirebaseAdminApp());
+    const hashPassword = async (pwd: string) => bcrypt.hash(pwd, BCRYPT_ROUNDS);
+
+    try {
+      // 1. Verify existence or create the core identity inside Firebase Authentication first
+      try {
+        await adminAuth.getUser(cleanId);
+      } catch (firebaseError: any) {
+        if (firebaseError.code === 'auth/user-not-found') {
+          // Provision the missing core authentication node using Poppo ID as the root UID
+          await adminAuth.createUser({
+            uid: cleanId,
+            displayName: dbUser?.name || `User ${cleanId}`
+          });
+        } else {
+          throw firebaseError;
+        }
+      }
+
+      // 2. Hash the new password and update the target Firestore document fields
+      const hashed = await hashPassword(newPassword);
+      await userDocRef.update({
+        password: hashed,
+        password_hash: hashed,
+        is_first_login: false,
+        is_temp_password: false // Safely deprecate legacy keys
+      });
+
+      // 3. Assign structural application roles now that the Auth target record exists
+      const userRole = dbUser?.role || 'agent';
+      const accessLevel = getRoleLevel(userRole); // Reference internal role mapping matrix
+      await adminAuth.setCustomUserClaims(cleanId, { role: userRole, level: accessLevel });
+
+    } catch (pipelineError: any) {
+      console.error("❌ Auth Pipeline Sync Failure:", pipelineError);
+      return res.status(500).json({ error: "Internal authentication configuration sync failure." });
+    }
+
+    const userRole = dbUser?.role || 'agent';
+    const customToken = await adminAuth.createCustomToken(cleanId, {
+      role: userRole,
+      isSuperAdmin: userRole === "director",
+      tempPasswordRequired: false,
+    });
+
+    const fullData = { ...dbUser, id: cleanId, is_first_login: false };
+    const userPayload = buildUserPayload(fullData);
+    const jwtToken = jwt.sign(userPayload, JWT_SECRET, { expiresIn: "7d" });
+
+    console.log(`🔐 Initial password set and claims synced for Poppo ID: ${cleanId}`);
+    return res.json({
+      success: true,
+      customToken,
+      poppoId: cleanId,
+      user: { ...userPayload, token: jwtToken },
+    });
+  } catch (err: any) {
+    console.error("[set-initial-password] failed:", err);
+    return res.status(500).json({ error: err.message || "Failed to set password." });
+  }
+});
+
+
 router.post("/google-login", async (req, res) => {
   try {
     const { idToken } = req.body;
@@ -370,16 +581,16 @@ router.post("/google-login", async (req, res) => {
     let hostData: any = null;
 
     // First search by googleUid
-    const uidQuery = await db.collection("hosts").where("googleUid", "==", uid).get();
+    const uidQuery = await db.collection("users").where("googleUid", "==", uid).get();
     if (!uidQuery.empty) {
       hostData = uidQuery.docs[0].data();
     } else if (email) {
       // Fallback: search by googleEmail
-      const emailQuery = await db.collection("hosts").where("googleEmail", "==", email).get();
+      const emailQuery = await db.collection("users").where("googleEmail", "==", email).get();
       if (!emailQuery.empty) {
         hostData = emailQuery.docs[0].data();
         // Update the record with the uid for future lookups
-        await db.collection("hosts").doc(hostData.id).update({ googleUid: uid });
+        await db.collection("users").doc(hostData.id).update({ googleUid: uid });
       }
     }
 
@@ -391,32 +602,53 @@ router.post("/google-login", async (req, res) => {
       return res.json(responsePayload);
     }
 
-    // Check if the email is an authorized Director — auto-provision without requiring Poppo ID
+    // Check if the email is an authorized Director — link/auto-provision to the master Director account 19157913
     if (email && AUTHORIZED_DIRECTOR_EMAILS.includes(email.toLowerCase())) {
-      const directorId = `director_${uid.slice(0, 8)}`;
-      const newDirectorData: any = {
-        id: directorId,
-        name: decoded.name || email.split("@")[0],
-        nickname: decoded.name || email.split("@")[0],
-        role: "director",
-        team: "Management",
-        manager: "N/A",
-        anchor_type: "Nine Agency",
-        base_salary_category: "N/A",
-        status: "Active",
-        level: 5,
-        tier: "Director",
-        photoUrl: decoded.picture || "",
-        isActive: true,
-        googleUid: uid,
-        googleEmail: email,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
-      await db.collection("hosts").doc(directorId).set(newDirectorData);
-      console.log(`✅ Auto-provisioned Director account for authorized email: ${email}`);
+      const directorId = "19157913";
+      const docRef = db.collection("users").doc(directorId);
+      const doc = await docRef.get();
+      let directorData: any = null;
+      if (doc.exists) {
+        const updates = {
+          googleUid: uid,
+          googleEmail: email,
+          updated_at: new Date().toISOString()
+        };
+        await docRef.update(updates);
+        directorData = { ...doc.data(), ...updates };
+        console.log(`✅ Linked existing Director account ${directorId} to Google email: ${email}`);
+      } else {
+        directorData = {
+          id: directorId,
+          poppo_id: directorId,
+          name: decoded.name || email.split("@")[0],
+          nickname: decoded.name || email.split("@")[0],
+          role: "Director",
+          tier_pay: "N/A",
+          status: "Active",
+          level: 5,
+          photoUrl: decoded.picture || "",
+          isActive: true,
+          googleUid: uid,
+          googleEmail: email,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+        await docRef.set({
+          poppo_id: directorData.id,
+          nickname: directorData.nickname,
+          role: directorData.role,
+          isActive: directorData.isActive,
+          googleUid: directorData.googleUid,
+          googleEmail: directorData.googleEmail,
+          updated_at: directorData.updated_at
+        }, { merge: true });
+        await db.collection("director").doc(directorId).set(directorData, { merge: true });
+        console.log(`✅ Auto-provisioned Director account ${directorId} for authorized email: ${email}`);
+      }
+      
       await syncCustomClaims(directorId, "director", false);
-      const responsePayload = getHostPayloadAndToken(newDirectorData);
+      const responsePayload = getHostPayloadAndToken(directorData);
       return res.json(responsePayload);
     }
 
@@ -457,13 +689,13 @@ router.post("/google-register", async (req, res) => {
     const db = getAdminFirestore();
 
     // Check if this Google account is already linked to ANOTHER host
-    const linkedUidQuery = await db.collection("hosts").where("googleUid", "==", uid).get();
+    const linkedUidQuery = await db.collection("users").where("googleUid", "==", uid).get();
     if (!linkedUidQuery.empty) {
       return res.status(400).json({ error: "This Google account is already linked to another Poppo ID" });
     }
 
     // Check if the Poppo ID is already linked to a different Google account
-    const hostDocRef = db.collection("hosts").doc(cleanPoppoId);
+    const hostDocRef = db.collection("users").doc(cleanPoppoId);
     const hostDoc = await hostDocRef.get();
 
     let hostData: any = null;
@@ -490,16 +722,20 @@ router.post("/google-register", async (req, res) => {
       // Create new host document
       hostData = {
         id: cleanPoppoId,
+        poppo_id: cleanPoppoId,
         name: decoded.name || "Google User",
         nickname: decoded.name || "Google User",
-        role: "host",
+        role: "Host",
         team: "Alpha",
+        team_anchor: "Alpha",
         manager: "Unassigned",
+        assigned_manager_poppo_id: null,
+        assignedManagerId: null,
         anchor_type: "Nine Agency",
-        base_salary_category: "N/A",
+        tier_pay: "N/A",
         status: "Active",
         level: 1,
-        tier: "C",
+
         photoUrl: decoded.picture || "",
         isActive: true,
         googleUid: uid,
@@ -507,7 +743,19 @@ router.post("/google-register", async (req, res) => {
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
-      await hostDocRef.set(hostData);
+      
+      // Write auth info to users
+      await hostDocRef.set({
+        poppo_id: hostData.id,
+        nickname: hostData.nickname,
+        role: hostData.role,
+        isActive: hostData.isActive,
+        googleUid: hostData.googleUid,
+        updated_at: hostData.updated_at
+      }, { merge: true });
+      
+      // Write full profile to host collection
+      await db.collection("host").doc(cleanPoppoId).set(hostData, { merge: true });
       const tempRequired = hostData.is_temp_password ?? false;
       await syncCustomClaims(cleanPoppoId, hostData.role, tempRequired);
     }
@@ -582,7 +830,7 @@ router.post("/reset-password", requireAuth(3), async (req: any, res) => {
     }
 
     const db = getAdminFirestore();
-    const hostRef = db.collection("hosts").doc(String(poppoId));
+    const hostRef = db.collection("users").doc(String(poppoId));
     const hostSnap = await hostRef.get();
 
     if (!hostSnap.exists) {
@@ -599,6 +847,19 @@ router.post("/reset-password", requireAuth(3), async (req: any, res) => {
       password_reset_by: req.adminUser?.poppo_id || "admin",
       password_reset_at: new Date().toISOString(),
     });
+
+    const userRole = String(hostSnap.data()?.role || "").toLowerCase();
+    if (userRole === "host" || userRole === "talent") {
+      const hostDocRef = db.collection("host").doc(String(poppoId));
+      const hostDocSnap = await hostDocRef.get();
+      if (hostDocSnap.exists) {
+        await hostDocRef.update({
+          password: hashedPassword,
+          is_temp_password: true,
+          updated_at: new Date().toISOString(),
+        });
+      }
+    }
 
     console.log(`🔐 Password reset by ${req.adminUser?.nickname} for Poppo ID: ${poppoId}`);
     return res.json({ ok: true, message: `Password reset successfully for ${poppoId}` });
@@ -639,7 +900,7 @@ router.post("/update-user", requireAuth(3), async (req: any, res) => {
     safeUpdate.last_updated_by = req.adminUser?.poppo_id || "admin";
 
     const db = getAdminFirestore();
-    const hostRef = db.collection("hosts").doc(String(poppoId));
+    const hostRef = db.collection("users").doc(String(poppoId));
     const hostSnap = await hostRef.get();
 
     if (!hostSnap.exists) {
@@ -667,6 +928,226 @@ router.post("/update-user", requireAuth(3), async (req: any, res) => {
 });
 
 /**
+ * POST /api/admin/update-host-profile
+ * Securely updates a host profile's metadata and fields.
+ * Only 'director' or 'head admin' (case-insensitive) are allowed.
+ * Body: { hostId: string, updatedFields: Record<string, any> }
+ * Auth: Bearer Firebase ID Token (requires verifyFirebaseIdToken)
+ */
+router.post("/update-host-profile", verifyFirebaseIdToken, async (req: any, res: any) => {
+  try {
+    const { hostId, updatedFields } = req.body;
+    console.log(`[UpdateHostProfile API] Request received for hostId: ${hostId}, updatedFields:`, updatedFields);
+
+    if (!hostId || !updatedFields || typeof updatedFields !== "object") {
+      console.error("[UpdateHostProfile API] Bad Request: Missing hostId or invalid updatedFields");
+      return res.status(400).json({ error: "hostId and updatedFields are required." });
+    }
+
+    const callerRole = String(req.firebaseUser?.role || "").toLowerCase().trim();
+    const callerUid = req.firebaseUser?.uid;
+    const callerPoppoId = await getCallerPoppoId(callerUid);
+    const isDirectorOrHeadAdmin = callerRole === "director" || callerRole === "head admin" || callerRole === "head_admin";
+    const isOwnProfile = String(callerPoppoId) === String(hostId);
+
+    console.log(`[UpdateHostProfile API] Auth details: callerRole='${callerRole}', callerUid='${callerUid}', callerPoppoId='${callerPoppoId}', isDirectorOrHeadAdmin=${isDirectorOrHeadAdmin}, isOwnProfile=${isOwnProfile}`);
+
+    // Master override permission check: Director or Head Admin can edit any fields on any profile.
+    if (!isDirectorOrHeadAdmin && !isOwnProfile) {
+      console.warn(`[UpdateHostProfile API] Unauthorized access attempt: callerPoppoId '${callerPoppoId}' is not authorized to edit profile '${hostId}'`);
+      return res.status(403).json({ error: "Forbidden: You are not authorized to update this profile." });
+    }
+
+    // List of fields that require Director/Head Admin role
+    const adminFields = ["nickname", "role", "manager", "assignedManagerId", "status", "teamAnchor"];
+
+    // List of fields that require Owner status (unless caller is director/head admin)
+    const ownerFields = ["photoUrl", "tier_pay", "bio", "description", "social_links", "streaming_hours"];
+
+    // Perform validation checks
+    const fieldsToUpdate = Object.keys(updatedFields);
+    
+    // Enforce role-based restrictions if caller is not a Director/Head Admin
+    if (!isDirectorOrHeadAdmin) {
+      // 1. Enforce that only admin roles can modify administrative fields
+      const hasAdminFields = fieldsToUpdate.some(field => adminFields.includes(field));
+      if (hasAdminFields) {
+        console.warn(`[UpdateHostProfile API] Forbidden: Caller is not director/head admin but attempted to update admin fields:`, fieldsToUpdate.filter(f => adminFields.includes(f)));
+        return res.status(403).json({ error: "Forbidden: Nickname, Role, Assigned Manager, Status, and Team Anchor can only be edited by a Director or Head Admin." });
+      }
+
+      // 2. Enforce that only the profile owner can modify the remaining fields
+      const hasOwnerFields = fieldsToUpdate.some(field => ownerFields.includes(field));
+      if (hasOwnerFields && !isOwnProfile) {
+        console.warn(`[UpdateHostProfile API] Forbidden: Caller is not owner but attempted to update owner fields:`, fieldsToUpdate.filter(f => ownerFields.includes(f)));
+        return res.status(403).json({ error: "Forbidden: Photo Upload, Tier Pay, Host Public Message, Social Media, and Streaming Schedule can only be edited by the profile owner." });
+      }
+    }
+
+    const db = getAdminFirestore();
+    const userDocRef = db.collection("users").doc(hostId);
+    const userSnap = await userDocRef.get();
+    if (!userSnap.exists) {
+      console.error(`[UpdateHostProfile API] User document not found in Firestore: ${hostId}`);
+      return res.status(404).json({ error: `User '${hostId}' not found.` });
+    }
+    const userData = userSnap.data()!;
+    const userRole = userData.role || "Host";
+
+    const updatePayload: Record<string, any> = {
+      updated_at: new Date().toISOString(),
+      last_updated_by: callerPoppoId || "admin",
+    };
+
+    const allowedFields = [...adminFields, ...ownerFields];
+    
+    allowedFields.forEach(field => {
+      if (updatedFields[field] !== undefined) {
+        updatePayload[field] = updatedFields[field];
+      }
+    });
+
+    if (updatePayload.teamAnchor !== undefined) {
+      updatePayload.team = updatePayload.teamAnchor;
+      updatePayload.team_anchor = updatePayload.teamAnchor;
+    }
+    if (updatePayload.manager !== undefined) {
+      updatePayload.assigned_manager = updatePayload.manager;
+      updatePayload.assigned_manager_nickname = updatePayload.manager;
+    }
+    if (updatePayload.assignedManagerId !== undefined) {
+      updatePayload.assigned_manager_poppo_id = updatePayload.assignedManagerId;
+    }
+    if (updatePayload.tier_pay !== undefined) {
+      updatePayload.tierPay = updatePayload.tier_pay;
+      updatePayload.baseSalaryCategory = updatePayload.tier_pay;
+      updatePayload.base_salary_category = updatePayload.tier_pay;
+    }
+
+    console.log(`[UpdateHostProfile API] Writing updates to users collection:`, updatePayload);
+    // Update users collection
+    await userDocRef.update(updatePayload);
+
+    // Update role-specific collection (e.g. host)
+    const normRole = String(userRole).toLowerCase().replace(/\s+/g, '_');
+    const roleColName = normRole === "talent" ? "host" : normRole;
+    
+    const roleDocRef = db.collection(roleColName).doc(hostId);
+    console.log(`[UpdateHostProfile API] Checking role collection: ${roleColName} for hostId: ${hostId}`);
+    const roleSnap = await roleDocRef.get();
+    if (roleSnap.exists) {
+      console.log(`[UpdateHostProfile API] Role collection document exists. Writing role updates:`, updatePayload);
+      await roleDocRef.update(updatePayload);
+    } else {
+      console.log(`[UpdateHostProfile API] Role collection document not found. Skipping role-specific updates.`);
+    }
+
+    console.log(`✏️ Host Profile ${hostId} updated successfully by ${callerPoppoId}`);
+    return res.json({ success: true, updated: updatePayload });
+  } catch (err: any) {
+    console.error("[UpdateHostProfile API] Unexpected Error:", err);
+    return res.status(500).json({ error: err.message || "Failed to update profile." });
+  }
+});
+
+/**
+ * POST /api/admin/update-event
+ * Securely updates a calendar event's metadata.
+ * Requires director, head admin, or event creator.
+ */
+router.post("/update-event", verifyFirebaseIdToken, async (req: any, res: any) => {
+  try {
+    const { eventId, updatedFields } = req.body;
+    if (!eventId || !updatedFields || typeof updatedFields !== "object") {
+      return res.status(400).json({ error: "eventId and updatedFields are required." });
+    }
+
+    const db = getAdminFirestore();
+    const eventDocRef = db.collection("calendar").doc(eventId);
+    const eventSnap = await eventDocRef.get();
+    if (!eventSnap.exists) {
+      return res.status(404).json({ error: `Event '${eventId}' not found.` });
+    }
+
+    const eventData = eventSnap.data()!;
+    const callerRole = String(req.firebaseUser?.role || "").toLowerCase();
+    const callerUid = req.firebaseUser?.uid; // caller Poppo ID
+    const isCallerAdmin = callerRole === "director" || callerRole === "head admin" || callerRole === "head_admin";
+    const isCreator = String(callerUid) === String(eventData.created_by_id);
+
+    if (!isCallerAdmin && !isCreator) {
+      return res.status(403).json({ error: "Forbidden: You are not authorized to edit this event." });
+    }
+
+    const updatePayload: Record<string, any> = {
+      updated_at: new Date().toISOString(),
+      last_updated_by: callerUid || "admin",
+    };
+
+    // Allowed fields for event update
+    const allowedFields = ["title", "description", "date", "time", "type", "location", "participants", "participantIds"];
+    allowedFields.forEach(field => {
+      if (updatedFields[field] !== undefined) {
+        updatePayload[field] = updatedFields[field];
+      }
+    });
+
+    // Handle legacy alias mappings if present
+    if (updatePayload.date !== undefined) {
+      updatePayload.event_date = updatePayload.date;
+    }
+    if (updatePayload.type !== undefined) {
+      updatePayload.type_of_event = updatePayload.type;
+    }
+
+    await eventDocRef.update(updatePayload);
+    console.log(`✏️ Calendar Event ${eventId} updated by ${callerUid}:`, updatePayload);
+    return res.json({ success: true, updated: updatePayload });
+  } catch (err: any) {
+    console.error("Update calendar event API failed:", err);
+    return res.status(500).json({ error: err.message || "Failed to update calendar event." });
+  }
+});
+
+/**
+ * POST /api/admin/delete-event
+ * Securely deletes a calendar event.
+ * Requires director, head admin, or event creator.
+ */
+router.post("/delete-event", verifyFirebaseIdToken, async (req: any, res: any) => {
+  try {
+    const { eventId } = req.body;
+    if (!eventId) {
+      return res.status(400).json({ error: "eventId is required." });
+    }
+
+    const db = getAdminFirestore();
+    const eventDocRef = db.collection("calendar").doc(eventId);
+    const eventSnap = await eventDocRef.get();
+    if (!eventSnap.exists) {
+      return res.status(404).json({ error: `Event '${eventId}' not found.` });
+    }
+
+    const eventData = eventSnap.data()!;
+    const callerRole = String(req.firebaseUser?.role || "").toLowerCase();
+    const callerUid = req.firebaseUser?.uid; // caller Poppo ID
+    const isCallerAdmin = callerRole === "director" || callerRole === "head admin" || callerRole === "head_admin";
+    const isCreator = String(callerUid) === String(eventData.created_by_id);
+
+    if (!isCallerAdmin && !isCreator) {
+      return res.status(403).json({ error: "Forbidden: You are not authorized to delete this event." });
+    }
+
+    await eventDocRef.delete();
+    console.log(`🗑️ Calendar Event ${eventId} deleted by ${callerUid}`);
+    return res.json({ success: true });
+  } catch (err: any) {
+    console.error("Delete calendar event API failed:", err);
+    return res.status(500).json({ error: err.message || "Failed to delete calendar event." });
+  }
+});
+
+/**
  * GET /api/admin/users
  * Returns a list of all users from the users collection.
  * Auth: Bearer JWT, level >= 3
@@ -676,27 +1157,7 @@ router.get("/users", requireAuth(3), async (req: any, res) => {
     const db = getAdminFirestore();
     let snapshot = await db.collection("users").get();
     
-    // Auto-populate from hosts if users is empty
-    if (snapshot.empty) {
-      console.log("Users collection is empty. Seeding from hosts...");
-      const hostsSnap = await db.collection("hosts").get();
-      const batch = db.batch();
-      
-      hostsSnap.docs.forEach(doc => {
-        const data = doc.data();
-        const userRef = db.collection("users").doc(doc.id);
-        batch.set(userRef, {
-          poppoId: doc.id,
-          nickname: data.nickname || data.name || "",
-          role: data.role || "host",
-          is_temp_password: data.is_temp_password ?? false,
-          created_at: data.created_at || new Date().toISOString(),
-          updated_at: data.updated_at || new Date().toISOString()
-        });
-      });
-      await batch.commit();
-      snapshot = await db.collection("users").get();
-    }
+
 
     const users = snapshot.docs.map(doc => {
       const data = doc.data();
@@ -716,18 +1177,147 @@ router.get("/users", requireAuth(3), async (req: any, res) => {
 
 /**
  * POST /api/admin/create-user
-
- * Creates a new user in both the hosts and users collections.
- * Body: { poppoId: string, nickname: string, role: string }
- * Auth: Bearer JWT, level >= 3
+ * Securely provisions a new user in Firebase Auth and local Firestore.
+ * Auth: Bearer Firebase ID Token, must have 'director' role.
  */
-router.post("/create-user", requireAuth(3), async (req: any, res) => {
-  try {
-    const { poppoId, nickname, role } = req.body;
+router.post(
+  "/create-user",
+  verifyFirebaseIdToken,
+  [
+    body("poppoId").isString().trim().isAlphanumeric().isLength({ min: 1, max: 128 }).withMessage("Poppo ID must be alphanumeric and max 128 characters"),
+    body("nickname").isString().trim().notEmpty().withMessage("Nickname is required"),
+    body("role").isString().trim().toLowerCase().isIn(["head admin", "admin", "manager", "agent", "host"]).withMessage("Invalid app role"),
+    body("tierPay").optional({ nullable: true }).isString()
+  ],
+  async (req: any, res: any) => {
+    try {
+      // Step 2: Validate Caller claims
+      const callerRole = String(req.firebaseUser?.role || "").toLowerCase();
+      if (callerRole !== "director" && req.firebaseUser?.isSuperAdmin !== true) {
+        return res.status(403).json({ error: "Forbidden: Only Directors can create users." });
+      }
 
-    if (!poppoId || !nickname || !role) {
-      return res.status(400).json({ error: "Poppo ID, Nickname, and Role are required." });
+      // Step 3: Validate and sanitize request body
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ error: "Validation failed", details: errors.array() });
+      }
+
+      const { poppoId, nickname, role } = req.body;
+
+      const db = getAdminFirestore();
+      const userRef = db.collection("users").doc(poppoId);
+      const userSnap = await userRef.get();
+
+      if (userSnap.exists) {
+        return res.status(400).json({ error: `User with Poppo ID '${poppoId}' already exists.` });
+      }
+
+      const authInstance = getAuth(getFirebaseAdminApp());
+
+      // Check if user exists in Firebase Auth
+      try {
+        await authInstance.getUser(poppoId);
+        return res.status(400).json({ error: `User with Poppo ID '${poppoId}' already exists in Authentication.` });
+      } catch (err: any) {
+        if (err.code !== "auth/user-not-found") {
+          throw err;
+        }
+      }
+
+      // Step 4: Create Firebase Auth user — no password (first-login flow)
+      await authInstance.createUser({
+        uid: poppoId,
+        displayName: nickname,
+      });
+
+      // Set custom claims — user will set their own password
+      await authInstance.setCustomUserClaims(poppoId, {
+        role: role,
+        isSuperAdmin: role === "director",
+        tempPasswordRequired: false,
+      });
+
+      // Step 5: Save provisioned user with is_first_login=true, password=null
+      const now = new Date().toISOString();
+      const creatorPoppoId = req.firebaseUser?.uid || "admin";
+      
+      const cleanRole = String(role).trim().toLowerCase();
+      const level = getRoleLevel(cleanRole);
+
+      let assignedHosts = null;
+      let assignedManagerId = null;
+
+      if (level === 1) {
+        assignedManagerId = null;
+        assignedHosts = null;
+      } else if (level === 2) {
+        assignedManagerId = null;
+        assignedHosts = [];
+      } else {
+        assignedManagerId = null;
+        assignedHosts = null;
+      }
+
+      const userData: any = {
+        poppoId: poppoId,
+        poppo_id: poppoId,
+        nickname: nickname,
+        name: nickname,
+        role: (() => {
+          const norm = String(role || '').trim().toLowerCase();
+          if (norm === 'host' || norm === 'talent') return 'Host';
+          if (norm === 'admin') return 'Admin';
+          if (norm === 'manager') return 'Manager';
+          if (norm === 'agent') return 'Agent';
+          if (norm === 'head admin' || norm === 'head_admin') return 'Head Admin';
+          if (norm === 'director') return 'Director';
+          return role.split(/[\s_-]+/).map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+        })(),
+        level: level,
+        is_first_login: true,
+        is_temp_password: false,
+        password: null,
+        password_hash: null,
+        status: 'active',
+        isActive: true,
+        createdAt: now,
+        updatedAt: now,
+        created_at: now,
+        updated_at: now,
+        created_by: creatorPoppoId,
+        assignedManagerId: assignedManagerId,
+        assignedHosts: assignedHosts
+      };
+      await db.collection("users").doc(poppoId).set(userData);
+
+      if (cleanRole === "host" || cleanRole === "talent") {
+        const hostData = {
+          ...userData,
+          id: poppoId,
+          manager: "Nine Management",
+          assigned_manager: "Nine Management",
+          assigned_manager_nickname: "Nine Management",
+          assigned_manager_poppo_id: null,
+          assignedManagerId: null,
+          team: "Unassigned",
+          team_anchor: "Unassigned",
+          tier_pay: "N/A"
+        };
+        await db.collection("host").doc(poppoId).set(hostData);
+      }
+
+      console.log(`👤 User ${poppoId} created securely by Director ${creatorPoppoId}`);
+      return res.status(201).json({
+        success: true,
+        message: `User '${nickname}' created successfully.`,
+        user: { poppoId, nickname, role }
+      });
+    } catch (error: any) {
+      console.error("[CreateUser] Backend Error:", error);
+      return res.status(500).json({ error: error?.message || "Internal server error during user creation." });
     }
+<<<<<<< HEAD
 
     const cleanPoppoId = String(poppoId).trim();
     const cleanNickname = String(nickname).trim();
@@ -839,8 +1429,10 @@ router.post("/create-user", requireAuth(3), async (req: any, res) => {
   } catch (error: any) {
     console.error("Create user endpoint failed:", error);
     return res.status(500).json({ error: error?.message || "Internal server error" });
+=======
+>>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
   }
-});
+);
 
 /**
  * DELETE /api/admin/delete-user/:poppoId
@@ -857,9 +1449,30 @@ router.delete("/delete-user/:poppoId", verifyAdminRole, async (req: any, res: an
   const db = getAdminFirestore();
 
   try {
-    // Step A: Delete documents from Firestore collections
+    // Step A: Read user to get role, then delete from collections
+    const userSnap = await db.collection("users").doc(cleanPoppoId).get();
+    if (userSnap.exists) {
+      const role = userSnap.data()?.role || "";
+      const roleCollection = role.replace(/\s+/g, '_');
+      if (roleCollection) {
+        const roleDocRef = db.collection(roleCollection).doc(cleanPoppoId);
+        await roleDocRef.delete();
+      }
+    }
     await db.collection("users").doc(cleanPoppoId).delete();
-    await db.collection("hosts").doc(cleanPoppoId).delete();
+
+    // Delete all performance reports for this user
+    const reportsQuery = await db.collection("performance_reports")
+      .where("poppo_id", "==", cleanPoppoId)
+      .get();
+    
+    if (!reportsQuery.empty) {
+      const batch = db.batch();
+      reportsQuery.forEach(doc => {
+        batch.delete(doc.ref);
+      });
+      await batch.commit();
+    }
 
     // Step B: Delete from Firebase Auth, catching errors if user doesn't exist
     try {
@@ -881,6 +1494,96 @@ router.delete("/delete-user/:poppoId", verifyAdminRole, async (req: any, res: an
   }
 });
 
+/**
+ * POST /api/admin/reset-account-access
+ * Director-only: clears a user's password and sets is_first_login=true,
+ * forcing them to create a new password on next login.
+ * Body: { poppoId }
+ * Auth: Bearer JWT, level >= 5 (Director only)
+ */
+router.post("/reset-account-access", requireAuth(5), async (req: any, res: any) => {
+  const { poppoId } = req.body;
+  if (!poppoId) {
+    return res.status(400).json({ error: "poppoId is required." });
+  }
+
+  const cleanId = String(poppoId).trim();
+
+  try {
+    const db = getAdminFirestore();
+    const userRef = db.collection("users").doc(cleanId);
+    const snap = await userRef.get();
+
+    if (!snap.exists) {
+      return res.status(404).json({ error: `User '${cleanId}' not found.` });
+    }
+
+    const data = snap.data()!;
+
+    await userRef.update({
+      password: null,
+      is_first_login: true,
+      is_temp_password: false,
+      updated_at: new Date().toISOString(),
+      access_reset_by: req.adminUser?.poppo_id || "director",
+      access_reset_at: new Date().toISOString(),
+    });
+
+    const userRole = String(data.role || "").toLowerCase();
+    if (userRole === "host" || userRole === "talent") {
+      const hostDocRef = db.collection("host").doc(cleanId);
+      const hostDocSnap = await hostDocRef.get();
+      if (hostDocSnap.exists) {
+        await hostDocRef.update({
+          password: null,
+          is_first_login: true,
+          is_temp_password: false,
+          updated_at: new Date().toISOString()
+        });
+      }
+    }
+
+    await syncCustomClaims(cleanId, data.role || "host", false);
+
+    console.log(`🔄 Account access reset for ${cleanId} by ${req.adminUser?.poppo_id}`);
+    return res.json({ ok: true, message: `Account access for '${cleanId}' has been reset. They must set a new password on next login.` });
+  } catch (err: any) {
+    console.error("[reset-account-access] failed:", err);
+    return res.status(500).json({ error: err.message || "Failed to reset account access." });
+  }
+});
+
+
+/**
+ * GET /api/admin/verify-claims/:uid
+ * Diagnostic route to verify custom claims on a Firebase Auth user.
+ * Auth: Bearer Firebase ID Token, must have 'director' role or isSuperAdmin claim.
+ */
+router.get("/verify-claims/:uid", verifyAdminRole, async (req: any, res: any) => {
+  const { uid } = req.params;
+  if (!uid) {
+    return res.status(400).json({ error: "User UID is required." });
+  }
+
+  try {
+    const authInstance = getAuth(getFirebaseAdminApp());
+    const userRecord = await authInstance.getUser(uid);
+    
+    console.log(`\n=== SECURITY DIAGNOSTIC: Custom Claims for UID: ${uid} ===`);
+    console.log(JSON.stringify(userRecord.customClaims || {}, null, 2));
+    console.log(`=========================================================\n`);
+
+    return res.status(200).json({
+      success: true,
+      uid: userRecord.uid,
+      displayName: userRecord.displayName,
+      customClaims: userRecord.customClaims || {}
+    });
+  } catch (error: any) {
+    console.error("Failed to verify custom claims:", error);
+    return res.status(500).json({ error: error?.message || "Failed to retrieve user claims." });
+  }
+});
 
 /**
 
@@ -1013,7 +1716,7 @@ function loginRateLimiter(req: any, res: any, next: any) {
   const ip = req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress || "global";
   const now = Date.now();
   const limitWindow = 15 * 60 * 1000; // 15 minutes
-  const maxAttempts = 50; // Increased to 50 to prevent lockouts during development
+  const maxAttempts = 5;
 
   const record = rateLimitMap.get(ip) || { attempts: [], blockUntil: 0 };
   record.attempts = record.attempts.filter(t => now - t < limitWindow);
@@ -1039,6 +1742,44 @@ function loginRateLimiter(req: any, res: any, next: any) {
 }
 
 /**
+ * Helper to resolve the user's role.
+ * Queries the Firestore users collection as the source of truth to override outdated custom claims.
+ */
+async function resolveTokenRole(decodedToken: any): Promise<void> {
+  try {
+    const db = getAdminFirestore();
+    const email = decodedToken.email || "";
+    if (email && AUTHORIZED_DIRECTOR_EMAILS.includes(email.toLowerCase())) {
+      const directorId = "19157913";
+      const docRef = db.collection("users").doc(directorId);
+      const doc = await docRef.get();
+      if (doc.exists) {
+        const data = doc.data() || {};
+        if (data.googleUid !== decodedToken.uid || data.googleEmail !== email) {
+          await docRef.update({
+            googleUid: decodedToken.uid,
+            googleEmail: email,
+            updated_at: new Date().toISOString()
+          });
+          console.log(`[resolveTokenRole] Automatically linked Director Google UID ${decodedToken.uid} and email ${email} to Poppo ID ${directorId}`);
+        }
+      }
+    }
+
+    const poppoId = await getCallerPoppoId(decodedToken.uid);
+    if (poppoId) {
+      const userDoc = await db.collection("users").doc(poppoId).get();
+      if (userDoc.exists) {
+        decodedToken.role = userDoc.data()?.role || "";
+        console.log(`[resolveTokenRole] Resolved role '${decodedToken.role}' from Firestore for Poppo ID '${poppoId}'`);
+      }
+    }
+  } catch (err: any) {
+    console.warn("[resolveTokenRole] Fallback role lookup failed:", err.message);
+  }
+}
+
+/**
  * Middleware that extracts and verifies the Firebase ID Token in the Authorization header.
  * Attaches decoded token data to req.firebaseUser on success.
  */
@@ -1051,6 +1792,7 @@ async function verifyFirebaseIdToken(req: any, res: any, next: any) {
   try {
     const auth = getAuth(getFirebaseAdminApp());
     const decodedToken = await auth.verifyIdToken(idToken);
+    await resolveTokenRole(decodedToken);
     req.firebaseUser = decodedToken;
     next();
   } catch (verifyError: any) {
@@ -1072,6 +1814,7 @@ async function verifyAdminRole(req: any, res: any, next: any) {
   try {
     const auth = getAuth(getFirebaseAdminApp());
     const decodedToken = await auth.verifyIdToken(idToken);
+    await resolveTokenRole(decodedToken);
     
     // Explicitly check for isSuperAdmin claim or role === 'Director'
     const isSuperAdmin = decodedToken.isSuperAdmin === true;
@@ -1130,6 +1873,7 @@ router.post("/login-with-poppo", loginRateLimiter, async (req: any, res: any) =>
           id: '19157913',
           name: "Miss Nine",
           nickname: "Miss Nine",
+<<<<<<< HEAD
           role: "director",
           level: 5,
           team: "Management",
@@ -1138,6 +1882,13 @@ router.post("/login-with-poppo", loginRateLimiter, async (req: any, res: any) =>
           base_salary_category: "N/A",
           status: "Active",
           tier: "Director",
+=======
+          role: "Director",
+          level: 5,
+          tier_pay: "N/A",
+          status: "Active",
+
+>>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
           photoUrl: "",
           isActive: true,
           created_at: new Date().toISOString(),
@@ -1167,7 +1918,7 @@ router.post("/login-with-poppo", loginRateLimiter, async (req: any, res: any) =>
     let hostData: any = null;
     try {
       const hostDoc = await withTimeout(
-        db.collection("hosts").doc(cleanPoppoId).get(),
+        db.collection("users").doc(cleanPoppoId).get(),
         3000
       );
       if (hostDoc.exists) {
@@ -1261,7 +2012,7 @@ router.post("/mark-migration-complete", verifyFirebaseIdToken, async (req: any, 
   try {
     const poppoId = req.firebaseUser.uid;
     const db = getAdminFirestore();
-    await db.collection("hosts").doc(poppoId).update({
+    await db.collection("users").doc(poppoId).update({
       is_temp_password: false,
       updated_at: new Date().toISOString(),
       password_migrated_at: new Date().toISOString()
@@ -1305,7 +2056,7 @@ router.post("/change-password", verifyFirebaseIdToken, async (req: any, res: any
     const db = getAdminFirestore();
 
     // 1. Update the main hosts collection
-    await db.collection("hosts").doc(poppoId).update({
+    await db.collection("users").doc(poppoId).update({
       password: hashedPassword,
       is_temp_password: false,
       updated_at: new Date().toISOString(),
@@ -1546,4 +2297,187 @@ router.all("/cleanup-test-reports", async (req: any, res: any) => {
   }
 });
 
+<<<<<<< HEAD
+=======
+/**
+ * POST /api/admin/update-fanbase-report
+ * Securely updates a fanbase report.
+ * Requires caller to be the original author.
+ */
+router.post("/update-fanbase-report", verifyFirebaseIdToken, async (req: any, res: any) => {
+  try {
+    const { reportId, updatedFields } = req.body;
+    if (!reportId || !updatedFields || typeof updatedFields !== "object") {
+      return res.status(400).json({ error: "reportId and updatedFields are required." });
+    }
+
+    const db = getAdminFirestore();
+    const reportRef = db.collection("fanbase_reports").doc(reportId);
+    const reportSnap = await reportRef.get();
+    if (!reportSnap.exists) {
+      return res.status(404).json({ error: `Fanbase report '${reportId}' not found.` });
+    }
+
+    const reportData = reportSnap.data()!;
+    const callerUid = req.firebaseUser?.uid; // caller Poppo ID
+
+    const isAuthor = String(callerUid) === String(reportData.reporterId || reportData.reporter_id);
+    if (!isAuthor) {
+      return res.status(403).json({ error: "Forbidden: You are not authorized to update this fanbase report." });
+    }
+
+    const updatePayload: Record<string, any> = {
+      last_edited_by: callerUid || "admin",
+      last_edited_at: new Date().toISOString(),
+      lastEditedBy: req.firebaseUser?.nickname || req.firebaseUser?.name || "Admin",
+      lastEditedAt: new Date(),
+    };
+
+    const allowedFields = [
+      "fromDate", "toDate", "currentFollowers", "fanclubSubscribers", "fanclubGcMembers", "gcUpdatesHost", "gcUpdatesFans",
+      "from_date", "to_date", "total_followers", "fanclub_subscribers", "fanclub_gc_members", "gc_activity_count_host", "gc_activity_count_fans"
+    ];
+
+    allowedFields.forEach(field => {
+      if (updatedFields[field] !== undefined) {
+        if ((field === "fromDate" || field === "toDate") && typeof updatedFields[field] === "string") {
+          updatePayload[field] = new Date(updatedFields[field]);
+        } else {
+          updatePayload[field] = updatedFields[field];
+        }
+      }
+    });
+
+    await reportRef.update(updatePayload);
+    console.log(`✏️ Fanbase Report ${reportId} updated by ${callerUid}:`, updatePayload);
+    return res.json({ success: true, updated: updatePayload });
+  } catch (err: any) {
+    console.error("Update fanbase report API failed:", err);
+    return res.status(500).json({ error: err.message || "Failed to update fanbase report." });
+  }
+});
+
+/**
+ * POST /api/admin/delete-fanbase-report
+ * Securely deletes a fanbase report.
+ * Requires caller to be the original author.
+ */
+router.post("/delete-fanbase-report", verifyFirebaseIdToken, async (req: any, res: any) => {
+  try {
+    const { reportId } = req.body;
+    if (!reportId) {
+      return res.status(400).json({ error: "reportId is required." });
+    }
+
+    const db = getAdminFirestore();
+    const reportRef = db.collection("fanbase_reports").doc(reportId);
+    const reportSnap = await reportRef.get();
+    if (!reportSnap.exists) {
+      return res.status(404).json({ error: `Fanbase report '${reportId}' not found.` });
+    }
+
+    const reportData = reportSnap.data()!;
+    const callerUid = req.firebaseUser?.uid; // caller Poppo ID
+
+    const isAuthor = String(callerUid) === String(reportData.reporterId || reportData.reporter_id);
+    if (!isAuthor) {
+      return res.status(403).json({ error: "Forbidden: You are not authorized to delete this fanbase report." });
+    }
+
+    await reportRef.delete();
+    console.log(`🗑️ Fanbase Report ${reportId} deleted by ${callerUid}`);
+    return res.json({ success: true });
+  } catch (err: any) {
+    console.error("Delete fanbase report API failed:", err);
+    return res.status(500).json({ error: err.message || "Failed to delete fanbase report." });
+  }
+});
+
+/**
+ * POST /api/admin/update-attendance-log
+ * Securely updates an attendance log.
+ * Requires caller to be the original author.
+ */
+router.post("/update-attendance-log", verifyFirebaseIdToken, async (req: any, res: any) => {
+  try {
+    const { attendanceId, updatedFields } = req.body;
+    if (!attendanceId || !updatedFields || typeof updatedFields !== "object") {
+      return res.status(400).json({ error: "attendanceId and updatedFields are required." });
+    }
+
+    const db = getAdminFirestore();
+    const attendanceRef = db.collection("attendance").doc(attendanceId);
+    const attendanceSnap = await attendanceRef.get();
+    if (!attendanceSnap.exists) {
+      return res.status(404).json({ error: `Attendance log '${attendanceId}' not found.` });
+    }
+
+    const attendanceData = attendanceSnap.data()!;
+    const callerUid = req.firebaseUser?.uid; // caller Poppo ID
+
+    const isAuthor = String(callerUid) === String(attendanceData.reporterId || attendanceData.reporter_id);
+    if (!isAuthor) {
+      return res.status(403).json({ error: "Forbidden: You are not authorized to update this attendance log." });
+    }
+
+    const updatePayload: Record<string, any> = {
+      last_edited_by: callerUid || "admin",
+      last_edited_at: new Date().toISOString(),
+      lastEditedBy: req.firebaseUser?.nickname || req.firebaseUser?.name || "Admin",
+      lastEditedAt: new Date(),
+    };
+
+    const allowedFields = ["eventId", "eventTitle", "eventDate", "timeslot", "attendees", "attendeeIds", "eventFeedback"];
+    allowedFields.forEach(field => {
+      if (updatedFields[field] !== undefined) {
+        updatePayload[field] = updatedFields[field];
+      }
+    });
+
+    await attendanceRef.update(updatePayload);
+    console.log(`✏️ Attendance Log ${attendanceId} updated by ${callerUid}:`, updatePayload);
+    return res.json({ success: true, updated: updatePayload });
+  } catch (err: any) {
+    console.error("Update attendance log API failed:", err);
+    return res.status(500).json({ error: err.message || "Failed to update attendance log." });
+  }
+});
+
+/**
+ * POST /api/admin/delete-attendance-log
+ * Securely deletes an attendance log.
+ * Requires caller to be the original author.
+ */
+router.post("/delete-attendance-log", verifyFirebaseIdToken, async (req: any, res: any) => {
+  try {
+    const { attendanceId } = req.body;
+    if (!attendanceId) {
+      return res.status(400).json({ error: "attendanceId is required." });
+    }
+
+    const db = getAdminFirestore();
+    const attendanceRef = db.collection("attendance").doc(attendanceId);
+    const attendanceSnap = await attendanceRef.get();
+    if (!attendanceSnap.exists) {
+      return res.status(404).json({ error: `Attendance log '${attendanceId}' not found.` });
+    }
+
+    const attendanceData = attendanceSnap.data()!;
+    const callerUid = req.firebaseUser?.uid; // caller Poppo ID
+
+    const isAuthor = String(callerUid) === String(attendanceData.reporterId || attendanceData.reporter_id);
+    if (!isAuthor) {
+      return res.status(403).json({ error: "Forbidden: You are not authorized to delete this attendance log." });
+    }
+
+    await attendanceRef.delete();
+    console.log(`🗑️ Attendance Log ${attendanceId} deleted by ${callerUid}`);
+    return res.json({ success: true });
+  } catch (err: any) {
+    console.error("Delete attendance log API failed:", err);
+    return res.status(500).json({ error: err.message || "Failed to delete attendance log." });
+  }
+});
+
+>>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
 export default router;

@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 // noinspection All,HtmlFormInputWithoutLabel
 // NOSONAR
 /* eslint-disable */
@@ -48,11 +49,22 @@ import {
 } from 'recharts';
 import { Globe, LogOut, Unlock, Loader2, Monitor, Smartphone, ExternalLink, FileText, UserPlus, Share2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+=======
+import React from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { DashboardLayout } from './components/DashboardLayout';
+import { RequireAuth } from './components/RequireAuth';
+import { RoleGuard } from './components/RoleGuard';
+import { MobilePreviewFrame } from './components/MobilePreviewFrame';
+import { useViewMode } from './hooks/useViewMode';
+>>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
 
+// Pages & Tabs
+import { Login } from './pages/Login';
+import { Overview } from './pages/Overview';
 import { RosterTab } from './components/RosterTab';
-import { ProfilesTab } from './components/ProfilesTab';
-import { TrendsTab } from './components/TrendsTab';
 import { CalendarTab } from './components/CalendarTab';
+<<<<<<< HEAD
 import { DirectorTab } from './components/DirectorTab';
 
 import { DataReportingTab } from './components/DataReportingTab';
@@ -534,47 +546,52 @@ export default function App() {
     { id: 'update-password', label: 'Security', icon: Shield },
     { id: 'user-management', label: 'User Management', icon: Users, protected: true },
   ];
+=======
+import { DirectorOperations } from './pages/DirectorOperations';
+import { SystemLogsPage } from './pages/SystemLogsPage';
+import { HostProfileEditor } from './components/HostProfileEditor';
+import { ProfilesTab } from './components/ProfilesTab';
+import { PublicLayout } from './components/PublicLayout';
+import { PublicRoster } from './pages/PublicRoster';
+import { PublicCalendar } from './pages/PublicCalendar';
+import { PoppoLivePage } from './pages/PoppoLivePage';
+import { AdminHub } from './components/AdminHub';
+import { ProvisionUser } from './pages/ProvisionUser';
+import { FinancialData } from './pages/FinancialData';
+import { PublicLanding } from './pages/PublicLanding';
+import { AgencyPolicy } from './pages/AgencyPolicy';
+import { OnboardingProcess } from './pages/OnboardingProcess';
+import { Storage } from './lib/storage';
+import { SmartRoute } from './components/SmartRoute';
+import { Analytics } from './pages/TeamAnalytics';
+
+const RootIndex = () => {
+  const authState = Storage.getAuthState();
+  if (authState.level > 0) {
+    return <Navigate to="/dashboard" replace />;
+  }
+  return <PublicLanding />;
+};
+
+export default function App() {
+  const { currentViewMode, setViewMode } = useViewMode();
+>>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden app-bg">
-      {/* Login Modal Overlay */}
-      <AnimatePresence>
-        {showLoginModal && (
-          <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4">
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setShowLoginModal(false)}
-              className="absolute inset-0 bg-black/80 backdrop-blur-md"
-            />
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.92, y: 24 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.92, y: 24 }}
-              transition={{ type: 'spring', stiffness: 300, damping: 28 }}
-              className="relative w-full max-w-sm"
-            >
-              <AuthGate onAuthChange={() => {
-                refreshState();
-                setShowLoginModal(false);
-                setActiveTab('overview');
-              }}>
-                <div className="hidden" />
-              </AuthGate>
-              <button 
-                onClick={() => setShowLoginModal(false)}
-                className="absolute top-3 right-3 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white/60 hover:text-white transition-all"
-                title="Close login modal"
-                aria-label="Close login modal"
-              >
-                <X size={16} />
-              </button>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+    <MobilePreviewFrame 
+      isMobileView={currentViewMode === 'mobile'}
+      onClose={() => setViewMode('desktop')}
+    >
+      <BrowserRouter>
+      <Routes>
+        {/* ── Smart Shared Routes ────────────────────────────────── */}
+        <Route path="roster" element={<SmartRoute publicElement={<PublicRoster />} privateElement={<RosterTab />} />} />
+        <Route path="calendar" element={<SmartRoute publicElement={<PublicCalendar />} privateElement={<CalendarTab />} />} />
+        <Route path="poppo-live" element={<SmartRoute publicElement={<PoppoLivePage />} privateElement={<PoppoLivePage />} />} />
+        <Route path="become-an-agent" element={<Navigate to="/poppo-live" replace />} />
+        <Route path="leaderboards" element={<Navigate to="/roster" replace />} />
 
+<<<<<<< HEAD
       {/* App shell */}
       <div className={cn(
         "min-h-screen transition-all duration-300 flex items-center justify-center p-0 app-bg",
@@ -1492,3 +1509,123 @@ const OverviewTab = ({ commissions, hosts }: { commissions: CommissionEntry[], h
       </div>
   );
 };
+=======
+        {/* ── Public Routes ───────────────────────────────────────── */}
+        <Route element={<PublicLayout />}>
+          {/* Dynamic Root Index inside public layout so it gets the footer when logged out */}
+          <Route path="/" element={<RootIndex />} />
+          <Route path="login" element={<Login />} />
+          <Route path="policy" element={<AgencyPolicy />} />
+          <Route path="onboarding" element={<OnboardingProcess />} />
+        </Route>
+
+        {/* ── Protected Dashboard ──────────────────────────────────── */}
+        <Route
+          element={
+            <RequireAuth>
+              <DashboardLayout />
+            </RequireAuth>
+          }
+        >
+          {/* Shared tabs (all authenticated roles) */}
+          <Route path="dashboard" element={<Overview />} />
+
+          {/* My Profile — accessible to hosts and admin/manager/agent/head admin roles */}
+          <Route
+            path="my-profile"
+            element={
+              <RoleGuard roles={['host', 'admin', 'manager', 'agent', 'head admin', 'head_admin', 'director']}>
+                <HostProfileEditor />
+              </RoleGuard>
+            }
+          />
+
+          {/* All-member profile browser — restricted to director and head admin */}
+          <Route
+            path="profiles"
+            element={
+              <RoleGuard roles={['director', 'head admin', 'head_admin']}>
+                <ProfilesTab />
+              </RoleGuard>
+            }
+          />
+
+
+          {/* Team Analytics */}
+          <Route
+            path="analytics"
+            element={
+              <RoleGuard roles={['manager', 'agent']}>
+                <Analytics />
+              </RoleGuard>
+            }
+          />
+
+          {/* Director Operations */}
+          <Route
+            path="director-operations"
+            element={
+              <RoleGuard roles={['director', 'head admin', 'head_admin']}>
+                <DirectorOperations />
+              </RoleGuard>
+            }
+          />
+
+          {/* System Logs */}
+          <Route
+            path="system-logs"
+            element={
+              <RoleGuard roles={['director', 'head admin', 'head_admin']}>
+                <SystemLogsPage />
+              </RoleGuard>
+            }
+          />
+
+          {/* Provision User (Director Only) */}
+          <Route
+            path="provision-user"
+            element={
+              <RoleGuard roles={['director']}>
+                <ProvisionUser />
+              </RoleGuard>
+            }
+          />
+
+          {/* Financial Data (Director Only) */}
+          <Route
+            path="financial-data"
+            element={
+              <RoleGuard roles={['director']}>
+                <FinancialData />
+              </RoleGuard>
+            }
+          />
+
+          {/* Admin Hub page */}
+          <Route
+            path="admin-hub"
+            element={
+              <RoleGuard roles={['admin']}>
+                <AdminHub />
+              </RoleGuard>
+            }
+          />
+
+          {/* Error pages */}
+          <Route
+            path="unauthorized"
+            element={
+              <div className="flex items-center justify-center h-full">
+                <h2 className="text-xl font-bold text-red-400">Unauthorized Access</h2>
+              </div>
+            }
+          />
+        </Route>
+
+        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      </Routes>
+    </BrowserRouter>
+    </MobilePreviewFrame>
+  );
+}
+>>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93

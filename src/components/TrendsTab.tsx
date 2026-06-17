@@ -76,7 +76,7 @@ export const TrendsTab = () => {
   const elite = hosts.filter(h => getRoleModelRatio(h.id) >= 90);
   const established = hosts.filter(h => getRoleModelRatio(h.id) >= 60 && getRoleModelRatio(h.id) < 90);
   const developing = hosts.filter(h => getRoleModelRatio(h.id) < 60);
-  const atRisk = hosts.filter(h => h.status === 'Inconsistent' || h.status === 'Inactive');
+  const atRisk = hosts.filter(h => h.status === 'Inconsistent' || h.status === 'Intermittent' || h.status === 'Inactive');
 
   if (isLoading) return <div className="p-20 text-center text-white/20 italic">Processing trends...</div>;
 

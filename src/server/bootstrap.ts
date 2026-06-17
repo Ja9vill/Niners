@@ -21,30 +21,30 @@ async function runBootstrap() {
     const db = getAdminFirestore();
     const now = new Date().toISOString();
 
-    // 3. Insert/Update the record in users collection
+    // 3. Insert/Update the record in users collection (auth credentials only)
     await db.collection("users").doc(poppoId).set({
-      poppoId: poppoId,
+      poppo_id: poppoId,
+      id: poppoId,
       nickname: "Miss Nine",
-      role: "director",
+      role: "Director",
       is_temp_password: false,
-      tempPassword: hashedPassword,
+      password: hashedPassword,
+      isActive: true,
       updated_at: now,
       created_at: now
     }, { merge: true });
 
-    // 4. Insert/Update the record in hosts collection (since the app queries hosts on auth and rendering)
-    await db.collection("hosts").doc(poppoId).set({
+    // 4. Insert/Update the record in director collection (profile data)
+    await db.collection("director").doc(poppoId).set({
       id: poppoId,
+      poppo_id: poppoId,
       name: "Miss Nine",
       nickname: "Miss Nine",
-      role: "director",
+      role: "Director",
       level: 5,
-      team: "Management",
-      manager: "Self",
-      anchor_type: "Nine Agency",
-      base_salary_category: "N/A",
+      tier_pay: "N/A",
       status: "Active",
-      tier: "Director",
+
       photoUrl: "",
       isActive: true,
       is_temp_password: false,

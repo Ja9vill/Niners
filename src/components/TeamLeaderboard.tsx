@@ -1,11 +1,11 @@
 import React, { useMemo } from 'react';
-import { HostUser } from '../types';
+import { Host } from '../types';
 import { Trophy, TrendingUp, TrendingDown, Minus, Star } from 'lucide-react';
 import { formatNumber } from '../lib/utils';
 import { motion } from 'motion/react';
 
 interface TeamLeaderboardProps {
-  managedHosts: HostUser[];
+  managedHosts: Host[];
   performanceReports: any[];
 }
 
@@ -83,7 +83,11 @@ export const TeamLeaderboard: React.FC<TeamLeaderboardProps> = React.memo(({ man
   if (leaderboardData.length === 0) return null;
 
   return (
+<<<<<<< HEAD
     <div className="bg-[#111111]/50 border border-white/5 p-5 rounded-2xl space-y-4">
+=======
+    <div className="bg-[#1A1A28]/50 border border-[#D4AF37]/10 p-5 rounded-2xl space-y-4">
+>>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
       <div className="flex items-center justify-between px-1">
         <h4 className="text-[10px] font-black uppercase tracking-[0.15em] text-[#B0B0B0] font-outfit flex items-center gap-2">
           <Trophy size={14} className="text-[#FFB800]" />
@@ -104,10 +108,17 @@ export const TeamLeaderboard: React.FC<TeamLeaderboardProps> = React.memo(({ man
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: idx * 0.1 }}
+<<<<<<< HEAD
               className="bg-[#222222]/40 border border-white/5 p-3 rounded-xl flex items-center justify-between hover:border-[#FFB800]/20 transition-colors shadow-sm group"
             >
               <div className="flex items-center gap-4">
                 <div className="w-6 h-6 flex items-center justify-center rounded-full bg-black/30 border border-white/10 text-xs font-black text-[#B0B0B0]">
+=======
+              className="bg-[#222235]/40 border border-[#D4AF37]/10 p-3 rounded-xl flex items-center justify-between hover:border-[#D4AF37]/20 transition-colors shadow-sm group"
+            >
+              <div className="flex items-center gap-4">
+                <div className="w-6 h-6 flex items-center justify-center rounded-full bg-black/30 border border-[#D4AF37]/15 text-xs font-black text-[#A09E9A]">
+>>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
                   #{host.currentRank}
                 </div>
                 <div>

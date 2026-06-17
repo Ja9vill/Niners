@@ -46,6 +46,7 @@ service cloud.firestore {
       return isLeadership() || isAdmin() || isManager() || isAgent();
     }
 
+<<<<<<< HEAD
     function isNotLocked() {
       return resource == null || !resource.data.keys().hasAll(['isLocked']) || resource.data.isLocked != true;
     }
@@ -62,15 +63,12 @@ service cloud.firestore {
 
 
     // 1. users Collection Rules
+=======
+    // 1. users and Role-Based Collections Rules
+>>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
     match /users/{userId} {
-      // Leadership/Admin can read all profiles. Managers/Agents can read themselves or users assigned to them.
-      // Hosts can read their own profile.
-      allow read: if isLeadership() || isAdmin() || (
-        (isManager() || isAgent()) && (request.auth.uid == userId || (resource != null && resource.data.assignedManagerId == request.auth.uid))
-      ) || (isSignedIn() && request.auth.uid == userId);
+      allow read: if true;
       
-      // Directors & Head Admins can do any write
-      // The user themselves can update their profile, but cannot escalate their own role or change critical fields
       allow create: if isLeadership();
       allow update: if isLeadership() || (
         isSignedIn() && request.auth.uid == userId &&
@@ -80,6 +78,43 @@ service cloud.firestore {
       );
       allow delete: if isLeadership();
     }
+
+    match /host/{userId} {
+      allow read: if true;
+      allow create, delete: if isLeadership();
+      allow update: if isLeadership() || (isSignedIn() && request.auth.uid == userId);
+
+      match /host_awards/{awardId} {
+        allow read: if isSignedIn();
+        allow write: if isDirector() || isHeadAdmin() || isLeadership();
+      }
+    }
+    match /manager/{userId} {
+      allow read: if true;
+      allow create, delete: if isLeadership();
+      allow update: if isLeadership() || (isSignedIn() && request.auth.uid == userId);
+    }
+    match /admin/{userId} {
+      allow read: if true;
+      allow create, delete: if isLeadership();
+      allow update: if isLeadership() || (isSignedIn() && request.auth.uid == userId);
+    }
+    match /head_admin/{userId} {
+      allow read: if true;
+      allow create, delete: if isLeadership();
+      allow update: if isLeadership() || (isSignedIn() && request.auth.uid == userId);
+    }
+    match /agent/{userId} {
+      allow read: if true;
+      allow create, delete: if isLeadership();
+      allow update: if isLeadership() || (isSignedIn() && request.auth.uid == userId);
+    }
+    match /director/{userId} {
+      allow read: if true;
+      allow create, delete: if isLeadership();
+      allow update: if isLeadership() || (isSignedIn() && request.auth.uid == userId);
+    }
+
 
     // 2. performance_reports Collection Rules
     match /performance_reports/{reportId} {
@@ -108,6 +143,7 @@ service cloud.firestore {
       allow update, delete: if isLeadership() || (isAdmin() && isNotLocked());
     }
 
+<<<<<<< HEAD
     // 5. events Collection Rules
     match /events/{eventId} {
       // Hidden events (marked as Director Only) can only be read by Directors
@@ -118,6 +154,23 @@ service cloud.firestore {
       );
       
       // All signed-in users can write events (hosts can add their own)
+=======
+    // 5. attendance Collection Rules
+    match /attendance/{attendanceId} {
+      allow read: if isSignedIn();
+      allow write: if isDirector() || isHeadAdmin() || isAdmin();
+    }
+
+    // announcements Collection Rules
+    match /announcements/{announcementId} {
+      allow read: if isSignedIn();
+      allow write: if isDirector() || isHeadAdmin();
+    }
+
+    // calendar Collection Rules
+    match /calendar/{eventId} {
+      allow read: if true;
+>>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
       allow write: if isSignedIn();
     }
 
@@ -177,6 +230,46 @@ service cloud.firestore {
       allow update, delete: if isDirector() || isHeadAdmin() || isLeadership();
     }
     
+    // 7. Director specific collections
+    match /activity_logs/{logId} {
+      allow read, write: if isLeadership();
+    }
+    match /earnings_summaries/{summaryId} {
+      allow read, write: if isLeadership();
+    }
+    match /financials_monthly/{docId} {
+      allow read, write: if isLeadership();
+    }
+    match /financials_weekly/{docId} {
+      allow read, write: if isLeadership();
+    }
+
+    // 8. Awards & Assignments
+    match /awards/{awardId} {
+      allow read: if isSignedIn();
+      allow write: if isDirector() || isHeadAdmin() || isLeadership();
+    }
+    match /host_awards/{awardId} {
+      allow read: if isSignedIn();
+      allow write: if isDirector() || isHeadAdmin() || isLeadership();
+    }
+    match /award_assignments/{assignmentId} {
+      allow read: if isSignedIn();
+      allow write: if isDirector() || isHeadAdmin() || isLeadership();
+    }
+
+    // 9. Progress Notes
+    match /notes/{noteId} {
+      allow read, write: if isDirector() || isHeadAdmin() || isLeadership() || isStaff();
+    }
+
+    // 10. Host Intake Requests
+    match /host_requests/{requestId} {
+      allow read: if isLeadership() || isAgent();
+      allow create: if isAgent();
+      allow update, delete: if isLeadership();
+    }
+
     // Default Deny: block all other access by default
     match /{document=**} {
       allow read, write: if false;

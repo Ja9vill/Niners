@@ -8,46 +8,7 @@ export const BASE_SALARY_POLICIES: BaseSalaryTier[] = [
   'Regular Host', 'Rocket Host', 'Star Host', 'S idol', 'ESport Host'
 ];
 
-// Mock initial data if empty
-export const INITIAL_HOSTS: Host[] = [
-  { 
-    id: '1001', 
-    name: 'Ye Joon', 
-    nickname: 'Efficiency King',
-    role: 'Talent',
-    team: 'Alpha',
-    manager: 'Ely', 
-    anchor_type: 'Nine Agency', 
-    base_salary_category: 'S idol',
-    status: 'Active', 
-    level: 50, 
-    tier: 'S',
-    password: '1234',
-    is_temp_password: true,
-    isActive: true,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString()
-  },
-  { 
-    id: '1002', 
-    name: 'LYKA', 
-    nickname: 'LYKA',
-    role: 'Talent',
-    team: 'Beta',
-    manager: 'Jean', 
-    anchor_type: 'Nine Agency', 
-    base_salary_category: 'Rocket Host',
-    status: 'Active', 
-    level: 45,
-    tier: 'A',
-    password: '1234',
-    is_temp_password: true,
-    isActive: true,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString()
-  },
-  // ... others can be derived or kept minimal for now
-];
+export const INITIAL_HOSTS: Host[] = [];
 
 export const INITIAL_COMMISSION: CommissionEntry[] = [];
 
@@ -63,4 +24,26 @@ export const TIMELINE_DATA = [
   { month: 'Feb 2026', value: 29100000 },
   { month: 'Mar 2026', value: 24200000 },
   { month: 'Apr 2026', value: 36500000 },
+];
+
+export const EVENT_COLORS: Record<string, { bg: string; text: string; gradient: string }> = {
+  'SOLO LIVEHOUSE': { text: 'text-amber-400', bg: 'bg-amber-500/10', gradient: 'from-amber-600 to-yellow-400' },
+  'PARTY LIVEHOUSE': { text: 'text-fuchsia-400', bg: 'bg-fuchsia-500/10', gradient: 'from-fuchsia-600 to-pink-400' },
+  'AGENCY MEETING': { text: 'text-indigo-400', bg: 'bg-indigo-500/10', gradient: 'from-indigo-600 to-blue-400' },
+  'PK MATCH': { text: 'text-rose-400', bg: 'bg-rose-500/10', gradient: 'from-rose-600 to-red-400' },
+  'OTHER': { text: 'text-purple-400', bg: 'bg-purple-500/10', gradient: 'from-purple-600 to-indigo-400' }
+};
+
+export const TIMESLOTS = [
+  '09:00 AM - 10:00 AM (Manila Time)',
+  '10:00 AM - 11:00 AM (Manila Time)',
+  '11:00 AM - 12:00 PM (Manila Time)',
+  '02:00 PM - 03:00 PM (Manila Time)',
+  '03:00 PM - 04:00 PM (Manila Time)',
+  '04:00 PM - 05:00 PM (Manila Time)',
+  '05:00 PM - 06:00 PM (Manila Time)',
+  '07:00 PM - 08:00 PM (Manila Time)',
+  '08:00 PM - 09:00 PM (Manila Time)',
+  '09:00 PM - 10:00 PM (Manila Time)',
+  '10:00 PM - 11:00 PM (Manila Time)'
 ];

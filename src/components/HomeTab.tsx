@@ -151,11 +151,12 @@ export const HomeTab: React.FC<HomeTabProps> = ({ hosts, commissions, onOpenLogi
                             rankNum === 1 ? "border-yellow-500/30" :
                             rankNum === 2 ? "border-slate-300/30" :
                             rankNum === 3 ? "border-amber-700/30" : "border-white/10"
-                          )}>
+                          )} style={{ aspectRatio: '1 / 1' }}>
                             <img 
                               src={host.photoUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${host.id}`} 
                               alt={host.nickname || host.name}
                               className="w-full h-full object-cover"
+                              style={{ aspectRatio: '1 / 1', objectFit: 'cover' }}
                               referrerPolicy="no-referrer"
                             />
                           </div>
