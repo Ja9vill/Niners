@@ -46,6 +46,21 @@ service cloud.firestore {
       return isLeadership() || isAdmin() || isManager() || isAgent();
     }
 
+    function isNotLocked() {
+      return resource == null || !resource.data.keys().hasAll(['isLocked']) || resource.data.isLocked != true;
+    }
+
+    // 0. staging_queue Collection Rules
+    match /staging_queue/{queueId} {
+      // Anyone signed in can read staging items (or we can restrict to staff)
+      allow read: if isStaff();
+      // Anyone signed in can submit to the staging queue
+      allow create: if isSignedIn();
+      // Only leadership can approve/reject
+      allow update, delete: if isLeadership();
+    }
+
+
     // 1. users Collection Rules
     match /users/{userId} {
       // Leadership/Admin can read all profiles. Managers/Agents can read themselves or users assigned to them.
@@ -68,36 +83,29 @@ service cloud.firestore {
 
     // 2. performance_reports Collection Rules
     match /performance_reports/{reportId} {
-      allow read: if isStaff() || (isSignedIn() && resource.data.poppoId == request.auth.uid);
-      allow write: if isLeadership() || isAdmin();
+      allow read: if isSignedIn();
+      // Regular creates are allowed (if not bulk), updates must respect the lock
+      allow create: if isLeadership() || isAdmin() || isAgent();
+      allow update, delete: if isLeadership() || ((isAdmin() || isAgent()) && isNotLocked());
+    }
+    match /performance_weekly_reports/{reportId} {
+      allow read: if isSignedIn();
+      allow create: if isLeadership() || isAdmin() || isAgent();
+      allow update, delete: if isLeadership() || ((isAdmin() || isAgent()) && isNotLocked());
     }
 
     // 3. fanbase_reports Collection Rules
     match /fanbase_reports/{reportId} {
-      allow read: if isStaff() || (isSignedIn() && resource.data.poppoId == request.auth.uid);
-      
-      // Leadership & Admins can write any report
-      // Hosts can create (submit) their own fanbase reports
-      allow create: if isLeadership() || isAdmin() || (
-        isHost() && 
-        request.resource.data.poppoId == request.auth.uid &&
-        request.resource.data.reporterId == request.auth.uid
-      );
-      allow update, delete: if isLeadership() || isAdmin();
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update, delete: if isLeadership() || (isAdmin() && isNotLocked());
     }
 
     // 4. pk_reports Collection Rules
     match /pk_reports/{reportId} {
-      allow read: if isStaff() || (isSignedIn() && resource.data.poppoId == request.auth.uid);
-      
-      // Leadership & Admins can write any report
-      // Hosts can create (submit) their own PK reports
-      allow create: if isLeadership() || isAdmin() || (
-        isHost() && 
-        request.resource.data.poppoId == request.auth.uid &&
-        request.resource.data.reporterId == request.auth.uid
-      );
-      allow update, delete: if isLeadership() || isAdmin();
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update, delete: if isLeadership() || (isAdmin() && isNotLocked());
     }
 
     // 5. events Collection Rules
@@ -109,8 +117,8 @@ service cloud.firestore {
         (!resource.data.keys().hasAll(['eventType']) || resource.data.eventType != 'Director Only')
       );
       
-      // Directors, Head Admins, Admins, and Managers can write events
-      allow write: if isLeadership() || isAdmin() || isManager();
+      // All signed-in users can write events (hosts can add their own)
+      allow write: if isSignedIn();
     }
 
     // 6. tasks Collection Rules

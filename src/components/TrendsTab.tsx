@@ -109,7 +109,7 @@ export const TrendsTab = () => {
              { label: '📈 Developing', range: 'Ratio < 60%', color: 'text-emerald-400', hosts: developing },
              { label: '⚠️ At Risk', range: '< 1M pts', color: 'text-red-400', hosts: atRisk },
            ].map((stage, i) => (
-             <div key={i} className="glass-card !p-6 flex flex-col h-full bg-[#0F1117] border-slate-800">
+             <div key={i} className="glass-card !p-6 flex flex-col h-full bg-[#1A1A1A] border-slate-800">
                 <div className="mb-6">
                   <h4 className={cn("font-bold text-[10px] uppercase tracking-[0.2em]", stage.color)}>{stage.label}</h4>
                   <p className="text-[10px] font-black uppercase text-slate-600 tracking-widest mt-1">{stage.range}</p>

@@ -6,6 +6,7 @@ import { FirebaseService } from '../lib/firebaseService';
 import { cn, formatNumber } from '../lib/utils';
 import { format, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay, addWeeks, subWeeks } from 'date-fns';
 import { motion, AnimatePresence } from 'motion/react';
+import { LivehouseMatrixService, LivehouseMatrixRow } from '../lib/sheetsService';
 
 const EVENT_COLORS: Record<string, { bg: string; text: string; gradient: string }> = {
   'Official PK': { bg: 'bg-[#f43f5e]/10 border-[#f43f5e]/20', text: 'text-[#f43f5e]', gradient: 'from-[#f43f5e] to-[#fda4af]' },
@@ -58,6 +59,10 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
   const [reserveTimeslot, setReserveTimeslot] = useState('');
   const [reserveNotes, setReserveNotes] = useState('');
   const [selectedLivehouseType, setSelectedLivehouseType] = useState<'Solo Livehouse' | 'Party Livehouse'>('Solo Livehouse');
+
+  // Live Livehouse Matrix (fetched from Google Apps Script Web App)
+  const [livehouseMatrix, setLivehouseMatrix] = useState<LivehouseMatrixRow[]>([]);
+  const [matrixLoading, setMatrixLoading] = useState(false);
  
   // Proposal States (Alternative slot proposal by Manager/Admin)
   const [proposingRequestId, setProposingRequestId] = useState<string | null>(null);
@@ -70,6 +75,14 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
       setSelectedParticipants([]);
     }
   }, [isAdding, isRequestingTimeslot]);
+
+  // Fetch livehouse matrix from Google Apps Script on mount
+  useEffect(() => {
+    setMatrixLoading(true);
+    LivehouseMatrixService.fetchSchedule()
+      .then(rows => setLivehouseMatrix(rows))
+      .finally(() => setMatrixLoading(false));
+  }, []);
 
   // Load events & livehouse requests from Firestore on mount
   useEffect(() => {
@@ -220,35 +233,59 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
   };
 
   // Livehouse Reservation availability checker
+  // Prefers live data from the Google Apps Script matrix; falls back to local counts.
   const getTimeslotAvailability = (targetDate: string) => {
-    // Count approved events in the calendar of type Solo Livehouse or Party Livehouse
+    const liveRows = LivehouseMatrixService.getDateAvailability(livehouseMatrix, targetDate);
+
+    if (liveRows.length > 0) {
+      // Live data path — trust the sheet directly
+      return liveRows.map(row => ({
+        slot: row.manilaLabel,
+        count: (row.slot1Available ? 0 : 1) + (row.slot2Available ? 0 : 1),
+        isTaken: row.fullyBooked,
+        label: row.fullyBooked
+          ? `${row.manilaLabel} [Fully Booked]`
+          : `${row.manilaLabel} (${row.slot1Available && row.slot2Available ? 2 : 1} slot${row.slot1Available && row.slot2Available ? 's' : ''} available)`,
+        // Pass through for reservation display
+        slot1Available: row.slot1Available,
+        slot1PoppoId:   row.slot1PoppoId,
+        slot2Available: row.slot2Available,
+        slot2PoppoId:   row.slot2PoppoId,
+        source: row.source_origin,
+      }));
+    }
+
+    // Fallback: derive counts from local calendar events + approved requests
     const calendarEventsCount = events.reduce((acc, event) => {
       if (event.date === targetDate && (event.type === 'Solo Livehouse' || event.type === 'Party Livehouse')) {
-        const timeKey = event.time;
-        acc[timeKey] = (acc[timeKey] || 0) + 1;
+        acc[event.time] = (acc[event.time] || 0) + 1;
       }
       return acc;
     }, {} as Record<string, number>);
 
-    // Count approved livehouse requests in database
     const approvedRequestsCount = livehouseRequests.reduce((acc, req) => {
       if (req.date === targetDate && req.status === 'Approved') {
-        const timeKey = req.timeslot;
-        acc[timeKey] = (acc[timeKey] || 0) + 1;
+        acc[req.timeslot] = (acc[req.timeslot] || 0) + 1;
       }
       return acc;
     }, {} as Record<string, number>);
 
     return TIMESLOTS.map(slot => {
-      const calendarCount = calendarEventsCount[slot] || 0;
-      const requestCount = approvedRequestsCount[slot] || 0;
-      const count = Math.max(calendarCount, requestCount);
+      const count = Math.max(
+        calendarEventsCount[slot] || 0,
+        approvedRequestsCount[slot] || 0
+      );
       const isTaken = count >= 2;
       return {
         slot,
         count,
         isTaken,
-        label: isTaken ? `${slot} [Fully Booked / Taken]` : `${slot} (${2 - count} slots available)`
+        label: isTaken ? `${slot} [Fully Booked / Taken]` : `${slot} (${2 - count} slots available)`,
+        slot1Available: count < 1,
+        slot1PoppoId: '',
+        slot2Available: count < 2,
+        slot2PoppoId: '',
+        source: 'LOCAL_FALLBACK' as const,
       };
     });
   };
@@ -588,7 +625,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
         {/* Main Calendar Section */}
         <div className="lg:col-span-3 space-y-6">
           {/* Week Selector / Navigation controls */}
-          <div className="flex items-center justify-between bg-[#0F1117] border border-slate-800 p-4 rounded-2xl">
+          <div className="flex items-center justify-between bg-[#111111] border border-slate-800 p-4 rounded-2xl">
             <button 
               onClick={goToPreviousWeek} 
               className="p-2 hover:bg-white/5 rounded-xl transition-all cursor-pointer"
@@ -614,7 +651,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
           </div>
 
           {/* 7-Day Calendar Grid */}
-          <div className="grid grid-cols-7 gap-2 md:gap-4 bg-[#0B0D12] p-4 rounded-3xl border border-white/5 shadow-xl">
+          <div className="grid grid-cols-7 gap-2 md:gap-4 bg-[#0A0A0A] p-4 rounded-3xl border border-white/5 shadow-xl">
             {weekDays.map((day, idx) => {
               const dayName = format(day, 'EEEE');
               const dayAbbr = format(day, 'EEE').toUpperCase();
@@ -633,15 +670,15 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                     className={cn(
                       "w-full py-4 rounded-2xl flex flex-col items-center justify-center gap-1.5 transition-all border cursor-pointer select-none relative",
                       isSelected 
-                        ? "bg-[#181B24] border-[#D4AF37] shadow-[0_0_15px_rgba(212,175,55,0.15)] text-[#D4AF37]" 
-                        : "bg-[#0F1117] border-white/5 hover:border-white/10 hover:bg-[#13161F] text-white"
+                        ? "bg-[#181B24] border-[#FFB800] shadow-[0_0_15px_rgba(212,175,55,0.15)] text-[#FFB800]" 
+                        : "bg-[#111111] border-white/5 hover:border-white/10 hover:bg-[#0A0A0A] text-white"
                     )}
                     title={`Select ${dayName}`}
                     aria-label={`Select ${dayName}`}
                   >
                     <span className={cn(
                       "text-[9px] font-black tracking-widest uppercase",
-                      isSelected ? "text-[#D4AF37]" : "text-white/40"
+                      isSelected ? "text-[#FFB800]" : "text-white/40"
                     )}>
                       {dayAbbr}
                     </span>
@@ -649,7 +686,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                       {dayNum}
                     </span>
                     {dayEventsCount > 0 && !isSelected && (
-                      <span className="absolute bottom-1.5 w-1.5 h-1.5 rounded-full bg-[#D4AF37]" />
+                      <span className="absolute bottom-1.5 w-1.5 h-1.5 rounded-full bg-[#FFB800]" />
                     )}
                   </button>
                 </div>
@@ -684,10 +721,10 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                     key={e.event_id}
                     onClick={() => setSelectedEventId(e.event_id)}
                     className={cn(
-                      "w-full text-left bg-[#0F1117]/80 p-5 rounded-2xl relative overflow-hidden transition-all flex items-stretch gap-4 border cursor-pointer group shadow-lg",
+                      "w-full text-left bg-[#111111]/80 p-5 rounded-2xl relative overflow-hidden transition-all flex items-stretch gap-4 border cursor-pointer group shadow-lg",
                       isEventSelected 
-                        ? "border-[#D4AF37] bg-[#13161C] shadow-[0_0_15px_rgba(212,175,55,0.15)]" 
-                        : "border-white/5 hover:border-white/10 hover:bg-[#12151D]"
+                        ? "border-[#FFB800] bg-[#1A1A1A] shadow-[0_0_15px_rgba(212,175,55,0.15)]" 
+                        : "border-white/5 hover:border-white/10 hover:bg-[#222222]"
                     )}
                   >
                     <div className={cn("w-1.5 rounded-full shrink-0 bg-gradient-to-b", colorConfig.gradient)} />
@@ -707,7 +744,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                       </div>
                       
                       <div>
-                        <h4 className="font-black text-white text-base tracking-tight uppercase group-hover:text-[#D4AF37] transition-colors">
+                        <h4 className="font-black text-white text-base tracking-tight uppercase group-hover:text-[#FFB800] transition-colors">
                           {e.title}
                         </h4>
                         <p className="text-xs text-white/55 font-medium leading-relaxed mt-1">
@@ -727,7 +764,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                 );
               })
             ) : (
-              <div className="bg-[#0F1117]/30 border border-dashed border-white/5 rounded-2xl py-12 text-center">
+              <div className="bg-[#111111]/30 border border-dashed border-white/5 rounded-2xl py-12 text-center">
                 <CalendarIcon className="mx-auto text-white/10 mb-2" size={28} />
                 <p className="text-xs text-white/20 italic">No events scheduled for this date.</p>
               </div>
@@ -735,15 +772,15 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
           </div>
 
           {/* Detailed Interactive Card */}
-          <div className="bg-[#0F1117] border border-white/5 rounded-3xl p-6 shadow-xl relative overflow-hidden bg-gradient-to-br from-[#0F1117] to-[#12141A]">
-            <div className="absolute inset-0 bg-gradient-to-tr from-indigo-500/2 via-transparent to-[#D4AF37]/2 pointer-events-none" />
+          <div className="bg-[#111111] border border-white/5 rounded-3xl p-6 shadow-xl relative overflow-hidden bg-gradient-to-br from-[#111111] to-[#12141A]">
+            <div className="absolute inset-0 bg-gradient-to-tr from-indigo-500/2 via-transparent to-[#FFB800]/2 pointer-events-none" />
             
             {selectedEvent ? (
               <div className="space-y-5 relative z-10">
                 <div className="flex items-center justify-between border-b border-white/5 pb-3">
                   <div className="flex items-center gap-2">
-                    <Info size={14} className="text-[#D4AF37]" />
-                    <span className="text-[10px] font-black uppercase text-[#D4AF37] tracking-widest">
+                    <Info size={14} className="text-[#FFB800]" />
+                    <span className="text-[10px] font-black uppercase text-[#FFB800] tracking-widest">
                       Complete Event Metadata
                     </span>
                   </div>
@@ -805,7 +842,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <span className="block text-[9px] font-black uppercase tracking-wider text-white/30 mb-1">Event Category</span>
-                        <span className="inline-flex px-2.5 py-1.5 bg-[#D4AF37]/10 border border-[#D4AF37]/20 text-[#D4AF37] rounded-lg font-bold">
+                        <span className="inline-flex px-2.5 py-1.5 bg-[#FFB800]/10 border border-[#FFB800]/20 text-[#FFB800] rounded-lg font-bold">
                           {selectedEvent.type || 'Standard Event'}
                         </span>
                       </div>
@@ -815,7 +852,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                           <User size={13} className="text-white/45" />
                           <span>
                             {selectedEvent.created_by_name}{' '}
-                            <span className="text-[9px] text-[#D4AF37] font-black uppercase">[{selectedEvent.created_by_role}]</span>
+                            <span className="text-[9px] text-[#FFB800] font-black uppercase">[{selectedEvent.created_by_role}]</span>
                           </span>
                         </div>
                       </div>
@@ -867,8 +904,8 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
 
           {/* Livehouse Reservation Requests Queue Panel */}
           {!isReadOnly && auth.level > 0 && (
-            <div className="bg-[#0F1117] border border-white/5 rounded-3xl p-6 shadow-xl bg-gradient-to-br from-[#0F1117] to-[#12141A] mt-6 relative overflow-hidden">
-              <div className="absolute inset-0 bg-gradient-to-tr from-pink-500/2 via-transparent to-[#D4AF37]/2 pointer-events-none" />
+            <div className="bg-[#111111] border border-white/5 rounded-3xl p-6 shadow-xl bg-gradient-to-br from-[#111111] to-[#12141A] mt-6 relative overflow-hidden">
+              <div className="absolute inset-0 bg-gradient-to-tr from-pink-500/2 via-transparent to-[#FFB800]/2 pointer-events-none" />
               
               <div className="flex items-center justify-between border-b border-white/5 pb-3 mb-5">
                 <div className="flex items-center gap-2">
@@ -939,7 +976,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                             <div className="flex items-center gap-2 pt-1 self-center justify-end">
                               <button 
                                 onClick={() => handleHostAcceptProposal(req.id)}
-                                className="bg-slate-900 border border-[#D4AF37] hover:bg-[#D4AF37]/10 text-[#D4AF37] text-[9px] font-black uppercase tracking-widest px-4 py-2 rounded-lg cursor-pointer transition-all active:scale-95 shadow-lg shadow-[#D4AF37]/5"
+                                className="bg-slate-900 border border-[#FFB800] hover:bg-[#FFB800]/10 text-[#FFB800] text-[9px] font-black uppercase tracking-widest px-4 py-2 rounded-lg cursor-pointer transition-all active:scale-95 shadow-lg shadow-[#FFB800]/5"
                               >
                                 Accept proposal
                               </button>
@@ -991,7 +1028,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                                   onChange={(e) => setProposalDate(e.target.value)} 
                                   required 
                                   title="Proposal Date" 
-                                  className="w-full bg-[#0A0B0E] border border-slate-800 rounded-lg px-3 py-2 text-xs focus:border-[#D4AF37] outline-none text-white font-mono" 
+                                  className="w-full bg-[#0A0B0E] border border-slate-800 rounded-lg px-3 py-2 text-xs focus:border-[#FFB800] outline-none text-white font-mono" 
                                 />
                               </div>
                               <div className="space-y-1">
@@ -1002,7 +1039,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                                   onChange={(e) => setProposalTimeslot(e.target.value)} 
                                   required 
                                   title="Proposal Timeslot Option" 
-                                  className="w-full bg-[#0A0B0E] border border-slate-800 rounded-lg px-3 py-2 text-xs focus:border-[#D4AF37] outline-none text-white font-bold cursor-pointer"
+                                  className="w-full bg-[#0A0B0E] border border-slate-800 rounded-lg px-3 py-2 text-xs focus:border-[#FFB800] outline-none text-white font-bold cursor-pointer"
                                 >
                                   <option value="">-- Choose timeslot --</option>
                                   {getTimeslotAvailability(proposalDate).map(t => (
@@ -1010,7 +1047,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                                       key={t.slot} 
                                       value={t.slot} 
                                       disabled={t.isTaken} 
-                                      className={cn("bg-[#0f1117]", t.isTaken ? "text-red-500/50" : "text-white")}
+                                      className={cn("bg-[#111111]", t.isTaken ? "text-red-500/50" : "text-white")}
                                     >
                                       {t.label}
                                     </option>
@@ -1053,7 +1090,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
         {/* Sidebar: Event Options & Create */}
         <div className="space-y-6">
           {/* Filter options */}
-          <div className="bg-[#0F1117] border border-slate-800 p-4 rounded-2xl space-y-3 shadow-lg">
+          <div className="bg-[#111111] border border-slate-800 p-4 rounded-2xl space-y-3 shadow-lg">
             <h4 className="font-black text-white/40 text-[9px] uppercase tracking-widest">Filter by Type</h4>
             <div className="flex flex-col gap-1.5">
               {Object.keys(EVENT_COLORS).map(type => {
@@ -1080,7 +1117,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
               {activeFilters.length > 0 && (
                 <button 
                   onClick={() => { setActiveFilters([]); setSelectedEventId(null); }}
-                  className="mt-2 text-center text-[9px] font-black uppercase text-[#D4AF37] hover:underline cursor-pointer"
+                  className="mt-2 text-center text-[9px] font-black uppercase text-[#FFB800] hover:underline cursor-pointer"
                 >
                   Clear Filters
                 </button>
@@ -1095,14 +1132,14 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                 <>
                   <button 
                     onClick={() => setIsAdding(true)} 
-                    className="w-full bg-[#D4AF37] hover:bg-[#D4AF37]/80 text-black font-black uppercase tracking-wider text-xs py-3.5 rounded-xl cursor-pointer flex items-center justify-center gap-2 shadow-lg shadow-[#D4AF37]/5 transition-all transform active:scale-95"
+                    className="w-full bg-[#FFB800] hover:bg-[#FFB800]/80 text-black font-black uppercase tracking-wider text-xs py-3.5 rounded-xl cursor-pointer flex items-center justify-center gap-2 shadow-lg shadow-[#FFB800]/5 transition-all transform active:scale-95"
                   >
                     <Plus size={16} />
                     Add Event Entry
                   </button>
                   <button 
                     onClick={() => setIsRequestingTimeslot(true)} 
-                    className="w-full border border-[#D4AF37]/50 hover:border-[#D4AF37] text-[#D4AF37] hover:bg-[#D4AF37]/5 font-black uppercase tracking-wider text-xs py-3.5 rounded-xl cursor-pointer flex items-center justify-center gap-2 transition-all transform active:scale-95"
+                    className="w-full border border-[#FFB800]/50 hover:border-[#FFB800] text-[#FFB800] hover:bg-[#FFB800]/5 font-black uppercase tracking-wider text-xs py-3.5 rounded-xl cursor-pointer flex items-center justify-center gap-2 transition-all transform active:scale-95"
                   >
                     <Clock size={16} />
                     Request Timeslot
@@ -1126,20 +1163,20 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
         {isAdding && (
           <div className="fixed inset-0 z-[1000] flex items-center justify-center p-6">
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsAdding(false)} className="absolute inset-0 bg-[#0A0B0E]/80 backdrop-blur-sm" />
-            <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="relative bg-[#0F1117] border border-slate-800 w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl z-10 max-h-[90vh] overflow-y-auto custom-scrollbar">
+            <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="relative bg-[#111111] border border-slate-800 w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl z-10 max-h-[90vh] overflow-y-auto custom-scrollbar">
               <div className="p-6 border-b border-slate-800 font-black text-white uppercase tracking-widest text-[10px]">Create New Event Entry</div>
               <form onSubmit={handleCreate} className="p-6 space-y-5">
                 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                     <label htmlFor="event-title" className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">Event Title</label>
-                    <input id="event-title" name="title" required className="w-full bg-[#0A0B0E] border border-slate-800 rounded-xl px-4 py-3 text-sm focus:border-[#D4AF37] outline-none text-white placeholder-white/20" placeholder="e.g. PK Battle" title="Event Title" />
+                    <input id="event-title" name="title" required className="w-full bg-[#0A0B0E] border border-slate-800 rounded-xl px-4 py-3 text-sm focus:border-[#FFB800] outline-none text-white placeholder-white/20" placeholder="e.g. PK Battle" title="Event Title" />
                   </div>
                   <div className="space-y-1.5">
                     <label htmlFor="event-type" className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">Event Type</label>
-                    <select id="event-type" name="type" title="Event Type" className="w-full bg-[#0A0B0E] border border-slate-800 rounded-xl px-4 py-3 text-sm focus:border-[#D4AF37] outline-none text-white font-bold cursor-pointer">
+                    <select id="event-type" name="type" title="Event Type" className="w-full bg-[#0A0B0E] border border-slate-800 rounded-xl px-4 py-3 text-sm focus:border-[#FFB800] outline-none text-white font-bold cursor-pointer">
                       {Object.keys(EVENT_COLORS).map(type => (
-                        <option key={type} value={type} className="bg-[#0f1117] text-white">{type}</option>
+                        <option key={type} value={type} className="bg-[#111111] text-white">{type}</option>
                       ))}
                     </select>
                   </div>
@@ -1154,7 +1191,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                       required={auth.role !== 'Talent'} 
                       disabled={auth.role === 'Talent'}
                       defaultValue={auth.role === 'Talent' ? auth.poppo_id : ''}
-                      className="w-full bg-[#0A0B0E] border border-slate-800 rounded-xl px-4 py-3 text-sm focus:border-[#D4AF37] outline-none text-white" 
+                      className="w-full bg-[#0A0B0E] border border-slate-800 rounded-xl px-4 py-3 text-sm focus:border-[#FFB800] outline-none text-white" 
                       placeholder="e.g. 19157913" 
                       title="Host ID"
                     />
@@ -1164,7 +1201,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                     <input 
                       id="event-ev-host-id"
                       name="eventHostId" 
-                      className="w-full bg-[#0A0B0E] border border-slate-800 rounded-xl px-4 py-3 text-sm focus:border-[#D4AF37] outline-none text-white placeholder-white/20" 
+                      className="w-full bg-[#0A0B0E] border border-slate-800 rounded-xl px-4 py-3 text-sm focus:border-[#FFB800] outline-none text-white placeholder-white/20" 
                       placeholder="e.g. 1234567" 
                       title="Event Host ID"
                     />
@@ -1174,22 +1211,22 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                     <label htmlFor="event-date" className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">Event Date</label>
-                    <input id="event-date" name="date" type="date" required className="w-full bg-[#0A0B0E] border border-slate-800 rounded-xl px-4 py-3 text-sm focus:border-[#D4AF37] outline-none text-white" title="Event Date" placeholder="Event Date" />
+                    <input id="event-date" name="date" type="date" required className="w-full bg-[#0A0B0E] border border-slate-800 rounded-xl px-4 py-3 text-sm focus:border-[#FFB800] outline-none text-white" title="Event Date" placeholder="Event Date" />
                   </div>
                   <div className="space-y-1.5">
                     <label htmlFor="event-time" className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">Time Block</label>
-                    <input id="event-time" name="time" placeholder="14:00 - 16:00" required className="w-full bg-[#0A0B0E] border border-slate-800 rounded-xl px-4 py-3 text-sm focus:border-[#D4AF37] outline-none text-white font-bold" title="Event Time" />
+                    <input id="event-time" name="time" placeholder="14:00 - 16:00" required className="w-full bg-[#0A0B0E] border border-slate-800 rounded-xl px-4 py-3 text-sm focus:border-[#FFB800] outline-none text-white font-bold" title="Event Time" />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                     <label htmlFor="event-location" className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">Location Details</label>
-                    <input id="event-location" name="location" placeholder="e.g. CHANNEL ROOM 109" required className="w-full bg-[#0A0B0E] border border-slate-800 rounded-xl px-4 py-3 text-sm focus:border-[#D4AF37] outline-none text-white font-bold" title="Location Details" />
+                    <input id="event-location" name="location" placeholder="e.g. CHANNEL ROOM 109" required className="w-full bg-[#0A0B0E] border border-slate-800 rounded-xl px-4 py-3 text-sm focus:border-[#FFB800] outline-none text-white font-bold" title="Location Details" />
                   </div>
                   <div className="space-y-1.5">
                     <label htmlFor="event-visibility" className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">Visibility</label>
-                    <select id="event-visibility" name="visibility" title="Event visibility level" className="w-full bg-[#0A0B0E] border border-slate-800 rounded-xl px-4 py-3 text-sm focus:border-[#D4AF37] outline-none text-white font-bold cursor-pointer">
+                    <select id="event-visibility" name="visibility" title="Event visibility level" className="w-full bg-[#0A0B0E] border border-slate-800 rounded-xl px-4 py-3 text-sm focus:border-[#FFB800] outline-none text-white font-bold cursor-pointer">
                        <option value="All">Everyone (Public)</option>
                        <option value="Leadership">Leadership Only</option>
                        <option value="Director">Director Only</option>
@@ -1213,11 +1250,11 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                       }
                     }}
                     disabled={selectedParticipants.length >= 9}
-                    className="w-full bg-[#0A0B0E] border border-slate-800 rounded-xl px-4 py-3 text-sm focus:border-[#D4AF37] outline-none text-white font-bold cursor-pointer disabled:opacity-40"
+                    className="w-full bg-[#0A0B0E] border border-slate-800 rounded-xl px-4 py-3 text-sm focus:border-[#FFB800] outline-none text-white font-bold cursor-pointer disabled:opacity-40"
                   >
                     <option value="">-- Add Participant Host --</option>
                     {(hosts || []).map(h => (
-                      <option key={h.id} value={h.id} className="bg-[#0f1117] text-white">
+                      <option key={h.id} value={h.id} className="bg-[#111111] text-white">
                         {h.nickname || h.name} (#{h.id})
                       </option>
                     ))}
@@ -1248,12 +1285,12 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
 
                 <div className="space-y-1.5">
                   <label htmlFor="event-description" className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">Description / Notes</label>
-                  <textarea id="event-description" name="description" title="Description and notes" className="w-full bg-[#0A0B0E] border border-slate-800 rounded-xl p-4 text-sm focus:border-[#D4AF37] outline-none text-white h-24 resize-none placeholder-white/20" placeholder="Details about the event requirements..." />
+                  <textarea id="event-description" name="description" title="Description and notes" className="w-full bg-[#0A0B0E] border border-slate-800 rounded-xl p-4 text-sm focus:border-[#FFB800] outline-none text-white h-24 resize-none placeholder-white/20" placeholder="Details about the event requirements..." />
                 </div>
 
                 <div className="pt-2 flex gap-4">
                    <button type="button" onClick={() => setIsAdding(false)} className="flex-1 px-6 py-4 rounded-xl bg-slate-900 border border-slate-800 text-white/40 font-black uppercase text-[10px] tracking-widest hover:bg-slate-800 hover:text-white transition-colors cursor-pointer">Cancel</button>
-                   <button type="submit" className="flex-[2] bg-slate-900 border border-[#D4AF37] hover:bg-[#D4AF37]/5 text-[#D4AF37] hover:text-white py-4 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] shadow-xl transition-all cursor-pointer">Authorize & Create</button>
+                   <button type="submit" className="flex-[2] bg-slate-900 border border-[#FFB800] hover:bg-[#FFB800]/5 text-[#FFB800] hover:text-white py-4 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] shadow-xl transition-all cursor-pointer">Authorize & Create</button>
                 </div>
               </form>
             </motion.div>
@@ -1266,20 +1303,20 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
         {isRequestingTimeslot && (
           <div className="fixed inset-0 z-[1000] flex items-center justify-center p-6">
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsRequestingTimeslot(false)} className="absolute inset-0 bg-[#0A0B0E]/80 backdrop-blur-sm" />
-            <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="relative bg-[#0F1117] border border-slate-800 w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl z-10 max-h-[90vh] overflow-y-auto custom-scrollbar">
+            <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="relative bg-[#111111] border border-slate-800 w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl z-10 max-h-[90vh] overflow-y-auto custom-scrollbar">
               <div className="p-6 border-b border-slate-800 font-black text-white uppercase tracking-widest text-[10px]">Request Livehouse Timeslot</div>
               <form onSubmit={handleRequestTimeslot} className="p-6 space-y-5">
                 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                     <label htmlFor="req-theme" className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">Performance Theme / Title</label>
-                    <input id="req-theme" name="title" required className="w-full bg-[#0A0B0E] border border-slate-800 rounded-xl px-4 py-3 text-sm focus:border-[#D4AF37] outline-none text-white placeholder-white/20" placeholder="e.g. Summer Acoustic Vibes" title="Performance Theme" />
+                    <input id="req-theme" name="title" required className="w-full bg-[#0A0B0E] border border-slate-800 rounded-xl px-4 py-3 text-sm focus:border-[#FFB800] outline-none text-white placeholder-white/20" placeholder="e.g. Summer Acoustic Vibes" title="Performance Theme" />
                   </div>
                   <div className="space-y-1.5">
                     <label htmlFor="req-livehouse-type" className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">Livehouse Type</label>
-                    <select id="req-livehouse-type" name="livehouseType" title="Livehouse Type" className="w-full bg-[#0A0B0E] border border-slate-800 rounded-xl px-4 py-3 text-sm focus:border-[#D4AF37] outline-none text-white font-bold cursor-pointer">
-                      <option value="Solo Livehouse" className="bg-[#0f1117] text-white">Solo Livehouse</option>
-                      <option value="Party Livehouse" className="bg-[#0f1117] text-white">Party Livehouse</option>
+                    <select id="req-livehouse-type" name="livehouseType" title="Livehouse Type" className="w-full bg-[#0A0B0E] border border-slate-800 rounded-xl px-4 py-3 text-sm focus:border-[#FFB800] outline-none text-white font-bold cursor-pointer">
+                      <option value="Solo Livehouse" className="bg-[#111111] text-white">Solo Livehouse</option>
+                      <option value="Party Livehouse" className="bg-[#111111] text-white">Party Livehouse</option>
                     </select>
                   </div>
                 </div>
@@ -1293,7 +1330,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                       required={auth.role !== 'Talent'} 
                       disabled={auth.role === 'Talent'}
                       defaultValue={auth.role === 'Talent' ? auth.poppo_id : ''}
-                      className="w-full bg-[#0A0B0E] border border-slate-800 rounded-xl px-4 py-3 text-sm focus:border-[#D4AF37] outline-none text-white" 
+                      className="w-full bg-[#0A0B0E] border border-slate-800 rounded-xl px-4 py-3 text-sm focus:border-[#FFB800] outline-none text-white" 
                       placeholder="Enter Poppo ID..." 
                       title="Target Poppo ID"
                     />
@@ -1303,7 +1340,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                     <input 
                       id="req-ev-host-id"
                       name="eventHostId" 
-                      className="w-full bg-[#0A0B0E] border border-slate-800 rounded-xl px-4 py-3 text-sm focus:border-[#D4AF37] outline-none text-white placeholder-white/20" 
+                      className="w-full bg-[#0A0B0E] border border-slate-800 rounded-xl px-4 py-3 text-sm focus:border-[#FFB800] outline-none text-white placeholder-white/20" 
                       placeholder="e.g. 1234567" 
                       title="Event Host ID"
                     />
@@ -1313,16 +1350,16 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                     <label htmlFor="req-date" className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">Requested Date</label>
-                    <input id="req-date" name="date" type="date" required className="w-full bg-[#0A0B0E] border border-slate-800 rounded-xl px-4 py-3 text-sm focus:border-[#D4AF37] outline-none text-white" title="Requested Date" placeholder="Requested Date" />
+                    <input id="req-date" name="date" type="date" required className="w-full bg-[#0A0B0E] border border-slate-800 rounded-xl px-4 py-3 text-sm focus:border-[#FFB800] outline-none text-white" title="Requested Date" placeholder="Requested Date" />
                   </div>
                   <div className="space-y-1.5">
                     <label htmlFor="req-time" className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">Requested Timeslot Block</label>
-                    <select id="req-time" name="time" title="Requested Timeslot Block" className="w-full bg-[#0A0B0E] border border-slate-800 rounded-xl px-4 py-3 text-sm focus:border-[#D4AF37] outline-none text-white font-bold cursor-pointer">
-                      <option value="14:00 - 16:00" className="bg-[#0f1117] text-white">14:00 - 16:00</option>
-                      <option value="16:00 - 18:00" className="bg-[#0f1117] text-white">16:00 - 18:00</option>
-                      <option value="18:00 - 20:00" className="bg-[#0f1117] text-white">18:00 - 20:00</option>
-                      <option value="20:00 - 22:00" className="bg-[#0f1117] text-white">20:00 - 22:00</option>
-                      <option value="22:00 - 00:00" className="bg-[#0f1117] text-white">22:00 - 00:00</option>
+                    <select id="req-time" name="time" title="Requested Timeslot Block" className="w-full bg-[#0A0B0E] border border-slate-800 rounded-xl px-4 py-3 text-sm focus:border-[#FFB800] outline-none text-white font-bold cursor-pointer">
+                      <option value="14:00 - 16:00" className="bg-[#111111] text-white">14:00 - 16:00</option>
+                      <option value="16:00 - 18:00" className="bg-[#111111] text-white">16:00 - 18:00</option>
+                      <option value="18:00 - 20:00" className="bg-[#111111] text-white">18:00 - 20:00</option>
+                      <option value="20:00 - 22:00" className="bg-[#111111] text-white">20:00 - 22:00</option>
+                      <option value="22:00 - 00:00" className="bg-[#111111] text-white">22:00 - 00:00</option>
                     </select>
                   </div>
                 </div>
@@ -1343,11 +1380,11 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                       }
                     }}
                     disabled={selectedParticipants.length >= 9}
-                    className="w-full bg-[#0A0B0E] border border-slate-800 rounded-xl px-4 py-3 text-sm focus:border-[#D4AF37] outline-none text-white font-bold cursor-pointer disabled:opacity-40"
+                    className="w-full bg-[#0A0B0E] border border-slate-800 rounded-xl px-4 py-3 text-sm focus:border-[#FFB800] outline-none text-white font-bold cursor-pointer disabled:opacity-40"
                   >
                     <option value="">-- Add Participant Host --</option>
                     {(hosts || []).map(h => (
-                      <option key={h.id} value={h.id} className="bg-[#0f1117] text-white">
+                      <option key={h.id} value={h.id} className="bg-[#111111] text-white">
                         {h.nickname || h.name} (#{h.id})
                       </option>
                     ))}
@@ -1378,12 +1415,12 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
 
                 <div className="space-y-1.5">
                   <label htmlFor="req-notes" className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">Special Notes / Equipment Requests</label>
-                  <textarea id="req-notes" name="notes" title="Special Notes / Equipment Requests" className="w-full bg-[#0A0B0E] border border-slate-800 rounded-xl p-4 text-sm focus:border-[#D4AF37] outline-none text-white h-24 resize-none placeholder-white/20" placeholder="e.g. Need high fidelity mic presets..." />
+                  <textarea id="req-notes" name="notes" title="Special Notes / Equipment Requests" className="w-full bg-[#0A0B0E] border border-slate-800 rounded-xl p-4 text-sm focus:border-[#FFB800] outline-none text-white h-24 resize-none placeholder-white/20" placeholder="e.g. Need high fidelity mic presets..." />
                 </div>
 
                 <div className="pt-2 flex gap-4">
                    <button type="button" onClick={() => setIsRequestingTimeslot(false)} className="flex-1 px-6 py-4 rounded-xl bg-slate-900 border border-slate-800 text-white/40 font-black uppercase text-[10px] tracking-widest hover:bg-slate-800 hover:text-white transition-colors cursor-pointer">Cancel</button>
-                   <button type="submit" className="flex-[2] bg-slate-900 border border-[#D4AF37] hover:bg-[#D4AF37]/5 text-[#D4AF37] hover:text-white py-4 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] shadow-xl transition-all cursor-pointer">Submit Timeslot Request</button>
+                   <button type="submit" className="flex-[2] bg-slate-900 border border-[#FFB800] hover:bg-[#FFB800]/5 text-[#FFB800] hover:text-white py-4 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] shadow-xl transition-all cursor-pointer">Submit Timeslot Request</button>
                 </div>
               </form>
             </motion.div>
@@ -1396,7 +1433,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
         {isReservingLivehouse && (
           <div className="fixed inset-0 z-[1000] flex items-center justify-center p-6">
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsReservingLivehouse(false)} className="absolute inset-0 bg-[#0A0B0E]/80 backdrop-blur-sm" />
-            <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="relative bg-[#0F1117] border border-slate-800 w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl z-10 max-h-[90vh] overflow-y-auto custom-scrollbar">
+            <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="relative bg-[#111111] border border-slate-800 w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl z-10 max-h-[90vh] overflow-y-auto custom-scrollbar">
               <div className="p-6 border-b border-slate-800 font-black text-white uppercase tracking-widest text-[10px]">Reserve Livehouse Timeslot</div>
               <form onSubmit={handleReserveLivehouse} className="p-6 space-y-5">
                 
@@ -1429,10 +1466,10 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                       value={selectedLivehouseType}
                       onChange={(e) => setSelectedLivehouseType(e.target.value as any)}
                       title="Livehouse Type" 
-                      className="w-full bg-[#0A0B0E] border border-slate-800 rounded-xl px-4 py-3 text-sm focus:border-[#D4AF37] outline-none text-white font-bold cursor-pointer"
+                      className="w-full bg-[#0A0B0E] border border-slate-800 rounded-xl px-4 py-3 text-sm focus:border-[#FFB800] outline-none text-white font-bold cursor-pointer"
                     >
-                      <option value="Solo Livehouse" className="bg-[#0f1117]">Solo Livehouse</option>
-                      <option value="Party Livehouse" className="bg-[#0f1117]">Party Livehouse</option>
+                      <option value="Solo Livehouse" className="bg-[#111111]">Solo Livehouse</option>
+                      <option value="Party Livehouse" className="bg-[#111111]">Party Livehouse</option>
                     </select>
                   </div>
                   <div className="space-y-1.5">
@@ -1443,7 +1480,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                       value={reserveDate} 
                       onChange={(e) => setReserveDate(e.target.value)} 
                       required 
-                      className="w-full bg-[#0A0B0E] border border-slate-800 rounded-xl px-4 py-3 text-sm focus:border-[#D4AF37] outline-none text-white font-mono" 
+                      className="w-full bg-[#0A0B0E] border border-slate-800 rounded-xl px-4 py-3 text-sm focus:border-[#FFB800] outline-none text-white font-mono" 
                       title="Reserve Date" 
                     />
                   </div>
@@ -1457,7 +1494,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                     onChange={(e) => setReserveTimeslot(e.target.value)} 
                     required 
                     title="Reserve Timeslot" 
-                    className="w-full bg-[#0A0B0E] border border-slate-800 rounded-xl px-4 py-3 text-sm focus:border-[#D4AF37] outline-none text-white font-bold cursor-pointer font-mono"
+                    className="w-full bg-[#0A0B0E] border border-slate-800 rounded-xl px-4 py-3 text-sm focus:border-[#FFB800] outline-none text-white font-bold cursor-pointer font-mono"
                   >
                     <option value="" className="text-white/40 font-sans">-- Choose a timeslot --</option>
                     {getTimeslotAvailability(reserveDate).map(t => (
@@ -1465,7 +1502,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                         key={t.slot} 
                         value={t.slot} 
                         disabled={t.isTaken} 
-                        className={cn("bg-[#0f1117]", t.isTaken ? "text-red-500/50" : "text-white")}
+                        className={cn("bg-[#111111]", t.isTaken ? "text-red-500/50" : "text-white")}
                       >
                         {t.label}
                       </option>
@@ -1480,7 +1517,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                     value={reserveNotes} 
                     onChange={(e) => setReserveNotes(e.target.value)} 
                     title="Reservation Notes" 
-                    className="w-full bg-[#0A0B0E] border border-slate-800 rounded-xl p-4 text-sm focus:border-[#D4AF37] outline-none text-white h-24 resize-none placeholder-white/20" 
+                    className="w-full bg-[#0A0B0E] border border-slate-800 rounded-xl p-4 text-sm focus:border-[#FFB800] outline-none text-white h-24 resize-none placeholder-white/20" 
                     placeholder="Provide details for your livehouse set..." 
                   />
                 </div>

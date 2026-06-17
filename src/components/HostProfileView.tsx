@@ -256,14 +256,14 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
   const isSpotlight = !!onClose;
 
   const renderIdentityCard = () => (
-    <div className="bg-[#1A1A28] border border-white/5 rounded-2xl p-4 flex gap-4 items-start shadow-md relative group/card">
+    <div className="bg-[#1A1A1A] border border-white/5 rounded-2xl p-4 flex gap-4 items-start shadow-md relative group/card">
       {/* Edit / Save Options */}
       {!isReadOnly && (
         <div className="absolute top-4 right-4 z-10">
           {!isEditing ? (
             <button 
               onClick={() => setIsEditing(true)}
-              className="p-1.5 bg-[#222235] hover:bg-[#2A2A3F] text-[#A09E9A] hover:text-[#D4AF37] rounded-lg transition-all border border-white/10 cursor-pointer"
+              className="p-1.5 bg-[#222222] hover:bg-[#2A2A3F] text-[#B0B0B0] hover:text-[#FFB800] rounded-lg transition-all border border-white/10 cursor-pointer"
               title="Edit Profile"
             >
               <Edit2 size={12} />
@@ -285,7 +285,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
                   setEditPhotoUrl(host.photoUrl || '');
                   setEditDescription(host.description || '');
                 }}
-                className="px-2 py-1 bg-[#222235] hover:bg-[#2A2A3F] text-[#A09E9A] hover:text-[#F0EFE8] rounded text-[8px] font-black uppercase tracking-wider transition-all cursor-pointer"
+                className="px-2 py-1 bg-[#222222] hover:bg-[#2A2A3F] text-[#B0B0B0] hover:text-[#F5F5F5] rounded text-[8px] font-black uppercase tracking-wider transition-all cursor-pointer"
                 title="Cancel"
               >
                 Cancel
@@ -297,23 +297,23 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
 
       {/* Host Photo Section */}
       <div className="flex flex-col items-center gap-1.5 shrink-0">
-        <span className="text-[8px] font-black text-[#A09E9A]/60 uppercase tracking-widest leading-none">HOST PHOTO</span>
-        <div className="w-16 h-16 rounded-full bg-[#0D0D14] border-2 border-[#D4AF37]/30 flex items-center justify-center font-bold text-[#F0EFE8] overflow-hidden shadow-lg shadow-[#D4AF37]/5 relative">
+        <span className="text-[8px] font-black text-[#B0B0B0]/60 uppercase tracking-widest leading-none">HOST PHOTO</span>
+        <div className="w-16 h-16 rounded-full bg-[#111111] border-2 border-[#FFB800]/30 flex items-center justify-center font-bold text-[#F5F5F5] overflow-hidden shadow-lg shadow-[#FFB800]/5 relative">
           {isProcessingPhoto && (
             <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
-              <Loader2 size={16} className="animate-spin text-[#D4AF37]" />
+              <Loader2 size={16} className="animate-spin text-[#FFB800]" />
             </div>
           )}
           {editPhotoUrl ? (
             <img src={editPhotoUrl} alt={host.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
           ) : (
-            <div className="text-lg text-[#A09E9A] font-bold">{editNickname?.[0]?.toUpperCase() || host.name?.[0] || 'JD'}</div>
+            <div className="text-lg text-[#B0B0B0] font-bold">{editNickname?.[0]?.toUpperCase() || host.name?.[0] || 'JD'}</div>
           )}
         </div>
         
         {isEditing && (
           <div className="flex flex-col items-center gap-1 mt-1">
-            <label className="px-2 py-0.5 bg-[#222235] border border-white/10 hover:bg-[#2A2A3F] rounded text-[7px] font-black uppercase tracking-wider cursor-pointer text-[#F0EFE8]">
+            <label className="px-2 py-0.5 bg-[#222222] border border-white/10 hover:bg-[#2A2A3F] rounded text-[7px] font-black uppercase tracking-wider cursor-pointer text-[#F5F5F5]">
               Upload
               <input type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
             </label>
@@ -322,7 +322,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
               placeholder="URL..." 
               value={editPhotoUrl}
               onChange={(e) => setEditPhotoUrl(e.target.value)}
-              className="w-14 bg-[#0D0D14] border border-white/10 rounded px-1 py-0.5 text-[6.5px] text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
+              className="w-14 bg-[#111111] border border-white/10 rounded px-1 py-0.5 text-[6.5px] text-[#F5F5F5] outline-none focus:border-[#FFB800]"
               title="Profile Photo URL"
             />
           </div>
@@ -333,145 +333,145 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
       <div className="flex-1 min-w-0 space-y-2.5 pr-8">
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <span className="text-[8px] font-black text-[#A09E9A] uppercase tracking-widest block mb-0.5">NICKNAME</span>
+            <span className="text-[8px] font-black text-[#B0B0B0] uppercase tracking-widest block mb-0.5">NICKNAME</span>
             {isEditing ? (
               <input 
                 type="text"
                 value={editNickname}
                 onChange={(e) => setEditNickname(e.target.value)}
-                className="w-full bg-[#0D0D14] border border-white/10 rounded px-2 py-1 text-xs font-bold text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
+                className="w-full bg-[#111111] border border-white/10 rounded px-2 py-1 text-xs font-bold text-[#F5F5F5] outline-none focus:border-[#FFB800]"
                 required
                 title="Nickname"
                 placeholder="Nickname"
               />
             ) : (
-              <span className="text-sm font-black text-[#F0EFE8] truncate block leading-tight">{host.nickname || host.name}</span>
+              <span className="text-sm font-black text-[#F5F5F5] truncate block leading-tight">{host.nickname || host.name}</span>
             )}
           </div>
           <div>
-            <span className="text-[8px] font-black text-[#A09E9A] uppercase tracking-widest block mb-0.5">POPPO ID</span>
-            <span className="text-sm font-black text-[#F0EFE8] truncate block leading-tight">{host.id}</span>
+            <span className="text-[8px] font-black text-[#B0B0B0] uppercase tracking-widest block mb-0.5">POPPO ID</span>
+            <span className="text-sm font-black text-[#F5F5F5] truncate block leading-tight">{host.id}</span>
           </div>
         </div>
 
         {isEditing ? (
-          <div className="grid grid-cols-2 gap-3 pt-2 border-t border-white/5 text-[10px] text-[#A09E9A]">
+          <div className="grid grid-cols-2 gap-3 pt-2 border-t border-white/5 text-[10px] text-[#B0B0B0]">
 
             <div className="space-y-1">
-              <label htmlFor="edit-role" className="text-[#A09E9A] font-bold uppercase tracking-wider block">Role:</label>
+              <label htmlFor="edit-role" className="text-[#B0B0B0] font-bold uppercase tracking-wider block">Role:</label>
               <select
                 id="edit-role"
                 value={editRole}
                 onChange={(e) => setEditRole(e.target.value)}
-                className="w-full bg-[#0D0D14] border border-white/10 rounded px-1.5 py-1 text-[11px] text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
+                className="w-full bg-[#111111] border border-white/10 rounded px-1.5 py-1 text-[11px] text-[#F5F5F5] outline-none focus:border-[#FFB800]"
               >
-                {['Talent', 'Manager', 'Admin', 'Head Admin', 'Director', 'Agent'].map(r => (
-                  <option key={r} value={r} className="bg-[#1A1A28] text-[#F0EFE8]">{r}</option>
+                {['Talent', 'Manager', 'Admin', 'Director', 'Agent'].map(r => (
+                  <option key={r} value={r} className="bg-[#1A1A1A] text-[#F5F5F5]">{r}</option>
                 ))}
               </select>
             </div>
 
             <div className="space-y-1">
-              <label htmlFor="edit-sal" className="text-[#A09E9A] font-bold uppercase tracking-wider block">Base Salary Category:</label>
+              <label htmlFor="edit-sal" className="text-[#B0B0B0] font-bold uppercase tracking-wider block">Base Salary Category:</label>
               <select
                 id="edit-sal"
                 value={editBaseSalaryCategory}
                 onChange={(e) => setEditBaseSalaryCategory(e.target.value)}
-                className="w-full bg-[#0D0D14] border border-white/10 rounded px-1.5 py-1 text-[11px] text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
+                className="w-full bg-[#111111] border border-white/10 rounded px-1.5 py-1 text-[11px] text-[#F5F5F5] outline-none focus:border-[#FFB800]"
               >
                 {BASE_SALARY_POLICIES.map(policy => (
-                  <option key={policy} value={policy} className="bg-[#1A1A28] text-[#F0EFE8]">{policy}</option>
+                  <option key={policy} value={policy} className="bg-[#1A1A1A] text-[#F5F5F5]">{policy}</option>
                 ))}
               </select>
             </div>
 
             <div className="space-y-1">
-              <label htmlFor="edit-mgr" className="text-[#A09E9A] font-bold uppercase tracking-wider block">Assigned Manager:</label>
+              <label htmlFor="edit-mgr" className="text-[#B0B0B0] font-bold uppercase tracking-wider block">Assigned Manager:</label>
               <select
                 id="edit-mgr"
                 value={editManager}
                 onChange={(e) => setEditManager(e.target.value)}
-                className="w-full bg-[#0D0D14] border border-white/10 rounded px-1.5 py-1 text-[11px] text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
+                className="w-full bg-[#111111] border border-white/10 rounded px-1.5 py-1 text-[11px] text-[#F5F5F5] outline-none focus:border-[#FFB800]"
               >
                 {!managersList.some(m => m.name === editManager) && editManager && (
-                  <option value={editManager} className="bg-[#1A1A28] text-[#F0EFE8]">{editManager}</option>
+                  <option value={editManager} className="bg-[#1A1A1A] text-[#F5F5F5]">{editManager}</option>
                 )}
                 {managersList.map(mgr => (
-                  <option key={mgr.id} value={mgr.name} className="bg-[#1A1A28] text-[#F0EFE8]">{mgr.name}</option>
+                  <option key={mgr.id} value={mgr.name} className="bg-[#1A1A1A] text-[#F5F5F5]">{mgr.name}</option>
                 ))}
               </select>
             </div>
 
             <div className="space-y-1">
-              <label htmlFor="edit-team" className="text-[#A09E9A] font-bold uppercase tracking-wider block">Team / Anchor Group:</label>
+              <label htmlFor="edit-team" className="text-[#B0B0B0] font-bold uppercase tracking-wider block">Team / Anchor Group:</label>
               <input
                 id="edit-team"
                 type="text"
                 value={editTeam}
                 onChange={(e) => setEditTeam(e.target.value)}
-                className="w-full bg-[#0D0D14] border border-white/10 rounded px-1.5 py-1 text-[11px] text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
+                className="w-full bg-[#111111] border border-white/10 rounded px-1.5 py-1 text-[11px] text-[#F5F5F5] outline-none focus:border-[#FFB800]"
               />
             </div>
 
             <div className="space-y-1">
-              <label htmlFor="edit-status" className="text-[#A09E9A] font-bold uppercase tracking-wider block">Status:</label>
+              <label htmlFor="edit-status" className="text-[#B0B0B0] font-bold uppercase tracking-wider block">Status:</label>
               <select
                 id="edit-status"
                 value={editStatus}
                 onChange={(e) => setEditStatus(e.target.value)}
-                className="w-full bg-[#0D0D14] border border-white/10 rounded px-1.5 py-1 text-[11px] text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
+                className="w-full bg-[#111111] border border-white/10 rounded px-1.5 py-1 text-[11px] text-[#F5F5F5] outline-none focus:border-[#FFB800]"
               >
                 {['Active', 'Inconsistent', 'Released', 'Inactive'].map(s => (
-                  <option key={s} value={s} className="bg-[#1A1A28] text-[#F0EFE8]">{s}</option>
+                  <option key={s} value={s} className="bg-[#1A1A1A] text-[#F5F5F5]">{s}</option>
                 ))}
               </select>
             </div>
 
             <div className="space-y-1">
-              <label htmlFor="edit-tier" className="text-[#A09E9A] font-bold uppercase tracking-wider block">Tier:</label>
+              <label htmlFor="edit-tier" className="text-[#B0B0B0] font-bold uppercase tracking-wider block">Tier:</label>
               <select
                 id="edit-tier"
                 value={editTier}
                 onChange={(e) => setEditTier(e.target.value)}
-                className="w-full bg-[#0D0D14] border border-white/10 rounded px-1.5 py-1 text-[11px] text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
+                className="w-full bg-[#111111] border border-white/10 rounded px-1.5 py-1 text-[11px] text-[#F5F5F5] outline-none focus:border-[#FFB800]"
               >
                 {['S', 'A', 'B', 'C', 'X'].map(t => (
-                  <option key={t} value={t} className="bg-[#1A1A28] text-[#F0EFE8]">{t}</option>
+                  <option key={t} value={t} className="bg-[#1A1A1A] text-[#F5F5F5]">{t}</option>
                 ))}
               </select>
             </div>
 
             <div className="space-y-1">
-              <label htmlFor="edit-lvl" className="text-[#A09E9A] font-bold uppercase tracking-wider block">Level Snap:</label>
+              <label htmlFor="edit-lvl" className="text-[#B0B0B0] font-bold uppercase tracking-wider block">Level Snap:</label>
               <input
                 id="edit-lvl"
                 type="number"
                 value={editLevel}
                 onChange={(e) => setEditLevel(parseInt(e.target.value) || 1)}
-                className="w-full bg-[#0D0D14] border border-white/10 rounded px-1.5 py-1 text-[11px] text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
+                className="w-full bg-[#111111] border border-white/10 rounded px-1.5 py-1 text-[11px] text-[#F5F5F5] outline-none focus:border-[#FFB800]"
               />
             </div>
           </div>
         ) : (
-          <div className="space-y-1.5 pt-2 border-t border-white/5 text-[10px] text-[#A09E9A]">
+          <div className="space-y-1.5 pt-2 border-t border-white/5 text-[10px] text-[#B0B0B0]">
             <div className="flex items-center gap-1.5">
-              <span className="text-[#A09E9A] font-bold uppercase tracking-wider">Role:</span>
-              <span className="text-[#D4AF37] font-semibold">{host.role === 'Talent' ? 'Star Host' : host.role}</span>
+              <span className="text-[#B0B0B0] font-bold uppercase tracking-wider">Role:</span>
+              <span className="text-[#FFB800] font-semibold">{host.role === 'Talent' ? 'Star Host' : host.role}</span>
             </div>
             <div className="flex items-center gap-1.5">
-              <span className="text-[#A09E9A] font-bold uppercase tracking-wider">Base Salary Category:</span>
-              <span className="text-[#F0EFE8] font-semibold">{host.base_salary_category || 'Regular Host'}</span>
+              <span className="text-[#B0B0B0] font-bold uppercase tracking-wider">Base Salary Category:</span>
+              <span className="text-[#F5F5F5] font-semibold">{host.base_salary_category || 'Regular Host'}</span>
             </div>
             <div className="flex items-center gap-1.5">
-              <span className="text-[#A09E9A] font-bold uppercase tracking-wider">Assigned Manager:</span>
-              <span className="text-[#F0EFE8] font-semibold">{host.manager}</span>
+              <span className="text-[#B0B0B0] font-bold uppercase tracking-wider">Assigned Manager:</span>
+              <span className="text-[#F5F5F5] font-semibold">{host.manager}</span>
             </div>
             <div className="flex items-center gap-1.5">
-              <span className="text-[#A09E9A] font-bold uppercase tracking-wider">Team / Anchor Group:</span>
+              <span className="text-[#B0B0B0] font-bold uppercase tracking-wider">Team / Anchor Group:</span>
               <span className="text-indigo-400 font-semibold">{host.team}</span>
             </div>
             <div className="flex items-center gap-1.5">
-              <span className="text-[#A09E9A] font-bold uppercase tracking-wider">Status:</span>
+              <span className="text-[#B0B0B0] font-bold uppercase tracking-wider">Status:</span>
               <span className={cn("font-semibold", host.status === 'Active' ? "text-emerald-400" : "text-amber-400")}>{host.status}</span>
             </div>
           </div>
@@ -483,18 +483,18 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
   const renderBiographyCard = () => {
     if (!host.description && !isEditing) return null;
     return (
-      <div className="bg-[#1A1A28] border border-white/5 rounded-2xl p-4 space-y-2 shadow-md">
-        <h4 className="text-[8px] font-black text-[#A09E9A] uppercase tracking-widest leading-none">BIOGRAPHY</h4>
+      <div className="bg-[#1A1A1A] border border-white/5 rounded-2xl p-4 space-y-2 shadow-md">
+        <h4 className="text-[8px] font-black text-[#B0B0B0] uppercase tracking-widest leading-none">BIOGRAPHY</h4>
         {isEditing ? (
           <textarea
             value={editDescription}
             onChange={(e) => setEditDescription(e.target.value)}
             placeholder="Introduce yourself to the agency..."
             rows={3}
-            className="w-full bg-[#0D0D14] border border-white/10 rounded-xl p-2 text-xs text-[#F0EFE8] resize-none focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] outline-none"
+            className="w-full bg-[#111111] border border-white/10 rounded-xl p-2 text-xs text-[#F5F5F5] resize-none focus:border-[#FFB800] focus:ring-1 focus:ring-[#FFB800] outline-none"
           />
         ) : (
-          <p className="text-xs text-[#A09E9A] leading-relaxed italic">
+          <p className="text-xs text-[#B0B0B0] leading-relaxed italic">
             "{host.description || 'No biography or talent assessment provided.'}"
           </p>
         )}
@@ -503,17 +503,17 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
   };
 
   const renderPerformanceHistory = () => (
-    <div className="space-y-3 bg-[#1A1A28]/50 border border-white/5 p-4 rounded-2xl">
+    <div className="space-y-3 bg-[#1A1A1A]/50 border border-white/5 p-4 rounded-2xl">
       <div className="flex items-center justify-between px-1">
-        <h4 className="text-[10px] font-black uppercase tracking-[0.15em] text-[#A09E9A] font-outfit">Performance History (Section 1)</h4>
-        <span className="text-[8px] font-bold text-[#D4AF37] border border-[#D4AF37]/20 bg-[#D4AF37]/5 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+        <h4 className="text-[10px] font-black uppercase tracking-[0.15em] text-[#B0B0B0] font-outfit">Performance History (Section 1)</h4>
+        <span className="text-[8px] font-bold text-[#FFB800] border border-[#FFB800]/20 bg-[#FFB800]/5 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
           Firestore Query: poppoId
         </span>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-left border-collapse text-xs mt-2">
           <thead>
-            <tr className="border-b border-white/5 text-[#A09E9A] font-bold uppercase tracking-wider">
+            <tr className="border-b border-white/5 text-[#B0B0B0] font-bold uppercase tracking-wider">
               <th className="py-2 px-1">Period</th>
               <th className="py-2 px-1">Level</th>
               <th className="py-2 px-1">Live Duration</th>
@@ -536,7 +536,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
               ))
             ) : (
               <tr>
-                <td colSpan={5} className="py-8 text-center text-[#A09E9A]/40 italic">No historical performance records found in database.</td>
+                <td colSpan={5} className="py-8 text-center text-[#B0B0B0]/40 italic">No historical performance records found in database.</td>
               </tr>
             )}
           </tbody>
@@ -567,9 +567,9 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
       : 0;
 
     return (
-      <div className="space-y-4 bg-[#1A1A28]/50 border border-white/5 p-5 rounded-2xl">
+      <div className="space-y-4 bg-[#1A1A1A]/50 border border-white/5 p-5 rounded-2xl">
         <div className="flex items-center justify-between px-1">
-          <h4 className="text-[10px] font-black uppercase tracking-[0.15em] text-[#A09E9A] font-outfit">Earnings Trend (Last 6 Months)</h4>
+          <h4 className="text-[10px] font-black uppercase tracking-[0.15em] text-[#B0B0B0] font-outfit">Earnings Trend (Last 6 Months)</h4>
           <span className="text-[8px] font-bold text-emerald-400 border border-emerald-500/20 bg-emerald-500/5 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
             3-Mo Avg: {formatNumber(Math.round(threeMonthAvg))}
           </span>
@@ -581,20 +581,20 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
               <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" vertical={false} />
               <XAxis 
                 dataKey="month" 
-                tick={{ fontSize: 9, fill: '#A09E9A', fontWeight: 'bold' }}
+                tick={{ fontSize: 9, fill: '#B0B0B0', fontWeight: 'bold' }}
                 axisLine={{ stroke: '#ffffff20' }}
                 tickLine={false}
               />
               <YAxis 
-                tick={{ fontSize: 9, fill: '#A09E9A', fontWeight: 'bold' }}
+                tick={{ fontSize: 9, fill: '#B0B0B0', fontWeight: 'bold' }}
                 axisLine={false}
                 tickLine={false}
                 tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`}
               />
               <Tooltip 
-                contentStyle={{ backgroundColor: '#13131E', borderColor: '#ffffff20', borderRadius: '12px', fontSize: '10px', fontWeight: 'bold' }}
-                itemStyle={{ color: '#F0EFE8' }}
-                labelStyle={{ color: '#D4AF37', marginBottom: '4px' }}
+                contentStyle={{ backgroundColor: '#0A0A0A', borderColor: '#ffffff20', borderRadius: '12px', fontSize: '10px', fontWeight: 'bold' }}
+                itemStyle={{ color: '#F5F5F5' }}
+                labelStyle={{ color: '#FFB800', marginBottom: '4px' }}
                 formatter={(value: number) => [formatNumber(value), 'Points']}
               />
               {threeMonthAvg > 0 && (

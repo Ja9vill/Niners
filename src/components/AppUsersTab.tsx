@@ -1,5 +1,4 @@
-/* eslint-disable */
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { subscribeToHosts, patchHost, HostRosterUser, UserRole } from '../lib/firebaseService';
 import { Storage } from '../lib/storage';
 
@@ -56,7 +55,7 @@ export const AppUsersTab: React.FC<AppUsersTabProps> = ({ currentUserRole }) => 
           <span className="text-2xl">🔒</span>
         </div>
         <p className="text-red-400 font-semibold text-sm">Access Denied</p>
-        <p className="text-[#A09E9A] text-xs">This panel is restricted to Directors only.</p>
+        <p className="text-[#B0B0B0] text-xs">This panel is restricted to Directors only.</p>
       </div>
     );
   }
@@ -64,6 +63,8 @@ export const AppUsersTab: React.FC<AppUsersTabProps> = ({ currentUserRole }) => 
   // ── State ─────────────────────────────────────────────────────────────────
   const [users, setUsers] = useState<HostRosterUser[]>([]);
   const [isConnected, setIsConnected] = useState(false);
+  const [connectionError, setConnectionError] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [pwStates, setPwStates] = useState<Record<string, PwState>>({});
   const toastIdRef = useRef(0);
@@ -77,22 +78,42 @@ export const AppUsersTab: React.FC<AppUsersTabProps> = ({ currentUserRole }) => 
 
   // ── Live Firestore subscription ───────────────────────────────────────────
   useEffect(() => {
-    const unsubscribe = subscribeToHosts((incoming) => {
-      setUsers(incoming.sort((a, b) => a.poppo_id.localeCompare(b.poppo_id)));
-      setIsConnected(true);
-      // Seed per-row password state for new rows
-      setPwStates(prev => {
-        const next = { ...prev };
-        incoming.forEach(u => {
-          if (!next[u.poppo_id]) {
-            next[u.poppo_id] = { value: '', loading: false };
-          }
+    const unsubscribe = subscribeToHosts(
+      (incoming) => {
+        setUsers(incoming.sort((a, b) => a.poppo_id.localeCompare(b.poppo_id)));
+        setIsConnected(true);
+        setConnectionError(null);
+        // Seed per-row password state for new rows
+        setPwStates(prev => {
+          const next = { ...prev };
+          incoming.forEach(u => {
+            if (!next[u.poppo_id]) {
+              next[u.poppo_id] = { value: '', loading: false };
+            }
+          });
+          return next;
         });
-        return next;
-      });
-    });
+      },
+      (error) => {
+        console.error('[AppUsersTab] Firestore error:', error);
+        setConnectionError(error?.message || 'Database subscription error');
+        setIsConnected(false);
+      }
+    );
     return () => unsubscribe();
   }, []);
+
+  // ── Filtered Users Memo ───────────────────────────────────────────────────
+  const filteredUsers = useMemo(() => {
+    if (!searchTerm.trim()) return users;
+    const s = searchTerm.toLowerCase();
+    return users.filter(
+      u =>
+        u.poppo_id.includes(s) ||
+        (u.nickname && u.nickname.toLowerCase().includes(s)) ||
+        (u.role && u.role.toLowerCase().includes(s))
+    );
+  }, [users, searchTerm]);
 
   // ── Nickname blur handler ─────────────────────────────────────────────────
   const handleNicknameBlur = async (user: HostRosterUser, newNickname: string) => {
@@ -166,8 +187,8 @@ export const AppUsersTab: React.FC<AppUsersTabProps> = ({ currentUserRole }) => 
             className={[
               'pointer-events-auto flex items-start gap-3 px-4 py-3 rounded-xl shadow-xl border text-sm font-semibold max-w-xs transition-all duration-300',
               t.type === 'success'
-                ? 'bg-[#1A1A28] border-emerald-500/30 text-emerald-400 shadow-[0_2px_15px_rgba(34,197,94,0.1)]'
-                : 'bg-[#1A1A28] border-red-500/30 text-red-400 shadow-[0_2px_15px_rgba(239,68,68,0.1)]',
+                ? 'bg-[#1A1A1A] border-emerald-500/30 text-emerald-400 shadow-[0_2px_15px_rgba(34,197,94,0.1)]'
+                : 'bg-[#1A1A1A] border-red-500/30 text-red-400 shadow-[0_2px_15px_rgba(239,68,68,0.1)]',
             ].join(' ')}
           >
             <span>{t.type === 'success' ? '✅' : '⚠️'}</span>
@@ -176,11 +197,10 @@ export const AppUsersTab: React.FC<AppUsersTabProps> = ({ currentUserRole }) => 
         ))}
       </div>
 
-      {/* ── Header ───────────────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between mb-5">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-5">
         <div>
           <div className="flex items-center gap-2">
-            <h2 className="text-sm font-black uppercase tracking-[0.2em] text-[#F0EFE8]">
+            <h2 className="text-sm font-black uppercase tracking-[0.2em] text-[#F5F5F5]">
               Roster Management
             </h2>
             {/* Live badge */}
@@ -197,17 +217,36 @@ export const AppUsersTab: React.FC<AppUsersTabProps> = ({ currentUserRole }) => 
               {isConnected ? 'Live' : 'Connecting…'}
             </span>
           </div>
-          <p className="text-[10px] text-[#A09E9A] font-medium mt-0.5 uppercase tracking-wider">
+          <p className="text-[10px] text-[#B0B0B0] font-medium mt-0.5 uppercase tracking-wider">
             {users.length} app user{users.length !== 1 ? 's' : ''} · Director access only
           </p>
+        </div>
+
+        {/* Search Input */}
+        <div className="relative w-full sm:w-64">
+          <input
+            type="text"
+            placeholder="Search by ID or Nickname..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full bg-black/30 border border-white/10 rounded-xl pl-9 pr-4 py-2 text-xs font-bold text-[#F5F5F5] placeholder-[#B0B0B0]/40 focus:ring-1 focus:ring-[#FFB800] focus:border-[#FFB800] outline-none transition-all"
+            title="Search Roster"
+            aria-label="Search Roster"
+          />
+          <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none text-[#B0B0B0]/40">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="11" cy="11" r="8"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+          </div>
         </div>
       </div>
 
       {/* ── Table ────────────────────────────────────────────────────────── */}
-      <div className="overflow-x-auto rounded-2xl border border-white/5 shadow-lg bg-[#13131E]">
+      <div className="overflow-x-auto rounded-2xl border border-white/5 shadow-lg bg-[#0A0A0A]">
         <table className="w-full text-left border-collapse">
           <thead>
-            <tr className="bg-[#1A1A28] border-b border-white/5 text-[9px] font-black text-[#A09E9A] uppercase tracking-[0.2em]">
+            <tr className="bg-[#1A1A1A] border-b border-white/5 text-[9px] font-black text-[#B0B0B0] uppercase tracking-[0.2em]">
               <th className="px-4 py-3 w-32">Poppo ID</th>
               <th className="px-4 py-3">Nickname</th>
               <th className="px-4 py-3 w-44">System App Role</th>
@@ -216,21 +255,28 @@ export const AppUsersTab: React.FC<AppUsersTabProps> = ({ currentUserRole }) => 
             </tr>
           </thead>
           <tbody className="divide-y divide-white/5">
-            {!isConnected && (
+            {!isConnected && !connectionError && (
               <tr>
                 <td colSpan={5} className="px-4 py-12 text-center text-slate-400 text-sm">
                   Connecting to Firebase…
                 </td>
               </tr>
             )}
-            {isConnected && users.length === 0 && (
+            {connectionError && (
               <tr>
-                <td colSpan={5} className="px-4 py-12 text-center text-slate-400 text-sm">
-                  No users found in the hosts collection.
+                <td colSpan={5} className="px-4 py-12 text-center text-red-400 text-sm">
+                  ⚠️ Error connecting to database: {connectionError}
                 </td>
               </tr>
             )}
-            {users.map(user => {
+            {isConnected && filteredUsers.length === 0 && (
+              <tr>
+                <td colSpan={5} className="px-4 py-12 text-center text-slate-400 text-sm">
+                  {users.length === 0 ? 'No users found in the users collection.' : 'No users match your search.'}
+                </td>
+              </tr>
+            )}
+            {filteredUsers.map(user => {
               const pw = pwStates[user.poppo_id] ?? { value: '', loading: false };
 
               return (
@@ -239,7 +285,7 @@ export const AppUsersTab: React.FC<AppUsersTabProps> = ({ currentUserRole }) => 
                   {/* ── Poppo ID (read-only, selectable) ───────────────── */}
                   <td className="px-4 py-2.5">
                     <span
-                      className="font-mono text-sm font-bold text-[#D4AF37] select-all cursor-default"
+                      className="font-mono text-sm font-bold text-[#FFB800] select-all cursor-default"
                       title="Poppo ID (read-only)"
                     >
                       {user.poppo_id}
@@ -258,7 +304,7 @@ export const AppUsersTab: React.FC<AppUsersTabProps> = ({ currentUserRole }) => 
                       defaultValue={user.nickname}
                       key={user.nickname} // re-mount when live data changes to reset field
                       onBlur={e => handleNicknameBlur(user, e.target.value.trim())}
-                      className="w-full bg-transparent border border-transparent rounded-lg px-2 py-1 text-sm font-medium text-[#F0EFE8] placeholder-[#5A5865] focus:bg-[#2A2A40] focus:border-white/10 outline-none transition-all"
+                      className="w-full bg-transparent border border-transparent rounded-lg px-2 py-1 text-sm font-medium text-[#F5F5F5] placeholder-[#5A5865] focus:bg-[#2A2A40] focus:border-white/10 outline-none transition-all"
                       placeholder="—"
                     />
                   </td>
@@ -267,12 +313,13 @@ export const AppUsersTab: React.FC<AppUsersTabProps> = ({ currentUserRole }) => 
                   <td className="px-4 py-2.5">
                     <div className="relative">
                       <select
+                        title="System App Role"
                         value={user.role}
                         onChange={e => handleRoleChange(user.poppo_id, e.target.value as UserRole)}
-                        className="w-full appearance-none bg-[#1A1A28] border border-white/10 text-[#F0EFE8] rounded-lg pl-2.5 pr-7 py-1.5 text-xs font-bold cursor-pointer outline-none focus:ring-1 focus:ring-[#D4AF37]/40 focus:border-[#D4AF37] transition-all"
+                        className="w-full appearance-none bg-[#1A1A1A] border border-white/10 text-[#F5F5F5] rounded-lg pl-2.5 pr-7 py-1.5 text-xs font-bold cursor-pointer outline-none focus:ring-1 focus:ring-[#FFB800]/40 focus:border-[#FFB800] transition-all"
                       >
                         {ALLOWED_ROLES.map(r => (
-                          <option key={r} value={r} className="bg-[#1A1A28] text-[#F0EFE8]">
+                          <option key={r} value={r} className="bg-[#1A1A1A] text-[#F5F5F5]">
                             {r.charAt(0).toUpperCase() + r.slice(1)}
                           </option>
                         ))}
@@ -305,7 +352,7 @@ export const AppUsersTab: React.FC<AppUsersTabProps> = ({ currentUserRole }) => 
                         }))}
                         placeholder="••••••••"
                         autoComplete="new-password"
-                        className="flex-1 min-w-0 bg-[#0D0D14] border border-white/10 rounded-lg px-2.5 py-1.5 text-xs font-medium text-[#F0EFE8] placeholder-[#5A5865] focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37]/30 outline-none transition-all"
+                        className="flex-1 min-w-0 bg-[#111111] border border-white/10 rounded-lg px-2.5 py-1.5 text-xs font-medium text-[#F5F5F5] placeholder-[#5A5865] focus:border-[#FFB800] focus:ring-1 focus:ring-[#FFB800]/30 outline-none transition-all"
                         onKeyDown={e => e.key === 'Enter' && handlePasswordSet(user.poppo_id)}
                       />
                       <button
@@ -316,7 +363,7 @@ export const AppUsersTab: React.FC<AppUsersTabProps> = ({ currentUserRole }) => 
                           pw.loading
                             ? 'bg-slate-800 text-slate-500 cursor-not-allowed'
                             : pw.value.length >= 6
-                              ? 'bg-[#D4AF37] text-[#0D0D14] hover:bg-[#c9a832] active:scale-95 shadow-sm'
+                              ? 'bg-[#FFB800] text-[#111111] hover:bg-[#c9a832] active:scale-95 shadow-sm'
                               : pw.value.length > 0
                                 ? 'bg-red-500/10 text-red-400 border border-red-500/25 cursor-not-allowed'
                                 : 'bg-slate-800 text-slate-500 cursor-not-allowed',
@@ -343,9 +390,8 @@ export const AppUsersTab: React.FC<AppUsersTabProps> = ({ currentUserRole }) => 
                           'relative inline-flex h-6 w-11 rounded-full border-2 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-offset-1',
                           user.isActive
                             ? 'bg-emerald-500 border-emerald-500 focus:ring-emerald-300'
-                            : 'bg-[#1A1A28] border-white/10 focus:ring-[#5a5865]',
+                            : 'bg-[#1A1A1A] border-white/10 focus:ring-[#5a5865]',
                         ].join(' ')}
-                        aria-pressed={user.isActive}
                         aria-label={`Toggle login access for ${user.poppo_id}`}
                       >
                         <span
@@ -357,7 +403,7 @@ export const AppUsersTab: React.FC<AppUsersTabProps> = ({ currentUserRole }) => 
                       </button>
                       <span className={[
                         'text-[9px] font-black uppercase tracking-widest',
-                        user.isActive ? 'text-emerald-400' : 'text-[#A09E9A]',
+                        user.isActive ? 'text-emerald-400' : 'text-[#B0B0B0]',
                       ].join(' ')}>
                         {user.isActive ? 'Active' : 'Inactive'}
                       </span>
@@ -372,7 +418,7 @@ export const AppUsersTab: React.FC<AppUsersTabProps> = ({ currentUserRole }) => 
       </div>
 
       {/* ── Security footer ───────────────────────────────────────────────── */}
-      <p className="mt-4 text-[10px] text-[#A09E9A] font-medium flex items-center gap-1.5">
+      <p className="mt-4 text-[10px] text-[#B0B0B0] font-medium flex items-center gap-1.5">
         <span>🔐</span>
         Passwords are hashed with bcrypt (12 rounds) before storage. Plaintext is never persisted.
       </p>

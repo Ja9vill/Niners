@@ -2,7 +2,7 @@ import { auth, db, storage } from './firebase';
 import { ref, uploadString, getBytes } from 'firebase/storage';
 import { Storage } from './storage';
 import { doc, setDoc, getDoc, collection, query, where, getDocs, deleteDoc, writeBatch, Timestamp, onSnapshot, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
-import { CommissionEntry, Host, PKEntry, ExposureEntry, FanbaseHealthEntry, WeeklyLiveDataEntry, MonthlyLiveDataEntry, TopNinersEarningsSummary, EventsCalendarPublic, ReportingSubmission, Task, ActivityAuditLog, CalendarEvent, LivehouseRequest } from '../types';
+import { CommissionEntry, Host, PKEntry, ExposureEntry, FanbaseHealthEntry, WeeklyLiveDataEntry, MonthlyLiveDataEntry, TopNinersEarningsSummary, EventsCalendarPublic, ReportingSubmission, Task, ActivityAuditLog, CalendarEvent, LivehouseRequest, AwardBadge, AwardAssignment } from '../types';
 
 export enum OperationType {
   CREATE = 'create',
@@ -313,6 +313,45 @@ export const FirebaseService = {
     const path = `commissions/${poppoId}_${month}`;
     try {
       await deleteDoc(doc(db, 'commissions', `${poppoId}_${month}`));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, path);
+    }
+  },
+
+  // Agent-Specific Team Financials
+  async saveAgentCommissions(commissions: CommissionEntry[], agentId: string, isWeekly: boolean = false) {
+    const collectionName = isWeekly ? 'agent_financials_weekly' : 'agent_financials_monthly';
+    try {
+      const batch = writeBatch(db);
+      commissions.forEach(c => {
+        const id = isWeekly ? `${c.poppo_id}_${c.from_date}_${c.to_date}` : `${c.poppo_id}_${c.month}`;
+        const docRef = doc(db, collectionName, id);
+        batch.set(docRef, { ...c, agentId });
+      });
+      await batch.commit();
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, collectionName);
+    }
+  },
+
+  async getAgentCommissions(agentId: string, isWeekly: boolean = false): Promise<CommissionEntry[]> {
+    const collectionName = isWeekly ? 'agent_financials_weekly' : 'agent_financials_monthly';
+    try {
+      const q = query(collection(db, collectionName), where('agentId', '==', agentId));
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(d => d.data() as CommissionEntry);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.LIST, collectionName);
+      return [];
+    }
+  },
+
+  async deleteAgentCommission(poppoId: string, dateKey: string, agentId: string, isWeekly: boolean = false) {
+    const collectionName = isWeekly ? 'agent_financials_weekly' : 'agent_financials_monthly';
+    const path = `${collectionName}/${poppoId}_${dateKey}`;
+    try {
+      // Security check could be handled by rules, but we explicitly use the known ID
+      await deleteDoc(doc(db, collectionName, `${poppoId}_${dateKey}`));
     } catch (error) {
       handleFirestoreError(error, OperationType.DELETE, path);
     }
@@ -756,6 +795,98 @@ export const FirebaseService = {
       return [];
     }
   },
+
+  // Hosts alias (some callers use getHosts, others use getAllHosts)
+  async getHosts(): Promise<Host[]> {
+    return this.getAllHosts();
+  },
+
+  // Awards (badges) management
+  async getAwards(): Promise<AwardBadge[]> {
+    const path = 'awards';
+    try {
+      const snapshot = await getDocs(collection(db, path));
+      return snapshot.docs.map(d => ({ id: d.id, ...d.data() } as AwardBadge));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.LIST, path);
+      return [];
+    }
+  },
+
+  async saveAwards(awards: AwardBadge[]): Promise<void> {
+    const path = 'awards';
+    try {
+      const batch = writeBatch(db);
+      awards.forEach(a => {
+        const docRef = doc(db, path, a.id);
+        batch.set(docRef, a);
+      });
+      await batch.commit();
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, path);
+    }
+  },
+
+  async deleteAward(awardId: string): Promise<void> {
+    const path = `awards/${awardId}`;
+    try {
+      await deleteDoc(doc(db, 'awards', awardId));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, path);
+    }
+  },
+
+  // Award assignments management
+  async getAwardAssignments(): Promise<AwardAssignment[]> {
+    const path = 'award_assignments';
+    try {
+      const snapshot = await getDocs(collection(db, path));
+      return snapshot.docs.map(d => ({ id: d.id, ...d.data() } as AwardAssignment));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.LIST, path);
+      return [];
+    }
+  },
+
+  async saveAwardAssignments(assignments: AwardAssignment[]): Promise<void> {
+    const path = 'award_assignments';
+    try {
+      const batch = writeBatch(db);
+      assignments.forEach(a => {
+        const docRef = doc(db, path, a.id);
+        batch.set(docRef, a);
+      });
+      await batch.commit();
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, path);
+    }
+  },
+
+  async deleteAwardAssignment(assignmentId: string): Promise<void> {
+    const path = `award_assignments/${assignmentId}`;
+    try {
+      await deleteDoc(doc(db, 'award_assignments', assignmentId));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, path);
+    }
+  },
+
+  // System activity log (used by audit trail in HostProfileView)
+  async logSystemActivity(description: string, level: 'Info' | 'Warning' | 'Error' = 'Info'): Promise<void> {
+    const path = 'system_activity_logs';
+    try {
+      const id = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2);
+      const docRef = doc(db, path, id);
+      await setDoc(docRef, {
+        id,
+        description,
+        level,
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      console.warn('[FirebaseService] logSystemActivity failed:', error);
+    }
+  },
 };
 // ─── Roster Management types & standalone exports ─────────────────────────────
 // These are used by AppUsersTab for the admin roster management feature.
@@ -777,8 +908,11 @@ export interface HostRosterUser {
  * poppo_id is pulled from docSnap.id (the document key).
  * Returns an unsubscribe function — call it in useEffect cleanup.
  */
-export const subscribeToHosts = (callback: (hosts: HostRosterUser[]) => void): (() => void) => {
-  const q = query(collection(db, 'host'));
+export const subscribeToHosts = (
+  callback: (hosts: HostRosterUser[]) => void,
+  onError?: (error: any) => void
+): (() => void) => {
+  const q = query(collection(db, 'users'));
   return onSnapshot(
     q,
     (snapshot) => {
@@ -796,6 +930,7 @@ export const subscribeToHosts = (callback: (hosts: HostRosterUser[]) => void): (
     },
     (error) => {
       console.error('[subscribeToHosts] Firestore onSnapshot error:', error);
+      if (onError) onError(error);
     }
   );
 };
@@ -808,7 +943,7 @@ export const patchHost = async (
   poppoId: string,
   updates: Partial<Omit<HostRosterUser, 'poppo_id'>>
 ): Promise<{ success: true }> => {
-  const hostDocRef = doc(db, 'host', poppoId);
+  const hostDocRef = doc(db, 'users', poppoId);
   await updateDoc(hostDocRef, { ...updates, updated_at: new Date().toISOString() });
   return { success: true };
 };

@@ -543,8 +543,8 @@ export const DataReportingTab = () => {
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
       return (
-        <div className="bg-[#1A1A28] border border-white/5 p-3 rounded-xl shadow-2xl">
-          <p className="text-[#F0EFE8] font-bold text-xs mb-2">{label}</p>
+        <div className="bg-[#1A1A1A] border border-white/5 p-3 rounded-xl shadow-2xl">
+          <p className="text-[#F5F5F5] font-bold text-xs mb-2">{label}</p>
           {payload.map((p: any, i: number) => {
             return (
               <p
@@ -569,17 +569,17 @@ export const DataReportingTab = () => {
       {/* Title Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-black text-[#F0EFE8] tracking-tight flex items-center gap-2">
-            <Sparkles className="text-[#D4AF37] font-bold" size={24} />
+          <h2 className="text-2xl font-black text-[#F5F5F5] tracking-tight flex items-center gap-2">
+            <Sparkles className="text-[#FFB800] font-bold" size={24} />
             Data Reporting Cockpit
           </h2>
-          <p className="text-xs text-[#A09E9A] font-medium">
-            Authorized: <span className="text-[#D4AF37] font-bold">{auth.name}</span> • Role: <span className="text-indigo-400 font-mono text-[10px] uppercase tracking-wider">{auth.role}</span>
+          <p className="text-xs text-[#B0B0B0] font-medium">
+            Authorized: <span className="text-[#FFB800] font-bold">{auth.name}</span> • Role: <span className="text-indigo-400 font-mono text-[10px] uppercase tracking-wider">{auth.role}</span>
           </p>
         </div>
 
         {/* 4-Tab Segmented Selector */}
-        <div className="flex gap-1.5 p-1.5 bg-[#13131E] rounded-2xl border border-white/5 overflow-x-auto no-scrollbar">
+        <div className="flex gap-1.5 p-1.5 bg-[#0A0A0A] rounded-2xl border border-white/5 overflow-x-auto no-scrollbar">
           {[
             { id: 'random_pk', label: 'Random PK' },
             { id: 'fanbase', label: 'Fanbase' },
@@ -594,8 +594,8 @@ export const DataReportingTab = () => {
                 "px-3.5 py-2 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all whitespace-nowrap cursor-pointer",
                 isLocked && "opacity-55 cursor-not-allowed",
                 activeTab === tab.id
-                  ? "bg-[#D4AF37] text-[#0D0D14] shadow-lg shadow-[#D4AF37]/20 font-black"
-                  : "text-[#A09E9A] hover:text-[#F0EFE8] hover:bg-white/5"
+                  ? "bg-[#FFB800] text-[#111111] shadow-lg shadow-[#FFB800]/20 font-black"
+                  : "text-[#B0B0B0] hover:text-[#F5F5F5] hover:bg-white/5"
               )}
             >
               {tab.label}
@@ -667,7 +667,7 @@ export const DataReportingTab = () => {
         {/* Form fields layout */}
         <div className="space-y-8">
           {/* Identity block */}
-          <div className="bg-[#13131E] p-6 rounded-2xl border border-white/5 grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="bg-[#1A1A1A] p-6 rounded-2xl border border-white/5 grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-1.5">
               <label htmlFor="poppo-id" className="text-[10px] font-black text-[#A09E9A] uppercase tracking-widest ml-1">Host Poppo ID</label>
               {isTalent ? (

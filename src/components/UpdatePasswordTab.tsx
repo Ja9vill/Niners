@@ -102,16 +102,16 @@ export const UpdatePasswordTab: React.FC<UpdatePasswordTabProps> = ({ onMigratio
   };
 
   return (
-    <div className="flex flex-col items-center justify-center p-6 min-h-[60vh] select-none text-[#F0EFE8]">
+    <div className="flex flex-col items-center justify-center p-6 min-h-[60vh] select-none text-[#F5F5F5]">
       {/* Re-Authentication Modal */}
       {showReAuthModal && (
         <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm">
-          <div className="bg-[#1A1A28] border border-white/10 p-6 rounded-2xl w-full max-w-sm space-y-4">
-            <div className="flex items-center gap-2 text-[#D4AF37]">
+          <div className="bg-[#1A1A1A] border border-white/10 p-6 rounded-2xl w-full max-w-sm space-y-4">
+            <div className="flex items-center gap-2 text-[#FFB800]">
               <Key size={20} />
               <h3 className="font-bold text-md tracking-wider uppercase">Re-Authenticate Session</h3>
             </div>
-            <p className="text-xs text-[#A09E9A]">
+            <p className="text-xs text-[#B0B0B0]">
               For security, you must confirm your original credentials to continue password migration.
             </p>
 
@@ -123,16 +123,16 @@ export const UpdatePasswordTab: React.FC<UpdatePasswordTabProps> = ({ onMigratio
 
             <form onSubmit={handleReAuthSubmit} className="space-y-4">
               <div className="space-y-1">
-                <label className="text-[10px] uppercase font-bold text-[#A09E9A]">Poppo ID</label>
+                <label className="text-[10px] uppercase font-bold text-[#B0B0B0]">Poppo ID</label>
                 <input
                   type="text"
                   value={reAuthPoppoId}
                   disabled={true}
-                  className="w-full px-3 py-2 bg-[#0D0D14] border border-white/5 rounded-xl text-sm outline-none text-[#A09E9A]"
+                  className="w-full px-3 py-2 bg-[#111111] border border-white/5 rounded-xl text-sm outline-none text-[#B0B0B0]"
                 />
               </div>
               <div className="space-y-1">
-                <label className="text-[10px] uppercase font-bold text-[#A09E9A]">Password</label>
+                <label className="text-[10px] uppercase font-bold text-[#B0B0B0]">Password</label>
                 <input
                   type="password"
                   placeholder="Enter current password"
@@ -140,7 +140,7 @@ export const UpdatePasswordTab: React.FC<UpdatePasswordTabProps> = ({ onMigratio
                   onChange={(e) => setReAuthPassword(e.target.value)}
                   disabled={isReAuthing}
                   required
-                  className="w-full px-3 py-2 bg-[#0D0D14] border border-white/10 rounded-xl text-sm outline-none text-[#F0EFE8] focus:border-[#D4AF37]/50"
+                  className="w-full px-3 py-2 bg-[#111111] border border-white/10 rounded-xl text-sm outline-none text-[#F5F5F5] focus:border-[#FFB800]/50"
                 />
               </div>
 
@@ -148,14 +148,14 @@ export const UpdatePasswordTab: React.FC<UpdatePasswordTabProps> = ({ onMigratio
                 <button
                   type="button"
                   onClick={() => setShowReAuthModal(false)}
-                  className="px-4 py-2 text-xs uppercase font-bold text-[#A09E9A] hover:text-[#F0EFE8]"
+                  className="px-4 py-2 text-xs uppercase font-bold text-[#B0B0B0] hover:text-[#F5F5F5]"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isReAuthing}
-                  className="px-4 py-2 bg-[#D4AF37] hover:bg-[#bfa032] text-[#0D0D14] rounded-xl text-xs uppercase font-bold flex items-center gap-1 shadow-lg cursor-pointer"
+                  className="px-4 py-2 bg-[#FFB800] hover:bg-[#bfa032] text-[#111111] rounded-xl text-xs uppercase font-bold flex items-center gap-1 shadow-lg cursor-pointer"
                 >
                   {isReAuthing ? <Loader2 className="animate-spin" size={14} /> : 'Confirm'}
                 </button>
@@ -166,13 +166,13 @@ export const UpdatePasswordTab: React.FC<UpdatePasswordTabProps> = ({ onMigratio
       )}
 
       {/* Main Password Upgrade Card */}
-      <div className="w-full max-w-md bg-[#1A1A28] border border-[#D4AF37]/20 p-8 rounded-3xl shadow-xl space-y-6">
+      <div className="w-full max-w-md bg-[#1A1A1A] border border-[#FFB800]/20 p-8 rounded-3xl shadow-xl space-y-6">
         <div className="flex flex-col items-center gap-2">
-          <div className="w-12 h-12 rounded-full bg-[#D4AF37]/10 flex items-center justify-center border border-[#D4AF37]/20">
-            <ShieldCheck className="text-[#D4AF37]" size={24} />
+          <div className="w-12 h-12 rounded-full bg-[#FFB800]/10 flex items-center justify-center border border-[#FFB800]/20">
+            <ShieldCheck className="text-[#FFB800]" size={24} />
           </div>
           <h2 className="text-lg font-black tracking-widest uppercase">Secure Your Account</h2>
-          <p className="text-xs text-[#A09E9A] text-center">
+          <p className="text-xs text-[#B0B0B0] text-center">
             You are signed in with a temporary password. Upgrade to a permanent, secure password to access the agency features.
           </p>
         </div>
@@ -191,7 +191,7 @@ export const UpdatePasswordTab: React.FC<UpdatePasswordTabProps> = ({ onMigratio
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-1">
-            <label className="text-[10px] uppercase font-bold text-[#A09E9A]">New Password</label>
+            <label className="text-[10px] uppercase font-bold text-[#B0B0B0]">New Password</label>
             <div className="relative">
               <input
                 type={showPassword ? 'text' : 'password'}
@@ -200,12 +200,12 @@ export const UpdatePasswordTab: React.FC<UpdatePasswordTabProps> = ({ onMigratio
                 onChange={(e) => setNewPassword(e.target.value)}
                 disabled={isLoading}
                 required
-                className="w-full pl-3 pr-10 py-2 bg-[#0D0D14] border border-white/10 rounded-xl text-sm outline-none text-[#F0EFE8] focus:border-[#D4AF37]/50"
+                className="w-full pl-3 pr-10 py-2 bg-[#111111] border border-white/10 rounded-xl text-sm outline-none text-[#F5F5F5] focus:border-[#FFB800]/50"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute top-1/2 -translate-y-1/2 right-3 text-[#A09E9A] hover:text-[#F0EFE8]"
+                className="absolute top-1/2 -translate-y-1/2 right-3 text-[#B0B0B0] hover:text-[#F5F5F5]"
               >
                 {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
@@ -213,7 +213,7 @@ export const UpdatePasswordTab: React.FC<UpdatePasswordTabProps> = ({ onMigratio
           </div>
 
           <div className="space-y-1">
-            <label className="text-[10px] uppercase font-bold text-[#A09E9A]">Confirm New Password</label>
+            <label className="text-[10px] uppercase font-bold text-[#B0B0B0]">Confirm New Password</label>
             <input
               type={showPassword ? 'text' : 'password'}
               placeholder="Confirm new password"
@@ -221,31 +221,31 @@ export const UpdatePasswordTab: React.FC<UpdatePasswordTabProps> = ({ onMigratio
               onChange={(e) => setConfirmPassword(e.target.value)}
               disabled={isLoading}
               required
-              className="w-full px-3 py-2 bg-[#0D0D14] border border-white/10 rounded-xl text-sm outline-none text-[#F0EFE8] focus:border-[#D4AF37]/50"
+              className="w-full px-3 py-2 bg-[#111111] border border-white/10 rounded-xl text-sm outline-none text-[#F5F5F5] focus:border-[#FFB800]/50"
             />
           </div>
 
           {/* Strength Indicators */}
-          <div className="p-4 bg-[#0D0D14] border border-white/5 rounded-2xl space-y-2 text-xs text-[#A09E9A]">
+          <div className="p-4 bg-[#111111] border border-white/5 rounded-2xl space-y-2 text-xs text-[#B0B0B0]">
             <p className="font-bold text-[10px] uppercase tracking-wider text-white/50">Requirements:</p>
             <div className="flex items-center gap-2">
               <span className={hasMinLength ? 'text-green-400' : 'text-white/20'}>●</span>
-              <span className={hasMinLength ? 'text-[#F0EFE8]' : 'text-[#A09E9A]/60'}>Minimum 8 characters</span>
+              <span className={hasMinLength ? 'text-[#F5F5F5]' : 'text-[#B0B0B0]/60'}>Minimum 8 characters</span>
             </div>
             <div className="flex items-center gap-2">
               <span className={hasUppercase ? 'text-green-400' : 'text-white/20'}>●</span>
-              <span className={hasUppercase ? 'text-[#F0EFE8]' : 'text-[#A09E9A]/60'}>At least one uppercase letter (A-Z)</span>
+              <span className={hasUppercase ? 'text-[#F5F5F5]' : 'text-[#B0B0B0]/60'}>At least one uppercase letter (A-Z)</span>
             </div>
             <div className="flex items-center gap-2">
               <span className={hasNumber ? 'text-green-400' : 'text-white/20'}>●</span>
-              <span className={hasNumber ? 'text-[#F0EFE8]' : 'text-[#A09E9A]/60'}>At least one numeric digit (0-9)</span>
+              <span className={hasNumber ? 'text-[#F5F5F5]' : 'text-[#B0B0B0]/60'}>At least one numeric digit (0-9)</span>
             </div>
           </div>
 
           <button
             type="submit"
             disabled={isLoading || !hasMinLength || !hasUppercase || !hasNumber}
-            className="w-full py-3 bg-[#D4AF37] hover:bg-[#bfa032] disabled:bg-[#1A1A28] disabled:border-white/5 disabled:text-[#A09E9A]/30 text-[#0D0D14] rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer shadow-lg shadow-[#D4AF37]/10 disabled:shadow-none border border-transparent transition-all flex items-center justify-center gap-2"
+            className="w-full py-3 bg-[#FFB800] hover:bg-[#bfa032] disabled:bg-[#1A1A1A] disabled:border-white/5 disabled:text-[#B0B0B0]/30 text-[#111111] rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer shadow-lg shadow-[#FFB800]/10 disabled:shadow-none border border-transparent transition-all flex items-center justify-center gap-2"
           >
             {isLoading ? <Loader2 className="animate-spin" size={16} /> : 'Secure My Account'}
           </button>

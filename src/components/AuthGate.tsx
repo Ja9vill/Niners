@@ -112,9 +112,9 @@ export const AuthGate: React.FC<AuthGateProps> = ({ children, onAuthChange }) =>
         <motion.div 
           animate={{ scale: [1, 1.1, 1], opacity: [0.3, 0.6, 0.3] }}
           transition={{ duration: 2, repeat: Infinity }}
-          className="w-12 h-12 rounded-[16px] bg-[#D4AF37]/20 flex items-center justify-center"
+          className="w-12 h-12 rounded-[16px] bg-[#FFB800]/20 flex items-center justify-center"
         >
-          <div className="w-6 h-6 rounded-[8px] bg-[#D4AF37]" />
+          <div className="w-6 h-6 rounded-[8px] bg-[#FFB800]" />
         </motion.div>
       </div>
     );
@@ -122,21 +122,21 @@ export const AuthGate: React.FC<AuthGateProps> = ({ children, onAuthChange }) =>
 
   return (
     <div className="w-full flex flex-col items-center justify-center p-4 bg-transparent relative overflow-hidden min-h-[80vh]">
-      <div className="w-full max-w-sm border border-[#D4AF37]/20 rounded-[24px] p-6 space-y-6 bg-[#1A1A28] shadow-2xl relative z-10 flex flex-col justify-between">
+      <div className="w-full max-w-sm border border-[#FFB800]/20 rounded-[24px] p-6 space-y-6 glass-card shadow-2xl relative z-10 flex flex-col justify-between">
         
         {/* Top Header Grid line style */}
         <div className="border-b border-t border-white/5 py-3 flex items-center justify-center gap-2 shrink-0">
-          <img src={appLogo} alt="Niners App Logo" className="h-6 w-6 rounded-md border border-[#D4AF37]/20 object-cover select-none pointer-events-none" />
-          <span className="text-xs font-black tracking-[0.25em] text-[#D4AF37]">{TEXT.title}</span>
+          <img src={appLogo} alt="Niners App Logo" className="h-6 w-6 rounded-md border border-[#FFB800]/20 object-cover select-none pointer-events-none" />
+          <span className="text-xs font-black tracking-[0.25em] text-[#FFB800]">{TEXT.title}</span>
         </div>
 
         {/* Member Login Title Area */}
         <div className="flex flex-col items-center text-center space-y-3 py-2">
           <div className="flex items-center gap-2 text-white">
-            <Shield className="text-[#D4AF37] w-6 h-6" strokeWidth={2} />
-            <h1 className="text-lg font-black tracking-widest uppercase text-[#F0EFE8]">{TEXT.memberLogin}</h1>
+            <Shield className="text-[#FFB800] w-6 h-6" strokeWidth={2} />
+            <h1 className="text-lg font-black tracking-widest uppercase text-[#F5F5F5]">{TEXT.memberLogin}</h1>
           </div>
-          <p className="text-[#A09E9A]/80 text-xs px-4 leading-relaxed font-medium">
+          <p className="text-[#B0B0B0]/80 text-xs px-4 leading-relaxed font-medium">
             {TEXT.loginDescription}
           </p>
         </div>
@@ -147,17 +147,17 @@ export const AuthGate: React.FC<AuthGateProps> = ({ children, onAuthChange }) =>
             
             {/* Poppo ID */}
             <div className="space-y-1.5">
-              <label className="text-[10px] font-black text-[#A09E9A]/60 uppercase tracking-[0.20em] ml-1 block">{TEXT.poppoId}</label>
+              <label className="text-[10px] font-black text-[#B0B0B0]/60 uppercase tracking-[0.20em] ml-1 block">{TEXT.poppoId}</label>
               <div className="relative">
                 <div className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30 flex items-center">
-                  <ShieldCheck size={16} className="text-[#D4AF37]" />
+                  <ShieldCheck size={16} className="text-[#FFB800]" />
                 </div>
                 <input 
                   type="text" 
                   value={poppoId}
                   onChange={(e) => setPoppoId(e.target.value)}
                   placeholder={TEXT.enterPoppoId}
-                  className="w-full bg-[#0D0D14] border border-white/10 rounded-xl pl-12 pr-4 py-3 text-sm font-bold tracking-widest focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37]/50 outline-none transition-all text-[#F0EFE8] placeholder-white/20"
+                  className="w-full glass-input rounded-xl pl-12 pr-4 py-3 text-sm font-bold tracking-widest transition-all text-[#F5F5F5] placeholder-white/20"
                   autoFocus
                   required
                 />
@@ -166,20 +166,20 @@ export const AuthGate: React.FC<AuthGateProps> = ({ children, onAuthChange }) =>
             
             {/* Password */}
             <div className="space-y-1.5">
-              <label className="text-[10px] font-black text-[#A09E9A]/60 uppercase tracking-[0.20em] ml-1 block">{TEXT.password}</label>
+              <label className="text-[10px] font-black text-[#B0B0B0]/60 uppercase tracking-[0.20em] ml-1 block">{TEXT.password}</label>
               <div className="relative">
                 <input 
                   type={showPassword ? "text" : "password"} 
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder={TEXT.enterPassword}
-                  className="w-full bg-[#0D0D14] border border-white/10 rounded-xl pl-4 pr-12 py-3 text-sm tracking-widest focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37]/50 outline-none transition-all text-[#F0EFE8] placeholder-white/20"
+                  className="w-full glass-input rounded-xl pl-4 pr-12 py-3 text-sm tracking-widest transition-all text-[#F5F5F5] placeholder-white/20"
                   required
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-[#A09E9A] hover:text-[#F0EFE8] transition-colors"
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-[#B0B0B0] hover:text-[#F5F5F5] transition-colors"
                 >
                   {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
@@ -193,19 +193,19 @@ export const AuthGate: React.FC<AuthGateProps> = ({ children, onAuthChange }) =>
           <button 
             type="submit" 
             disabled={isSubmitting}
-            className="w-full btn-gold py-3.5 rounded-xl text-xs font-black uppercase tracking-[0.25em] transition-all flex items-center justify-center gap-2 active:scale-95 shadow-[0_2px_12px_rgba(212,175,55,0.25)] cursor-pointer"
+            className="w-full btn-gold py-3.5 rounded-xl text-xs font-black uppercase tracking-[0.25em] transition-all flex items-center justify-center gap-2 active:scale-95 cursor-pointer"
           >
-            {isSubmitting && <Loader2 size={14} className="animate-spin text-[#0D0D14]" />}
+            {isSubmitting && <Loader2 size={14} className="animate-spin text-[#0A0A0A]" />}
             {TEXT.logIn}
           </button>
         </form>
 
         {/* Links */}
-        <div className="flex flex-col items-center space-y-2 pt-2 text-[10px] font-bold text-[#A09E9A]/60 tracking-wider">
-          <button type="button" className="hover:text-[#D4AF37] hover:underline transition-all">{TEXT.forgotPassword}</button>
+        <div className="flex flex-col items-center space-y-2 pt-2 text-[10px] font-bold text-[#B0B0B0]/60 tracking-wider">
+          <button type="button" className="hover:text-[#FFB800] hover:underline transition-all">{TEXT.forgotPassword}</button>
           <div className="flex items-center gap-1">
             <span>{TEXT.noAccount}</span>
-            <button type="button" className="text-[#A09E9A] hover:text-[#D4AF37] hover:underline transition-all">{TEXT.contactAgency}</button>
+            <button type="button" className="text-[#B0B0B0] hover:text-[#FFB800] hover:underline transition-all">{TEXT.contactAgency}</button>
           </div>
           <button 
             type="button" 

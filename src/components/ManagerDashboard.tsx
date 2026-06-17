@@ -439,8 +439,8 @@ export const ManagerDashboard: React.FC = () => {
         <div className="w-16 h-16 rounded-2xl bg-red-950/30 flex items-center justify-center border border-red-900/50 shadow-lg shadow-red-950/20">
           <span className="text-2xl">🔒</span>
         </div>
-        <p className="text-[#A09E9A] font-semibold text-sm">Access Denied</p>
-        <p className="text-[#A09E9A]/60 text-xs text-center max-w-sm">This panel is restricted to Managers and Team Agents. If you are a host, please navigate back to your profile.</p>
+        <p className="text-[#B0B0B0] font-semibold text-sm">Access Denied</p>
+        <p className="text-[#B0B0B0]/60 text-xs text-center max-w-sm">This panel is restricted to Managers and Team Agents. If you are a host, please navigate back to your profile.</p>
       </div>
     );
   }

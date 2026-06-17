@@ -2,43 +2,41 @@
 
 /* =========================================
    NINE TALENT MANAGEMENT — DESIGN SYSTEM
-   Premium Dark Theme with Gold Accents
+   Premium Futuristic Dark Theme with Fiery Gold & Amethyst
    ========================================= */
 
 /* noinspection CssUnknownAtRule */
 @theme {
-  /* Brand gold palette */
-  --color-gold-50:  #FFF8E1;
-  --color-gold-100: #FFECB3;
-  --color-gold-200: #F5D87E;
-  --color-gold-300: #E8C44A;
-  --color-gold-400: #D4AF37;   /* primary brand gold */
-  --color-gold-500: #B8960C;
-  --color-gold-600: #9A7B0A;
+  /* Brand gold palette (Fiery Gold) */
+  --color-gold-100: #FFE066;
+  --color-gold-200: #FFCC00;
+  --color-gold-300: #FFB800; /* Primary */
+  --color-gold-400: #FF9900;
+  --color-gold-500: #FF7B00; /* Mid-gradient */
+  --color-gold-600: #FF5A20;
+  --color-gold-700: #FF3B5C; /* Dark end of gradient */
 
-  /* Surface palette */
-  --color-surface-0:  #08080F;  /* deepest */
-  --color-surface-1:  #0D0D14;  /* body bg */
-  --color-surface-2:  #13131E;  /* sidebar / header */
-  --color-surface-3:  #1A1A28;  /* cards */
-  --color-surface-4:  #222235;  /* elevated cards */
-  --color-surface-5:  #2A2A40;  /* hover states */
+  /* Amethyst Accent */
+  --color-amethyst-300: #D4B3FF;
+  --color-amethyst-400: #B388FF; /* Secondary Neon Amethyst */
+  --color-amethyst-500: #8E54E9;
+
+  /* Surface palette (Charcoal / Deep Black) */
+  --color-surface-0:  #000000;
+  --color-surface-1:  #0A0A0A;
+  --color-surface-2:  #111111;
+  --color-surface-3:  #1A1A1A;
+  --color-surface-4:  #222222;
 
   /* Text palette */
-  --color-text-primary:   #F0EFE8;  /* warm off-white */
-  --color-text-secondary: #A09E9A;  /* muted */
-  --color-text-muted:     #5A5865;  /* very muted */
-
-  /* Semantic */
-  --color-success: #22C55E;
-  --color-error:   #EF4444;
-  --color-warning: #F59E0B;
-  --color-info:    #60A5FA;
+  --color-text-primary:   #F5F5F5;  /* Soft gray/white */
+  --color-text-secondary: #B0B0B0;
+  --color-text-muted:     #707070;
 
   /* Override tailwind defaults for brand consistency */
-  --color-indigo-500: #D4AF37;
-  --color-indigo-400: #E8C44A;
-  --color-indigo-600: #B8960C;
+  --color-indigo-400: #FFB800;
+  --color-indigo-500: #FF7B00;
+  --color-indigo-600: #FF3B5C;
 }
 
 /* ---- Base ---- */
@@ -52,66 +50,122 @@ html, body, #root {
 
 body {
   margin: 0;
-  background-color: #0D0D14;
-  background-image:
-    radial-gradient(ellipse at 10% 0%,   rgba(212, 175, 55, 0.07) 0%, transparent 50%),
-    radial-gradient(ellipse at 90% 100%, rgba(212, 175, 55, 0.04) 0%, transparent 50%);
+  background-color: #0A0A0A;
+  background-image: linear-gradient(to bottom right, #0A0A0A, #1A1A1A);
   background-attachment: fixed;
-  color: #F0EFE8;
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  color: #F5F5F5;
+  font-family: Inter, Poppins, "SF Pro", Urbanist, sans-serif;
   -webkit-font-smoothing: antialiased;
+  letter-spacing: 0.01em;
 }
+
+/* ---- Typography Weights ---- */
+h1, h2, h3, h4, h5, h6, .title { font-weight: 600; }
+.subtitle { font-weight: 500; }
+p, .body-text { font-weight: 400; }
 
 /* ---- Component Classes ---- */
 @layer components {
 
-  /* Cards */
-  .glass-card {
-    background: #1A1A28;
-    border: 1px solid rgba(212, 175, 55, 0.10);
-    border-radius: 1rem;
-    padding: 1.5rem;
-    box-shadow: 0 4px 24px rgba(0,0,0,0.35);
+  /* Cards / Blocks / Tables */
+  .glass-card, .glass-block, .glass-table-container {
+    background: rgba(0, 0, 0, 0.45);
+    -webkit-backdrop-filter: blur(16px);
+    backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 184, 0, 0.15); /* Soft gold border */
+    border-radius: 1rem; /* 16px */
+    padding: 1.5rem; /* 24px */
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), inset 0 0 10px rgba(255, 184, 0, 0.05);
+    transition: all 0.25s ease;
+  }
+  
+  .glass-card:hover {
+    border-color: rgba(179, 136, 255, 0.25); /* Subtle amethyst glow */
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6), 0 0 15px rgba(179, 136, 255, 0.1);
   }
 
+  /* Specific Overview page themed card (Fiery Gold) */
+  .overview-glass-card {
+    background: linear-gradient(to bottom right, rgba(26, 18, 10, 0.55), rgba(13, 10, 8, 0.55));
+    -webkit-backdrop-filter: blur(16px);
+    backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 184, 0, 0.4); /* Gold glow edge */
+    border-radius: 1rem; /* 16px */
+    padding: 1.5rem; /* 24px */
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), inset 0 0 15px rgba(255, 184, 0, 0.3);
+    transition: all 0.25s ease;
+  }
+  
+  .overview-glass-card:hover {
+    border-color: rgba(255, 184, 0, 0.6);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6), inset 0 0 20px rgba(255, 184, 0, 0.4);
+  }
+
+  /* Utility for any glassmorphic surface */
   .glass {
-    background: rgba(26, 26, 40, 0.85);
+    background: rgba(0, 0, 0, 0.4);
     -webkit-backdrop-filter: blur(12px);
     backdrop-filter: blur(12px);
-    border: 1px solid rgba(212, 175, 55, 0.10);
+    border: 1px solid rgba(255, 184, 0, 0.15);
   }
 
-  /* Inputs */
+  /* Inputs / Forms */
   .glass-input {
-    background: #222235;
-    border: 1px solid rgba(212, 175, 55, 0.15);
-    border-radius: 0.75rem;
+    background: rgba(0, 0, 0, 0.5);
+    border: 1px solid rgba(255, 184, 0, 0.2);
+    border-radius: 0.75rem; /* 12px */
     padding: 0.75rem 1rem;
-    color: #F0EFE8;
-    transition: all 0.2s;
+    color: #F5F5F5;
+    transition: all 0.2s ease-in-out;
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
   }
-  .glass-input::placeholder { color: #5A5865; }
+  .glass-input::placeholder { color: #707070; }
   .glass-input:focus {
     outline: none;
-    border-color: rgba(212, 175, 55, 0.5);
-    box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.08);
+    border-color: #B388FF; /* Amethyst focus ring */
+    box-shadow: 0 0 12px rgba(179, 136, 255, 0.25);
   }
 
-  /* Gold accent button */
+  /* Fiery Gold gradient button */
   .btn-gold {
-    background: linear-gradient(135deg, #D4AF37, #B8960C);
-    color: #0D0D14;
-    font-weight: 700;
-    border-radius: 0.625rem;
-    padding: 0.5rem 1.25rem;
-    font-size: 0.75rem;
-    transition: all 0.2s;
-    box-shadow: 0 2px 12px rgba(212,175,55,0.25);
+    background: linear-gradient(135deg, #FFB800, #FF7B00, #FF3B5C);
+    color: #0A0A0A;
+    font-weight: 600;
+    border-radius: 0.75rem; /* 12px */
+    padding: 0.75rem 1.5rem;
+    font-size: 0.875rem;
+    border: none;
+    transition: all 0.2s ease;
+    box-shadow: 0 4px 15px rgba(255, 123, 0, 0.3);
+    cursor: pointer;
   }
   .btn-gold:hover {
-    background: linear-gradient(135deg, #E8C44A, #D4AF37);
-    box-shadow: 0 4px 20px rgba(212,175,55,0.35);
-    transform: translateY(-1px);
+    background: linear-gradient(135deg, #FFCC00, #FFB800, #FF7B00);
+    box-shadow: 0 6px 20px rgba(255, 184, 0, 0.4);
+    transform: translateY(-2px) scale(1.02);
+  }
+  .btn-gold:disabled {
+    background: linear-gradient(135deg, #5A4A1A, #4A2810);
+    color: #A0A0A0;
+    box-shadow: none;
+    cursor: not-allowed;
+    transform: none;
+  }
+
+  /* Outline variant */
+  .btn-outline-amethyst {
+    background: transparent;
+    border: 1px solid #B388FF;
+    color: #B388FF;
+    border-radius: 0.75rem;
+    padding: 0.75rem 1.5rem;
+    font-weight: 600;
+    transition: all 0.2s ease;
+  }
+  .btn-outline-amethyst:hover {
+    background: rgba(179, 136, 255, 0.1);
+    box-shadow: 0 0 15px rgba(179, 136, 255, 0.2);
   }
 
   /* Nav item */
@@ -119,82 +173,111 @@ body {
     display: flex;
     align-items: center;
     gap: 0.75rem;
-    padding: 0.625rem 0.75rem;
-    border-radius: 0.5rem;
+    padding: 0.75rem 1rem;
+    border-radius: 0.75rem; /* 12px */
     font-size: 0.875rem;
-    font-weight: 600;
+    font-weight: 500;
     width: 100%;
     text-align: left;
     cursor: pointer;
-    transition: all 0.15s;
-    color: #A09E9A;
+    transition: all 0.2s ease;
+    color: #B0B0B0;
   }
   .nav-item:hover {
-    background: rgba(212, 175, 55, 0.08);
-    color: #F0EFE8;
+    background: rgba(255, 184, 0, 0.08);
+    color: #F5F5F5;
   }
   .nav-item.active {
-    background: rgba(212, 175, 55, 0.12);
-    color: #D4AF37;
+    background: rgba(255, 184, 0, 0.12);
+    color: #FFB800;
+    box-shadow: inset 3px 0 0 #FFB800;
   }
 
   /* Section label */
   .nav-section-label {
-    font-size: 0.625rem;
-    font-weight: 800;
-    letter-spacing: 0.2em;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.1em;
     text-transform: uppercase;
-    color: #5A5865;
-    padding: 0.5rem 0.75rem 0.25rem;
+    color: #707070;
+    padding: 1rem 1rem 0.5rem;
   }
 
-  /* App shell utilities (replaces inline styles in App.tsx) */
+  /* App shell utilities */
   .app-bg {
-    background: #0D0D14;
+    background: #0A0A0A;
   }
   .app-header {
-    background: #13131E;
-    border-color: rgba(212, 175, 55, 0.12);
+    background: rgba(10, 10, 10, 0.85);
+    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid rgba(255, 184, 0, 0.1);
   }
   .app-sidebar {
-    background: #13131E;
-    border-color: rgba(212, 175, 55, 0.10);
+    background: #111111;
+    border-right: 1px solid rgba(255, 184, 0, 0.1);
   }
   .app-dropdown {
-    background: #1A1A28;
-    border-color: rgba(212, 175, 55, 0.15);
+    background: rgba(26, 26, 26, 0.9);
+    -webkit-backdrop-filter: blur(16px);
+    backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 184, 0, 0.15);
+    border-radius: 1rem;
   }
   .app-divider-border {
-    border-color: rgba(212, 175, 55, 0.10);
+    border-color: rgba(255, 184, 0, 0.10);
   }
   .app-logo-border {
-    border-color: rgba(212, 175, 55, 0.15);
+    border-color: rgba(255, 184, 0, 0.15);
   }
   .app-notif-header-border {
-    border-color: rgba(212, 175, 55, 0.10);
+    border-color: rgba(255, 184, 0, 0.10);
   }
   .app-notif-border {
-    border-color: rgba(255, 255, 255, 0.04);
+    border-color: rgba(255, 255, 255, 0.05);
   }
   .app-avatar {
-    background: rgba(212, 175, 55, 0.10);
-    border-color: rgba(212, 175, 55, 0.25);
+    background: rgba(255, 184, 0, 0.15);
+    border: 1px solid rgba(255, 184, 0, 0.3);
   }
   .app-loader-spinner {
-    border-color: rgba(212, 175, 55, 0.2);
-    border-top-color: #D4AF37;
+    border-color: rgba(255, 184, 0, 0.2);
+    border-top-color: #FFB800;
+  }
+  
+  /* Tables */
+  .table-row {
+    background: rgba(0, 0, 0, 0.35);
+    transition: all 0.2s ease;
+  }
+  .table-row:nth-child(even) {
+    background: rgba(26, 26, 26, 0.35);
+  }
+  .table-row:hover {
+    background: rgba(255, 184, 0, 0.05);
+    box-shadow: 0 0 10px rgba(255, 184, 0, 0.1);
   }
 }
 
 /* ---- Scrollbar ---- */
-.custom-scrollbar::-webkit-scrollbar { width: 4px; }
+.custom-scrollbar::-webkit-scrollbar { width: 6px; }
 .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(212, 175, 55, 0.2);
+  background: rgba(255, 184, 0, 0.2);
   border-radius: 999px;
 }
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(212, 175, 55, 0.4);
+  background: rgba(255, 184, 0, 0.4);
+}
+
+/* ---- Animations ---- */
+.animate-fade-in {
+  animation: fadeIn 0.25s ease-out forwards;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(5px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 /* ---- Mobile safe-area padding ---- */

@@ -1,5 +1,6 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import { Search, Filter, TrendingUp, BarChart3, PieChart, Info, UserPen, Target, Plus, ChevronRight, X, Shield, Edit2, Loader2, Fingerprint } from 'lucide-react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
+import { Search, Filter, TrendingUp, BarChart3, PieChart, Info, UserPen, Target, Plus, ChevronRight, X, Shield, Edit2, Loader2, Fingerprint, Star } from 'lucide-react';
 import { Host, Tier, BaseSalaryTier, HostStatus, AnchorType, PerformanceGoal, Role, CommissionEntry, DirectorNote, NoteType } from '../types';
 import { Storage } from '../lib/storage';
 import { FirebaseService } from '../lib/firebaseService';
@@ -7,7 +8,7 @@ import { cn, formatNumber } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 import { MANAGERS, BASE_SALARY_POLICIES } from '../lib/constants';
 
-const ROLES: Role[] = ['Talent', 'Manager', 'Admin', 'Head Admin', 'Director', 'Agent'];
+const ROLES: Role[] = ['Talent', 'Manager', 'Admin', 'Director', 'Agent'];
 const STATUSES: HostStatus[] = ['Active', 'Inconsistent', 'Released', 'Inactive'];
 const ANCHORS: AnchorType[] = ['Nine Agency', 'Sub Agency', 'External'];
 
@@ -98,6 +99,18 @@ export const ProfilesTab = () => {
   const [uploadedPhoto, setUploadedPhoto] = useState<string | null>(null);
   const [isProcessingPhoto, setIsProcessingPhoto] = useState(false);
   
+  // Dynamic portal target setup to resolve iframe/mobile layout clipping
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
+
+  useEffect(() => {
+    if (containerRef.current) {
+      setPortalTarget(containerRef.current.ownerDocument.body);
+    } else {
+      setPortalTarget(document.body);
+    }
+  }, [selectedHostId]);
+
   useEffect(() => {
     if (!isEditingHost) {
       setUploadedPhoto(null);
@@ -105,8 +118,8 @@ export const ProfilesTab = () => {
   }, [isEditingHost]);
 
   // Filters
-  const [tierFilter, setTierFilter] = useState<Tier[]>([]);
-  const [salaryFilter, setSalaryFilter] = useState<BaseSalaryTier[]>([]);
+  const [roleFilter, setRoleFilter] = useState<'All Members' | 'Show hosts' | 'Show team leaders'>('All Members');
+  const [tierPayFilter, setTierPayFilter] = useState<string>('All Tiers');
 
   const managerOptions = useMemo(() => {
     return hosts
@@ -163,15 +176,30 @@ export const ProfilesTab = () => {
 
   const filteredGrid = useMemo(() => {
     return hosts.filter(h => {
-        const matchesSearch = h.id === searchTerm || h.name.toLowerCase().includes(searchTerm.toLowerCase()) || (h.nickname?.toLowerCase().includes(searchTerm.toLowerCase()));
-        const matchesTier = tierFilter.length === 0 || tierFilter.includes(h.tier);
-        const matchesSalary = salaryFilter.length === 0 || salaryFilter.includes(h.base_salary_category);
-        return matchesSearch && matchesTier && matchesSalary;
+      // Search
+      const s = searchTerm.toLowerCase();
+      const matchesSearch = h.id === searchTerm ||
+        h.name.toLowerCase().includes(s) ||
+        (h.nickname?.toLowerCase().includes(s));
+      if (!matchesSearch) return false;
+
+      // Role filter
+      const roleStr = (h.role || '').toLowerCase();
+      if (roleFilter === 'Show hosts' && roleStr !== 'host') return false;
+      if (roleFilter === 'Show team leaders' && roleStr === 'host') return false;
+
+      // Tier pay filter
+      if (tierPayFilter !== 'All Tiers') {
+        const tp = ((h as any).tier_pay || h.base_salary_category || '').toLowerCase();
+        if (tp !== tierPayFilter.toLowerCase()) return false;
+      }
+
+      return true;
     }).sort((a, b) => {
-        const tiers: Tier[] = ['S', 'A', 'B', 'C', 'X'];
-        return tiers.indexOf(a.tier) - tiers.indexOf(b.tier);
+      const tiers: Tier[] = ['S', 'A', 'B', 'C', 'X'];
+      return tiers.indexOf(a.tier) - tiers.indexOf(b.tier);
     });
-  }, [hosts, searchTerm, tierFilter, salaryFilter]);
+  }, [hosts, searchTerm, roleFilter, tierPayFilter]);
 
   const selectedHost = useMemo(() => hosts.find(h => h.id === selectedHostId), [hosts, selectedHostId]);
   const goals = useMemo(() => selectedHost ? Storage.getGoals(selectedHost.id) : [], [selectedHost, selectedHostId]);
@@ -408,33 +436,70 @@ export const ProfilesTab = () => {
     }
   };
 
+  const getTierPayBadge = (tierPay: string): { label: string; cls: string } => {
+    const norm = (tierPay || '').toLowerCase();
+    if (norm.includes('star'))    return { label: tierPay, cls: 'bg-gradient-to-br from-yellow-400 to-amber-600 border-yellow-300 text-white shadow-[0_0_10px_rgba(250,204,21,0.6)]' };
+    if (norm.includes('idol'))    return { label: tierPay, cls: 'bg-gradient-to-br from-pink-400 to-pink-700 border-pink-300 text-white shadow-[0_0_10px_rgba(244,114,182,0.6)]' };
+    if (norm.includes('rocket'))  return { label: tierPay, cls: 'bg-gradient-to-br from-sky-400 to-blue-600 border-sky-300 text-white shadow-[0_0_10px_rgba(56,189,248,0.6)]' };
+    if (norm.includes('esport'))  return { label: tierPay, cls: 'bg-gradient-to-br from-violet-500 to-purple-700 border-violet-400 text-white shadow-[0_0_10px_rgba(139,92,246,0.6)]' };
+    if (norm.includes('regular')) return { label: tierPay, cls: 'bg-gradient-to-br from-emerald-400 to-green-600 border-emerald-300 text-white shadow-[0_0_10px_rgba(52,211,153,0.6)]' };
+    return { label: tierPay, cls: 'bg-white/10 border-white/20 text-white shadow-[0_0_10px_rgba(255,255,255,0.2)]' };
+  };
+
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col md:flex-row gap-4 items-center">
-         <div className="relative flex-1 w-full">
-            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600" />
-            <input 
-              type="text" 
-              placeholder="Search by ID or Name..." 
-              className="w-full glass-input pl-10 text-xs" 
-              value={searchTerm} 
-              onChange={(e) => setSearchTerm(e.target.value)} 
-            />
-         </div>
-         <div className="flex items-center gap-2 overflow-x-auto w-full md:w-auto pb-1 no-scrollbar">
-            {['S', 'A', 'B', 'C', 'X'].map(t => (
-              <button 
-                key={t} 
-                onClick={() => setTierFilter(prev => prev.includes(t as Tier) ? prev.filter(x => x !== t) : [...prev, t as Tier])}
+    <div ref={containerRef} className="space-y-6">
+      {/* ── Row 1: Search + Role filter ── */}
+      <div className="flex gap-3 items-center">
+        <div className="relative flex-1">
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#B0B0B0]/50" />
+          <input
+            type="text"
+            placeholder="Search Host ID or Nickname..."
+            className="w-full pl-10 pr-4 py-3 bg-black/30 border border-[#FFB800]/20 rounded-xl text-sm text-[#F5F5F5] placeholder-[#B0B0B0]/50 focus:outline-none focus:border-[#FFB800]/50 transition-all"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+        <div className="relative">
+          <select
+            value={roleFilter}
+            onChange={(e) => setRoleFilter(e.target.value as any)}
+            title="Filter by Role"
+            aria-label="Filter by Role"
+            className="px-4 py-3 bg-black/30 border border-[#FFB800]/20 rounded-xl text-sm text-[#F5F5F5] focus:outline-none focus:border-[#FFB800]/50 appearance-none cursor-pointer transition-all pr-8"
+          >
+            <option value="All Members">All Members</option>
+            <option value="Show hosts">Show Hosts</option>
+            <option value="Show team leaders">Team Leaders</option>
+          </select>
+          <ChevronRight size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#B0B0B0]/50 pointer-events-none rotate-90" />
+        </div>
+      </div>
+
+      {/* ── Row 2: Tier Pay category chips ── */}
+      <div className="p-4 bg-black/20 border border-[#FFB800]/10 rounded-2xl space-y-3">
+        <div className="flex items-center gap-1.5">
+          <Star size={11} className="text-[#B0B0B0]/60" />
+          <span className="text-[10px] font-black uppercase tracking-[0.15em] text-[#B0B0B0]/60">Tier Pay Category</span>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {['Star Host', 'Rocket Host', 'S idol', 'ESport Host', 'Regular Host'].map(tier => {
+            const isActive = tierPayFilter === tier;
+            const badge = getTierPayBadge(tier);
+            return (
+              <button
+                key={tier}
+                onClick={() => setTierPayFilter(isActive ? 'All Tiers' : tier)}
                 className={cn(
-                  "px-3 py-1.5 rounded text-[10px] font-bold border transition-all whitespace-nowrap",
-                  tierFilter.includes(t as Tier) ? "bg-indigo-600 border-indigo-500 text-white" : "bg-slate-800 border-slate-700 text-slate-500"
+                  'px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest border transition-all',
+                  isActive ? badge.cls : 'bg-black/20 border-white/10 text-[#B0B0B0]/60 hover:border-white/20 hover:text-[#B0B0B0]'
                 )}
               >
-                {TEXT.tier} {t}
+                {tier.toUpperCase()}
               </button>
-            ))}
-         </div>
+            );
+          })}
+        </div>
       </div>
 
       {isLoading ? (
@@ -446,47 +511,87 @@ export const ProfilesTab = () => {
           <p className="text-xs text-white/20 max-w-xs leading-relaxed font-medium">{TEXT.initializeRoster}</p>
         </div>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
-          {filteredGrid.map(host => (
-            <motion.div 
-              layoutId={host.id}
-              key={host.id}
-              onClick={() => setSelectedHostId(host.id)}
-              className="group relative glass-card !p-0 overflow-hidden cursor-pointer hover:ring-1 hover:ring-indigo-500 transition-all bg-[#0F1117] border-slate-800"
-            >
-              <div className="aspect-[3/4] bg-slate-800 relative">
-                {host.photoUrl ? (
-                  <img src={host.photoUrl} alt={host.name} className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all" referrerPolicy="no-referrer" />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-slate-700 font-bold text-3xl">
-                    {host.name?.[0] || '?'}
+        <div className="space-y-4">
+          {/* Count label */}
+          <div className="flex items-center justify-between px-1">
+            <h2 className="text-[#F5F5F5] font-black text-lg tracking-wider flex items-center gap-2">
+              <span className="text-[#FFB800]" ref={el => { if (el) el.style.fontSize = '1.1rem'; }}
+              >⊞</span>
+              ROSTER DIRECTORY
+            </h2>
+            <span className="text-[#B0B0B0] text-xs font-mono">{filteredGrid.length} profiles found</span>
+          </div>
+
+          {/* 2-col card grid matching production design */}
+          <div className="grid grid-cols-2 gap-4">
+          {filteredGrid.map(host => {
+            const tierPay = (host as any).tier_pay || host.base_salary_category || '';
+            const badge = tierPay && tierPay !== 'N/A' ? getTierPayBadge(tierPay) : null;
+            return (
+              <motion.div
+                layoutId={host.id}
+                key={host.id}
+                onClick={() => setSelectedHostId(host.id)}
+                className="group relative overflow-hidden cursor-pointer rounded-2xl border border-[#FFB800]/20 hover:border-[#FFB800]/50 transition-all shadow-lg shadow-black/40 active:scale-[0.98]"
+              >
+                {/* Full-bleed portrait image */}
+                <div className="aspect-[3/4] bg-[#1A1A1A] relative">
+                  {host.photoUrl ? (
+                    <img
+                      src={host.photoUrl}
+                      alt={host.name}
+                      className="w-full h-full object-cover transition-transform group-hover:scale-105 duration-500"
+                      referrerPolicy="no-referrer"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-[#FFB800]/20 font-black text-5xl">
+                      {(host.nickname || host.name)?.[0]?.toUpperCase() || '?'}
+                    </div>
+                  )}
+
+                  {/* Bottom gradient */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black via-black/30 to-transparent" />
+
+                  {/* Tier badge — top right */}
+                  {badge && (
+                    <div className="absolute top-2.5 right-2.5">
+                      <span className={cn(
+                        'flex items-center gap-1 px-2 py-1 rounded-full text-[8px] font-black uppercase tracking-wider border backdrop-blur-sm',
+                        badge.cls
+                      )}>
+                        <Star size={8} />
+                        {badge.label}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Bottom info overlay */}
+                  <div className="absolute bottom-0 left-0 right-0 p-3">
+                    <h4 className="font-black text-white text-sm leading-tight mb-2 drop-shadow-lg truncate">
+                      {host.nickname || host.name}
+                    </h4>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="px-2 py-0.5 rounded-md bg-black/70 border border-[#FFB800]/30 text-[#FFB800] text-[8px] font-black font-mono">
+                        ID: {host.id}
+                      </span>
+                      {host.role && (
+                        <span className="px-2 py-0.5 rounded-md bg-black/70 border border-white/10 text-white/60 text-[8px] font-black uppercase">
+                          {host.role}
+                        </span>
+                      )}
+                    </div>
                   </div>
-                )}
-                <div className="absolute inset-0 bg-gradient-to-t from-[#0F1117] via-transparent to-transparent opacity-60" />
-              </div>
-              <div className="p-4 absolute bottom-0 left-0 right-0">
-                <div className="flex items-center justify-between mb-1">
-                  <span className={cn(
-                    "px-1.5 py-0.5 rounded text-[7px] font-black uppercase tracking-widest border",
-                    host.tier === 'S' ? "bg-yellow-900/30 text-yellow-500 border-yellow-500/20" :
-                    host.tier === 'A' ? "bg-indigo-900/30 text-indigo-400 border-indigo-400/20" :
-                    host.tier === 'B' ? "bg-cyan-900/30 text-cyan-400 border-cyan-400/20" : "bg-slate-800 text-slate-500 border-slate-700"
-                  )}>
-                    {TEXT.roleModelRatio}: {Math.min(100, Math.round((exposuresList.filter(e => e.poppo_id === host.id || (e.agency_attendance && e.agency_attendance.includes(host.id))).length / (exposuresList.length || 1)) * 100))}%
-                  </span>
-                  <span className="text-[9px] font-mono text-slate-500">#{host.id}</span>
                 </div>
-                <h4 className="font-bold text-white truncate text-sm">{host.nickname || host.name}</h4>
-                <p className="text-[8px] text-slate-500 uppercase font-black tracking-widest mt-0.5">{host.role}</p>
-              </div>
-            </motion.div>
-          ))}
+              </motion.div>
+            );
+          })}
         </div>
+      </div>
       )}
 
       {/* Details View Modal */}
       <AnimatePresence>
-        {selectedHost && (
+        {selectedHost && portalTarget && createPortal(
           <div className="fixed inset-0 z-[70] flex items-center justify-end">
             <motion.div 
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -496,7 +601,7 @@ export const ProfilesTab = () => {
             <motion.div 
               initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
               transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className="relative w-full max-w-4xl h-full bg-[#0a0a1a] border-l border-white/10 overflow-y-auto"
+              className="relative w-full max-w-4xl h-full bg-[#111111] border-l border-white/10 overflow-y-auto"
             >
               <div className="sticky top-0 z-10 glass border-b border-white/10 p-6 flex items-center justify-between">
                 <div className="flex items-center gap-4">
@@ -567,7 +672,7 @@ export const ProfilesTab = () => {
                                   <BarChart data={commissions}>
                                     <XAxis dataKey="month" hide />
                                     <Tooltip 
-                                      contentStyle={{ backgroundColor: '#0f1117', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px' }}
+                                      contentStyle={{ backgroundColor: '#0A0A0A', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px' }}
                                       labelStyle={{ color: 'rgba(255,255,255,0.4)', fontSize: '10px', fontWeight: 'bold' }}
                                     />
                                     <Bar dataKey="total_points" fill="#6366f1" radius={[4, 4, 0, 0]} />
@@ -933,7 +1038,7 @@ export const ProfilesTab = () => {
       </AnimatePresence>
 
       <AnimatePresence>
-        {isEditingHost && selectedHost && (
+        {isEditingHost && selectedHost && portalTarget && createPortal(
           <div className="fixed inset-0 z-[80] flex items-center justify-center p-6">
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsEditingHost(false)} className="absolute inset-0 bg-[#08080F]/80 backdrop-blur-md" />
             <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="relative w-full max-w-lg glass rounded-3xl overflow-hidden border border-white/10 flex flex-col shadow-2xl shadow-indigo-500/20">
@@ -1064,7 +1169,8 @@ export const ProfilesTab = () => {
                 </div>
               </form>
             </motion.div>
-          </div>
+          </div>,
+          portalTarget
         )}
       </AnimatePresence>
     </div>

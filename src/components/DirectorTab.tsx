@@ -25,7 +25,9 @@ import {
   Plus, 
   Lock,
   Award,
-  ListTodo
+  ListTodo,
+  Search,
+  Settings
 } from 'lucide-react';
 import { Storage } from '../lib/storage';
 import { 
@@ -43,6 +45,12 @@ import * as XLSX from 'xlsx';
 import { FirebaseService } from '../lib/firebaseService';
 import { MANAGERS, BASE_SALARY_POLICIES } from '../lib/constants';
 import { FinancialUpload } from './FinancialUpload';
+
+import { FirestoreManager } from './director-console/FirestoreManager';
+import { AuthManager } from './director-console/AuthManager';
+import { FunctionsMonitor } from './director-console/FunctionsMonitor';
+import { StorageManager } from './director-console/StorageManager';
+import { SettingsPanel } from './director-console/SettingsPanel';
 
 // --- Types for AI Recommendations ---
 interface AIInsight {
@@ -70,8 +78,8 @@ export const DirectorTab = () => {
   const isDirector = localAuth.role?.toLowerCase() === 'director';
   const hasAccess = isDirector;
 
-  // Sidebar views: overview, awards, tasks, roster_admin, financials
-  const [activeView, setActiveView] = useState<'overview' | 'awards' | 'tasks' | 'roster_admin' | 'financials'>('overview');
+  // Sidebar views: overview, awards, tasks, roster_admin, financials, firestore, auth, functions, storage, settings
+  const [activeView, setActiveView] = useState<'overview' | 'awards' | 'tasks' | 'roster_admin' | 'financials' | 'firestore' | 'auth' | 'functions' | 'storage' | 'settings'>('overview');
   
   // Data State
   const [hosts, setHosts] = useState<Host[]>([]);
@@ -113,6 +121,7 @@ export const DirectorTab = () => {
 
   // Storage Financial Ledger states
   const [financialTab, setFinancialTab] = useState<'monthly' | 'weekly'>('monthly');
+  const [financialSearchTerm, setFinancialSearchTerm] = useState('');
   const [monthlyLedger, setMonthlyLedger] = useState<any[]>([]);
   const [weeklyLedger, setWeeklyLedger] = useState<any[]>([]);
   const [selectedRows, setSelectedRows] = useState<Record<string, boolean>>({});
@@ -652,9 +661,9 @@ export const DirectorTab = () => {
   if (!hasAccess) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center space-y-4 bg-mesh min-h-[70vh]">
-        <Shield size={64} className="text-[#D4AF37]/20" />
-        <h2 className="text-2xl font-black text-[#F0EFE8]">Leadership Credentials Required</h2>
-        <p className="max-w-md text-[#A09E9A] font-medium text-sm">This cockpit is restricted to Director level only. Please authenticate with credentials to access this system.</p>
+        <Shield size={64} className="text-[#FFB800]/20" />
+        <h2 className="text-2xl font-black text-[#F5F5F5]">Leadership Credentials Required</h2>
+        <p className="max-w-md text-[#B0B0B0] font-medium text-sm">This cockpit is restricted to Director level only. Please authenticate with credentials to access this system.</p>
       </div>
     );
   }
@@ -666,10 +675,10 @@ export const DirectorTab = () => {
         <div className="p-4 mb-6 rounded-3xl bg-indigo-500/5 border border-indigo-500/10">
           <div className="flex items-center gap-3 mb-1">
             <Shield size={16} className="text-indigo-400" />
-            <h4 className="text-[10px] font-black uppercase tracking-widest text-[#A09E9A]/40">Director Portal</h4>
+            <h4 className="text-[10px] font-black uppercase tracking-widest text-[#B0B0B0]/40">Director Portal</h4>
           </div>
-          <div className="text-xs font-bold text-[#F0EFE8] truncate">{localAuth.name}</div>
-          <div className="text-[9px] text-[#D4AF37] font-black mt-1 uppercase tracking-wider">Secure Session Active</div>
+          <div className="text-xs font-bold text-[#F5F5F5] truncate">{localAuth.name}</div>
+          <div className="text-[9px] text-[#FFB800] font-black mt-1 uppercase tracking-wider">Secure Session Active</div>
         </div>
 
         {[
@@ -678,6 +687,11 @@ export const DirectorTab = () => {
           { id: 'tasks', label: 'Tasks Desk', icon: ListTodo },
           { id: 'roster_admin', label: 'Roster Admin', icon: Users },
           { id: 'financials', label: 'Financials', icon: Database },
+          { id: 'firestore', label: 'Database', icon: Database },
+          { id: 'auth', label: 'Authentication', icon: Shield },
+          { id: 'functions', label: 'Cloud Functions', icon: Activity },
+          { id: 'storage', label: 'Storage', icon: FolderPlus },
+          { id: 'settings', label: 'Settings', icon: Settings },
         ].map(item => (
           <button
             key={item.id}
@@ -685,13 +699,13 @@ export const DirectorTab = () => {
             className={cn(
               "w-full flex items-center gap-4 p-4 rounded-2xl transition-all group relative cursor-pointer",
               activeView === item.id 
-                ? "bg-[#1A1A28] text-[#F0EFE8] border border-white/5 shadow-xl" 
-                : "text-[#A09E9A] hover:bg-white/[0.02] hover:text-[#F0EFE8]"
+                ? "bg-[#1A1A1A] text-[#F5F5F5] border border-white/5 shadow-xl" 
+                : "text-[#B0B0B0] hover:bg-white/[0.02] hover:text-[#F5F5F5]"
             )}
             title={`Switch to ${item.label} view`}
             aria-label={`Switch to ${item.label} view`}
           >
-            <item.icon size={18} className={cn("transition-colors", activeView === item.id ? "text-indigo-400" : "group-hover:text-[#F0EFE8]")} />
+            <item.icon size={18} className={cn("transition-colors", activeView === item.id ? "text-indigo-400" : "group-hover:text-[#F5F5F5]")} />
             <span className="text-[11px] font-black uppercase tracking-widest">{item.label}</span>
             {activeView === item.id && (
               <motion.div layoutId="nav-glow" className="absolute left-0 w-1 h-6 bg-indigo-500 rounded-r-full shadow-[0_0_15px_rgba(99,102,241,0.5)]" />
@@ -727,8 +741,8 @@ export const DirectorTab = () => {
 
         {/* Loading Overlay */}
         {isLoading && (
-          <div className="flex flex-col items-center justify-center py-20 text-center text-[#A09E9A]/40 italic">
-            <Loader2 className="animate-spin text-[#D4AF37] mb-2" size={32} />
+          <div className="flex flex-col items-center justify-center py-20 text-center text-[#B0B0B0]/40 italic">
+            <Loader2 className="animate-spin text-[#FFB800] mb-2" size={32} />
             Parsing cloud synchronization tables...
           </div>
         )}
@@ -742,30 +756,30 @@ export const DirectorTab = () => {
                              {/* Dashboard Metrics */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   <div className="p-6 rounded-3xl border border-white/5 bg-white/[0.01] tech-card">
-                    <p className="text-[9px] font-black uppercase text-[#A09E9A]/60 tracking-[0.2em]">Active Hosts Roster</p>
+                    <p className="text-[9px] font-black uppercase text-[#B0B0B0]/60 tracking-[0.2em]">Active Hosts Roster</p>
                     <div className="mt-4 flex items-end gap-3">
-                      <span className="text-4xl font-black text-[#F0EFE8] leading-none">{hosts.filter(h => h.status === 'Active').length}</span>
+                      <span className="text-4xl font-black text-[#F5F5F5] leading-none">{hosts.filter(h => h.status === 'Active').length}</span>
                       <span className="text-[10px] font-black uppercase text-emerald-500 mb-1">Live Anchors</span>
                     </div>
                   </div>
 
                   <div className="p-6 rounded-3xl border border-white/5 bg-white/[0.01] tech-card">
-                    <p className="text-[9px] font-black uppercase text-[#A09E9A]/60 tracking-[0.2em]">Selected Month Commissions</p>
+                    <p className="text-[9px] font-black uppercase text-[#B0B0B0]/60 tracking-[0.2em]">Selected Month Commissions</p>
                     <div className="mt-4 flex items-end gap-3">
                       <span className="text-4xl font-black text-indigo-400 leading-none">
                         {commissions.filter(c => c.month === selectedMonth).reduce((sum, c) => sum + (c.my_commission || 0), 0).toLocaleString()}
                       </span>
-                      <span className="text-[10px] font-black uppercase text-[#A09E9A]/40 mb-1">Points</span>
+                      <span className="text-[10px] font-black uppercase text-[#B0B0B0]/40 mb-1">Points</span>
                     </div>
                   </div>
 
                   <div className="p-6 rounded-3xl border border-white/5 bg-white/[0.01] tech-card">
-                    <p className="text-[9px] font-black uppercase text-[#A09E9A]/60 tracking-[0.2em]">Total Tasks Queue</p>
+                    <p className="text-[9px] font-black uppercase text-[#B0B0B0]/60 tracking-[0.2em]">Total Tasks Queue</p>
                     <div className="mt-4 flex items-end gap-3">
                       <span className="text-4xl font-black text-amber-500 leading-none">
                         {tasks.filter(t => t.status !== 'Completed').length}
                       </span>
-                      <span className="text-[10px] font-black uppercase text-[#A09E9A]/40 mb-1">Open Items</span>
+                      <span className="text-[10px] font-black uppercase text-[#B0B0B0]/40 mb-1">Open Items</span>
                     </div>
                   </div>
                 </div>
@@ -773,13 +787,13 @@ export const DirectorTab = () => {
                 {/* AI Recommendations Engine section */}
                 <section className="space-y-4">
                   <div className="flex items-center justify-between">
-                    <h3 className="font-bold text-lg flex items-center gap-2 text-[#F0EFE8]">
-                      <Zap size={18} className="text-[#D4AF37]" />
+                    <h3 className="font-bold text-lg flex items-center gap-2 text-[#F5F5F5]">
+                      <Zap size={18} className="text-[#FFB800]" />
                       System AI Recommendations Engine
                     </h3>
                     <button 
                       onClick={() => runRecommendationsEngine(true)}
-                      className="px-4 py-1.5 bg-[#D4AF37]/10 hover:bg-[#D4AF37] border border-[#D4AF37]/20 text-[#D4AF37] hover:text-[#0D0D14] rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
+                      className="px-4 py-1.5 bg-[#FFB800]/10 hover:bg-[#FFB800] border border-[#FFB800]/20 text-[#FFB800] hover:text-[#111111] rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
                       title="Recalculate recommendation metrics"
                       aria-label="Recalculate recommendation metrics"
                     >
@@ -789,7 +803,7 @@ export const DirectorTab = () => {
 
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     {insights.length === 0 ? (
-                      <div className="col-span-3 text-center py-12 border border-dashed border-white/10 rounded-3xl text-[#A09E9A]/30 italic text-xs">
+                      <div className="col-span-3 text-center py-12 border border-dashed border-white/10 rounded-3xl text-[#B0B0B0]/30 italic text-xs">
                         No recommendations generated for this cycle. Roster and performance points are stable.
                       </div>
                     ) : (
@@ -799,7 +813,7 @@ export const DirectorTab = () => {
                           className={cn(
                             "p-6 rounded-3xl border flex flex-col justify-between h-56 tech-card",
                             item.priority === 'High' ? 'border-red-500/20 bg-red-500/[0.02]' :
-                            item.priority === 'Medium' ? 'border-amber-500/20 bg-amber-500/[0.02]' : 'border-[#D4AF37]/20 bg-[#D4AF37]/[0.02]'
+                            item.priority === 'Medium' ? 'border-amber-500/20 bg-amber-500/[0.02]' : 'border-[#FFB800]/20 bg-[#FFB800]/[0.02]'
                           )}
                         >
                           <div>
@@ -808,14 +822,14 @@ export const DirectorTab = () => {
                                 "text-[8px] font-black uppercase px-2 py-0.5 rounded-full",
                                 item.priority === 'High' ? 'bg-red-500/10 text-red-400 border border-red-500/20' :
                                 item.priority === 'Medium' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
-                                'bg-[#D4AF37]/10 text-[#D4AF37] border border-[#D4AF37]/20'
+                                'bg-[#FFB800]/10 text-[#FFB800] border border-[#FFB800]/20'
                               )}>
                                 {item.priority} Priority
                               </span>
-                              <span className="text-[9px] font-mono text-[#A09E9A]/40">{item.triggerMetric}</span>
+                              <span className="text-[9px] font-mono text-[#B0B0B0]/40">{item.triggerMetric}</span>
                             </div>
-                            <h4 className="font-extrabold text-[#F0EFE8] text-sm line-clamp-1">{item.hostName}</h4>
-                            <p className="text-[11px] text-[#A09E9A] leading-relaxed mt-2 line-clamp-3">{item.details}</p>
+                            <h4 className="font-extrabold text-[#F5F5F5] text-sm line-clamp-1">{item.hostName}</h4>
+                            <p className="text-[11px] text-[#B0B0B0] leading-relaxed mt-2 line-clamp-3">{item.details}</p>
                           </div>
                           
                           <button
@@ -834,14 +848,14 @@ export const DirectorTab = () => {
 
                 {/* Exception Queue */}
                 <section className="space-y-4">
-                  <h3 className="font-bold text-lg flex items-center gap-2 text-[#F0EFE8]">
+                  <h3 className="font-bold text-lg flex items-center gap-2 text-[#F5F5F5]">
                     <AlertCircle size={18} className="text-red-400" />
                     Data Gaps Exception Queue
                   </h3>
                   <div className="tech-card !p-0 overflow-hidden">
                     <table className="w-full text-left text-xs">
                       <thead>
-                        <tr className="border-b border-white/5 text-[9px] font-black text-[#A09E9A]/40 uppercase tracking-[0.2em] bg-white/[0.02]">
+                        <tr className="border-b border-white/5 text-[9px] font-black text-[#B0B0B0]/40 uppercase tracking-[0.2em] bg-white/[0.02]">
                           <th className="px-6 py-4">Poppo ID</th>
                           <th className="px-6 py-4">Nickname</th>
                           <th className="px-6 py-4">Gap Type</th>
@@ -852,25 +866,25 @@ export const DirectorTab = () => {
                       <tbody className="divide-y divide-white/5">
                         {exceptionQueue.length === 0 ? (
                           <tr>
-                            <td colSpan={5} className="py-12 text-center text-[#A09E9A]/30 italic">No operational data gaps or anomalies detected. Roster is fully intact.</td>
+                            <td colSpan={5} className="py-12 text-center text-[#B0B0B0]/30 italic">No operational data gaps or anomalies detected. Roster is fully intact.</td>
                           </tr>
                         ) : (
                           exceptionQueue.map((item, idx) => (
                             <tr key={idx} className="hover:bg-white/[0.01] transition-colors">
                               <td className="px-6 py-4 font-mono font-bold text-indigo-400">{item.hostId}</td>
-                              <td className="px-6 py-4 font-bold text-[#F0EFE8]">{item.name}</td>
+                              <td className="px-6 py-4 font-bold text-[#F5F5F5]">{item.name}</td>
                               <td className="px-6 py-4 text-slate-300 font-medium">{item.gapType}</td>
                               <td className="px-6 py-4">
                                 <span className={cn(
                                   "text-[8px] font-black uppercase px-2 py-0.5 rounded-full border",
                                   item.severity === 'High' ? 'bg-red-500/10 text-red-400 border-red-500/20' :
                                   item.severity === 'Medium' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
-                                  'bg-slate-500/10 text-[#A09E9A] border-slate-500/20'
+                                  'bg-slate-500/10 text-[#B0B0B0] border-slate-500/20'
                                 )}>
                                   {item.severity}
                                 </span>
                               </td>
-                              <td className="px-6 py-4 text-[#A09E9A]/60">{item.details}</td>
+                              <td className="px-6 py-4 text-[#B0B0B0]/60">{item.details}</td>
                             </tr>
                           ))
                         )}
@@ -888,8 +902,8 @@ export const DirectorTab = () => {
                   <div className="tech-card !p-0 overflow-hidden">
                     <div className="max-h-60 overflow-y-auto custom-scrollbar">
                       <table className="w-full text-left text-xs">
-                        <thead className="sticky top-0 bg-[#13131E] z-10 border-b border-white/5">
-                          <tr className="text-[9px] font-black text-[#A09E9A]/20 uppercase tracking-[0.2em] bg-[#13131E]">
+                        <thead className="sticky top-0 bg-[#0A0A0A] z-10 border-b border-white/5">
+                          <tr className="text-[9px] font-black text-[#B0B0B0]/20 uppercase tracking-[0.2em] bg-[#0A0A0A]">
                             <th className="px-6 py-3">Timestamp</th>
                             <th className="px-6 py-3">Actor ID</th>
                             <th className="px-6 py-3">Action</th>
@@ -900,15 +914,15 @@ export const DirectorTab = () => {
                         <tbody className="divide-y divide-white/5">
                           {auditLogs.length === 0 ? (
                             <tr>
-                              <td colSpan={5} className="py-12 text-center text-[#A09E9A]/20 italic">No activity logs recorded.</td>
+                              <td colSpan={5} className="py-12 text-center text-[#B0B0B0]/20 italic">No activity logs recorded.</td>
                             </tr>
                           ) : (
                             auditLogs.map((log) => (
                               <tr key={log.logId} className="hover:bg-white/[0.01] transition-colors font-mono text-[10px]">
-                                <td className="px-6 py-3 text-[#A09E9A]/40 whitespace-nowrap">{formatDate(log.timestamp)}</td>
+                                <td className="px-6 py-3 text-[#B0B0B0]/40 whitespace-nowrap">{formatDate(log.timestamp)}</td>
                                 <td className="px-6 py-3 font-bold text-indigo-400">{log.actorUserId}</td>
-                                <td className="px-6 py-3 text-[#F0EFE8] font-bold uppercase">{log.actionType}</td>
-                                <td className="px-6 py-3 text-[#A09E9A]/30 truncate max-w-[180px]" title={log.beforeValue}>{log.beforeValue}</td>
+                                <td className="px-6 py-3 text-[#F5F5F5] font-bold uppercase">{log.actionType}</td>
+                                <td className="px-6 py-3 text-[#B0B0B0]/30 truncate max-w-[180px]" title={log.beforeValue}>{log.beforeValue}</td>
                                 <td className="px-6 py-3 text-emerald-400 truncate max-w-[180px]" title={log.afterValue}>{log.afterValue}</td>
                               </tr>
                             ))
@@ -927,14 +941,14 @@ export const DirectorTab = () => {
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div className="space-y-1">
                     <h3 className="font-bold text-xl flex items-center gap-2">
-                      <Award size={20} className="text-[#D4AF37]" />
+                      <Award size={20} className="text-[#FFB800]" />
                       Custom Monthly Awards & Badges
                     </h3>
-                    <p className="text-[10px] text-[#A09E9A]/40 uppercase tracking-widest font-black">Assign badges to top performing talent</p>
+                    <p className="text-[10px] text-[#B0B0B0]/40 uppercase tracking-widest font-black">Assign badges to top performing talent</p>
                   </div>
                   
-                  <div className="flex items-center gap-3 bg-[#1A1A28] p-2 px-4 rounded-xl border border-white/5">
-                    <span className="text-[9px] font-black uppercase tracking-widest text-[#A09E9A]/50">Target Month:</span>
+                  <div className="flex items-center gap-3 bg-[#1A1A1A] p-2 px-4 rounded-xl border border-white/5">
+                    <span className="text-[9px] font-black uppercase tracking-widest text-[#B0B0B0]/50">Target Month:</span>
                     <div className="flex items-center gap-1">
                       <select 
                         value={selectedMonth.split('-')[0]} 
@@ -942,10 +956,10 @@ export const DirectorTab = () => {
                         className="bg-transparent text-indigo-400 font-bold text-xs outline-none cursor-pointer focus:ring-0"
                         title="Target Year selection"
                       >
-                        <option value="2024" className="bg-[#1A1A28] text-[#F0EFE8]">2024</option>
-                        <option value="2025" className="bg-[#1A1A28] text-[#F0EFE8]">2025</option>
-                        <option value="2026" className="bg-[#1A1A28] text-[#F0EFE8]">2026</option>
-                        <option value="2027" className="bg-[#1A1A28] text-[#F0EFE8]">2027</option>
+                        <option value="2024" className="bg-[#1A1A1A] text-[#F5F5F5]">2024</option>
+                        <option value="2025" className="bg-[#1A1A1A] text-[#F5F5F5]">2025</option>
+                        <option value="2026" className="bg-[#1A1A1A] text-[#F5F5F5]">2026</option>
+                        <option value="2027" className="bg-[#1A1A1A] text-[#F5F5F5]">2027</option>
                       </select>
                       <span className="text-white/20 text-xs">-</span>
                       <select 
@@ -955,7 +969,7 @@ export const DirectorTab = () => {
                         title="Target Month selection"
                       >
                         {['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'].map(m => (
-                          <option key={m} value={m} className="bg-[#1A1A28] text-[#F0EFE8]">{m}</option>
+                          <option key={m} value={m} className="bg-[#1A1A1A] text-[#F5F5F5]">{m}</option>
                         ))}
                       </select>
                     </div>
@@ -965,7 +979,7 @@ export const DirectorTab = () => {
                 <div className="tech-card !p-0 overflow-hidden">
                   <table className="w-full text-left text-xs">
                     <thead>
-                      <tr className="border-b border-white/5 text-[9px] font-black text-[#A09E9A]/40 uppercase tracking-widest bg-white/[0.02]">
+                      <tr className="border-b border-white/5 text-[9px] font-black text-[#B0B0B0]/40 uppercase tracking-widest bg-white/[0.02]">
                         <th className="px-6 py-4">Poppo ID</th>
                         <th className="px-6 py-4">Nickname</th>
                         <th className="px-6 py-4">Month</th>
@@ -981,12 +995,12 @@ export const DirectorTab = () => {
                         return (
                           <tr key={host.id} className="hover:bg-white/[0.01] transition-colors">
                             <td className="px-6 py-4 font-mono font-bold text-indigo-400">{host.id}</td>
-                            <td className="px-6 py-4 font-bold text-[#F0EFE8]">{host.nickname || host.name}</td>
-                            <td className="px-6 py-4 text-[#A09E9A]/40">{selectedMonth}</td>
+                            <td className="px-6 py-4 font-bold text-[#F5F5F5]">{host.nickname || host.name}</td>
+                            <td className="px-6 py-4 text-[#B0B0B0]/40">{selectedMonth}</td>
                             <td className="px-6 py-4">
                               <span className={cn(
                                 "text-[10px] font-bold px-2 py-0.5 rounded-full border",
-                                currentBadge !== 'None' ? 'bg-[#D4AF37]/10 text-[#D4AF37] border-[#D4AF37]/20' : 'bg-[#222235] text-[#A09E9A] border-transparent'
+                                currentBadge !== 'None' ? 'bg-[#FFB800]/10 text-[#FFB800] border-[#FFB800]/20' : 'bg-[#222222] text-[#B0B0B0] border-transparent'
                               )}>
                                 {currentBadge}
                               </span>
@@ -1026,7 +1040,7 @@ export const DirectorTab = () => {
                                   }
                                 }}
                                 value={currentBadge}
-                                className="bg-[#1A1A28] border border-white/10 rounded-lg px-2 py-1 text-xs text-[#D4AF37] font-bold outline-none cursor-pointer"
+                                className="bg-[#1A1A1A] border border-white/10 rounded-lg px-2 py-1 text-xs text-[#FFB800] font-bold outline-none cursor-pointer"
                                 title="Assign award badge"
                                 aria-label="Assign award badge"
                               >
@@ -1052,18 +1066,18 @@ export const DirectorTab = () => {
               <motion.div key="tasks" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div className="space-y-1">
-                    <h3 className="font-bold text-xl flex items-center gap-2 text-[#F0EFE8]">
+                    <h3 className="font-bold text-xl flex items-center gap-2 text-[#F5F5F5]">
                       <ListTodo size={20} className="text-indigo-400" />
                       Tasks Coordination Desk
                     </h3>
-                    <p className="text-[10px] text-[#A09E9A]/40 uppercase tracking-widest font-black">Delegate instruction tasks to agency staff</p>
+                    <p className="text-[10px] text-[#B0B0B0]/40 uppercase tracking-widest font-black">Delegate instruction tasks to agency staff</p>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                   {/* Create Task Form */}
                   <div className="tech-card h-fit space-y-6">
-                    <h4 className="text-[10px] font-black uppercase tracking-widest text-[#D4AF37] border-b border-white/5 pb-2">Delegate New Task</h4>
+                    <h4 className="text-[10px] font-black uppercase tracking-widest text-[#FFB800] border-b border-white/5 pb-2">Delegate New Task</h4>
                     
                     <form 
                       onSubmit={async (e) => {
@@ -1094,45 +1108,45 @@ export const DirectorTab = () => {
                       className="space-y-4"
                     >
                       <div className="space-y-1.5">
-                        <label htmlFor="task-assignee" className="text-[9px] font-black uppercase text-[#A09E9A]/40 tracking-wider">Assignee Role</label>
-                        <select id="task-assignee" name="assignedTo" className="w-full bg-[#1A1A28] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-[#F0EFE8]" title="Select assignee role" aria-label="Select assignee role">
-                          <option value="support_staff" className="bg-[#1A1A28] text-[#F0EFE8]">Support Staff (Assistant)</option>
-                          <option value="Manager" className="bg-[#1A1A28] text-[#F0EFE8]">Manager</option>
-                          <option value="Admin" className="bg-[#1A1A28] text-[#F0EFE8]">Admin</option>
+                        <label htmlFor="task-assignee" className="text-[9px] font-black uppercase text-[#B0B0B0]/40 tracking-wider">Assignee Role</label>
+                        <select id="task-assignee" name="assignedTo" className="w-full bg-[#1A1A1A] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-[#F5F5F5]" title="Select assignee role" aria-label="Select assignee role">
+                          <option value="support_staff" className="bg-[#1A1A1A] text-[#F5F5F5]">Support Staff (Assistant)</option>
+                          <option value="Manager" className="bg-[#1A1A1A] text-[#F5F5F5]">Manager</option>
+                          <option value="Admin" className="bg-[#1A1A1A] text-[#F5F5F5]">Admin</option>
                         </select>
                       </div>
 
                       <div className="space-y-1.5">
-                        <label htmlFor="task-related-poppo" className="text-[9px] font-black uppercase text-[#A09E9A]/40 tracking-wider">Related Talent</label>
-                        <select id="task-related-poppo" name="relatedPoppo" className="w-full bg-[#1A1A28] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-[#F0EFE8]" title="Select related talent" aria-label="Select related talent">
-                          <option value="" className="bg-[#1A1A28] text-[#F0EFE8]">-- No Related Host --</option>
+                        <label htmlFor="task-related-poppo" className="text-[9px] font-black uppercase text-[#B0B0B0]/40 tracking-wider">Related Talent</label>
+                        <select id="task-related-poppo" name="relatedPoppo" className="w-full bg-[#1A1A1A] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-[#F5F5F5]" title="Select related talent" aria-label="Select related talent">
+                          <option value="" className="bg-[#1A1A1A] text-[#F5F5F5]">-- No Related Host --</option>
                           {hosts.map(h => (
-                            <option key={h.id} value={h.id} className="bg-[#1A1A28] text-[#F0EFE8]">{h.nickname || h.name} ({h.id})</option>
+                            <option key={h.id} value={h.id} className="bg-[#1A1A1A] text-[#F5F5F5]">{h.nickname || h.name} ({h.id})</option>
                           ))}
                         </select>
                       </div>
 
                       <div className="space-y-1.5">
-                        <label htmlFor="task-type" className="text-[9px] font-black uppercase text-[#A09E9A]/40 tracking-wider">Task Type</label>
-                        <input id="task-type" name="type" type="text" placeholder="e.g. Coaching" className="w-full glass-input text-xs text-[#F0EFE8]" required title="Enter task type" aria-label="Enter task type" />
+                        <label htmlFor="task-type" className="text-[9px] font-black uppercase text-[#B0B0B0]/40 tracking-wider">Task Type</label>
+                        <input id="task-type" name="type" type="text" placeholder="e.g. Coaching" className="w-full glass-input text-xs text-[#F5F5F5]" required title="Enter task type" aria-label="Enter task type" />
                       </div>
 
                       <div className="space-y-1.5">
-                        <label htmlFor="task-title" className="text-[9px] font-black uppercase text-[#A09E9A]/40 tracking-wider">Task Title</label>
-                        <input id="task-title" name="title" type="text" placeholder="Complete Profile Info" className="w-full glass-input text-xs text-[#F0EFE8]" required title="Enter task title" aria-label="Enter task title" />
+                        <label htmlFor="task-title" className="text-[9px] font-black uppercase text-[#B0B0B0]/40 tracking-wider">Task Title</label>
+                        <input id="task-title" name="title" type="text" placeholder="Complete Profile Info" className="w-full glass-input text-xs text-[#F5F5F5]" required title="Enter task title" aria-label="Enter task title" />
                       </div>
 
                       <div className="space-y-1.5">
-                        <label htmlFor="task-description" className="text-[9px] font-black uppercase text-[#A09E9A]/40 tracking-wider">Task Description</label>
-                        <textarea id="task-description" name="description" placeholder="Specify missing fields or guidelines..." className="w-full glass-input text-xs text-[#F0EFE8] h-20 resize-none" required title="Enter task description" aria-label="Enter task description" />
+                        <label htmlFor="task-description" className="text-[9px] font-black uppercase text-[#B0B0B0]/40 tracking-wider">Task Description</label>
+                        <textarea id="task-description" name="description" placeholder="Specify missing fields or guidelines..." className="w-full glass-input text-xs text-[#F5F5F5] h-20 resize-none" required title="Enter task description" aria-label="Enter task description" />
                       </div>
 
                       <div className="space-y-1.5">
-                        <label htmlFor="task-due-date" className="text-[9px] font-black uppercase text-[#A09E9A]/40 tracking-wider">Due Date</label>
-                        <input id="task-due-date" name="dueDate" type="date" className="w-full glass-input text-xs text-[#F0EFE8] [color-scheme:dark]" required title="Select task due date" aria-label="Select task due date" />
+                        <label htmlFor="task-due-date" className="text-[9px] font-black uppercase text-[#B0B0B0]/40 tracking-wider">Due Date</label>
+                        <input id="task-due-date" name="dueDate" type="date" className="w-full glass-input text-xs text-[#F5F5F5] [color-scheme:dark]" required title="Select task due date" aria-label="Select task due date" />
                       </div>
 
-                      <button type="submit" className="w-full py-3 btn-gold rounded-xl text-xs font-black uppercase tracking-widest text-[#0D0D14] transition-all shadow-lg active:scale-95 cursor-pointer">
+                      <button type="submit" className="w-full py-3 btn-gold rounded-xl text-xs font-black uppercase tracking-widest text-[#111111] transition-all shadow-lg active:scale-95 cursor-pointer">
                         Delegate Task
                       </button>
                     </form>
@@ -1140,11 +1154,11 @@ export const DirectorTab = () => {
 
                   {/* Tasks List */}
                   <div className="lg:col-span-2 space-y-4">
-                    <h4 className="text-[10px] font-black uppercase tracking-widest text-[#A09E9A]/40">Active Assignments</h4>
+                    <h4 className="text-[10px] font-black uppercase tracking-widest text-[#B0B0B0]/40">Active Assignments</h4>
                     
                     <div className="space-y-3">
                       {tasks.length === 0 ? (
-                        <div className="text-center py-12 border border-dashed border-white/10 rounded-3xl text-[#A09E9A]/30 italic text-xs">
+                        <div className="text-center py-12 border border-dashed border-white/10 rounded-3xl text-[#B0B0B0]/30 italic text-xs">
                           No delegated tasks found.
                         </div>
                       ) : (
@@ -1160,9 +1174,9 @@ export const DirectorTab = () => {
                                 </span>
                                 <span className="text-[9px] font-black text-indigo-400 uppercase tracking-wider">{task.taskType}</span>
                               </div>
-                              <h5 className="font-black text-[#F0EFE8] text-sm">{task.title}</h5>
-                              <p className="text-xs text-[#A09E9A]/60 leading-relaxed font-medium">{task.description}</p>
-                              <div className="text-[9px] text-[#A09E9A]/40 font-bold flex gap-4 pt-1">
+                              <h5 className="font-black text-[#F5F5F5] text-sm">{task.title}</h5>
+                              <p className="text-xs text-[#B0B0B0]/60 leading-relaxed font-medium">{task.description}</p>
+                              <div className="text-[9px] text-[#B0B0B0]/40 font-bold flex gap-4 pt-1">
                                 <span>Assignee: {task.assignedToUserId}</span>
                                 <span>Related Poppo ID: {task.relatedPoppoId}</span>
                                 <span>Due: {task.dueDate}</span>
@@ -1184,7 +1198,7 @@ export const DirectorTab = () => {
                                       alert("Failed to complete task");
                                     }
                                   }}
-                                  className="px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500 text-emerald-400 hover:text-[#0D0D14] rounded-lg text-[9px] font-black uppercase transition-all cursor-pointer"
+                                  className="px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500 text-emerald-400 hover:text-[#111111] rounded-lg text-[9px] font-black uppercase transition-all cursor-pointer"
                                 >
                                   Complete
                                 </button>
@@ -1201,7 +1215,7 @@ export const DirectorTab = () => {
                                     alert("Failed to delete task");
                                   }
                                 }}
-                                className="p-2 bg-red-500/10 hover:bg-red-500 text-red-400 hover:text-[#0D0D14] rounded-lg transition-all cursor-pointer"
+                                className="p-2 bg-red-500/10 hover:bg-red-500 text-red-400 hover:text-[#111111] rounded-lg transition-all cursor-pointer"
                                 title="Delete task"
                                 aria-label="Delete task"
                               >
@@ -1299,18 +1313,18 @@ export const DirectorTab = () => {
                     className="tech-card grid grid-cols-1 sm:grid-cols-4 gap-4 items-end bg-white/[0.01]"
                   >
                     <div className="space-y-1.5">
-                      <label htmlFor="reg-poppo-id" className="text-[9px] font-black uppercase text-[#A09E9A]/40 tracking-wider">Poppo ID</label>
-                      <input id="reg-poppo-id" name="poppoId" type="text" placeholder="Enter numeric PoppoID" className="w-full glass-input text-xs text-[#F0EFE8]" required title="Enter numeric Poppo ID" aria-label="Enter numeric Poppo ID" />
+                      <label htmlFor="reg-poppo-id" className="text-[9px] font-black uppercase text-[#B0B0B0]/40 tracking-wider">Poppo ID</label>
+                      <input id="reg-poppo-id" name="poppoId" type="text" placeholder="Enter numeric PoppoID" className="w-full glass-input text-xs text-[#F5F5F5]" required title="Enter numeric Poppo ID" aria-label="Enter numeric Poppo ID" />
                     </div>
                     <div className="space-y-1.5">
-                      <label htmlFor="reg-name" className="text-[9px] font-black uppercase text-[#A09E9A]/40 tracking-wider">Display Name</label>
-                      <input id="reg-name" name="name" type="text" placeholder="Display name" className="w-full glass-input text-xs text-[#F0EFE8]" required title="Enter Display Name" aria-label="Enter Display Name" />
+                      <label htmlFor="reg-name" className="text-[9px] font-black uppercase text-[#B0B0B0]/40 tracking-wider">Display Name</label>
+                      <input id="reg-name" name="name" type="text" placeholder="Display name" className="w-full glass-input text-xs text-[#F5F5F5]" required title="Enter Display Name" aria-label="Enter Display Name" />
                     </div>
                     <div className="space-y-1.5">
-                      <label htmlFor="reg-team" className="text-[9px] font-black uppercase text-[#A09E9A]/40 tracking-wider">Team Group</label>
-                      <input id="reg-team" name="team" type="text" placeholder="Unassigned" className="w-full glass-input text-xs text-[#F0EFE8]" title="Enter Team Group" aria-label="Enter Team Group" />
+                      <label htmlFor="reg-team" className="text-[9px] font-black uppercase text-[#B0B0B0]/40 tracking-wider">Team Group</label>
+                      <input id="reg-team" name="team" type="text" placeholder="Unassigned" className="w-full glass-input text-xs text-[#F5F5F5]" title="Enter Team Group" aria-label="Enter Team Group" />
                     </div>
-                    <button type="submit" className="py-3 btn-gold rounded-xl text-xs font-black uppercase tracking-widest text-[#0D0D14] transition-all shadow-lg active:scale-95 cursor-pointer">
+                    <button type="submit" className="py-3 btn-gold rounded-xl text-xs font-black uppercase tracking-widest text-[#111111] transition-all shadow-lg active:scale-95 cursor-pointer">
                       Register Host
                     </button>
                   </form>
@@ -1318,16 +1332,16 @@ export const DirectorTab = () => {
 
                 {/* Bulk Onboard Talent Section */}
                 <section className="space-y-4">
-                  <h3 className="font-bold text-lg flex items-center gap-2 text-[#F0EFE8]">
+                  <h3 className="font-bold text-lg flex items-center gap-2 text-[#F5F5F5]">
                     <Database size={18} className="text-indigo-400" />
                     Bulk Onboard Talent
                   </h3>
-                  <div className="tech-card space-y-4 bg-[#1A1A28] border border-white/5">
-                    <p className="text-[10px] text-[#A09E9A]/60 leading-relaxed font-medium">
+                  <div className="tech-card space-y-4 bg-[#1A1A1A] border border-white/5">
+                    <p className="text-[10px] text-[#B0B0B0]/60 leading-relaxed font-medium">
                       Paste rows directly from Excel or Google Sheets to upload multiple talent records at once. Duplicates will be flagged and reviewed.
                     </p>
                     <div className="space-y-2">
-                      <label htmlFor="roster-bulk-paste" className="text-[9px] font-black uppercase tracking-widest text-[#A09E9A]/40 block">
+                      <label htmlFor="roster-bulk-paste" className="text-[9px] font-black uppercase tracking-widest text-[#B0B0B0]/40 block">
                         Excel Tabular Raw Paste (Roster Sheet)
                       </label>
                       <textarea
@@ -1444,7 +1458,7 @@ export const DirectorTab = () => {
                           setIsLoading(false);
                         }
                       }}
-                      className="w-full py-3 btn-gold rounded-xl text-xs font-black uppercase tracking-widest text-[#0D0D14] transition-all shadow-lg active:scale-95 cursor-pointer"
+                      className="w-full py-3 btn-gold rounded-xl text-xs font-black uppercase tracking-widest text-[#111111] transition-all shadow-lg active:scale-95 cursor-pointer"
                       title="Import bulk raw roster data"
                       aria-label="Import bulk raw roster data"
                     >
@@ -1455,25 +1469,25 @@ export const DirectorTab = () => {
 
                 {/* Reset & Manage Talent Passwords Section */}
                 <section className="space-y-4">
-                  <h3 className="font-bold text-lg flex items-center gap-2 text-[#F0EFE8]">
+                  <h3 className="font-bold text-lg flex items-center gap-2 text-[#F5F5F5]">
                     <Lock size={18} className="text-indigo-400" />
                     Reset & Manage Talent Passwords
                   </h3>
                   <div className="tech-card space-y-6 bg-white/[0.01]">
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-end">
                       <div className="space-y-1.5">
-                        <label htmlFor="pwd-host-select" className="text-[9px] font-black uppercase text-[#A09E9A]/40 tracking-wider">Select Talent / Host</label>
+                        <label htmlFor="pwd-host-select" className="text-[9px] font-black uppercase text-[#B0B0B0]/40 tracking-wider">Select Talent / Host</label>
                         <select
                           id="pwd-host-select"
                           value={selectedHostForPasswordId}
                           onChange={(e) => setSelectedHostForPasswordId(e.target.value)}
-                          className="w-full bg-[#1A1A28] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-[#F0EFE8]"
+                          className="w-full bg-[#1A1A1A] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-[#F5F5F5]"
                           title="Select a talent to reset password"
                           aria-label="Select a talent to reset password"
                         >
-                          <option value="" className="bg-[#1A1A28] text-[#F0EFE8]">-- Choose Host --</option>
+                          <option value="" className="bg-[#1A1A1A] text-[#F5F5F5]">-- Choose Host --</option>
                           {hosts.map(h => (
-                            <option key={h.id} value={h.id} className="bg-[#1A1A28] text-[#F0EFE8]">
+                            <option key={h.id} value={h.id} className="bg-[#1A1A1A] text-[#F5F5F5]">
                               {h.nickname || h.name} ({h.id})
                             </option>
                           ))}
@@ -1481,7 +1495,7 @@ export const DirectorTab = () => {
                       </div>
 
                       <div className="space-y-1.5">
-                        <label htmlFor="pwd-input" className="text-[9px] font-black uppercase text-[#A09E9A]/40 tracking-wider">Set Password</label>
+                        <label htmlFor="pwd-input" className="text-[9px] font-black uppercase text-[#B0B0B0]/40 tracking-wider">Set Password</label>
                         <div className="flex gap-2">
                           <input
                             id="pwd-input"
@@ -1489,7 +1503,7 @@ export const DirectorTab = () => {
                             placeholder="Password value"
                             value={targetPassword}
                             onChange={(e) => setTargetPassword(e.target.value)}
-                            className="w-full glass-input text-xs text-[#F0EFE8]"
+                            className="w-full glass-input text-xs text-[#F5F5F5]"
                             title="Enter or generate password"
                             aria-label="Enter or generate password"
                           />
@@ -1506,7 +1520,7 @@ export const DirectorTab = () => {
                               })();
                               setTargetPassword(randomPwd);
                             }}
-                            className="px-3 py-2.5 bg-[#1A1A28] hover:bg-[#222235] border border-white/10 rounded-xl text-[10px] font-black uppercase tracking-widest text-[#D4AF37] transition-all whitespace-nowrap cursor-pointer"
+                            className="px-3 py-2.5 bg-[#1A1A1A] hover:bg-[#222222] border border-white/10 rounded-xl text-[10px] font-black uppercase tracking-widest text-[#FFB800] transition-all whitespace-nowrap cursor-pointer"
                             title="Generate a random password"
                             aria-label="Generate a random password"
                           >
@@ -1548,7 +1562,7 @@ export const DirectorTab = () => {
                             alert("Failed to update password.");
                           }
                         }}
-                        className="py-3 btn-gold rounded-xl text-xs font-black uppercase tracking-widest text-[#0D0D14] transition-all shadow-lg active:scale-95 cursor-pointer"
+                        className="py-3 btn-gold rounded-xl text-xs font-black uppercase tracking-widest text-[#111111] transition-all shadow-lg active:scale-95 cursor-pointer"
                       >
                         Update Password
                       </button>
@@ -1557,7 +1571,7 @@ export const DirectorTab = () => {
                 </section>
 
                 <section className="space-y-4">
-                  <h3 className="font-bold text-lg flex items-center gap-2 text-[#F0EFE8]">
+                  <h3 className="font-bold text-lg flex items-center gap-2 text-[#F5F5F5]">
                     <Shield size={18} className="text-indigo-400" />
                     Master Agency Directory Table
                   </h3>
@@ -1565,9 +1579,9 @@ export const DirectorTab = () => {
                     <div className="overflow-x-auto">
                       <table className="w-full text-left text-xs min-w-[900px] border-collapse">
                         <thead>
-                          <tr className="border-b border-white/5 text-[9px] font-black text-[#A09E9A]/30 uppercase tracking-widest bg-white/2">
-                            <th className="px-6 py-4 sticky left-0 bg-[#13131E] z-20 min-w-[100px] max-w-[100px] border-r border-white/5">Poppo ID</th>
-                            <th className="px-6 py-4 sticky left-[100px] bg-[#13131E] z-20 min-w-[150px] max-w-[150px] border-r border-white/5">Nickname</th>
+                          <tr className="border-b border-white/5 text-[9px] font-black text-[#B0B0B0]/30 uppercase tracking-widest bg-white/2">
+                            <th className="px-6 py-4 sticky left-0 bg-[#0A0A0A] z-20 min-w-[100px] max-w-[100px] border-r border-white/5">Poppo ID</th>
+                            <th className="px-6 py-4 sticky left-[100px] bg-[#0A0A0A] z-20 min-w-[150px] max-w-[150px] border-r border-white/5">Nickname</th>
                             <th className="px-4 py-4">Role</th>
 
                             <th className="px-6 py-4">Status</th>
@@ -1578,8 +1592,8 @@ export const DirectorTab = () => {
                         <tbody className="divide-y divide-white/5 bg-transparent">
                           {hosts.map(host => (
                             <tr key={host.id} className="hover:bg-white/[0.01] transition-colors group">
-                              <td className="px-6 py-4 font-mono font-bold text-indigo-400 sticky left-0 bg-[#13131E] group-hover:bg-[#1A1A28] transition-colors z-10 min-w-[100px] max-w-[100px] border-r border-white/5">{host.id}</td>
-                              <td className="px-6 py-4 font-bold text-[#F0EFE8] sticky left-[100px] bg-[#13131E] group-hover:bg-[#1A1A28] transition-colors z-10 min-w-[150px] max-w-[150px] border-r border-white/5">
+                              <td className="px-6 py-4 font-mono font-bold text-indigo-400 sticky left-0 bg-[#0A0A0A] group-hover:bg-[#1A1A1A] transition-colors z-10 min-w-[100px] max-w-[100px] border-r border-white/5">{host.id}</td>
+                              <td className="px-6 py-4 font-bold text-[#F5F5F5] sticky left-[100px] bg-[#0A0A0A] group-hover:bg-[#1A1A1A] transition-colors z-10 min-w-[150px] max-w-[150px] border-r border-white/5">
                                 <input 
                                   type="text"
                                   defaultValue={host.nickname || host.name}
@@ -1598,7 +1612,7 @@ export const DirectorTab = () => {
                                       }
                                     }
                                   }}
-                                  className="bg-transparent border-none focus:ring-1 focus:ring-indigo-500/50 rounded-lg px-2 py-1 w-full text-[#F0EFE8] font-bold hover:bg-[#1A1A28] focus:bg-[#0D0D14]"
+                                  className="bg-transparent border-none focus:ring-1 focus:ring-indigo-500/50 rounded-lg px-2 py-1 w-full text-[#F5F5F5] font-bold hover:bg-[#1A1A1A] focus:bg-[#111111]"
                                   title="Edit host nickname"
                                   aria-label="Edit host nickname"
                                 />
@@ -1624,8 +1638,8 @@ export const DirectorTab = () => {
                                   aria-label="Select role"
                                 >
                                   
-                                    {['Talent', 'Manager', 'Admin', 'Head Admin', 'Director', 'Agent'].map(r => (
-                                      <option key={r} value={r} className="bg-[#0A0A0B] text-[#F0EFE8]">{r}</option>
+                                    {['Talent', 'Manager', 'Admin', 'Director', 'Agent'].map(r => (
+                                      <option key={r} value={r} className="bg-[#0A0A0B] text-[#F5F5F5]">{r}</option>
                                     ))}
                                   
                                 </select>
@@ -1647,12 +1661,12 @@ export const DirectorTab = () => {
                                       alert("Failed to update status");
                                     }
                                   }}
-                                  className="bg-transparent border-none rounded text-xs text-[#A09E9A] hover:text-[#F0EFE8] focus:ring-1 focus:ring-indigo-500 cursor-pointer"
+                                  className="bg-transparent border-none rounded text-xs text-[#B0B0B0] hover:text-[#F5F5F5] focus:ring-1 focus:ring-indigo-500 cursor-pointer"
                                   title="Select status"
                                   aria-label="Select status"
                                 >
                                   {['Active', 'Inconsistent', 'Released', 'Inactive'].map(s => (
-                                    <option key={s} value={s} className="bg-[#0A0A0B] text-[#F0EFE8]">{s}</option>
+                                    <option key={s} value={s} className="bg-[#0A0A0B] text-[#F5F5F5]">{s}</option>
                                   ))}
                                 </select>
                               </td>
@@ -1672,12 +1686,12 @@ export const DirectorTab = () => {
                                       alert("Failed to update salary");
                                     }
                                   }}
-                                  className="bg-transparent border-none rounded text-xs text-[#A09E9A] hover:text-[#F0EFE8] focus:ring-1 focus:ring-indigo-500 cursor-pointer"
+                                  className="bg-transparent border-none rounded text-xs text-[#B0B0B0] hover:text-[#F5F5F5] focus:ring-1 focus:ring-indigo-500 cursor-pointer"
                                   title="Select salary category"
                                   aria-label="Select salary category"
                                 >
-                                  {['N/A', 'Rocket Host', 'Star Host', 'S idol', 'ESport Host'].map(s => (
-                                    <option key={s} value={s} className="bg-[#0A0A0B] text-[#F0EFE8]">{s}</option>
+                                  {['Rocket Host', 'Star Host', 'S idol', 'ESport Host'].map(s => (
+                                    <option key={s} value={s} className="bg-[#0A0A0B] text-[#F5F5F5]">{s}</option>
                                   ))}
                                 </select>
                               </td>
@@ -1695,7 +1709,7 @@ export const DirectorTab = () => {
                                       alert("Failed to delete host");
                                     }
                                   }}
-                                  className="p-2 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-[#0D0D14] rounded-xl transition-all cursor-pointer"
+                                  className="p-2 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-[#111111] rounded-xl transition-all cursor-pointer"
                                   title="Hard delete host"
                                   aria-label="Hard delete host"
                                 >
@@ -1719,8 +1733,8 @@ export const DirectorTab = () => {
                 {/* Header */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div className="space-y-1">
-                    <h3 className="font-bold text-xl flex items-center gap-2 text-[#F0EFE8]">
-                      <Database size={20} className="text-[#D4AF37]" />
+                    <h3 className="font-bold text-xl flex items-center gap-2 text-[#F5F5F5]">
+                      <Database size={20} className="text-[#FFB800]" />
                       High-Volume Financial Ledger
                     </h3>
                     <p className="text-[10px] text-slate-400 uppercase tracking-widest font-black">
@@ -1732,10 +1746,10 @@ export const DirectorTab = () => {
                   <button
                     onClick={handleSaveChanges}
                     disabled={isSavingFinancials}
-                    className="flex items-center gap-2 px-5 py-3 bg-[#D4AF37] hover:bg-[#c9a832] disabled:bg-slate-700 text-[#0D0D14] rounded-xl text-xs font-black uppercase tracking-widest transition-all cursor-pointer shadow-lg active:scale-95 shrink-0"
+                    className="flex items-center gap-2 px-5 py-3 bg-[#FFB800] hover:bg-[#c9a832] disabled:bg-slate-700 text-[#111111] rounded-xl text-xs font-black uppercase tracking-widest transition-all cursor-pointer shadow-lg active:scale-95 shrink-0"
                   >
                     {isSavingFinancials ? (
-                      <span className="w-3.5 h-3.5 border-2 border-[#0D0D14]/20 border-t-[#0D0D14] rounded-full animate-spin" />
+                      <span className="w-3.5 h-3.5 border-2 border-[#111111]/20 border-t-[#111111] rounded-full animate-spin" />
                     ) : (
                       <span>💾</span>
                     )}
@@ -1749,7 +1763,7 @@ export const DirectorTab = () => {
                     onClick={() => { setFinancialTab('monthly'); setSelectedRows({}); }}
                     className={cn(
                       "pb-3 text-xs font-black uppercase tracking-widest border-b-2 transition-all cursor-pointer",
-                      financialTab === 'monthly' ? "border-[#D4AF37] text-[#F0EFE8]" : "border-transparent text-[#A09E9A] hover:text-[#F0EFE8]"
+                      financialTab === 'monthly' ? "border-[#FFB800] text-[#F5F5F5]" : "border-transparent text-[#B0B0B0] hover:text-[#F5F5F5]"
                     )}
                   >
                     Monthly Financials
@@ -1758,7 +1772,7 @@ export const DirectorTab = () => {
                     onClick={() => { setFinancialTab('weekly'); setSelectedRows({}); }}
                     className={cn(
                       "pb-3 text-xs font-black uppercase tracking-widest border-b-2 transition-all cursor-pointer",
-                      financialTab === 'weekly' ? "border-[#D4AF37] text-[#F0EFE8]" : "border-transparent text-[#A09E9A] hover:text-[#F0EFE8]"
+                      financialTab === 'weekly' ? "border-[#FFB800] text-[#F5F5F5]" : "border-transparent text-[#B0B0B0] hover:text-[#F5F5F5]"
                     )}
                   >
                     Weekly Financials
@@ -1770,15 +1784,15 @@ export const DirectorTab = () => {
                 </div>
 
                 {/* Bulk Intake & Paste Section (Flat-file Storage Ledger) */}
-                <div className="tech-card bg-[#1A1A28] border border-white/5 p-6 rounded-2xl grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="tech-card bg-[#1A1A1A] border border-white/5 p-6 rounded-2xl grid grid-cols-1 lg:grid-cols-2 gap-6">
                   {/* File Upload Area */}
-                  <div className="border-2 border-dashed border-white/10 rounded-2xl p-6 flex flex-col items-center justify-center gap-3 hover:border-[#D4AF37]/50 hover:bg-[#D4AF37]/[0.02] transition-all cursor-pointer relative group">
-                    <div className="w-10 h-10 rounded-full bg-[#D4AF37]/10 flex items-center justify-center border border-[#D4AF37]/20 group-hover:scale-105 transition-transform">
-                      <span className="text-[#D4AF37]">📁</span>
+                  <div className="border-2 border-dashed border-white/10 rounded-2xl p-6 flex flex-col items-center justify-center gap-3 hover:border-[#FFB800]/50 hover:bg-[#FFB800]/[0.02] transition-all cursor-pointer relative group">
+                    <div className="w-10 h-10 rounded-full bg-[#FFB800]/10 flex items-center justify-center border border-[#FFB800]/20 group-hover:scale-105 transition-transform">
+                      <span className="text-[#FFB800]">📁</span>
                     </div>
                     <div className="text-center space-y-1">
-                      <p className="font-bold text-xs uppercase tracking-wider text-[#F0EFE8]">Upload Commission Report</p>
-                      <p className="text-[9px] text-[#A09E9A]">Drag XLSX or CSV file here or click to browse</p>
+                      <p className="font-bold text-xs uppercase tracking-wider text-[#F5F5F5]">Upload Commission Report</p>
+                      <p className="text-[9px] text-[#B0B0B0]">Drag XLSX or CSV file here or click to browse</p>
                     </div>
                     <input 
                       type="file" 
@@ -1811,7 +1825,7 @@ export const DirectorTab = () => {
 
                   {/* Bulk Paste Textarea */}
                   <div className="space-y-2 flex flex-col">
-                    <label htmlFor="bulk-ledger-paste" className="text-[9px] font-black uppercase tracking-wider text-[#A09E9A]">
+                    <label htmlFor="bulk-ledger-paste" className="text-[9px] font-black uppercase tracking-wider text-[#B0B0B0]">
                       Excel / Sheets Tabular Paste Intake
                     </label>
                     <div className="flex gap-2 flex-1">
@@ -1822,7 +1836,7 @@ export const DirectorTab = () => {
                             ? "Paste monthly columns (tab-separated):\nPoppoID\tMonth\tYear\tNickname\tLiveHours\tPartyHours\tTotalPoints\tAgentCommission\tLiveEarnings\tPartyEarnings\tPrivateChat\tTips\tPlatformReward\tOtherEarnings\tHourlySalary\tSuperSalary\tSuperRank\tLevel"
                             : "Paste weekly columns (tab-separated):\nPoppoID\tFromDate\tToDate\tNickname\tLiveHours\tPartyHours\tTotalPoints\tAgentCommission\tLiveEarnings\tPartyEarnings\tPrivateChat\tTips\tPlatformReward\tOtherEarnings\tHourlySalary\tSuperSalary\tSuperRank\tLevel"
                         }
-                        className="flex-1 h-24 glass-input font-mono text-[9px] resize-none focus:ring-1 focus:ring-[#D4AF37] text-[#F0EFE8] bg-[#0D0D14] border border-white/10"
+                        className="flex-1 h-24 glass-input font-mono text-[9px] resize-none focus:ring-1 focus:ring-[#FFB800] text-[#F5F5F5] bg-[#111111] border border-white/10"
                       />
                       <button
                         onClick={() => {
@@ -1832,7 +1846,7 @@ export const DirectorTab = () => {
                             textarea.value = '';
                           }
                         }}
-                        className="px-4 bg-[#D4AF37]/10 hover:bg-[#D4AF37]/25 text-[#D4AF37] border border-[#D4AF37]/25 hover:text-white transition-all font-black uppercase text-[10px] tracking-wider rounded-xl cursor-pointer"
+                        className="px-4 bg-[#FFB800]/10 hover:bg-[#FFB800]/25 text-[#FFB800] border border-[#FFB800]/25 hover:text-white transition-all font-black uppercase text-[10px] tracking-wider rounded-xl cursor-pointer"
                       >
                         Paste
                       </button>
@@ -1841,11 +1855,21 @@ export const DirectorTab = () => {
                 </div>
 
                 {/* Ledger Interactive Spreadsheet Table */}
-                <div className="tech-card !p-0 border border-white/5 overflow-hidden bg-[#13131E] shadow-xl">
+                <div className="tech-card !p-0 border border-white/5 overflow-hidden bg-[#0A0A0A] shadow-xl">
                   
                   {/* Grid Action Bar */}
-                  <div className="flex items-center justify-between p-4 border-b border-white/5 bg-[#1A1A28]/40">
-                    <div className="flex items-center gap-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border-b border-white/5 bg-[#1A1A1A]/40 gap-4">
+                    <div className="flex flex-wrap items-center gap-3">
+                      <div className="relative">
+                        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#B0B0B0]" />
+                        <input
+                          type="text"
+                          placeholder="Search ID, Nickname, Month, Year..."
+                          value={financialSearchTerm}
+                          onChange={(e) => setFinancialSearchTerm(e.target.value)}
+                          className="w-64 glass-input text-xs pl-8 py-2 text-[#F5F5F5]"
+                        />
+                      </div>
                       <button
                         onClick={handleAddRow}
                         className="px-3.5 py-2 bg-emerald-550 hover:bg-emerald-600 text-white rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer shadow-sm shadow-emerald-500/10 active:scale-95"
@@ -1855,23 +1879,23 @@ export const DirectorTab = () => {
                       <button
                         onClick={handleDeleteSelection}
                         disabled={!Object.keys(selectedRows).some(key => key.startsWith(`${financialTab}_`) && selectedRows[key])}
-                        className="px-3.5 py-2 bg-red-550 hover:bg-red-650 disabled:bg-[#222235] text-white disabled:text-[#A09E9A]/40 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer shadow-sm active:scale-95"
+                        className="px-3.5 py-2 bg-red-550 hover:bg-red-650 disabled:bg-[#222222] text-white disabled:text-[#B0B0B0]/40 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer shadow-sm active:scale-95"
                       >
                         🗑️ Delete Selection
                       </button>
                     </div>
 
-                    <div className="text-[10px] font-black uppercase tracking-widest text-[#A09E9A]">
+                    <div className="text-[10px] font-black uppercase tracking-widest text-[#B0B0B0]">
                       {(financialTab === 'monthly' ? monthlyLedger : weeklyLedger).length} Total rows in workspace
                     </div>
                   </div>
 
                   {/* Spreadsheet Grid Container */}
                   <div className="overflow-x-auto overflow-y-auto max-h-[500px] relative custom-scrollbar">
-                    <table className="w-full text-left text-xs min-w-[1800px] border-collapse">
+                    <table className="w-full text-left text-xs min-w-max border-collapse">
                       <thead>
-                        <tr className="border-b border-white/5 text-[9px] font-black text-[#A09E9A] uppercase tracking-widest bg-[#1A1A28] sticky top-0 z-20">
-                          <th className="px-3 py-3 w-12 text-center bg-[#13131E] sticky left-0 z-30 border-r border-white/5">
+                        <tr className="border-b border-white/5 text-[10px] font-bold text-[#B0B0B0] uppercase tracking-wider bg-[#1A1A1A] sticky top-0 z-20">
+                          <th className="px-3 py-3 w-12 text-center bg-[#0A0A0A] sticky left-0 z-30 border-r border-white/5">
                             <input 
                               type="checkbox"
                               onChange={(e) => {
@@ -1882,53 +1906,81 @@ export const DirectorTab = () => {
                                 });
                                 setSelectedRows(nextSelected);
                               }}
-                              className="rounded border-white/10 text-[#D4AF37] focus:ring-[#D4AF37] cursor-pointer"
+                              className="rounded border-white/10 text-[#FFB800] focus:ring-[#FFB800] cursor-pointer"
                               title="Select all rows"
                             />
                           </th>
                           {/* STICKY COLUMN FOR POPPO ID */}
-                          <th className="px-4 py-3 w-36 sticky left-[48px] bg-[#13131E] z-30 border-r border-white/5">Poppo ID</th>
+                          <th className="px-3 py-3 w-28 sticky left-[48px] bg-[#0A0A0A] z-30 border-r border-white/5 whitespace-nowrap">Poppo ID</th>
                           {financialTab === 'monthly' ? (
                             <>
-                              <th className="px-3 py-3 w-28">Month</th>
-                              <th className="px-3 py-3 w-20">Year</th>
+                              <th className="px-3 py-3 w-24 whitespace-nowrap">Month</th>
+                              <th className="px-3 py-3 w-24 whitespace-nowrap">Year</th>
                             </>
                           ) : (
                             <>
-                              <th className="px-3 py-3 w-32">From Date</th>
-                              <th className="px-3 py-3 w-32">To Date</th>
+                              <th className="px-3 py-3 w-28 whitespace-nowrap">From Date</th>
+                              <th className="px-3 py-3 w-28 whitespace-nowrap">To Date</th>
                             </>
                           )}
-                          <th className="px-3 py-3 w-40">Nickname</th>
-                          <th className="px-3 py-3 w-28">Live duration</th>
-                          <th className="px-3 py-3 w-32">Party host duration</th>
-                          <th className="px-3 py-3 w-36">Total earnings of points</th>
-                          <th className="px-3 py-3 w-32">Agent Commission</th>
-                          <th className="px-3 py-3 w-28">Live earnings</th>
-                          <th className="px-3 py-3 w-28">Party Earnings</th>
-                          <th className="px-3 py-3 w-28">Private chat</th>
-                          <th className="px-3 py-3 w-24">Tips</th>
-                          <th className="px-3 py-3 w-32">Platform reward</th>
-                          <th className="px-3 py-3 w-28">Other Earnings</th>
-                          <th className="px-3 py-3 w-36">Platform hourly salary</th>
-                          <th className="px-3 py-3 w-28">Super Salary</th>
-                          <th className="px-3 py-3 w-28">Super Rank</th>
-                          <th className="px-3 py-3 w-20">Level</th>
+                          <th className="px-3 py-3 w-32 whitespace-nowrap">Nickname</th>
+                          <th className="px-3 py-3 w-28 whitespace-nowrap">Live Duration</th>
+                          <th className="px-3 py-3 w-28 whitespace-nowrap">Party Host</th>
+                          <th className="px-3 py-3 w-32 whitespace-nowrap">Total Earnings</th>
+                          <th className="px-3 py-3 w-32 whitespace-nowrap">Agent Comm.</th>
+                          <th className="px-3 py-3 w-28 whitespace-nowrap">Live Earnings</th>
+                          <th className="px-3 py-3 w-28 whitespace-nowrap">Party Earnings</th>
+                          <th className="px-3 py-3 w-28 whitespace-nowrap">Private Chat</th>
+                          <th className="px-3 py-3 w-24 whitespace-nowrap">Tips</th>
+                          <th className="px-3 py-3 w-28 whitespace-nowrap">Platform Rwd</th>
+                          <th className="px-3 py-3 w-28 whitespace-nowrap">Other Earnings</th>
+                          <th className="px-3 py-3 w-32 whitespace-nowrap">Hourly Salary</th>
+                          <th className="px-3 py-3 w-28 whitespace-nowrap">Super Salary</th>
+                          <th className="px-3 py-3 w-28 whitespace-nowrap">Super Rank</th>
+                          <th className="px-3 py-3 w-24 whitespace-nowrap">Level</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-white/5 bg-transparent">
-                        {(financialTab === 'monthly' ? monthlyLedger : weeklyLedger).length === 0 ? (
-                          <tr>
-                            <td colSpan={20} className="py-12 text-center text-[#A09E9A] italic">
-                              No ledger entries found. Click "+ Add Row" or paste data above.
-                            </td>
-                          </tr>
-                        ) : (
-                          (financialTab === 'monthly' ? monthlyLedger : weeklyLedger).map((row, idx) => {
+                        {(() => {
+                          const currentData = financialTab === 'monthly' ? monthlyLedger : weeklyLedger;
+                          if (currentData.length === 0) {
+                            return (
+                              <tr>
+                                <td colSpan={20} className="py-12 text-center text-[#B0B0B0] italic">
+                                  No ledger entries found. Click "+ Add Row" or paste data above.
+                                </td>
+                              </tr>
+                            );
+                          }
+
+                          const filtered = currentData.map((row, idx) => ({ row, idx })).filter(({ row }) => {
+                            if (!financialSearchTerm) return true;
+                            const s = financialSearchTerm.toLowerCase();
+                            return (
+                              (row.poppo_id || '').toLowerCase().includes(s) ||
+                              (row.nickname || '').toLowerCase().includes(s) ||
+                              (row.month || '').toLowerCase().includes(s) ||
+                              (row.year?.toString() || '').toLowerCase().includes(s) ||
+                              (row.from_date || '').toLowerCase().includes(s) ||
+                              (row.to_date || '').toLowerCase().includes(s)
+                            );
+                          });
+
+                          if (filtered.length === 0) {
+                            return (
+                              <tr>
+                                <td colSpan={20} className="py-12 text-center text-[#B0B0B0] italic">
+                                  No entries match your search.
+                                </td>
+                              </tr>
+                            );
+                          }
+
+                          return filtered.map(({ row, idx }) => {
                             const isChecked = !!selectedRows[`${financialTab}_${idx}`];
                             return (
                               <tr key={idx} className="hover:bg-white/[0.01] transition-colors group">
-                                <td className="px-3 py-2 text-center bg-[#13131E] group-hover:bg-[#1A1A28] sticky left-0 z-10 border-r border-white/5 transition-colors">
+                                <td className="px-3 py-2 text-center bg-[#0A0A0A] group-hover:bg-[#1A1A1A] sticky left-0 z-10 border-r border-white/5 transition-colors">
                                   <input
                                     type="checkbox"
                                     checked={isChecked}
@@ -1938,18 +1990,18 @@ export const DirectorTab = () => {
                                         [`${financialTab}_${idx}`]: e.target.checked
                                       }));
                                     }}
-                                    className="rounded border-white/10 text-[#D4AF37] focus:ring-[#D4AF37] cursor-pointer"
+                                    className="rounded border-white/10 text-[#FFB800] focus:ring-[#FFB800] cursor-pointer"
                                     title="Select row"
                                   />
                                 </td>
                                 
                                 {/* STICKY POPPO ID COLUMN - MONO SPACED READ WRITE WITH COPY SELECT-ALL */}
-                                <td className="px-4 py-2 sticky left-[48px] bg-[#13131E] group-hover:bg-[#1A1A28] transition-colors border-r border-white/5 z-10 font-mono font-bold text-indigo-500 w-36">
+                                <td className="px-3 py-2 sticky left-[48px] bg-[#0A0A0A] group-hover:bg-[#1A1A1A] transition-colors border-r border-white/5 z-10 font-mono font-bold text-indigo-500 w-28">
                                   <input
                                     type="text"
                                     value={row.poppo_id || ''}
                                     onChange={(e) => handleCellChange(idx, 'poppo_id', e.target.value)}
-                                    className="bg-transparent border-none w-full text-xs font-mono font-bold text-[#D4AF37] select-all focus:ring-1 focus:ring-[#D4AF37]/50 rounded px-1.5 py-0.5 outline-none"
+                                    className="bg-transparent border-none w-full text-xs font-mono font-bold text-[#FFB800] select-all focus:ring-1 focus:ring-[#FFB800]/50 rounded px-1.5 py-0.5 outline-none"
                                     placeholder="Enter Poppo ID"
                                   />
                                 </td>
@@ -1961,7 +2013,7 @@ export const DirectorTab = () => {
                                         type="text"
                                         value={row.month || ''}
                                         onChange={(e) => handleCellChange(idx, 'month', e.target.value)}
-                                        className="bg-transparent border-none w-full text-xs focus:ring-1 focus:ring-[#D4AF37]/50 rounded px-1.5 py-0.5 outline-none font-medium text-[#F0EFE8]"
+                                        className="bg-transparent border-none w-full text-xs focus:ring-1 focus:ring-[#FFB800]/50 rounded px-1.5 py-0.5 outline-none font-medium text-[#F5F5F5]"
                                         placeholder="YYYY-MM"
                                       />
                                     </td>
@@ -1970,7 +2022,7 @@ export const DirectorTab = () => {
                                         type="number"
                                         value={row.year ?? ''}
                                         onChange={(e) => handleCellChange(idx, 'year', parseInt(e.target.value) || 0)}
-                                        className="bg-transparent border-none w-full text-xs focus:ring-1 focus:ring-[#D4AF37]/50 rounded px-1.5 py-0.5 outline-none font-medium text-[#F0EFE8]"
+                                        className="bg-transparent border-none w-full text-xs focus:ring-1 focus:ring-[#FFB800]/50 rounded px-1.5 py-0.5 outline-none font-medium text-[#F5F5F5]"
                                         placeholder="Year"
                                       />
                                     </td>
@@ -1982,7 +2034,7 @@ export const DirectorTab = () => {
                                         type="text"
                                         value={row.from_date || ''}
                                         onChange={(e) => handleCellChange(idx, 'from_date', e.target.value)}
-                                        className="bg-transparent border-none w-full text-xs focus:ring-1 focus:ring-[#D4AF37]/50 rounded px-1.5 py-0.5 outline-none font-medium text-[#F0EFE8]"
+                                        className="bg-transparent border-none w-full text-xs focus:ring-1 focus:ring-[#FFB800]/50 rounded px-1.5 py-0.5 outline-none font-medium text-[#F5F5F5]"
                                         placeholder="YYYY-MM-DD"
                                       />
                                     </td>
@@ -1991,7 +2043,7 @@ export const DirectorTab = () => {
                                         type="text"
                                         value={row.to_date || ''}
                                         onChange={(e) => handleCellChange(idx, 'to_date', e.target.value)}
-                                        className="bg-transparent border-none w-full text-xs focus:ring-1 focus:ring-[#D4AF37]/50 rounded px-1.5 py-0.5 outline-none font-medium text-[#F0EFE8]"
+                                        className="bg-transparent border-none w-full text-xs focus:ring-1 focus:ring-[#FFB800]/50 rounded px-1.5 py-0.5 outline-none font-medium text-[#F5F5F5]"
                                         placeholder="YYYY-MM-DD"
                                       />
                                     </td>
@@ -2003,7 +2055,7 @@ export const DirectorTab = () => {
                                     type="text"
                                     value={row.nickname || ''}
                                     onChange={(e) => handleCellChange(idx, 'nickname', e.target.value)}
-                                    className="bg-transparent border-none w-full text-xs font-semibold text-[#F0EFE8] focus:ring-1 focus:ring-[#D4AF37]/50 rounded px-1.5 py-0.5 outline-none"
+                                    className="bg-transparent border-none w-full text-xs font-semibold text-[#F5F5F5] focus:ring-1 focus:ring-[#FFB800]/50 rounded px-1.5 py-0.5 outline-none"
                                     placeholder="Nickname"
                                   />
                                 </td>
@@ -2016,7 +2068,7 @@ export const DirectorTab = () => {
                                     onChange={(e) => handleCellChange(idx, 'live_duration', parseFloat(e.target.value) || 0)}
                                     title="Live duration (hours)"
                                     placeholder="0"
-                                    className="bg-transparent border-none w-full text-xs focus:ring-1 focus:ring-[#D4AF37]/50 rounded px-1.5 py-0.5 outline-none text-[#F0EFE8]"
+                                    className="bg-transparent border-none w-full text-xs focus:ring-1 focus:ring-[#FFB800]/50 rounded px-1.5 py-0.5 outline-none text-[#F5F5F5]"
                                   />
                                 </td>
 
@@ -2028,7 +2080,7 @@ export const DirectorTab = () => {
                                     onChange={(e) => handleCellChange(idx, 'party_host_duration', parseFloat(e.target.value) || 0)}
                                     title="Party host duration (hours)"
                                     placeholder="0"
-                                    className="bg-transparent border-none w-full text-xs focus:ring-1 focus:ring-[#D4AF37]/50 rounded px-1.5 py-0.5 outline-none text-[#F0EFE8]"
+                                    className="bg-transparent border-none w-full text-xs focus:ring-1 focus:ring-[#FFB800]/50 rounded px-1.5 py-0.5 outline-none text-[#F5F5F5]"
                                   />
                                 </td>
 
@@ -2039,7 +2091,7 @@ export const DirectorTab = () => {
                                     onChange={(e) => handleCellChange(idx, 'total_points', parseInt(e.target.value) || 0)}
                                     title="Total earnings of points"
                                     placeholder="0"
-                                    className="bg-transparent border-none w-full text-xs font-semibold focus:ring-1 focus:ring-[#D4AF37]/50 rounded px-1.5 py-0.5 outline-none text-[#F0EFE8]"
+                                    className="bg-transparent border-none w-full text-xs font-semibold focus:ring-1 focus:ring-[#FFB800]/50 rounded px-1.5 py-0.5 outline-none text-[#F5F5F5]"
                                   />
                                 </td>
 
@@ -2050,7 +2102,7 @@ export const DirectorTab = () => {
                                     onChange={(e) => handleCellChange(idx, 'agent_commission', parseInt(e.target.value) || 0)}
                                     title="Agent commission"
                                     placeholder="0"
-                                    className="bg-transparent border-none w-full text-xs text-emerald-400 font-semibold focus:ring-1 focus:ring-[#D4AF37]/50 rounded px-1.5 py-0.5 outline-none"
+                                    className="bg-transparent border-none w-full text-xs text-emerald-400 font-semibold focus:ring-1 focus:ring-[#FFB800]/50 rounded px-1.5 py-0.5 outline-none"
                                   />
                                 </td>
 
@@ -2061,7 +2113,7 @@ export const DirectorTab = () => {
                                     onChange={(e) => handleCellChange(idx, 'live_earnings', parseInt(e.target.value) || 0)}
                                     title="Live earnings"
                                     placeholder="0"
-                                    className="bg-transparent border-none w-full text-xs focus:ring-1 focus:ring-[#D4AF37]/50 rounded px-1.5 py-0.5 outline-none text-[#F0EFE8]"
+                                    className="bg-transparent border-none w-full text-xs focus:ring-1 focus:ring-[#FFB800]/50 rounded px-1.5 py-0.5 outline-none text-[#F5F5F5]"
                                   />
                                 </td>
 
@@ -2072,7 +2124,7 @@ export const DirectorTab = () => {
                                     onChange={(e) => handleCellChange(idx, 'party_earnings', parseInt(e.target.value) || 0)}
                                     title="Party earnings"
                                     placeholder="0"
-                                    className="bg-transparent border-none w-full text-xs focus:ring-1 focus:ring-[#D4AF37]/50 rounded px-1.5 py-0.5 outline-none text-[#F0EFE8]"
+                                    className="bg-transparent border-none w-full text-xs focus:ring-1 focus:ring-[#FFB800]/50 rounded px-1.5 py-0.5 outline-none text-[#F5F5F5]"
                                   />
                                 </td>
 
@@ -2083,7 +2135,7 @@ export const DirectorTab = () => {
                                     onChange={(e) => handleCellChange(idx, 'private_chat', parseInt(e.target.value) || 0)}
                                     title="Private chat earnings"
                                     placeholder="0"
-                                    className="bg-transparent border-none w-full text-xs focus:ring-1 focus:ring-[#D4AF37]/50 rounded px-1.5 py-0.5 outline-none text-[#F0EFE8]"
+                                    className="bg-transparent border-none w-full text-xs focus:ring-1 focus:ring-[#FFB800]/50 rounded px-1.5 py-0.5 outline-none text-[#F5F5F5]"
                                   />
                                 </td>
 
@@ -2094,7 +2146,7 @@ export const DirectorTab = () => {
                                     onChange={(e) => handleCellChange(idx, 'tips', parseInt(e.target.value) || 0)}
                                     title="Tips"
                                     placeholder="0"
-                                    className="bg-transparent border-none w-full text-xs focus:ring-1 focus:ring-[#D4AF37]/50 rounded px-1.5 py-0.5 outline-none text-[#F0EFE8]"
+                                    className="bg-transparent border-none w-full text-xs focus:ring-1 focus:ring-[#FFB800]/50 rounded px-1.5 py-0.5 outline-none text-[#F5F5F5]"
                                   />
                                 </td>
 
@@ -2105,7 +2157,7 @@ export const DirectorTab = () => {
                                     onChange={(e) => handleCellChange(idx, 'platform_reward', parseInt(e.target.value) || 0)}
                                     title="Platform reward"
                                     placeholder="0"
-                                    className="bg-transparent border-none w-full text-xs focus:ring-1 focus:ring-[#D4AF37]/50 rounded px-1.5 py-0.5 outline-none text-[#F0EFE8]"
+                                    className="bg-transparent border-none w-full text-xs focus:ring-1 focus:ring-[#FFB800]/50 rounded px-1.5 py-0.5 outline-none text-[#F5F5F5]"
                                   />
                                 </td>
 
@@ -2116,7 +2168,7 @@ export const DirectorTab = () => {
                                     onChange={(e) => handleCellChange(idx, 'other_earnings', parseInt(e.target.value) || 0)}
                                     title="Other earnings"
                                     placeholder="0"
-                                    className="bg-transparent border-none w-full text-xs focus:ring-1 focus:ring-[#D4AF37]/50 rounded px-1.5 py-0.5 outline-none text-[#F0EFE8]"
+                                    className="bg-transparent border-none w-full text-xs focus:ring-1 focus:ring-[#FFB800]/50 rounded px-1.5 py-0.5 outline-none text-[#F5F5F5]"
                                   />
                                 </td>
 
@@ -2127,7 +2179,7 @@ export const DirectorTab = () => {
                                     onChange={(e) => handleCellChange(idx, 'platform_hourly_salary', parseInt(e.target.value) || 0)}
                                     title="Platform hourly salary"
                                     placeholder="0"
-                                    className="bg-transparent border-none w-full text-xs focus:ring-1 focus:ring-[#D4AF37]/50 rounded px-1.5 py-0.5 outline-none text-[#F0EFE8]"
+                                    className="bg-transparent border-none w-full text-xs focus:ring-1 focus:ring-[#FFB800]/50 rounded px-1.5 py-0.5 outline-none text-[#F5F5F5]"
                                   />
                                 </td>
 
@@ -2138,7 +2190,7 @@ export const DirectorTab = () => {
                                     onChange={(e) => handleCellChange(idx, 'super_salary', parseInt(e.target.value) || 0)}
                                     title="Super salary"
                                     placeholder="0"
-                                    className="bg-transparent border-none w-full text-xs focus:ring-1 focus:ring-[#D4AF37]/50 rounded px-1.5 py-0.5 outline-none text-[#F0EFE8]"
+                                    className="bg-transparent border-none w-full text-xs focus:ring-1 focus:ring-[#FFB800]/50 rounded px-1.5 py-0.5 outline-none text-[#F5F5F5]"
                                   />
                                 </td>
 
@@ -2149,7 +2201,7 @@ export const DirectorTab = () => {
                                     onChange={(e) => handleCellChange(idx, 'super_rank', parseInt(e.target.value) || 0)}
                                     title="Super rank"
                                     placeholder="0"
-                                    className="bg-transparent border-none w-full text-xs focus:ring-1 focus:ring-[#D4AF37]/50 rounded px-1.5 py-0.5 outline-none text-[#F0EFE8]"
+                                    className="bg-transparent border-none w-full text-xs focus:ring-1 focus:ring-[#FFB800]/50 rounded px-1.5 py-0.5 outline-none text-[#F5F5F5]"
                                   />
                                 </td>
 
@@ -2160,19 +2212,19 @@ export const DirectorTab = () => {
                                     onChange={(e) => handleCellChange(idx, 'level', parseInt(e.target.value) || 0)}
                                     title="Level"
                                     placeholder="0"
-                                    className="bg-transparent border-none w-full text-xs font-bold focus:ring-1 focus:ring-[#D4AF37]/50 rounded px-1.5 py-0.5 outline-none text-[#F0EFE8]"
+                                    className="bg-transparent border-none w-full text-xs font-bold focus:ring-1 focus:ring-[#FFB800]/50 rounded px-1.5 py-0.5 outline-none text-[#F5F5F5]"
                                   />
                                 </td>
                               </tr>
                             );
-                          })
-                        )}
+                          });
+                        })()}
                       </tbody>
                     </table>
                   </div>
 
                   {/* Spreadsheet footer info */}
-                  <div className="p-3 border-t border-white/5 bg-[#1A1A28]/40 text-[10px] text-[#A09E9A] font-medium flex items-center gap-1.5">
+                  <div className="p-3 border-t border-white/5 bg-[#1A1A1A]/40 text-[10px] text-[#B0B0B0] font-medium flex items-center gap-1.5">
                     <span>💡</span>
                     <span>Poppo ID columns support copy-paste selection. Nicknames are cross-referenced with the active roster instantly. Changes are stored in memory until you click "Save Changes".</span>
                   </div>
@@ -2181,15 +2233,46 @@ export const DirectorTab = () => {
               </motion.div>
             )}
 
+            {/* FIREBASE ADMIN CONSOLE VIEWS */}
+            {activeView === 'firestore' && (
+              <motion.div key="firestore" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
+                <FirestoreManager />
+              </motion.div>
+            )}
+
+            {activeView === 'auth' && (
+              <motion.div key="auth" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
+                <AuthManager />
+              </motion.div>
+            )}
+
+            {activeView === 'functions' && (
+              <motion.div key="functions" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
+                <FunctionsMonitor />
+              </motion.div>
+            )}
+
+            {activeView === 'storage' && (
+              <motion.div key="storage" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
+                <StorageManager />
+              </motion.div>
+            )}
+
+            {activeView === 'settings' && (
+              <motion.div key="settings" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
+                <SettingsPanel />
+              </motion.div>
+            )}
+
           </AnimatePresence>
         )}
         {showMergeModal && existingHost && incomingHost && (
-          <div className="fixed inset-0 bg-[#0D0D14]/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
-            <div className="bg-[#1A1A28] border border-white/5 max-w-3xl w-full rounded-3xl p-6 space-y-6 shadow-2xl max-h-[90vh] overflow-y-auto custom-scrollbar">
+          <div className="fixed inset-0 bg-[#111111]/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
+            <div className="bg-[#1A1A1A] border border-white/5 max-w-3xl w-full rounded-3xl p-6 space-y-6 shadow-2xl max-h-[90vh] overflow-y-auto custom-scrollbar">
               <div className="flex items-center justify-between border-b border-white/5 pb-3">
                 <div className="flex items-center gap-2">
-                  <Lock className="text-[#D4AF37]" size={20} />
-                  <h3 className="text-md font-black text-[#F0EFE8] uppercase tracking-wider">Duplicate Identity Conflict Detector</h3>
+                  <Lock className="text-[#FFB800]" size={20} />
+                  <h3 className="text-md font-black text-[#F5F5F5] uppercase tracking-wider">Duplicate Identity Conflict Detector</h3>
                 </div>
                 <button 
                   onClick={() => processNextDuplicate(duplicateQueue)} 
@@ -2202,8 +2285,8 @@ export const DirectorTab = () => {
               </div>
 
               <div className="space-y-1">
-                <p className="text-xs text-slate-300 font-bold">Poppo ID <span className="text-[#D4AF37] font-mono">{existingHost.id}</span> already exists in the master database.</p>
-                <p className="text-[10px] text-[#A09E9A]/60">Review conflicts below. Select which values to preserve, or merge them.</p>
+                <p className="text-xs text-slate-300 font-bold">Poppo ID <span className="text-[#FFB800] font-mono">{existingHost.id}</span> already exists in the master database.</p>
+                <p className="text-[10px] text-[#B0B0B0]/60">Review conflicts below. Select which values to preserve, or merge them.</p>
               </div>
 
               <div className="space-y-4">
@@ -2223,9 +2306,9 @@ export const DirectorTab = () => {
                   const hasConflict = existVal !== incomingVal;
 
                   return (
-                    <div key={field} className="p-4 rounded-2xl bg-[#13131E] border border-white/5 space-y-2">
+                    <div key={field} className="p-4 rounded-2xl bg-[#0A0A0A] border border-white/5 space-y-2">
                       <div className="flex justify-between items-center">
-                        <span className="text-[9px] font-black text-[#A09E9A]/60 uppercase tracking-wider">{label}</span>
+                        <span className="text-[9px] font-black text-[#B0B0B0]/60 uppercase tracking-wider">{label}</span>
                         {hasConflict && (
                           <span className="text-[8px] font-black uppercase px-2 py-0.5 rounded bg-red-500/10 text-red-400 border border-red-500/20">Conflict</span>
                         )}
@@ -2238,12 +2321,12 @@ export const DirectorTab = () => {
                           className={cn(
                             "p-3 rounded-xl border text-left flex flex-col justify-between cursor-pointer transition-all",
                             resolvedFields[field as keyof Host] === existVal
-                              ? "bg-[#D4AF37]/5 border-[#D4AF37] text-[#F0EFE8]"
-                              : "bg-[#1A1A28] border-white/10 text-[#A09E9A] hover:border-[#D4AF37]/50"
+                              ? "bg-[#FFB800]/5 border-[#FFB800] text-[#F5F5F5]"
+                              : "bg-[#1A1A1A] border-white/10 text-[#B0B0B0] hover:border-[#FFB800]/50"
                           )}
                         >
-                          <span className="text-[8px] text-[#A09E9A]/40 uppercase font-black">Keep Existing Database Record</span>
-                          <span className="text-xs font-bold mt-1.5 text-[#F0EFE8]">{String(existVal)}</span>
+                          <span className="text-[8px] text-[#B0B0B0]/40 uppercase font-black">Keep Existing Database Record</span>
+                          <span className="text-xs font-bold mt-1.5 text-[#F5F5F5]">{String(existVal)}</span>
                         </button>
 
                         <button
@@ -2252,12 +2335,12 @@ export const DirectorTab = () => {
                           className={cn(
                             "p-3 rounded-xl border text-left flex flex-col justify-between cursor-pointer transition-all",
                             resolvedFields[field as keyof Host] === incomingVal
-                              ? "bg-[#D4AF37]/5 border-[#D4AF37] text-[#F0EFE8]"
-                              : "bg-[#1A1A28] border-white/10 text-[#A09E9A] hover:border-[#D4AF37]/50"
+                              ? "bg-[#FFB800]/5 border-[#FFB800] text-[#F5F5F5]"
+                              : "bg-[#1A1A1A] border-white/10 text-[#B0B0B0] hover:border-[#FFB800]/50"
                           )}
                         >
-                          <span className="text-[8px] text-[#A09E9A]/40 uppercase font-black">Merge/Overwrite with Incoming Record</span>
-                          <span className="text-xs font-bold mt-1.5 text-[#F0EFE8]">{String(incomingVal)}</span>
+                          <span className="text-[8px] text-[#B0B0B0]/40 uppercase font-black">Merge/Overwrite with Incoming Record</span>
+                          <span className="text-xs font-bold mt-1.5 text-[#F5F5F5]">{String(incomingVal)}</span>
                         </button>
                       </div>
 
@@ -2271,8 +2354,8 @@ export const DirectorTab = () => {
                               setResolvedFields(prev => ({ ...prev, nickname: mergedNick }));
                             }}
                             className={cn(
-                              "px-3 py-1 bg-[#1A1A28] hover:bg-[#222235] border border-white/10 rounded text-[9px] font-black uppercase text-slate-300 transition-all cursor-pointer",
-                              resolvedFields.nickname === `${existVal} (alias: ${incomingVal})` && "border-[#D4AF37] text-[#D4AF37]"
+                              "px-3 py-1 bg-[#1A1A1A] hover:bg-[#222222] border border-white/10 rounded text-[9px] font-black uppercase text-slate-300 transition-all cursor-pointer",
+                              resolvedFields.nickname === `${existVal} (alias: ${incomingVal})` && "border-[#FFB800] text-[#FFB800]"
                             )}
                           >
                             Combine Nicknames (Save Alias)
@@ -2289,8 +2372,8 @@ export const DirectorTab = () => {
                               setResolvedFields(prev => ({ ...prev, [field]: mergedVal }));
                             }}
                             className={cn(
-                              "px-3 py-1 bg-[#1A1A28] hover:bg-[#222235] border border-white/10 rounded text-[9px] font-black uppercase text-slate-300 transition-all cursor-pointer",
-                              resolvedFields[field as keyof Host] === Array.from(new Set([String(existVal), String(incomingVal)])).join(', ') && "border-[#D4AF37] text-[#D4AF37]"
+                              "px-3 py-1 bg-[#1A1A1A] hover:bg-[#222222] border border-white/10 rounded text-[9px] font-black uppercase text-slate-300 transition-all cursor-pointer",
+                              resolvedFields[field as keyof Host] === Array.from(new Set([String(existVal), String(incomingVal)])).join(', ') && "border-[#FFB800] text-[#FFB800]"
                             )}
                           >
                             Keep Both (Multiple Positions/Roles)
@@ -2307,7 +2390,7 @@ export const DirectorTab = () => {
                 <button
                   type="button"
                   onClick={() => processNextDuplicate(duplicateQueue)}
-                  className="px-5 py-2.5 bg-[#1A1A28] hover:bg-[#222235] border border-white/10 rounded-xl text-xs font-black uppercase tracking-wider text-[#A09E9A] hover:text-[#F0EFE8] cursor-pointer"
+                  className="px-5 py-2.5 bg-[#1A1A1A] hover:bg-[#222222] border border-white/10 rounded-xl text-xs font-black uppercase tracking-wider text-[#B0B0B0] hover:text-[#F5F5F5] cursor-pointer"
                 >
                   Cancel
                 </button>
@@ -2330,7 +2413,7 @@ export const DirectorTab = () => {
                       alert("Failed to commit merged record.");
                     }
                   }}
-                  className="px-6 py-2.5 btn-gold rounded-xl text-xs font-black uppercase tracking-wider text-[#0D0D14] cursor-pointer shadow-lg"
+                  className="px-6 py-2.5 btn-gold rounded-xl text-xs font-black uppercase tracking-wider text-[#111111] cursor-pointer shadow-lg"
                 >
                   Resolve & Commit
                 </button>
