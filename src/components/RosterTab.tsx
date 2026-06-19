@@ -143,6 +143,10 @@ const formatTimeslot = (timeStr: string) => {
   return `${formattedTime} Manila Time PHT`;
 };
 
+interface RosterTabProps {
+  isReadOnly?: boolean;
+}
+
 export const RosterTab: React.FC<RosterTabProps> = ({ isReadOnly = false }) => {
   const [hosts, setHosts] = useState<Host[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -294,7 +298,7 @@ export const RosterTab: React.FC<RosterTabProps> = ({ isReadOnly = false }) => {
         <div className="flex flex-col md:flex-row gap-6">
           {/* Role Checkboxes */}
           <div className="flex-1">
-            <h3 className="text-[10px] font-black uppercase tracking-widest text-[#A09E9A]/50 mb-2 flex items-center gap-1.5"><Filter size={12}/> Role Filter</h3>
+            <div className="text-[10px] font-black uppercase tracking-widest text-[#A09E9A]/50 mb-2 flex items-center gap-1.5"><Filter size={12}/> Role Filter</div>
             <div className="flex flex-wrap gap-4">
               {['Host', 'Team Leader'].map(role => (
                 <label key={role} className="flex items-center gap-2 cursor-pointer group">
@@ -321,7 +325,7 @@ export const RosterTab: React.FC<RosterTabProps> = ({ isReadOnly = false }) => {
 
           {/* Tier Pay Blocks */}
           <div className="flex-[2]">
-            <h3 className="text-[10px] font-black uppercase tracking-widest text-[#A09E9A]/50 mb-2 flex items-center gap-1.5"><Star size={12}/> Tier Pay Category</h3>
+            <div className="text-[10px] font-black uppercase tracking-widest text-[#A09E9A]/50 mb-2 flex items-center gap-1.5"><Star size={12}/> Tier Pay Category</div>
             <div className="flex flex-wrap gap-2">
               {['Star Host', 'Rocket Host', 'S idol', 'Esports', 'Influencer', 'Regular Host'].map(tier => {
                 const isSelected = selectedTiers.includes(tier);

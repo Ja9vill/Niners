@@ -77,7 +77,7 @@ export const DirectorOperations = () => {
       const aa = await FirebaseService.getAwardAssignments();
       setAwardAssignments(aa);
       const lr = await FirebaseService.getLivehouses();
-      setLivehouseRequests(lr.filter(r => r.status !== 'Completed'));
+      setLivehouseRequests(lr.filter(r => (r.status as string) !== 'Completed'));
       const mn = await FirebaseService.getManagerNotes();
       setManagerNotes(mn);
       const es = await FirebaseService.getTopNinersSummary(selectedMonth);

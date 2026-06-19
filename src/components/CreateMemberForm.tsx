@@ -5,6 +5,7 @@ import { FirebaseService } from '../lib/firebaseService';
 import { Host } from '../types';
 import { collection, query, where, getDocs, doc, setDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
+import { Storage } from '../lib/storage';
 
 export const CreateMemberForm = () => {
   const [poppoId, setPoppoId] = useState('');

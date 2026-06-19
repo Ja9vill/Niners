@@ -43,7 +43,7 @@ const getTierBlockStyles = (tierInput: string) => {
   };
 };
 
-export const ProfilesTab: React.FC<ProfilesTabProps> = ({ isReadOnly = false }) => {
+export const ProfilesTab: React.FC<{ isReadOnly?: boolean }> = ({ isReadOnly = false }) => {
   const [hosts, setHosts] = useState<Host[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

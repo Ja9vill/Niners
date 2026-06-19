@@ -681,7 +681,7 @@ export const FirebaseService = {
             assigned_manager_poppo_id: managerId,
             team_anchor: teamName,
             tier_pay: salaryCategory,
-          } as Host;
+          } as unknown as Host;
         });
         allHosts = allHosts.concat(docs);
       } catch (error) {
@@ -1018,6 +1018,16 @@ export const FirebaseService = {
       return snap.docs.map(d => d.data() as ExposureEntry);
     } catch (error) {
       console.warn('[FirebaseService] getExposures failed for', hostId, error);
+      return [];
+    }
+  },
+
+  async getAllExposures(): Promise<ExposureEntry[]> {
+    try {
+      const snap = await getDocs(collection(db, 'calendar'));
+      return snap.docs.map(d => ({ id: d.id, ...d.data() } as unknown as ExposureEntry));
+    } catch (error) {
+      console.warn('[FirebaseService] getAllExposures failed', error);
       return [];
     }
   },

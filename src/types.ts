@@ -69,12 +69,14 @@ export interface Host {
   tier_pay: BaseSalaryTier;
   photoUrl?: string;
   bio?: string;
+  description?: string;
   social_links?: {
     fb?: string;
     ig?: string;
     tiktok?: string;
     whatsapp?: string;
   };
+  streaming_hours?: any[];
   followers_count?: number;
   created_at: string;
   updated_at: string;
@@ -105,26 +107,26 @@ export interface PasswordResetRequest {
 
 export interface PerformanceReportEntry {
   poppo_id: string;
-  nickname: string;
-  month: string;
-  year: number;
+  nickname?: string;
+  month?: string;
+  year?: number;
   from_date?: string;
   to_date?: string;
-  level: number;
-  live_duration: number;
-  party_host_duration: number;
-  total_earnings: number; // merged with total_points
-  agent_commission: number;
-  live_earnings: number;
-  party_earnings: number;
-  private_chat: number;
-  tips: number;
-  platform_reward: number;
-  other_earnings: number;
-  platform_hourly_salary: number;
-  super_salary: number;
-  super_rank: number;
-  agentweb_commission_rate: number;
+  level?: number;
+  live_duration?: number;
+  party_host_duration?: number;
+  total_earnings?: number; // merged with total_points
+  agent_commission?: number;
+  live_earnings?: number;
+  party_earnings?: number;
+  private_chat?: number;
+  tips?: number;
+  platform_reward?: number;
+  other_earnings?: number;
+  platform_hourly_salary?: number;
+  super_salary?: number;
+  super_rank?: number;
+  agentweb_commission_rate?: number;
   _isUnknownHost?: boolean;
   
   // legacy fallbacks
@@ -132,6 +134,10 @@ export interface PerformanceReportEntry {
   agentweb_commission_earning?: number;
   video_duration?: number;
   video_earnings?: number;
+  poppo_name?: string;
+  other_earn?: number;
+  my_commission?: number;
+  timestamp?: string;
 }
 
 // Ensure CommissionEntry points to PerformanceReportEntry during migration to avoid breaking current code types outright

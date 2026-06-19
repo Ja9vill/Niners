@@ -63,12 +63,11 @@ async function startServer() {
       }
 
       // Authenticate with Google APIs using service account
-      const auth = new google.auth.JWT(
-        clientEmail,
-        undefined,
-        privateKey,
-        ['https://www.googleapis.com/auth/devstorage.read_write']
-      );
+      const auth = new google.auth.JWT({
+        email: clientEmail,
+        key: privateKey,
+        scopes: ['https://www.googleapis.com/auth/devstorage.read_write']
+      });
       const tokenResponse = await auth.getAccessToken();
       const accessToken = tokenResponse.token;
 

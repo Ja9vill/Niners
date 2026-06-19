@@ -49,7 +49,7 @@ import { SystemLogsViewer } from './SystemLogsViewer';
 import { CreateMemberForm } from './CreateMemberForm';
 import { RosterManagementTab } from './RosterManagementTab';
 import { db } from '../lib/firebase';
-import { collection, query, where, getDocs, addDoc, deleteDoc, doc, setDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, addDoc, deleteDoc, doc, setDoc, writeBatch } from 'firebase/firestore';
 
 // --- Types for AI Recommendations ---
 interface AIInsight {

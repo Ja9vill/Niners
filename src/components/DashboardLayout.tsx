@@ -802,7 +802,7 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
               )}
             >
               <BookOpen size={18} />
-              <span>{role === 'host' ? 'Streaming 101' : 'Managing 101'}</span>
+              <span>Learning Hub</span>
             </Link>
 
             <button 

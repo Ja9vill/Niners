@@ -484,7 +484,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
             )
           );
           if (!pkSnap.empty) {
-            const reports = pkSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+            const reports = pkSnap.docs.map(d => ({ id: d.id, ...d.data() } as any));
             reports.sort((a: any, b: any) => {
               const getReportTime = (r: any) => {
                 if (r.timestamp) return new Date(r.timestamp).getTime();
@@ -575,7 +575,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
         // Load AI reports from Firestore
         try {
           const aiSnap = await getDocs(query(collection(db, 'ai_reports'), where('hostId', '==', host.id)));
-          const allAi = aiSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+          const allAi = aiSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
           allAi.sort((a: any, b: any) => (b.timestamp || '').localeCompare(a.timestamp || ''));
           
           const latestPosted = allAi.find((r: any) => r.isPosted === true);
@@ -616,7 +616,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
 
         // Load awards
         try {
-          const awardsData = await FirebaseService.getAwards(host.id);
+          const awardsData = await FirebaseService.getAwards();
           const sortedAwards = (awardsData || []).sort((a: any, b: any) => {
             const dateA = a.dateAwarded || a.awardedAt || '';
             const dateB = b.dateAwarded || b.awardedAt || '';
@@ -672,7 +672,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
     const reloadAiReports = async () => {
       try {
         const aiSnap = await getDocs(query(collection(db, 'ai_reports'), where('hostId', '==', host.id)));
-        const allAi = aiSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const allAi = aiSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
         allAi.sort((a: any, b: any) => (b.timestamp || '').localeCompare(a.timestamp || ''));
         
         const latestPosted = allAi.find((r: any) => r.isPosted === true);
@@ -827,7 +827,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
           )
         );
         if (!pkSnap.empty) {
-          const reports = pkSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+          const reports = pkSnap.docs.map(d => ({ id: d.id, ...d.data() } as any));
           reports.sort((a: any, b: any) => {
             const getReportTime = (r: any) => {
               if (r.timestamp) return new Date(r.timestamp).getTime();
@@ -1207,6 +1207,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
 
   // AI Report Generator — defined here so perfTotals is in scope
   const handleGenerateAI = async () => {
+    const perfTotals = selectedMetrics;
     const currentAuth = Storage.getAuthState();
     const userRoleLower = String(currentAuth?.role || '').toLowerCase();
     const canGenerateAI = 
@@ -2326,7 +2327,7 @@ CRITICAL REQUIREMENT: When generating the analysis, recommendations, and tasks, 
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-2">
              <div className="w-8 h-8 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-400 text-sm shadow-inner">📅</div>
-             <h4 className="text-xs font-black uppercase tracking-widest text-[#F0EFE8]">EVENTS</h4>
+             <h4 className="text-xs font-black uppercase tracking-widest text-[#F0EFE8]">EVENTS & ATTENDANCE</h4>
           </div>
           <div className="flex items-center gap-2">
             {isOwnProfile && eventActiveTab === 'exposure' && (
@@ -2348,7 +2349,7 @@ CRITICAL REQUIREMENT: When generating the analysis, recommendations, and tasks, 
                     : "text-white/40 hover:text-white/70 border border-transparent"
                 )}
               >
-                Exposures
+                Events
               </button>
               <button
                 type="button"
@@ -3191,7 +3192,7 @@ CRITICAL REQUIREMENT: When generating the analysis, recommendations, and tasks, 
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
              <div className="w-8 h-8 rounded-full bg-[#D4AF37]/20 flex items-center justify-center text-[#D4AF37] text-sm shadow-inner">🏆</div>
-             <h4 className="text-xs font-black uppercase tracking-widest text-[#F0EFE8]">Agency Awards</h4>
+             <h4 className="text-xs font-black uppercase tracking-widest text-[#F0EFE8]">RECOGNITIONS</h4>
           </div>
           <span className="px-3 py-1 text-[9px] font-black text-[#D4AF37] border border-[#D4AF37]/30 bg-[#D4AF37]/10 rounded-full uppercase tracking-widest shadow-[0_0_10px_rgba(212,175,55,0.2)]">
             {activeAwards.length} active
@@ -3366,8 +3367,8 @@ CRITICAL REQUIREMENT: When generating the analysis, recommendations, and tasks, 
                 {renderRandomPK()}
                 {renderExposuresAndAttendance()}
               </div>
-              {renderFanbaseBlock()}
               {renderAwardsBlock()}
+              {renderFanbaseBlock()}
               {renderTrendBadge()}
               {renderWeeklyLiveStats()}
               {renderAgentNotes()}
@@ -3397,8 +3398,8 @@ CRITICAL REQUIREMENT: When generating the analysis, recommendations, and tasks, 
                   {renderRandomPK()}
                   {renderExposuresAndAttendance()}
                 </div>
-                {renderFanbaseBlock()}
                 {renderAwardsBlock()}
+                {renderFanbaseBlock()}
                 {renderTrendBadge()}
                 {renderWeeklyLiveStats()}
                 {renderAgentNotes()}

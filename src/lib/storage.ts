@@ -11,6 +11,7 @@ export interface AuthState {
   anchor_team: string;
   profile_photo: string;
   token: string;
+  position?: string;
   mockRole?: string;
   originalRole?: string;
 }

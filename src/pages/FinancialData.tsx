@@ -22,7 +22,7 @@ export const FinancialData = () => {
 
   const loadData = async () => {
     try {
-      const c = await FirebaseService.getCommissions();
+      const c = await FirebaseService.getAllCommissions();
       setCommissions(c);
       setMonthlyLedger(c.filter(entry => entry.month));
       setWeeklyLedger(c.filter(entry => entry.from_date && entry.to_date));

@@ -80,7 +80,7 @@ export default function App() {
           <Route
             path="my-profile"
             element={
-              <RoleGuard roles={['host']}>
+              <RoleGuard roles={['host', 'manager', 'agent', 'admin', 'director', 'head admin', 'head_admin']}>
                 <HostProfileEditor />
               </RoleGuard>
             }
