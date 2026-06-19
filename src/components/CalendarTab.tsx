@@ -607,26 +607,45 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
   const isAdminOrDirector = ['admin', 'head admin', 'head_admin', 'director'].includes(userRole);
 
   const attFilteredUsers = useMemo(() => {
-    return allUsers.filter(u => {
-      const uRole = String(u.role || '').toLowerCase();
-      if (uRole === 'director') return false;
+    return allUsers
+      .filter(u => {
+        const uRole = String(u.role || '').toLowerCase();
+        if (uRole === 'director') return false;
 
-      if (attRoleFilter !== 'All Roles') {
-        if (attRoleFilter === 'hosts' && uRole !== 'host' && uRole !== 'talent') return false;
-        if (attRoleFilter === 'managers' && uRole !== 'manager') return false;
-        if (attRoleFilter === 'agents' && uRole !== 'agent') return false;
-        if (attRoleFilter === 'admins' && uRole !== 'admin' && uRole !== 'head admin') return false;
-      }
+        if (attRoleFilter !== 'All Roles') {
+          if (attRoleFilter === 'hosts' && uRole !== 'host' && uRole !== 'talent') return false;
+          if (attRoleFilter === 'managers' && uRole !== 'manager') return false;
+          if (attRoleFilter === 'agents' && uRole !== 'agent') return false;
+          if (attRoleFilter === 'admins' && uRole !== 'admin' && uRole !== 'head admin') return false;
+        }
 
-      const searchStr = attSearch.toLowerCase().trim();
-      if (searchStr) {
-        const nickname = String(u.nickname || u.name || '').toLowerCase();
-        const poppoId = String(u.poppo_id || u.poppoId || u.id || '').toLowerCase();
-        return nickname.includes(searchStr) || poppoId.includes(searchStr);
-      }
+        const searchStr = attSearch.toLowerCase().trim();
+        if (searchStr) {
+          const nickname = String(u.nickname || u.name || '').toLowerCase();
+          const poppoId = String(u.poppo_id || u.poppoId || u.id || '').toLowerCase();
+          return nickname.includes(searchStr) || poppoId.includes(searchStr);
+        }
 
-      return true;
-    });
+        return true;
+      })
+      .sort((a, b) => {
+        const aRole = String(a.role || '').toLowerCase();
+        const bRole = String(b.role || '').toLowerCase();
+        const aIsHost = aRole === 'host' || aRole === 'talent';
+        const bIsHost = bRole === 'host' || bRole === 'talent';
+        const aHasPhoto = !!a.photoUrl;
+        const bHasPhoto = !!b.photoUrl;
+
+        const aFirst = aIsHost && aHasPhoto;
+        const bFirst = bIsHost && bHasPhoto;
+
+        if (aFirst && !bFirst) return -1;
+        if (!aFirst && bFirst) return 1;
+
+        const aName = String(a.nickname || a.name || '').toLowerCase();
+        const bName = String(b.nickname || b.name || '').toLowerCase();
+        return aName.localeCompare(bName);
+      });
   }, [allUsers, attSearch, attRoleFilter]);
 
   const handleAddAttAttendee = (user: any) => {
@@ -784,26 +803,45 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
   );
 
   const editFilteredUsers = useMemo(() => {
-    return allUsers.filter(u => {
-      const userRole = String(u.role || '').toLowerCase();
-      if (userRole === 'director') return false;
+    return allUsers
+      .filter(u => {
+        const userRole = String(u.role || '').toLowerCase();
+        if (userRole === 'director') return false;
 
-      if (editParticipantRoleFilter !== 'All Roles') {
-        if (editParticipantRoleFilter === 'hosts' && userRole !== 'host' && userRole !== 'talent') return false;
-        if (editParticipantRoleFilter === 'managers' && userRole !== 'manager') return false;
-        if (editParticipantRoleFilter === 'agents' && userRole !== 'agent') return false;
-        if (editParticipantRoleFilter === 'admins' && userRole !== 'admin' && userRole !== 'head admin') return false;
-      }
+        if (editParticipantRoleFilter !== 'All Roles') {
+          if (editParticipantRoleFilter === 'hosts' && userRole !== 'host' && userRole !== 'talent') return false;
+          if (editParticipantRoleFilter === 'managers' && userRole !== 'manager') return false;
+          if (editParticipantRoleFilter === 'agents' && userRole !== 'agent') return false;
+          if (editParticipantRoleFilter === 'admins' && userRole !== 'admin' && userRole !== 'head admin') return false;
+        }
 
-      const searchStr = editParticipantSearch.toLowerCase().trim();
-      if (searchStr) {
-        const nickname = String(u.nickname || u.name || '').toLowerCase();
-        const poppoId = String(u.poppo_id || u.poppoId || u.id || '').toLowerCase();
-        return nickname.includes(searchStr) || poppoId.includes(searchStr);
-      }
+        const searchStr = editParticipantSearch.toLowerCase().trim();
+        if (searchStr) {
+          const nickname = String(u.nickname || u.name || '').toLowerCase();
+          const poppoId = String(u.poppo_id || u.poppoId || u.id || '').toLowerCase();
+          return nickname.includes(searchStr) || poppoId.includes(searchStr);
+        }
 
-      return true;
-    });
+        return true;
+      })
+      .sort((a, b) => {
+        const aRole = String(a.role || '').toLowerCase();
+        const bRole = String(b.role || '').toLowerCase();
+        const aIsHost = aRole === 'host' || aRole === 'talent';
+        const bIsHost = bRole === 'host' || bRole === 'talent';
+        const aHasPhoto = !!a.photoUrl;
+        const bHasPhoto = !!b.photoUrl;
+
+        const aFirst = aIsHost && aHasPhoto;
+        const bFirst = bIsHost && bHasPhoto;
+
+        if (aFirst && !bFirst) return -1;
+        if (!aFirst && bFirst) return 1;
+
+        const aName = String(a.nickname || a.name || '').toLowerCase();
+        const bName = String(b.nickname || b.name || '').toLowerCase();
+        return aName.localeCompare(bName);
+      });
   }, [allUsers, editParticipantSearch, editParticipantRoleFilter]);
 
   const handleAddEditParticipant = (poppoId: string) => {
@@ -960,106 +998,115 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 calendar-container">
+      <style>{`
+        /* Force 60% black background for the entire calendar page elements to let global gradients show */
+        body,
+        .app-bg,
+        main {
+          background-color: rgba(0, 0, 0, 0.6) !important;
+        }
+        /* Scoped style overrides for Calendar and its subcomponents (like AddEventForm) to match the global gold & charcoal brand theme */
+        .calendar-container select,
+        .calendar-container input,
+        .calendar-container textarea {
+          background-color: rgba(0, 0, 0, 0.6) !important;
+          border-color: rgba(212, 175, 55, 0.25) !important;
+          color: #f0efe8 !important;
+        }
+        .calendar-container select:focus,
+        .calendar-container input:focus,
+        .calendar-container textarea:focus {
+          border-color: rgba(212, 175, 55, 0.6) !important;
+          box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.08) !important;
+        }
+        .calendar-container select option {
+          background-color: #000000 !important;
+          color: #f0efe8 !important;
+        }
+        /* Override bg classes to 60% black */
+        .calendar-container .bg-black\\/85,
+        .calendar-container .bg-\\[\\#0D0D14\\],
+        .calendar-container .bg-\\[\\#0A0B0E\\],
+        .calendar-container .bg-slate-900,
+        .calendar-container .bg-\\[\\#13161F\\] {
+          background-color: rgba(0, 0, 0, 0.6) !important;
+        }
+        .calendar-container .bg-\\[\\#0A0B0E\\]\\/60 {
+          background-color: rgba(0, 0, 0, 0.6) !important;
+        }
+        .calendar-container .bg-\\[\\#181B24\\] {
+          background-color: #1a120e !important;
+        }
+        .calendar-container .bg-\\[\\#12151D\\]:hover {
+          background-color: #090605 !important;
+        }
+        /* Override border colors */
+        .calendar-container .border-purple-500\\/10,
+        .calendar-container .border-purple-500\\/20,
+        .calendar-container .border-purple-500\\/30,
+        .calendar-container .border-purple-500\\/50 {
+          border-color: rgba(212, 175, 55, 0.15) !important;
+        }
+        /* Override purple/indigo text & backgrounds to brand gold */
+        .calendar-container .text-purple-400,
+        .calendar-container .text-purple-300 {
+          color: #D4AF37 !important;
+        }
+        .calendar-container .bg-purple-500\\/20 {
+          background-color: rgba(212, 175, 55, 0.1) !important;
+          border-color: rgba(212, 175, 55, 0.2) !important;
+        }
+        .calendar-container .bg-gradient-to-r.from-purple-600.to-indigo-600 {
+          background: linear-gradient(135deg, #d4af37, #b8960c) !important;
+          color: #0c0806 !important;
+        }
+        .calendar-container .border-purple-500\\/50 {
+          border-color: rgba(212, 175, 55, 0.3) !important;
+        }
+      `}</style>
 
 
       <div className="space-y-6">
         {/* Main Calendar Section */}
         <div className="space-y-6">
-          {/* View Toggles & Navigation controls */}
-          <div className="flex flex-col sm:flex-row items-center justify-between bg-[#0F1117] border border-[#D4AF37]/40 p-4 rounded-2xl gap-4 shadow-[0_0_15px_rgba(212,175,55,0.15)]">
-            <div className="flex items-center gap-2 bg-[#0A0B0E] p-1.5 rounded-xl border border-[#D4AF37]/20 w-full sm:w-auto">
-              <button 
-                onClick={() => setViewMode('week')}
-                className={cn(
-                  "flex-1 sm:flex-none px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all cursor-pointer",
-                  viewMode === 'week' ? "bg-[#D4AF37] text-black shadow-lg shadow-[#D4AF37]/20" : "text-white/40 hover:text-white hover:bg-white/5"
-                )}
-              >
-                Week
-              </button>
-              <button 
-                onClick={() => setViewMode('month')}
-                className={cn(
-                  "flex-1 sm:flex-none px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all cursor-pointer",
-                  viewMode === 'month' ? "bg-[#D4AF37] text-black shadow-lg shadow-[#D4AF37]/20" : "text-white/40 hover:text-white hover:bg-white/5"
-                )}
-              >
-                Month
-              </button>
-            </div>
-
-            <div className="flex items-center gap-4">
-              <button 
-                title="Previous"
-                onClick={viewMode === 'week' ? goToPreviousWeek : goToPreviousMonth} 
-                className="p-2 bg-[#0A0B0E] border border-[#D4AF37]/10 hover:border-[#D4AF37]/30 hover:bg-[#D4AF37]/5 rounded-xl transition-all cursor-pointer"
-              >
-                <ChevronLeft size={16} className="text-[#D4AF37]" />
-              </button>
-              <div className="text-center min-w-[150px]">
-                <h2 className="text-sm font-black text-white tracking-widest uppercase">
-                  {viewMode === 'week' 
-                    ? `${format(weekDays[0], 'MMM d')} - ${format(weekDays[6], 'MMM d, yyyy')}`
-                    : format(currentDate, 'MMMM yyyy')}
+          {/* Monthly Grid View */}
+          <div className="bg-black/20 backdrop-blur-xl p-5 rounded-3xl border border-[#D4AF37]/20 shadow-[0_0_30px_rgba(212,175,55,0.05)] animate-fade-in space-y-4">
+            {/* Header with Navigation & Month/Year */}
+            <div className="flex items-center justify-between border-b border-[#D4AF37]/10 pb-3">
+              <div className="flex items-center gap-2">
+                <CalendarIcon className="text-[#D4AF37] w-4.5 h-4.5" />
+                <h2 className="text-sm font-black text-[#F0EFE8] tracking-widest uppercase">
+                  {format(currentDate, 'MMMM yyyy')}
                 </h2>
               </div>
-              <button 
-                title="Next"
-                onClick={viewMode === 'week' ? goToNextWeek : goToNextMonth} 
-                className="p-2 bg-[#0A0B0E] border border-[#D4AF37]/10 hover:border-[#D4AF37]/30 hover:bg-[#D4AF37]/5 rounded-xl transition-all cursor-pointer"
-              >
-                <ChevronRight size={16} className="text-[#D4AF37]" />
-              </button>
-            </div>
-          </div>
-
-          {/* Calendar Grids */}
-          {viewMode === 'week' ? (
-            /* 7-Day Calendar Grid */
-            <div className="overflow-x-auto pb-4 -mx-4 px-4 sm:mx-0 sm:px-0 custom-scrollbar">
-              <div className="grid grid-cols-7 gap-2 md:gap-4 bg-[#0B0D12] p-4 rounded-3xl border border-[#D4AF37]/40 shadow-[0_0_15px_rgba(212,175,55,0.15)] min-w-[700px]">
-                {weekDays.map((day, idx) => {
-                  const dayName = format(day, 'EEEE');
-                  const dayAbbr = format(day, 'EEE').toUpperCase();
-                  const dayNum = format(day, 'd');
-                  const isSelected = isSameDay(day, selectedDate);
-                  const dayEventsCount = getEventsForDay(day).length;
-
-                  return (
-                    <div key={idx} className="flex flex-col items-center gap-2">
-                      <span className="text-[9px] font-black uppercase tracking-[0.1em] text-[#D4AF37]/60 text-center truncate w-full">
-                        {dayName}
-                      </span>
-                      <button
-                        onClick={() => handleDateClick(day)}
-                        className={cn(
-                          "w-full py-4 rounded-2xl flex flex-col items-center justify-center gap-1.5 transition-all border cursor-pointer select-none relative bg-gradient-to-br",
-                          isSelected 
-                            ? "from-indigo-950 to-slate-900 ring-1 ring-purple-500 shadow-[0_0_15px_rgba(168,85,247,0.4)] border-transparent" 
-                            : "from-[#0F1117] to-[#13161F] border-[#D4AF37]/10 hover:border-purple-500/50 hover:from-slate-900 hover:to-indigo-950/40 text-white"
-                        )}
-                      >
-                        <span className={cn("text-[9px] font-black tracking-widest uppercase", isSelected ? "text-purple-400" : "text-white/40")}>{dayAbbr}</span>
-                        <span className={cn("text-lg font-black tracking-tight", isSelected ? "text-white" : "")}>{dayNum}</span>
-                        {dayEventsCount > 0 && !isSelected && <span className="absolute bottom-1.5 w-1.5 h-1.5 rounded-full bg-purple-500 shadow-[0_0_8px_rgba(168,85,247,0.8)]" />}
-                      </button>
-                    </div>
-                  );
-                })}
+              <div className="flex items-center gap-2">
+                <button 
+                  title="Previous Month"
+                  onClick={goToPreviousMonth} 
+                  className="p-2 bg-[#0e0a08]/90 border border-[#D4AF37]/20 hover:border-[#D4AF37]/50 hover:bg-[#D4AF37]/10 rounded-xl transition-all cursor-pointer"
+                >
+                  <ChevronLeft size={14} className="text-[#D4AF37]" />
+                </button>
+                <button 
+                  title="Next Month"
+                  onClick={goToNextMonth} 
+                  className="p-2 bg-[#0e0a08]/90 border border-[#D4AF37]/20 hover:border-[#D4AF37]/50 hover:bg-[#D4AF37]/10 rounded-xl transition-all cursor-pointer"
+                >
+                  <ChevronRight size={14} className="text-[#D4AF37]" />
+                </button>
               </div>
             </div>
-          ) : (
-            /* Monthly Grid View */
-            <div className="bg-[#0B0D12] p-4 rounded-3xl border border-[#D4AF37]/40 shadow-[0_0_15px_rgba(212,175,55,0.15)] animate-fade-in">
-              <div className="grid grid-cols-7 gap-1 mb-2">
-                {['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'].map(day => (
-                  <div key={day} className="text-center text-[9px] font-black uppercase tracking-widest text-[#D4AF37]/60 py-2">
-                    {day}
-                  </div>
-                ))}
-              </div>
-              <div className="grid grid-cols-7 gap-1 sm:gap-2">
+
+            {/* Days of Week Header */}
+            <div className="grid grid-cols-7 gap-1 mb-2">
+              {['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'].map(day => (
+                <div key={day} className="text-center text-[9px] font-black uppercase tracking-widest text-[#D4AF37]/60 py-2">
+                  {day}
+                </div>
+              ))}
+            </div>
+            <div className="grid grid-cols-7 gap-1 sm:gap-2">
                 {monthDays.map((day, idx) => {
                   const isCurrentMonth = isSameMonth(day, currentDate);
                   const isSelected = isSameDay(day, selectedDate);
@@ -1072,24 +1119,24 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                       onClick={() => handleDateClick(day)}
                       className={cn(
                         "aspect-square p-1 sm:p-2 rounded-xl border flex flex-col items-center justify-start gap-1 transition-all cursor-pointer relative group bg-gradient-to-br",
-                        !isCurrentMonth ? "border-white/5 hover:border-purple-500/30" : "border-[#D4AF37]/10 hover:border-purple-500/50",
-                        isSelected ? "from-indigo-950 to-slate-900 ring-1 ring-purple-500 shadow-[0_0_15px_rgba(168,85,247,0.4)] border-transparent" : "from-[#0F1117] to-[#13161F] hover:from-slate-900 hover:to-indigo-950/40",
-                        isToday && !isSelected && "ring-1 ring-[#ec4899] border-transparent"
+                        !isCurrentMonth ? "border-white/5 hover:border-[#D4AF37]/20" : "border-[#D4AF37]/10 hover:border-[#D4AF37]/50",
+                        isSelected ? "from-[#2d1c0c] to-[#1a120e] ring-1 ring-[#D4AF37] shadow-[0_0_15px_rgba(212,175,55,0.3)] border-transparent" : "from-black/60 to-black/30 hover:from-[#2d1c0c]/80 hover:to-[#1a120e]/80 text-[#F0EFE8]",
+                        isToday && !isSelected && "ring-1 ring-[#FF6B00] border-transparent"
                       )}
                     >
                       <span className={cn(
                         "text-xs sm:text-sm font-black tracking-tight mt-1",
-                        isSelected ? "text-white" : isToday ? "text-[#ec4899]" : !isCurrentMonth ? "text-white/60" : "text-white"
+                        isSelected ? "text-white" : isToday ? "text-[#FF6B00]" : !isCurrentMonth ? "text-white/40" : "text-white"
                       )}>
                         {format(day, 'd')}
                       </span>
                       {dayEvents.length > 0 && (
                         <div className="flex flex-wrap justify-center gap-0.5 sm:gap-1 mt-auto w-full px-1">
                           {dayEvents.slice(0, 3).map((e, i) => {
-                            const config = EVENT_COLORS[e.type || ''] || { gradient: 'from-purple-600 to-indigo-400' };
+                            const config = EVENT_COLORS[e.type || ''] || { gradient: 'from-[#D4AF37] to-[#b8960c]' };
                             return <div key={i} className={cn("w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-gradient-to-br shadow-sm", config.gradient)} />;
                           })}
-                          {dayEvents.length > 3 && <span className="text-[8px] text-white/40 font-bold leading-none pl-0.5">+{dayEvents.length - 3}</span>}
+                          {dayEvents.length > 3 && <span className="text-[8px] text-[#A09E9A] font-bold leading-none pl-0.5">+{dayEvents.length - 3}</span>}
                         </div>
                       )}
                     </button>
@@ -1097,31 +1144,30 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                 })}
               </div>
             </div>
-          )}
 
           {/* Scheduled Events Panel */}
-          <div className="bg-gradient-to-br from-[#0F1117] to-[#12141A] rounded-3xl border border-[#D4AF37]/40 p-5 space-y-4 shadow-[0_0_15px_rgba(212,175,55,0.15)] relative overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-tr from-purple-500/5 via-transparent to-indigo-500/5 pointer-events-none" />
+          <div className="bg-black/20 backdrop-blur-xl rounded-3xl border border-[#D4AF37]/25 p-5 space-y-4 shadow-[0_0_30px_rgba(212,175,55,0.05)] relative overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-tr from-[#D4AF37]/5 via-transparent to-orange-500/5 pointer-events-none" />
             
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-[#D4AF37]/20 pb-4 gap-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-[#D4AF37]/15 pb-4 gap-4">
               <div className="flex items-center gap-3">
-                <div className="w-2.5 h-2.5 rounded-full bg-purple-400 shadow-[0_0_8px_rgba(168,85,247,0.8)]" />
-                <h3 className="text-xs font-black uppercase tracking-widest text-white/90">
+                <div className="w-2.5 h-2.5 rounded-full bg-[#D4AF37] shadow-[0_0_8px_rgba(212,175,55,0.8)]" />
+                <h3 className="text-xs font-black uppercase tracking-widest text-[#F0EFE8]">
                   Scheduled Events
                 </h3>
               </div>
               
               <div className="flex items-center gap-2">
-                <Globe size={14} className="text-purple-400" />
+                <Globe size={14} className="text-[#D4AF37]" />
                 <select 
                   title="Select timezone"
                   aria-label="Select timezone"
                   value={selectedTimezone}
                   onChange={(e) => setSelectedTimezone(e.target.value)}
-                  className="bg-[#0A0B0E] border border-purple-500/30 rounded-lg px-2 py-1 text-[10px] font-bold text-white/80 focus:border-purple-400 focus:ring-1 focus:ring-purple-400 outline-none cursor-pointer tracking-widest uppercase appearance-none"
+                  className="bg-black/20 border border-[#D4AF37]/20 rounded-lg px-2 py-1 text-[10px] font-bold text-white/80 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37]/35 outline-none cursor-pointer tracking-widest uppercase appearance-none"
                 >
                   {TIMEZONES.map(tz => (
-                    <option key={tz.value} value={tz.value}>{tz.label}</option>
+                    <option key={tz.value} value={tz.value} className="bg-[#0e0a08] text-[#F0EFE8]">{tz.label}</option>
                   ))}
                 </select>
               </div>
@@ -1132,7 +1178,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                 selectedDayEvents
                   .sort((a, b) => a.time.localeCompare(b.time))
                   .map(e => {
-                  const colorConfig = EVENT_COLORS[e.type || ''] || { text: 'text-purple-400', bg: 'bg-purple-500/10', gradient: 'from-purple-600 to-indigo-400' };
+                  const colorConfig = EVENT_COLORS[e.type || ''] || { text: 'text-[#D4AF37]', bg: 'bg-[#D4AF37]/10', gradient: 'from-[#D4AF37] to-[#b8960c]' };
                   
                   // For the timezone display mock
                   const timezoneLabel = TIMEZONES.find(t => t.value === selectedTimezone)?.label.split(' ')[0] || '';
@@ -1146,16 +1192,16 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                     <div
                       key={e.event_id}
                       onClick={() => setSelectedEventId(e.event_id)}
-                      className="w-full text-left p-4 rounded-xl bg-gradient-to-r from-[#0A0B0E] to-[#13161F] border border-[#D4AF37]/5 hover:border-purple-500/50 transition-all flex gap-4 group items-center cursor-pointer shadow-lg hover:shadow-purple-500/10"
+                      className="w-full text-left p-4 rounded-xl bg-gradient-to-r from-black/90 to-black/80 border border-[#D4AF37]/15 hover:border-[#D4AF37]/50 transition-all flex gap-4 group items-center cursor-pointer shadow-lg hover:shadow-[#D4AF37]/5"
                     >
                       <div className={cn("w-1 h-10 rounded-full shrink-0 bg-gradient-to-b", colorConfig.gradient)} />
                       <div className="flex-1 min-w-0 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                         <div>
-                          <h4 className="text-sm font-black text-white truncate group-hover:text-purple-400 transition-colors">{e.title}</h4>
+                          <h4 className="text-sm font-black text-white truncate group-hover:text-[#D4AF37] transition-colors">{e.title}</h4>
                           <p className="text-[10px] text-slate-300 mt-0.5 line-clamp-1">{e.description || 'No description provided.'}</p>
                         </div>
                         <div className="flex items-center gap-3 shrink-0">
-                          <span className="text-xs font-black text-purple-300 tracking-wider bg-[#0A0B0E] border border-purple-500/20 px-2 py-1 rounded-md">{displayTime}</span>
+                          <span className="text-xs font-black text-[#D4AF37] tracking-wider bg-[#0e0a08]/90 border border-[#D4AF37]/20 px-2 py-1 rounded-md">{displayTime}</span>
                           {isOngoingOrPast && (
                             <button
                               type="button"
@@ -1163,7 +1209,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                                 ev.stopPropagation();
                                 handleAttendanceClick(e);
                               }}
-                              className="px-3 py-1.5 bg-[#D4AF37]/10 border border-[#D4AF37]/30 hover:bg-[#D4AF37]/20 text-[#D4AF37] font-bold text-xs uppercase tracking-wider rounded-lg transition-all cursor-pointer z-10 shrink-0"
+                              className="px-3.5 py-1.5 border border-[#D4AF37]/30 bg-gradient-to-r from-[#D4AF37]/20 to-[#D4AF37]/5 text-[#D4AF37] hover:from-[#D4AF37]/30 hover:border-[#D4AF37]/50 font-black text-[10px] uppercase tracking-widest rounded-xl transition-all active:scale-[0.99] cursor-pointer z-10 shrink-0 shadow-md shadow-[#D4AF37]/5"
                             >
                               Attendance
                             </button>
@@ -1175,7 +1221,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                 })
               ) : (
                 <div className="flex flex-col items-center justify-center py-12 gap-3">
-                  <div className="w-12 h-12 rounded-full bg-[#13161F] border border-white/5 flex items-center justify-center">
+                  <div className="w-12 h-12 rounded-full bg-[#0e0a08]/90 border border-white/5 flex items-center justify-center">
                     <CalendarIcon size={20} className="text-white/20" />
                   </div>
                   <p className="text-[10px] text-white/30 uppercase tracking-widest font-black">No events scheduled</p>
@@ -1185,24 +1231,24 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
             
             {/* Action Buttons for interactive page only */}
             {!isReadOnly && (
-              <div className="pt-4 border-t border-purple-500/10 flex flex-col sm:flex-row gap-3">
+              <div className="pt-4 border-t border-[#D4AF37]/15 flex items-center justify-end gap-3 flex-wrap">
                 {auth.level > 0 && (
                   <button 
                     onClick={() => setIsAdding(true)} 
-                    className="flex-1 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-black uppercase tracking-wider text-xs py-3.5 rounded-xl cursor-pointer flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(168,85,247,0.4)] transition-all transform active:scale-95 border border-purple-400/50"
+                    className="px-4 py-2 border border-[#D4AF37]/30 bg-[#D4AF37]/10 hover:bg-[#D4AF37]/20 text-[#D4AF37] font-black text-[10px] uppercase tracking-widest hover:border-[#D4AF37]/50 rounded-xl transition-all active:scale-[0.99] cursor-pointer flex items-center gap-2 shadow-md shadow-[#D4AF37]/5"
                   >
-                    <Plus size={16} />
-                    Add Event Entry
+                    <Plus size={14} />
+                    Add Event
                   </button>
                 )}
 
                 {['talent', 'host'].includes(auth.role?.toLowerCase() || '') && (
                   <button 
                     onClick={() => setIsReservingLivehouse(true)} 
-                    className="flex-1 bg-slate-900 border border-purple-500/50 hover:bg-purple-500/10 text-purple-400 hover:text-white font-black uppercase tracking-[0.2em] text-xs py-3.5 rounded-xl cursor-pointer flex items-center justify-center gap-2 shadow-xl transition-all transform active:scale-95"
+                    className="px-4 py-2 bg-black/20 border border-white/10 hover:bg-[#1a120e] hover:border-white/20 text-[#A09E9A] hover:text-[#F0EFE8] font-black text-[10px] uppercase tracking-widest rounded-xl transition-all active:scale-[0.99] cursor-pointer flex items-center gap-2 shadow-md"
                   >
-                    <Clock size={16} />
-                    SCHEDULE LIVEHOUSE
+                    <Clock size={14} />
+                    Schedule Livehouse
                   </button>
                 )}
               </div>
@@ -1215,8 +1261,8 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
       <AnimatePresence>
         {isAdding && (
           <div className="fixed inset-0 z-[1000] flex items-center justify-center p-6">
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsAdding(false)} className="absolute inset-0 bg-[#0A0B0E]/80 backdrop-blur-sm" />
-            <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="relative bg-[#0F1117] border border-[#D4AF37]/20 w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl z-10 max-h-[90vh] overflow-y-auto custom-scrollbar">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsAdding(false)} className="absolute inset-0 bg-black/20 backdrop-blur-sm" />
+            <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="relative bg-black/20 border border-[#D4AF37]/20 w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl z-10 max-h-[90vh] overflow-y-auto custom-scrollbar">
               <div className="p-6 border-b border-[#D4AF37]/20 font-black text-white uppercase tracking-widest text-[10px]">Schedule New Calendar Event</div>
               <div className="p-6">
                 <AddEventForm 
@@ -1237,8 +1283,8 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
       <AnimatePresence>
         {isReservingLivehouse && (
           <div className="fixed inset-0 z-[1000] flex items-center justify-center p-6">
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsReservingLivehouse(false)} className="absolute inset-0 bg-[#0A0B0E]/80 backdrop-blur-sm" />
-            <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="relative bg-[#0F1117] border border-[#D4AF37]/20 w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl z-10 max-h-[90vh] overflow-y-auto custom-scrollbar">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsReservingLivehouse(false)} className="absolute inset-0 bg-black/20 backdrop-blur-sm" />
+            <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="relative bg-black/20 border border-[#D4AF37]/20 w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl z-10 max-h-[90vh] overflow-y-auto custom-scrollbar">
               <div className="p-6 border-b border-[#D4AF37]/20 font-black text-white uppercase tracking-widest text-[10px]">SCHEDULE LIVEHOUSE</div>
               <form onSubmit={handleReserveLivehouse} className="p-6 space-y-5">
                 
@@ -1249,7 +1295,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                       id="res-poppo-id"
                       disabled 
                       value={auth.poppo_id} 
-                      className="w-full bg-[#0A0B0E] border border-[#D4AF37]/15 rounded-xl px-4 py-3 text-sm text-white/50 cursor-not-allowed outline-none" 
+                      className="w-full bg-[#0c0806] border border-[#D4AF37]/15 rounded-xl px-4 py-3 text-sm text-[#A09E9A]/60 cursor-not-allowed outline-none" 
                     />
                   </div>
                   <div className="space-y-1.5">
@@ -1258,7 +1304,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                       id="res-host-name"
                       disabled 
                       value={auth.nickname || auth.name} 
-                      className="w-full bg-[#0A0B0E] border border-[#D4AF37]/15 rounded-xl px-4 py-3 text-sm text-white/50 cursor-not-allowed outline-none" 
+                      className="w-full bg-[#0c0806] border border-[#D4AF37]/15 rounded-xl px-4 py-3 text-sm text-[#A09E9A]/60 cursor-not-allowed outline-none" 
                     />
                   </div>
                 </div>
@@ -1271,10 +1317,10 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                       value={selectedLivehouseType}
                       onChange={(e) => setSelectedLivehouseType(e.target.value as any)}
                       title="Livehouse Type" 
-                      className="w-full bg-[#0A0B0E] border border-[#D4AF37]/15 rounded-xl px-4 py-3 text-sm focus:border-[#D4AF37] outline-none text-white font-bold cursor-pointer"
+                      className="w-full bg-[#0e0a08]/90 border border-[#D4AF37]/15 rounded-xl px-4 py-3 text-sm focus:border-[#D4AF37] outline-none text-[#F0EFE8] font-bold cursor-pointer"
                     >
-                      <option value="SOLO LIVEHOUSE" className="bg-[#0f1117]">SOLO LIVEHOUSE</option>
-                      <option value="PARTY LIVEHOUSE" className="bg-[#0f1117]">PARTY LIVEHOUSE</option>
+                      <option value="SOLO LIVEHOUSE" className="bg-[#0e0a08] text-[#F0EFE8]">SOLO LIVEHOUSE</option>
+                      <option value="PARTY LIVEHOUSE" className="bg-[#0e0a08] text-[#F0EFE8]">PARTY LIVEHOUSE</option>
                     </select>
                   </div>
                   <div className="space-y-1.5">
@@ -1378,14 +1424,14 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                     value={reserveNotes} 
                     onChange={(e) => setReserveNotes(e.target.value)} 
                     title="Reservation Notes" 
-                    className="w-full bg-[#0A0B0E] border border-[#D4AF37]/15 rounded-xl p-4 text-sm focus:border-[#D4AF37] outline-none text-white h-24 resize-none placeholder-white/20" 
+                    className="w-full bg-[#0e0a08]/90 border border-[#D4AF37]/15 rounded-xl p-4 text-sm focus:border-[#D4AF37] outline-none text-[#F0EFE8] h-24 resize-none placeholder-white/20" 
                     placeholder="Provide details for your livehouse set..." 
                   />
                 </div>
 
                 <div className="pt-2 flex gap-4">
-                  <button type="button" onClick={() => setIsReservingLivehouse(false)} className="flex-1 px-6 py-4 rounded-xl bg-slate-900 border border-[#D4AF37]/15 text-white/40 font-black uppercase text-[10px] tracking-widest hover:bg-slate-800 hover:text-white transition-colors cursor-pointer">Cancel</button>
-                  <button type="submit" className="flex-[2] bg-slate-900 border border-[#D4AF37] hover:bg-[#D4AF37]/5 text-[#D4AF37] hover:text-white py-4 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] shadow-xl transition-all cursor-pointer">Submit Schedule Request</button>
+                  <button type="button" onClick={() => setIsReservingLivehouse(false)} className="flex-1 px-6 py-4 rounded-xl bg-[#0e0a08]/90 border border-white/10 text-[#A09E9A] font-black uppercase text-[10px] tracking-widest hover:bg-[#1a120e] hover:border-white/20 hover:text-[#F0EFE8] transition-colors cursor-pointer">Cancel</button>
+                  <button type="submit" className="flex-[2] bg-[#D4AF37] hover:bg-[#FFEA00] text-black font-black uppercase text-[10px] tracking-[0.2em] py-4 rounded-xl shadow-xl transition-all cursor-pointer">Submit Schedule Request</button>
                 </div>
               </form>
             </motion.div>
@@ -1402,25 +1448,25 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
               animate={{ opacity: 1 }} 
               exit={{ opacity: 0 }} 
               onClick={() => setSelectedEventId(null)} 
-              className="absolute inset-0 bg-[#0A0B0E]/90 backdrop-blur-md cursor-pointer" 
+              className="absolute inset-0 bg-black/20 backdrop-blur-md cursor-pointer" 
             />
             
             <motion.div 
               initial={{ scale: 0.95, opacity: 0, y: 20 }} 
               animate={{ scale: 1, opacity: 1, y: 0 }} 
               exit={{ scale: 0.95, opacity: 0, y: 20 }} 
-              className="relative w-full max-w-2xl bg-[#0F1117] border border-[#D4AF37]/20 rounded-3xl shadow-[0_0_50px_rgba(212,175,55,0.1)] z-10 max-h-[90vh] overflow-hidden flex flex-col"
+              className="relative w-full max-w-2xl bg-black/20 border border-[#D4AF37]/20 rounded-3xl shadow-[0_0_50px_rgba(212,175,55,0.1)] z-10 max-h-[90vh] overflow-hidden flex flex-col"
             >
-              <div className="absolute inset-0 bg-gradient-to-tr from-indigo-500/5 via-transparent to-[#D4AF37]/5 pointer-events-none" />
+              <div className="absolute inset-0 bg-gradient-to-tr from-[#D4AF37]/5 via-transparent to-orange-500/5 pointer-events-none" />
               
               <div className="p-5 sm:p-6 border-b border-[#D4AF37]/10 flex items-center justify-between bg-black/20 backdrop-blur-sm shrink-0">
-                <div className="flex items-center gap-3">                   <div className={cn("w-2 h-2 rounded-full shadow-[0_0_10px_currentColor]", EVENT_COLORS[selectedEvent.type || '']?.text || "text-purple-400 bg-purple-500")} />
-                  <span className="font-black text-white uppercase tracking-widest text-xs sm:text-sm">Event Spotlight</span>
+                <div className="flex items-center gap-3">                   <div className={cn("w-2 h-2 rounded-full shadow-[0_0_10px_currentColor]", EVENT_COLORS[selectedEvent.type || '']?.text || "text-[#D4AF37] bg-[#D4AF37]")} />
+                  <span className="font-black text-[#F0EFE8] uppercase tracking-widest text-xs sm:text-sm">Event Spotlight</span>
                 </div>
                 <button 
                   title="Close"
                   onClick={() => setSelectedEventId(null)}
-                  className="p-2 hover:bg-white/10 rounded-full transition-colors text-white/60 hover:text-white cursor-pointer"
+                  className="p-2 hover:bg-white/10 rounded-full transition-colors text-[#A09E9A] hover:text-[#F0EFE8] cursor-pointer"
                 >
                   <X size={20} />
                 </button>
@@ -1585,7 +1631,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                             const pHost = (hosts || []).find(h => String(h.id) === String(poppoId) || String(h.poppo_id) === String(poppoId));
                             const dispName = pHost ? `${pHost.nickname || pHost.name}` : `User #${poppoId}`;
                             return (
-                              <div key={poppoId} className="flex items-center gap-1.5 bg-[#13161F] border border-white/5 rounded-lg px-2 py-1">
+                              <div key={poppoId} className="flex items-center gap-1.5 bg-[#0c0806] border border-[#D4AF37]/20 rounded-lg px-2 py-1">
                                 <span className="text-[10px] font-bold text-white truncate max-w-[120px]">{dispName}</span>
                                 <button
                                   type="button"
@@ -1612,7 +1658,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                       <button
                         type="submit"
                         disabled={isSavingEdit}
-                        className="px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 disabled:opacity-50 text-white font-bold text-xs uppercase tracking-wider rounded-xl transition-all cursor-pointer flex items-center gap-2"
+                        className="px-4 py-2 btn-gold disabled:opacity-50 text-xs font-black uppercase tracking-widest transition-all cursor-pointer flex items-center gap-2"
                       >
                         {isSavingEdit ? 'Saving...' : 'Save Changes'}
                       </button>
@@ -1763,9 +1809,9 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
               initial={{ scale: 0.95, opacity: 0, y: 20 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.95, opacity: 0, y: 20 }}
-              className="relative w-full max-w-2xl bg-[#0F1117] border border-[#D4AF37]/20 rounded-3xl shadow-[0_0_50px_rgba(212,175,55,0.1)] z-10 max-h-[90vh] overflow-hidden flex flex-col"
+              className="relative w-full max-w-2xl bg-black/20 border border-[#D4AF37]/20 rounded-3xl shadow-[0_0_50px_rgba(212,175,55,0.1)] z-10 max-h-[90vh] overflow-hidden flex flex-col"
             >
-              <div className="absolute inset-0 bg-gradient-to-tr from-indigo-500/5 via-transparent to-[#D4AF37]/5 pointer-events-none" />
+              <div className="absolute inset-0 bg-gradient-to-tr from-[#D4AF37]/5 via-transparent to-orange-500/5 pointer-events-none" />
               
               <div className="p-5 sm:p-6 border-b border-[#D4AF37]/10 flex items-center justify-between bg-black/20 backdrop-blur-sm shrink-0">
                 <div className="flex items-center gap-3">
@@ -1880,7 +1926,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                             const pId = a.poppo_id || a.id;
                             const dispName = a.nickname || a.name || `User #${pId}`;
                             return (
-                              <div key={pId} className="flex items-center gap-1.5 bg-[#13161F] border border-white/5 rounded-lg px-2 py-1">
+                              <div key={pId} className="flex items-center gap-1.5 bg-[#0c0806] border border-[#D4AF37]/20 rounded-lg px-2 py-1">
                                 <span className="text-[10px] font-bold text-white truncate max-w-[120px]">{dispName}</span>
                                 <button
                                   type="button"
@@ -1917,9 +1963,13 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                       <button
                         type="submit"
                         disabled={isAttProcessing}
-                        className="px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 disabled:opacity-50 text-white font-bold text-xs uppercase tracking-wider rounded-xl transition-all cursor-pointer flex items-center gap-2"
+                        className="px-4 py-2 btn-gold disabled:opacity-50 text-xs font-black uppercase tracking-widest transition-all cursor-pointer flex items-center gap-2"
                       >
-                        {isAttProcessing ? 'Processing...' : 'Record Attendance Logs'}
+                        {isAttProcessing 
+                          ? 'Processing...' 
+                          : (attendanceModalEvent && attendanceRecords.some(r => r.eventId === attendanceModalEvent.event_id)
+                              ? 'Update Attendance' 
+                              : 'Submit Attendance')}
                       </button>
                     </div>
                   </form>

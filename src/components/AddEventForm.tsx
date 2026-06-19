@@ -69,29 +69,48 @@ export const AddEventForm: React.FC<AddEventFormProps> = ({ onSuccess, onCancel 
 
   // Filter users based on search query and role filter (excluding director role)
   const filteredUsers = useMemo(() => {
-    return allUsers.filter(u => {
-      const userRole = String(u.role || '').toLowerCase();
-      // Exclude director role
-      if (userRole === 'director') return false;
+    return allUsers
+      .filter(u => {
+        const userRole = String(u.role || '').toLowerCase();
+        // Exclude director role
+        if (userRole === 'director') return false;
 
-      // Filter by role selection
-      if (participantRoleFilter !== 'All Roles') {
-        if (participantRoleFilter === 'hosts' && userRole !== 'host' && userRole !== 'talent') return false;
-        if (participantRoleFilter === 'managers' && userRole !== 'manager') return false;
-        if (participantRoleFilter === 'agents' && userRole !== 'agent') return false;
-        if (participantRoleFilter === 'admins' && userRole !== 'admin' && userRole !== 'head admin') return false;
-      }
+        // Filter by role selection
+        if (participantRoleFilter !== 'All Roles') {
+          if (participantRoleFilter === 'hosts' && userRole !== 'host' && userRole !== 'talent') return false;
+          if (participantRoleFilter === 'managers' && userRole !== 'manager') return false;
+          if (participantRoleFilter === 'agents' && userRole !== 'agent') return false;
+          if (participantRoleFilter === 'admins' && userRole !== 'admin' && userRole !== 'head admin') return false;
+        }
 
-      // Search matching poppoId or nickname
-      const searchStr = participantSearch.toLowerCase().trim();
-      if (searchStr) {
-        const nickname = String(u.nickname || u.name || '').toLowerCase();
-        const poppoId = String(u.poppo_id || u.poppoId || u.id || '').toLowerCase();
-        return nickname.includes(searchStr) || poppoId.includes(searchStr);
-      }
+        // Search matching poppoId or nickname
+        const searchStr = participantSearch.toLowerCase().trim();
+        if (searchStr) {
+          const nickname = String(u.nickname || u.name || '').toLowerCase();
+          const poppoId = String(u.poppo_id || u.poppoId || u.id || '').toLowerCase();
+          return nickname.includes(searchStr) || poppoId.includes(searchStr);
+        }
 
-      return true;
-    });
+        return true;
+      })
+      .sort((a, b) => {
+        const aRole = String(a.role || '').toLowerCase();
+        const bRole = String(b.role || '').toLowerCase();
+        const aIsHost = aRole === 'host' || aRole === 'talent';
+        const bIsHost = bRole === 'host' || bRole === 'talent';
+        const aHasPhoto = !!a.photoUrl;
+        const bHasPhoto = !!b.photoUrl;
+
+        const aFirst = aIsHost && aHasPhoto;
+        const bFirst = bIsHost && bHasPhoto;
+
+        if (aFirst && !bFirst) return -1;
+        if (!aFirst && bFirst) return 1;
+
+        const aName = String(a.nickname || a.name || '').toLowerCase();
+        const bName = String(b.nickname || b.name || '').toLowerCase();
+        return aName.localeCompare(bName);
+      });
   }, [allUsers, participantSearch, participantRoleFilter]);
 
   const handleAddParticipant = (user: any) => {
@@ -224,7 +243,7 @@ export const AddEventForm: React.FC<AddEventFormProps> = ({ onSuccess, onCancel 
             value={eventTitle}
             onChange={(e) => setEventTitle(e.target.value)}
             placeholder="e.g. Host PK Championship (Leave blank for default)"
-            className="w-full bg-[#0D0D14] border border-white/10 rounded-xl px-4 py-3 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37]/30 transition-all"
+            className="w-full bg-[#000000] border border-white/10 rounded-xl px-4 py-3 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37]/30 transition-all"
           />
         </div>
 
@@ -235,7 +254,7 @@ export const AddEventForm: React.FC<AddEventFormProps> = ({ onSuccess, onCancel 
             id="event-type"
             value={eventType}
             onChange={(e) => setEventType(e.target.value)}
-            className="w-full bg-[#0D0D14] border border-white/10 rounded-xl px-4 py-3 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37]/30 transition-all font-bold cursor-pointer"
+            className="w-full bg-[#000000] border border-white/10 rounded-xl px-4 py-3 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37]/30 transition-all font-bold cursor-pointer"
           >
             <option value="SOLO LIVEHOUSE">SOLO LIVEHOUSE</option>
             <option value="PARTY LIVEHOUSE">PARTY LIVEHOUSE</option>
@@ -265,7 +284,7 @@ export const AddEventForm: React.FC<AddEventFormProps> = ({ onSuccess, onCancel 
               value={eventTimeHour}
               onChange={(e) => setEventTimeHour(e.target.value)}
               title="Hour"
-              className="flex-1 bg-[#0D0D14] border border-white/10 rounded-xl px-3 py-3 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37]/30 font-bold"
+              className="flex-1 bg-[#000000] border border-white/10 rounded-xl px-3 py-3 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37]/30 font-bold"
             >
               {['01','02','03','04','05','06','07','08','09','10','11','12'].map(h => (
                 <option key={h} value={h}>{h}</option>
@@ -275,7 +294,7 @@ export const AddEventForm: React.FC<AddEventFormProps> = ({ onSuccess, onCancel 
               value={eventTimeMinute}
               onChange={(e) => setEventTimeMinute(e.target.value)}
               title="Minute"
-              className="flex-1 bg-[#0D0D14] border border-white/10 rounded-xl px-3 py-3 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37]/30 font-bold"
+              className="flex-1 bg-[#000000] border border-white/10 rounded-xl px-3 py-3 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37]/30 font-bold"
             >
               {['00','05','10','15','20','25','30','35','40','45','50','55'].map(m => (
                 <option key={m} value={m}>{m}</option>
@@ -285,7 +304,7 @@ export const AddEventForm: React.FC<AddEventFormProps> = ({ onSuccess, onCancel 
               value={eventTimeAmpm}
               onChange={(e) => setEventTimeAmpm(e.target.value)}
               title="AM or PM"
-              className="flex-1 bg-[#0D0D14] border border-white/10 rounded-xl px-3 py-3 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37]/30 font-bold"
+              className="flex-1 bg-[#000000] border border-white/10 rounded-xl px-3 py-3 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37]/30 font-bold"
             >
               <option value="AM">AM</option>
               <option value="PM">PM</option>
@@ -303,12 +322,12 @@ export const AddEventForm: React.FC<AddEventFormProps> = ({ onSuccess, onCancel 
           value={eventDescription}
           onChange={(e) => setEventDescription(e.target.value)}
           placeholder="Log event parameters, rules, bonuses, or locations..."
-          className="w-full bg-[#0D0D14] border border-white/10 rounded-xl px-4 py-3 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37]/30 transition-all resize-none"
+          className="w-full bg-[#000000] border border-white/10 rounded-xl px-4 py-3 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37]/30 transition-all resize-none"
         />
       </div>
 
       {/* Participants */}
-      <div className="space-y-4 bg-[#0D0D14]/50 p-6 rounded-2xl border border-white/5">
+      <div className="space-y-4 bg-[#000000]/50 p-6 rounded-2xl border border-white/5">
         <span className="text-[10px] font-black text-[#A09E9A] uppercase tracking-widest block border-b border-white/5 pb-2">ADD PARTICIPANTS</span>
         
         {/* Search & Filter Row */}
@@ -320,7 +339,7 @@ export const AddEventForm: React.FC<AddEventFormProps> = ({ onSuccess, onCancel 
               value={participantSearch}
               onChange={(e) => setParticipantSearch(e.target.value)}
               placeholder="Search nickname or poppoId..."
-              className="w-full bg-[#0A0B0E] border border-white/10 rounded-xl pl-9 pr-4 py-2.5 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
+              className="w-full bg-[#000000] border border-white/10 rounded-xl pl-9 pr-4 py-2.5 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
             />
           </div>
 
@@ -328,7 +347,7 @@ export const AddEventForm: React.FC<AddEventFormProps> = ({ onSuccess, onCancel 
             value={participantRoleFilter}
             onChange={(e) => setParticipantRoleFilter(e.target.value)}
             title="Role Filter"
-            className="bg-[#0A0B0E] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-[#F0EFE8] outline-none font-bold cursor-pointer"
+            className="bg-[#000000] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-[#F0EFE8] outline-none font-bold cursor-pointer"
           >
             <option value="All Roles">All Roles</option>
             <option value="hosts">Hosts</option>
@@ -443,18 +462,7 @@ export const AddEventForm: React.FC<AddEventFormProps> = ({ onSuccess, onCancel 
         </div>
       </div>
 
-      {/* Generated ID Preview */}
-      <div className="p-4 bg-indigo-500/5 border border-indigo-500/10 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between text-xs gap-2">
-        <div className="flex items-center gap-2">
-          <Info size={14} className="text-[#D4AF37]" />
-          <span className="font-bold text-[#A09E9A]">Auto-Generated Event ID:</span>
-        </div>
-        <span className="font-mono text-[11px] text-[#F0EFE8] tracking-tight bg-black/40 px-3 py-1 rounded border border-white/5 select-all overflow-x-auto whitespace-nowrap scrollbar-none">
-          {computedEventId}
-        </span>
-      </div>
-
-      {/* Autofills metadata display */}
+      {/* Submitter Metadata Display */}
       <div className="flex flex-wrap gap-4 text-[10px] font-bold text-[#A09E9A] uppercase tracking-wider bg-black/20 p-4 rounded-xl border border-white/5">
         <span>Submitted by: <span className="text-[#F0EFE8] font-bold">{auth.role || 'Guest'} {auth.nickname || auth.name || 'Niner'} ({auth.poppo_id || 'SystemAdmin'})</span></span>
       </div>
@@ -465,7 +473,7 @@ export const AddEventForm: React.FC<AddEventFormProps> = ({ onSuccess, onCancel 
           <button
             type="button"
             onClick={onCancel}
-            className="flex-1 sm:flex-initial px-6 py-3.5 rounded-xl bg-slate-900 border border-slate-800 text-white/40 font-black uppercase text-[10px] tracking-widest hover:bg-slate-800 hover:text-white transition-colors cursor-pointer"
+            className="flex-1 sm:flex-initial px-6 py-2.5 rounded-xl bg-[#0e0a08]/90 border border-white/10 text-[#A09E9A] hover:bg-[#1a120e] hover:border-white/20 hover:text-[#F0EFE8] font-black uppercase text-[10px] tracking-widest transition-colors cursor-pointer"
           >
             Cancel
           </button>
@@ -473,10 +481,10 @@ export const AddEventForm: React.FC<AddEventFormProps> = ({ onSuccess, onCancel 
         <button
           type="submit"
           disabled={isProcessing}
-          className="flex-1 sm:flex-initial px-8 py-3.5 btn-gold rounded-xl text-xs font-black uppercase tracking-widest flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50 cursor-pointer shadow-lg"
+          className="flex-1 sm:flex-initial px-8 py-2.5 btn-gold rounded-xl text-xs font-black uppercase tracking-widest flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50 cursor-pointer shadow-lg"
         >
-          <Send size={14} className="text-[#0D0D14]" />
-          {isProcessing ? 'Processing...' : 'Create Event Entry'}
+          <Send size={12} className="text-[#0c0806]" />
+          {isProcessing ? 'Processing...' : 'Add Event'}
         </button>
       </div>
     </form>

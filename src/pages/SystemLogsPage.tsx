@@ -6,7 +6,7 @@ export const SystemLogsPage = () => {
   const auth = Storage.getAuthState();
 
   return (
-    <div className="w-full h-full flex flex-col p-6 bg-[#0A0A0F] text-[#F0EFE8] overflow-hidden">
+    <div className="w-full h-full flex flex-col p-6 bg-transparent text-[#F0EFE8] overflow-hidden">
       <div className="flex items-center justify-between mb-6 shrink-0">
         <div>
           <h1 className="text-2xl font-black uppercase tracking-widest text-[#D4AF37]">

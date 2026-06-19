@@ -156,6 +156,13 @@ export const sanitizeUserAuthDoc = (docData: any, id: string): any => {
   if (nickname) {
     userAuthData.nickname = nickname;
   }
+
+  // Normalize tier_pay field for consistency across collections
+  const rawTier = docData.tier_pay ?? docData.tierPay ?? docData.base_salary_category ?? docData.baseSalaryCategory ?? docData.tier;
+  if (rawTier !== undefined) {
+    userAuthData.tier_pay = rawTier;
+  }
+
   const authKeys = [
     'password',
     'googleUid',
@@ -173,7 +180,11 @@ export const sanitizeUserAuthDoc = (docData: any, id: string): any => {
     'assigned_manager_nickname',
     'assigned_manager_poppo_id',
     'status',
-    'level'
+    'level',
+    'tier_pay',
+    'tierPay',
+    'baseSalaryCategory',
+    'base_salary_category'
   ];
   authKeys.forEach(k => {
     if (docData[k] !== undefined) {
@@ -464,10 +475,20 @@ export const FirebaseService = {
           const id = d.id;
           const data = d.data();
           
-          // Merge data, keeping the auth fields from users if already present
+          // If user exists in users collection, only merge if this collection matches the user's current role
+          if (metadataMap[id]) {
+            const currentRole = metadataMap[id].role || '';
+            const safeRole = getSafeRoleCollection(currentRole);
+            if (col !== safeRole) {
+              // Skip stale document from previous/inactive role collection
+              return;
+            }
+          }
+
+          // Merge data, letting the specific role collection override users collection for shared fields
           metadataMap[id] = {
-            ...data,
             ...metadataMap[id],
+            ...data,
             id,
             poppo_id: id
           };

@@ -259,7 +259,7 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
       <div className="relative">
         <button
           onClick={toggleNotifications}
-          className="relative p-2.5 text-[#A09E9A] hover:text-white rounded-full bg-white/[0.02] hover:bg-white/[0.05] transition-all cursor-pointer border border-white/5 active:scale-95 flex items-center justify-center shrink-0"
+          className="relative p-2.5 text-[#D4AF37] hover:text-[#F0EFE8] rounded-full bg-[#140e0a]/90 hover:bg-[#1c1511] transition-all cursor-pointer border border-[#D4AF37]/20 hover:border-[#D4AF37]/45 active:scale-95 flex items-center justify-center shrink-0 shadow-md"
           title="Notifications"
           type="button"
         >
@@ -272,7 +272,7 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
         </button>
 
         {isNotificationOpen && (
-          <div className="absolute right-0 mt-3 w-80 md:w-[380px] bg-[#11111A]/95 border border-white/10 backdrop-blur-md rounded-2xl shadow-2xl z-50 p-4 space-y-4 max-h-[480px] overflow-y-auto custom-scrollbar">
+          <div className="absolute right-0 mt-3 w-80 md:w-[380px] bg-[#120D0A]/95 border border-[#D4AF37]/20 backdrop-blur-md rounded-2xl shadow-2xl z-50 p-4 space-y-4 max-h-[480px] overflow-y-auto custom-scrollbar">
             {isPostingAnnouncement ? (
               <form onSubmit={handlePublishAnnouncement} className="space-y-4 text-left">
                 <div className="flex items-center justify-between border-b border-white/5 pb-2">
@@ -618,7 +618,7 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
   const bottomNavLinks = getBottomNavLinks();
 
   return (
-    <div className="flex flex-col h-[100dvh] bg-[#0A0A0F] text-[#F0EFE8] overflow-hidden selection:bg-[#D4AF37]/30 selection:text-white">
+    <div className="flex flex-col h-[100dvh] bg-transparent text-[#F0EFE8] overflow-hidden selection:bg-[#D4AF37]/30 selection:text-white">
       {authState.mockRole && (
         <div className="w-full bg-indigo-600 text-white text-xs font-bold py-2 flex items-center justify-center gap-4 z-[9999] shrink-0 sticky top-0 shadow-lg px-4 text-center">
           <span>
@@ -643,11 +643,11 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
           </button>
         </div>
       )}
-      <header className="md:hidden flex items-center justify-between p-4 bg-[#11111A] border-b border-white/5 shrink-0 z-20">
+      <header className="md:hidden flex items-center justify-between p-4 bg-[#0F0A06]/95 border-b border-[#D4AF37]/20 backdrop-blur-md shrink-0 z-20 shadow-[0_4px_20px_rgba(212,175,55,0.08)]">
         <div className="flex items-center gap-3">
-          <img src={appLogo} alt="Nine Dashboard" className="w-8 h-8 rounded-full border border-white/10 shrink-0" />
+          <img src={appLogo} alt="Nine Dashboard" className="w-8 h-8 rounded-md border border-white/10 shrink-0 object-cover" />
           <div className="flex flex-col">
-            <h1 className="text-[11px] font-black uppercase tracking-widest text-[#F0EFE8] leading-tight">NINE TALENT MANAGEMENT</h1>
+            <h1 className="text-[11px] font-black uppercase tracking-widest text-[#D4AF37] leading-tight">NINE TALENT MANAGEMENT</h1>
             <div className="text-[10px] text-[#A09E9A] flex items-center gap-2">
               <span className="capitalize">{authState.name} ({authState.role || 'Guest'})</span>
             </div>
@@ -655,8 +655,13 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
         </div>
         <div className="flex items-center gap-2">
           {renderNotificationCenter()}
-          <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 text-[#A09E9A] hover:text-white">
-            {isSidebarOpen ? <X size={24} /> : <Menu size={24} />}
+          <button 
+            onClick={() => setIsSidebarOpen(!isSidebarOpen)} 
+            className="p-2.5 text-[#D4AF37] hover:text-[#F0EFE8] rounded-full bg-[#140e0a]/90 hover:bg-[#1c1511] transition-all cursor-pointer border border-[#D4AF37]/20 hover:border-[#D4AF37]/45 active:scale-95 flex items-center justify-center shrink-0 shadow-md"
+            title="Toggle Menu"
+            type="button"
+          >
+            {isSidebarOpen ? <X size={16} /> : <Menu size={16} />}
           </button>
         </div>
       </header>
@@ -664,13 +669,13 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
       <div className="flex flex-1 overflow-hidden relative">
         {/* Sidebar */}
         <aside className={cn(
-          "absolute md:static inset-y-0 left-0 w-64 bg-[#11111A] border-r border-white/5 z-30 transition-transform duration-300 ease-in-out flex flex-col",
+          "absolute md:static inset-y-0 left-0 w-64 bg-[#140E0A] border-r border-[#D4AF37]/10 z-30 transition-transform duration-300 ease-in-out flex flex-col",
           !isSidebarOpen && "-translate-x-full md:translate-x-0"
         )}>
           <div className="p-6 hidden md:flex items-center gap-3 border-b border-white/5">
-            <img src={appLogo} alt="Nine Dashboard" className="w-10 h-10 rounded-full border border-[#D4AF37]/30 shrink-0" />
+            <img src={appLogo} alt="Nine Dashboard" className="w-10 h-10 rounded-md border border-[#D4AF37]/30 shrink-0 object-cover" />
             <div className="flex flex-col">
-              <h1 className="text-[11px] font-black uppercase tracking-widest text-[#F0EFE8] leading-tight mt-1">NINE TALENT MANAGEMENT</h1>
+              <h1 className="text-[11px] font-black uppercase tracking-widest text-[#D4AF37] leading-tight mt-1">NINE TALENT MANAGEMENT</h1>
             </div>
           </div>
 
@@ -802,9 +807,9 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
         </aside>
 
         {/* Main Content Area */}
-        <main className="flex-1 flex flex-col relative overflow-hidden bg-[#0A0A0F]">
+        <main className="flex-1 flex flex-col relative overflow-hidden bg-transparent">
           {/* Desktop Header */}
-          <header className="hidden md:flex items-center justify-between px-8 py-4 bg-[#11111A] border-b border-white/5 shrink-0 z-20 h-16 animate-fadeIn">
+          <header className="hidden md:flex items-center justify-between px-8 py-4 bg-[#140E0A] border-b border-[#D4AF37]/10 shrink-0 z-20 h-16 animate-fadeIn">
             <div className="flex items-center gap-2">
               <span className="text-[10px] font-black uppercase tracking-[0.2em] text-[#D4AF37]">Niners Portal Dashboard</span>
             </div>
@@ -814,14 +819,14 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
             </div>
           </header>
 
-          <div className="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar">
+          <div className="flex-1 overflow-y-auto p-4 pb-24 md:p-8 custom-scrollbar">
             {children || <Outlet />}
           </div>
         </main>
       </div>
 
       {/* Mobile Bottom Nav */}
-      <div className="md:hidden h-16 bg-[#11111A] border-t border-white/5 flex items-center justify-around shrink-0 px-2 pb-safe z-20">
+      <div className="md:hidden fixed bottom-4 left-0 right-0 flex items-center justify-center gap-2 px-4 pb-safe z-50 pointer-events-none">
         {bottomNavLinks.map(tab => {
           const Icon = tab.icon;
           const isActive = location.pathname.startsWith(tab.path);
@@ -829,12 +834,17 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
             <Link
               key={tab.path}
               to={tab.path}
-              className={cn("flex flex-col items-center justify-center flex-1 h-full gap-1 transition-colors relative")}
+              className={cn(
+                "pointer-events-auto flex flex-col items-center justify-center flex-1 py-2 rounded-xl transition-all duration-300 backdrop-blur-md border",
+                isActive
+                  ? "bg-[#1C120C]/90 border-[#D4AF37] text-[#D4AF37] shadow-[0_0_15px_rgba(212,175,55,0.25)] scale-105"
+                  : "bg-[#0F0A06]/75 border-[#D4AF37]/20 text-[#A09E9A] hover:border-[#D4AF37]/50"
+              )}
             >
-              <Icon size={18} className={isActive ? "text-[#D4AF37]" : "text-[#5A5865]"} />
+              <Icon size={16} className={isActive ? "text-[#D4AF37]" : "text-[#A09E9A]"} />
               <span className={cn(
-                "text-[8px] font-bold uppercase tracking-wider",
-                isActive ? "text-[#D4AF37]" : "text-[#5A5865]"
+                "text-[8px] font-black uppercase tracking-wider mt-0.5",
+                isActive ? "text-[#D4AF37]" : "text-[#A09E9A]"
               )}>{tab.label}</span>
             </Link>
           );

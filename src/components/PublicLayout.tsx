@@ -11,15 +11,15 @@ export const PublicLayout = ({ children }: { children?: React.ReactNode }) => {
   const isLoggedIn = authState && authState.level > 0;
 
   return (
-    <div className="fixed inset-0 w-full h-[100dvh] flex flex-col overflow-hidden bg-[#0A0A0F] text-[#F0EFE8] font-sans selection:bg-[#D4AF37]/30 selection:text-white">
+    <div className="fixed inset-0 w-full h-[100dvh] flex flex-col overflow-hidden bg-transparent text-[#F0EFE8] font-sans selection:bg-[#D4AF37]/30 selection:text-white">
       {/* Native App Top Bar */}
-      <header className="w-full bg-[#0A0A0F]/90 backdrop-blur-md border-b border-white/5 shrink-0 z-50">
+      <header className="w-full bg-[#140E0A]/90 backdrop-blur-md border-b border-white/5 shrink-0 z-50">
         <div className="w-full px-4 h-14 flex items-center justify-between pt-[env(safe-area-inset-top)]">
           <Link to="/" className="flex items-center gap-3">
             <img 
               src={appLogo} 
               alt="Nine Talent Management" 
-              className="w-8 h-8 rounded-full border border-[#D4AF37]/30 shadow-md object-cover" 
+              className="w-8 h-8 rounded-md border border-[#D4AF37]/30 shadow-md object-cover" 
             />
             <span className="font-black tracking-widest text-[#D4AF37] text-[11px] md:text-sm uppercase">
               NINE TALENT MANAGEMENT
@@ -38,40 +38,40 @@ export const PublicLayout = ({ children }: { children?: React.ReactNode }) => {
 
       {/* Main Scrollable Content */}
       <main 
-        className="flex-1 w-full overflow-y-auto custom-scrollbar" 
+        className="flex-1 w-full overflow-y-auto pb-24 custom-scrollbar" 
         style={{ WebkitOverflowScrolling: 'touch' }}
       >
         {children || <Outlet />}
       </main>
 
-      {/* Native Bottom Tab Bar */}
-      <footer className="shrink-0 z-40 w-full bg-[#11111A] border-t border-white/5 min-h-[56px] pt-1 pb-[calc(0.5rem+env(safe-area-inset-bottom))]">
-        <div className="w-full px-2 flex items-center justify-around">
-          {[
-            { to: '/', icon: Home, label: 'Home' },
-            { to: '/roster', icon: Trophy, label: 'Roster' },
-            { to: '/calendar', icon: Calendar, label: 'Calendar' },
-            { to: '/poppo-live', icon: PlayCircle, label: 'Poppo' },
-          ].map(({ to, icon: Icon, label }) => {
-            const isActive = to === '/' ? location.pathname === '/' : location.pathname.startsWith(to);
-            return (
-              <Link
-                key={to}
-                to={to}
-                className={cn(
-                  'flex flex-col items-center justify-center gap-1 transition-colors flex-1 py-1',
-                  isActive ? 'text-[#D4AF37]' : 'text-[#A09E9A] hover:text-[#D4AF37]'
-                )}
-              >
-                <Icon size={20} />
-                <span className={cn('text-[9px] font-bold uppercase tracking-wider', isActive && 'text-[#D4AF37]')}>
-                  {label}
-                </span>
-              </Link>
-            );
-          })}
-        </div>
-      </footer>
+      {/* Floating Bottom Tab Bar */}
+      <div className="fixed bottom-4 left-0 right-0 flex items-center justify-center gap-2 px-4 pb-safe z-50 pointer-events-none">
+        {[
+          { to: '/', icon: Home, label: 'Home' },
+          { to: '/roster', icon: Trophy, label: 'Roster' },
+          { to: '/calendar', icon: Calendar, label: 'Calendar' },
+          { to: '/poppo-live', icon: PlayCircle, label: 'Poppo' },
+        ].map(({ to, icon: Icon, label }) => {
+          const isActive = to === '/' ? location.pathname === '/' : location.pathname.startsWith(to);
+          return (
+            <Link
+              key={to}
+              to={to}
+              className={cn(
+                "pointer-events-auto flex flex-col items-center justify-center flex-1 py-2 rounded-xl transition-all duration-300 backdrop-blur-md border",
+                isActive 
+                  ? "bg-[#1C120C]/90 border-[#D4AF37] text-[#D4AF37] shadow-[0_0_15px_rgba(212,175,55,0.25)] scale-105"
+                  : "bg-[#0F0A06]/75 border-[#D4AF37]/20 text-[#A09E9A] hover:border-[#D4AF37]/50"
+              )}
+            >
+              <Icon size={16} className={isActive ? "text-[#D4AF37]" : "text-[#A09E9A]"} />
+              <span className={cn("text-[8px] font-black uppercase tracking-wider mt-0.5", isActive ? "text-[#D4AF37]" : "text-[#A09E9A]")}>
+                {label}
+              </span>
+            </Link>
+          );
+        })}
+      </div>
     </div>
   );
 };

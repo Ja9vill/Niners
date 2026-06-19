@@ -168,8 +168,21 @@ export const RosterManagementTab: React.FC<RosterManagementTabProps> = ({ hosts,
   // Managers/Agents list for the 'Assigned Manager' dropdown
   const managerOptions = useMemo(() => {
     return users
-      .filter(h => (h.role || '').toLowerCase() === 'manager' || (h.role || '').toLowerCase() === 'agent')
-      .map(h => ({ id: h.poppo_id || h.poppoId || h.id, name: h.nickname || h.name }));
+      .filter(h => {
+        const role = (h.role || '').toLowerCase();
+        return role === 'manager' || role === 'agent';
+      })
+      .map(h => ({ 
+        id: h.poppo_id || h.poppoId || h.id, 
+        name: h.nickname || h.name 
+      }))
+      .filter(m => {
+        const nameLower = (m.name || '').toLowerCase();
+        return nameLower !== 'nine management' && 
+               nameLower !== 'test manager' && 
+               nameLower !== 'test agent' &&
+               nameLower !== 'unknown';
+      });
   }, [users]);
 
   // Filter out Directors, apply search/role filters, and sort completed hosts to the bottom
@@ -546,14 +559,25 @@ export const RosterManagementTab: React.FC<RosterManagementTabProps> = ({ hosts,
                           className={cn(
                             "bg-transparent border border-transparent hover:border-white/10 focus:border-indigo-500 rounded px-2 py-1 outline-none font-bold",
                             getDisplayValue(host, 'status') === 'Active' ? 'text-emerald-400' :
-                            (getDisplayValue(host, 'status') === 'Inconsistent' || getDisplayValue(host, 'status') === 'Intermittent') ? 'text-amber-400' :
-                            getDisplayValue(host, 'status') === 'Releasing' ? 'text-orange-400' :
-                            'text-red-400'
+                            getDisplayValue(host, 'status') === 'Intermittent' ? 'text-yellow-400' :
+                            getDisplayValue(host, 'status') === 'Releasing' ? 'text-red-400' :
+                            getDisplayValue(host, 'status') === 'Released' ? 'text-red-600' :
+                            getDisplayValue(host, 'status') === 'Inactive' ? 'text-orange-400' :
+                            'text-neutral-400'
                           )}
+                          style={{ colorScheme: 'dark' }}
                         >
-                          {['Active', 'Intermittent', 'Inactive', 'Releasing', 'Released'].map(s => (
-                            <option key={s} value={s} className="bg-[#1A1A28]">{s}</option>
-                          ))}
+                          {['Active', 'Intermittent', 'Released', 'Releasing', 'Inactive'].map(s => {
+                            let colorClass = 'text-[#F0EFE8]';
+                            if (s === 'Active') colorClass = 'text-emerald-400 font-bold';
+                            else if (s === 'Intermittent') colorClass = 'text-yellow-400 font-bold';
+                            else if (s === 'Releasing') colorClass = 'text-red-400 font-bold';
+                            else if (s === 'Released') colorClass = 'text-red-600 font-bold';
+                            else if (s === 'Inactive') colorClass = 'text-orange-400 font-bold';
+                            return (
+                              <option key={s} value={s} className={colorClass} style={{ backgroundColor: '#1A1A28' }}>{s}</option>
+                            );
+                          })}
                         </select>
                       </td>
 
@@ -639,7 +663,7 @@ export const RosterManagementTab: React.FC<RosterManagementTabProps> = ({ hosts,
                             onChange={(e) => handleManagerChange(host.id, e.target.value)}
                             className="bg-transparent border border-transparent hover:border-white/10 focus:border-indigo-500 rounded px-2 py-1 outline-none text-[#F0EFE8] w-40"
                           >
-                            <option value="" className="bg-[#1A1A28]">No Manager</option>
+                            <option value="" className="bg-[#1A1A28]">Unassigned</option>
                             {managerOptions.map(m => (
                               <option key={m.id} value={m.id} className="bg-[#1A1A28]">{m.name}</option>
                             ))}
@@ -657,7 +681,7 @@ export const RosterManagementTab: React.FC<RosterManagementTabProps> = ({ hosts,
                             onChange={(e) => handleManagerChange(host.id, e.target.value)}
                             className="bg-transparent border border-transparent hover:border-white/10 focus:border-indigo-500 rounded px-2 py-1 outline-none text-[#F0EFE8] w-32 font-mono text-xs"
                           >
-                            <option value="" className="bg-[#1A1A28]">No ID</option>
+                            <option value="" className="bg-[#1A1A28]">Unassigned</option>
                             {managerOptions.map(m => (
                               <option key={m.id} value={m.id} className="bg-[#1A1A28]">{m.id}</option>
                             ))}

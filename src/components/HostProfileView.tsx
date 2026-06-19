@@ -255,7 +255,7 @@ const renderCardFooter = (dateInput: any, role?: string, nickname?: string) => {
   }
 
   return (
-    <div className="flex items-center justify-between mt-4 pt-4 border-t border-white/5 w-full">
+    <div className="flex items-center justify-between mt-4 pt-4 border-t border-[#D4AF37]/15 w-full">
       <p className="text-[9px] text-[#A09E9A]/60 italic font-medium">
         Last Updated on {formattedDate}{userStr}
       </p>
@@ -534,12 +534,18 @@ const formatPeriodShort = (monthNameOrNum: any, year: any): string => {
 };
 
 export const HostProfileView: React.FC<HostProfileViewProps> = ({ 
-  host, 
+  host: initialHost, 
   isReadOnly = false, 
   onClose,
   onProfileUpdated,
   hidePerformanceStats = false
 }) => {
+  const [host, setHost] = useState<Host>(initialHost);
+
+  useEffect(() => {
+    setHost(initialHost);
+  }, [initialHost]);
+
   const rootAuth = Storage.getAuthState();
   const managerPoppoId = String(rootAuth?.poppo_id || rootAuth?.poppoId || rootAuth?.id || '');
   const [toasts, setToasts] = useState<{ id: number; type: 'success' | 'error'; message: string }[]>([]);
@@ -552,6 +558,8 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
   const [opsHosts, setOpsHosts] = useState<Host[]>([]);
   const [opsTasks, setOpsTasks] = useState<Task[]>([]);
   const [opsAwards, setOpsAwards] = useState<AwardBadge[]>([]);
+  const [badgeTab, setBadgeTab] = useState<'badges' | 'tasks'>('badges');
+  const [subTab, setSubTab] = useState<'assign' | 'create' | 'unassigned' | 'assigned'>('assign');
   const [opsAwardAssignments, setOpsAwardAssignments] = useState<AwardAssignment[]>([]);
   const [isOpsLoading, setIsOpsLoading] = useState(false);
   const [opsErrorMessage, setOpsErrorMessage] = useState<string | null>(null);
@@ -575,6 +583,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
 
   const [assignAwardId, setAssignAwardId] = useState('');
   const [assignHostId, setAssignHostId] = useState('');
+  const [assignMemberSearch, setAssignMemberSearch] = useState('');
   const [assignRoleFilter, setAssignRoleFilter] = useState('All');
   const [awardStartDate, setAwardStartDate] = useState('');
   const [awardEndDate, setAwardEndDate] = useState('');
@@ -810,16 +819,18 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
   };
 
   const filteredAssignHosts = useMemo(() => {
+    // Filter out directors and optionally filter by search term
     return opsHosts.filter(h => {
       const roleLower = String(h.role || '').toLowerCase().replace('_', ' ');
       if (roleLower === 'director') return false;
-
-      if (assignRoleFilter === 'All') return true;
-      if (assignRoleFilter === 'Host' && (roleLower === 'host' || roleLower === 'talent')) return true;
-      const filterRoleLower = assignRoleFilter.toLowerCase().replace('_', ' ');
-      return roleLower === filterRoleLower;
+      if (assignMemberSearch) {
+        const nicknameMatch = h.nickname?.toLowerCase().includes(assignMemberSearch.toLowerCase());
+        const poppoMatch = String(h.id).includes(assignMemberSearch);
+        return nicknameMatch || poppoMatch;
+      }
+      return true;
     });
-  }, [opsHosts, assignRoleFilter]);
+  }, [opsHosts, assignMemberSearch]);
 
   // Intake Request States
   const [intakePoppoId, setIntakePoppoId] = useState('');
@@ -835,7 +846,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
   const [isLoadingNotes, setIsLoadingNotes] = useState(false);
   const [noteSuccess, setNoteSuccess] = useState('');
   const [noteError, setNoteError] = useState('');
-  const [activeTab, setActiveTab] = useState<'todo' | 'add' | 'history'>('todo');
+  const [notesTab, setNotesTab] = useState<'todo' | 'add' | 'history'>('todo');
   const [todoList, setTodoList] = useState<any[]>([]);
   const [newTodoTitle, setNewTodoTitle] = useState('');
   const [newTodoHostId, setNewTodoHostId] = useState('');
@@ -1365,7 +1376,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
 
   const renderImpersonationBlock = () => {
     return (
-      <div className="bg-white/5 backdrop-blur-xl border border-white/10 p-5 rounded-3xl transition-all duration-300 hover:border-indigo-500/30 group space-y-4 shadow-lg">
+      <div className="bg-[#120D0A]/75 backdrop-blur-xl border border-[#D4AF37]/20 p-5 rounded-3xl transition-all duration-300 hover:border-indigo-500/30 group space-y-4 shadow-lg">
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-full bg-indigo-500/20 flex items-center justify-center text-indigo-400 text-sm shadow-inner">👤</div>
           <div>
@@ -1388,10 +1399,10 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
                 }
               }}
               onFocus={() => setIsImpersonateDropdownOpen(true)}
-              className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-[#F0EFE8] outline-none focus:border-indigo-500/50 placeholder:text-white/20 transition-all font-medium"
+              className="w-full bg-black/40 border border-[#D4AF37]/20 rounded-xl px-4 py-2.5 text-xs text-[#F0EFE8] outline-none focus:border-indigo-500/50 placeholder:text-white/20 transition-all font-medium"
             />
             {isImpersonateDropdownOpen && filteredSearchUsers.length > 0 && (
-              <div className="absolute left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-[#11111A]/95 border border-white/10 backdrop-blur-md rounded-xl shadow-2xl z-55 custom-scrollbar p-1">
+              <div className="absolute left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-[#11111A]/95 border border-[#D4AF37]/20 backdrop-blur-md rounded-xl shadow-2xl z-55 custom-scrollbar p-1">
                 {filteredSearchUsers.map((user) => (
                   <button
                     key={user.id}
@@ -1419,7 +1430,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
               "px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-md whitespace-nowrap",
               selectedImpersonationUser
                 ? "bg-indigo-500 hover:bg-indigo-400 text-white shadow-[0_0_15px_rgba(99,102,241,0.3)] cursor-pointer"
-                : "bg-white/5 text-slate-500 border border-white/5 cursor-not-allowed"
+                : "bg-white/5 text-slate-500 border border-[#D4AF37]/15 cursor-not-allowed"
             )}
           >
             View as {selectedImpersonationUser ? (selectedImpersonationUser.nickname || selectedImpersonationUser.name) : 'User'}
@@ -1430,57 +1441,170 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
   };
 
   const renderBadgeAndTaskAssignment = () => {
+    // Gold accent color used throughout
+    const gold = '#C9A84C';
+    const goldBorder = 'border-[#C9A84C]/30';
+    const goldText = 'text-[#C9A84C]';
+    const inactiveText = 'text-[#6B6B6B]';
+    const cardBg = 'bg-[#161618]';
+    const cardBorder = 'border-[#2A2A2E]';
+
     return (
-      <div className="bg-white/5 backdrop-blur-xl border border-white/10 p-6 rounded-3xl space-y-6 shadow-lg">
-        {/* Title block */}
-        <div className="flex items-center gap-2.5 pb-4 border-b border-white/5">
-          <div className="w-8 h-8 rounded-full bg-indigo-500/20 flex items-center justify-center text-indigo-400 text-sm shadow-inner">
-            <Award size={16} />
+      <div className="bg-[#0f0f11] border border-[#2A2A2E] p-6 rounded-2xl space-y-6 shadow-2xl" style={{ fontFamily: "'Inter', 'Segoe UI', sans-serif" }}>
+
+        {/* ─── 1. HEADER ─── */}
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-full bg-[#C9A84C]/15 border border-[#C9A84C]/30 flex items-center justify-center shadow-md">
+            <Award size={18} className="text-[#C9A84C]" />
           </div>
           <div>
-            <h4 className="text-xs font-black uppercase tracking-widest text-[#F0EFE8]">Badge &amp; Task Assignment</h4>
-            <p className="text-[9px] text-[#A09E9A] uppercase tracking-wider mt-0.5 font-bold">Admin Delegation Control Panel</p>
+            <h4 className="text-sm font-extrabold uppercase tracking-widest text-white leading-tight">Badge &amp; Task Assignment</h4>
+            <p className="text-[10px] text-[#6B6B6B] uppercase tracking-wider font-bold mt-0.5">Admin Delegation Control Panel</p>
           </div>
         </div>
 
-        {/* Global Messages inside Ops */}
+        {/* ─── 2. MAIN TABS (BADGES / TASK) ─── */}
+        <div className="flex rounded-full border border-[#2A2A2E] overflow-hidden bg-[#0f0f11]">
+          <button
+            type="button"
+            onClick={() => { setBadgeTab('badges'); setSubTab('assign'); }}
+            className={`flex-1 py-2.5 text-[11px] font-extrabold uppercase tracking-widest text-center transition-all duration-200 cursor-pointer
+              ${badgeTab === 'badges'
+                ? 'text-[#C9A84C] border border-[#C9A84C]/40 rounded-full bg-[#C9A84C]/5 shadow-[inset_0_0_12px_rgba(201,168,76,0.06)]'
+                : 'text-[#6B6B6B] border border-transparent hover:text-[#8B8B8B]'
+              }`}
+          >
+            Badges
+          </button>
+          <button
+            type="button"
+            onClick={() => { setBadgeTab('tasks'); setSubTab('assign'); }}
+            className={`flex-1 py-2.5 text-[11px] font-extrabold uppercase tracking-widest text-center transition-all duration-200 cursor-pointer
+              ${badgeTab === 'tasks'
+                ? 'text-[#C9A84C] border border-[#C9A84C]/40 rounded-full bg-[#C9A84C]/5 shadow-[inset_0_0_12px_rgba(201,168,76,0.06)]'
+                : 'text-[#6B6B6B] border border-transparent hover:text-[#8B8B8B]'
+              }`}
+          >
+            Task
+          </button>
+        </div>
+
+        {/* ─── Global Messages ─── */}
         {opsErrorMessage && (
-          <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-2xl flex items-start gap-3">
-            <AlertCircle size={16} className="text-red-400 mt-0.5" />
-            <div className="space-y-1">
-              <p className="text-[11px] font-black uppercase text-red-400">System Alert</p>
-              <p className="text-[10px] text-red-300 font-mono leading-relaxed">{opsErrorMessage}</p>
+          <div className="p-4 bg-red-500/8 border border-red-500/20 rounded-xl flex items-start gap-3">
+            <AlertCircle size={16} className="text-red-400 mt-0.5 shrink-0" />
+            <div className="space-y-1 min-w-0">
+              <p className="text-[11px] font-extrabold uppercase text-red-400">System Alert</p>
+              <p className="text-[10px] text-red-300 font-mono leading-relaxed break-words">{opsErrorMessage}</p>
             </div>
-            <button onClick={() => setOpsErrorMessage(null)} className="ml-auto text-red-400">✕</button>
+            <button onClick={() => setOpsErrorMessage(null)} className="ml-auto text-red-400 hover:text-red-300 transition cursor-pointer">✕</button>
           </div>
         )}
         {opsSuccessMessage && (
-          <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl flex items-center gap-3">
-            <CheckCircle2 size={16} className="text-emerald-400" />
+          <div className="p-4 bg-emerald-500/8 border border-emerald-500/20 rounded-xl flex items-center gap-3">
+            <CheckCircle2 size={16} className="text-emerald-400 shrink-0" />
             <p className="text-[11px] font-bold text-emerald-400 uppercase tracking-tight">{opsSuccessMessage}</p>
-            <button onClick={() => setOpsSuccessMessage('')} className="ml-auto text-emerald-400">✕</button>
+            <button onClick={() => setOpsSuccessMessage('')} className="ml-auto text-emerald-400 hover:text-emerald-300 transition cursor-pointer">✕</button>
           </div>
         )}
 
         {isOpsLoading ? (
-          <div className="flex justify-center py-12">
-            <Loader2 className="animate-spin text-indigo-400" size={32} />
+          <div className="flex justify-center py-16">
+            <Loader2 className="animate-spin text-[#C9A84C]" size={28} />
           </div>
-        ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 pt-2">
-            
-            {/* LEFT COLUMN: Badge (former Awards Desk) */}
-            <div className="space-y-6">
-              <div className="flex items-center gap-2 border-b border-white/5 pb-2">
-                <Award size={18} className="text-indigo-400" />
-                <h5 className="font-black text-xs uppercase tracking-wider text-[#F0EFE8]">Badge</h5>
+        ) : badgeTab === 'badges' ? (
+          /* ════════════════════════════════════════════
+             BADGES MODE — Top Card + Bottom Card
+             ════════════════════════════════════════════ */
+          <div className="space-y-4">
+
+            {/* ─── 3. TOP CARD (Assignment Controls) ─── */}
+            <div className="bg-[#161618] border border-[#2A2A2E] rounded-xl p-6 space-y-6">
+
+              {/* Inner Tabs: ASSIGN / CREATE */}
+              <div className="flex gap-4 border-b border-[#2A2A2E] pb-3">
+                {(['assign', 'create'] as const).map(tab => (
+                  <button
+                    key={tab}
+                    type="button"
+                    onClick={() => setSubTab(tab)}
+                    className={`text-[11px] font-extrabold uppercase tracking-widest pb-2 transition-all duration-200 cursor-pointer
+                      ${subTab === tab
+                        ? 'text-[#C9A84C] border-b-2 border-[#C9A84C]'
+                        : 'text-[#6B6B6B] border-b-2 border-transparent hover:text-[#8B8B8B]'
+                      }`}
+                  >
+                    {tab}
+                  </button>
+                ))}
               </div>
 
-              {/* Create Award Form */}
-              <div className="bg-[#11111A]/40 border border-white/5 p-5 rounded-2xl space-y-4 shadow-md">
-                <div className="flex items-center justify-between pb-2 border-b border-white/5">
+              {/* ── ASSIGN sub-tab ── */}
+              {subTab === 'assign' && (
+                <form onSubmit={handleAssignAward} className="space-y-5">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-extrabold uppercase text-[#6B6B6B] tracking-wider">Select Created Badge</label>
+                    <select
+                      value={assignAwardId}
+                      onChange={e => setAssignAwardId(e.target.value)}
+                      className="w-full bg-[#0f0f11] border border-[#2A2A2E] rounded-lg px-4 py-2.5 text-xs text-white outline-none focus:border-[#C9A84C]/50 transition-colors cursor-pointer appearance-none"
+                      required
+                    >
+                      <option value="" className="bg-[#0f0f11] text-[#6B6B6B]">-- Select Badge --</option>
+                      {opsAwards.map(a => <option key={a.id} value={a.id} className="bg-[#0f0f11] text-white">{a.name} ({a.color})</option>)}
+                    </select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-extrabold uppercase text-[#6B6B6B] tracking-wider">Search Member</label>
+                    <input
+                      type="text"
+                      value={assignMemberSearch}
+                      onChange={e => setAssignMemberSearch(e.target.value)}
+                      className="w-full bg-[#0f0f11] border border-[#2A2A2E] rounded-lg px-4 py-2.5 text-xs text-white outline-none focus:border-[#C9A84C]/50 transition-colors placeholder:text-[#4A4A4A]"
+                      placeholder="Search nickname, name or ID..."
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-extrabold uppercase text-[#6B6B6B] tracking-wider">Select Member</label>
+                    <select
+                      value={assignHostId}
+                      onChange={e => setAssignHostId(e.target.value)}
+                      className="w-full bg-[#0f0f11] border border-[#2A2A2E] rounded-lg px-4 py-2.5 text-xs text-white outline-none focus:border-[#C9A84C]/50 transition-colors cursor-pointer appearance-none"
+                      required
+                    >
+                      <option value="" className="bg-[#0f0f11] text-[#6B6B6B]">-- Choose Member --</option>
+                      {filteredAssignHosts.map(h => <option key={h.id} value={h.id} className="bg-[#0f0f11] text-white">{h.nickname || h.name} - {h.id} ({String(h.role || 'Host').toUpperCase()})</option>)}
+                    </select>
+                  </div>
+
+                  {assignAwardId && (
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-extrabold uppercase text-[#6B6B6B] tracking-wider">Effectivity Period</label>
+                      <div className="bg-[#0f0f11] border border-[#2A2A2E] rounded-lg p-3 text-xs text-white/70 font-mono">
+                        <span className="text-[9px] text-[#6B6B6B] uppercase block mb-1">Start Date</span>
+                        {awardStartDate || 'N/A'}
+                      </div>
+                    </div>
+                  )}
+
+                  <button
+                    type="submit"
+                    disabled={isCreatingAward}
+                    className="w-full py-3 bg-[#C9A84C] hover:bg-[#D4B85C] text-[#0D0D14] rounded-lg text-xs font-extrabold uppercase tracking-widest transition-all duration-200 cursor-pointer shadow-lg shadow-[#C9A84C]/10 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isCreatingAward ? 'Assigning...' : 'Assign Badge'}
+                  </button>
+                </form>
+              )}
+
+              {/* ── CREATE sub-tab ── */}
+              {subTab === 'create' && (
+              <div className="bg-[#11111A]/40 border border-[#D4AF37]/15 p-5 rounded-2xl space-y-4 shadow-md">
+                <div className="flex items-center justify-between pb-2 border-b border-[#D4AF37]/15">
                   <h6 className="text-[10px] font-black uppercase tracking-wider text-[#F0EFE8]">Create Badge Template</h6>
-                  <div className="flex gap-1 bg-[#0D0D14] p-1 rounded-lg border border-white/5">
+                  <div className="flex gap-1 bg-[#0c0806] p-1 rounded-lg border border-[#D4AF37]/15">
                     <button
                       type="button"
                       onClick={() => setAwardCreateMode('single')}
@@ -1504,17 +1628,17 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
                   <form onSubmit={handleCreateAward} className="space-y-4">
                     <div className="space-y-1.5">
                       <label className="text-[9px] font-black uppercase text-[#A09E9A] tracking-wider">Badge Name</label>
-                      <input type="text" value={newAwardName} onChange={e => setNewAwardName(e.target.value)} placeholder="e.g. Star Host" className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-indigo-500/50" required />
+                      <input type="text" value={newAwardName} onChange={e => setNewAwardName(e.target.value)} placeholder="e.g. Star Host" className="w-full bg-black/40 border border-[#D4AF37]/20 rounded-xl px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-indigo-500/50" required />
                     </div>
                     <div className="space-y-1.5">
                       <label className="text-[9px] font-black uppercase text-[#A09E9A] tracking-wider">Badge Color</label>
-                      <select value={newAwardColor} onChange={e => setNewAwardColor(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-indigo-500/50 cursor-pointer">
-                        <option value="Gold">🏆 Gold</option>
-                        <option value="Purple">⭐ Purple</option>
-                        <option value="Emerald">💚 Emerald</option>
-                        <option value="Blue">💙 Blue</option>
-                        <option value="Red">❤️ Red</option>
-                        <option value="Orange">🧡 Orange</option>
+                      <select value={newAwardColor} onChange={e => setNewAwardColor(e.target.value)} className="w-full bg-black/40 border border-[#D4AF37]/20 rounded-xl px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-indigo-500/50 cursor-pointer">
+                        <option value="Gold" className="bg-[#0c0806] text-[#F0EFE8]">🏆 Gold</option>
+                        <option value="Purple" className="bg-[#0c0806] text-[#F0EFE8]">⭐ Purple</option>
+                        <option value="Emerald" className="bg-[#0c0806] text-[#F0EFE8]">💚 Emerald</option>
+                        <option value="Blue" className="bg-[#0c0806] text-[#F0EFE8]">💙 Blue</option>
+                        <option value="Red" className="bg-[#0c0806] text-[#F0EFE8]">❤️ Red</option>
+                        <option value="Orange" className="bg-[#0c0806] text-[#F0EFE8]">🧡 Orange</option>
                       </select>
                     </div>
                     <div className="space-y-1.5">
@@ -1535,20 +1659,20 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
                       <select
                         value={bulkMonth}
                         onChange={(e) => setBulkMonth(e.target.value)}
-                        className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-indigo-500/50 cursor-pointer"
+                        className="w-full bg-black/40 border border-[#D4AF37]/20 rounded-xl px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-indigo-500/50 cursor-pointer"
                       >
-                        <option value="01">January</option>
-                        <option value="02">February</option>
-                        <option value="03">March</option>
-                        <option value="04">April</option>
-                        <option value="05">May</option>
-                        <option value="06">June</option>
-                        <option value="07">July</option>
-                        <option value="08">August</option>
-                        <option value="09">September</option>
-                        <option value="10">October</option>
-                        <option value="11">November</option>
-                        <option value="12">December</option>
+                        <option value="01" className="bg-[#0c0806] text-[#F0EFE8]">January</option>
+                        <option value="02" className="bg-[#0c0806] text-[#F0EFE8]">February</option>
+                        <option value="03" className="bg-[#0c0806] text-[#F0EFE8]">March</option>
+                        <option value="04" className="bg-[#0c0806] text-[#F0EFE8]">April</option>
+                        <option value="05" className="bg-[#0c0806] text-[#F0EFE8]">May</option>
+                        <option value="06" className="bg-[#0c0806] text-[#F0EFE8]">June</option>
+                        <option value="07" className="bg-[#0c0806] text-[#F0EFE8]">July</option>
+                        <option value="08" className="bg-[#0c0806] text-[#F0EFE8]">August</option>
+                        <option value="09" className="bg-[#0c0806] text-[#F0EFE8]">September</option>
+                        <option value="10" className="bg-[#0c0806] text-[#F0EFE8]">October</option>
+                        <option value="11" className="bg-[#0c0806] text-[#F0EFE8]">November</option>
+                        <option value="12" className="bg-[#0c0806] text-[#F0EFE8]">December</option>
                       </select>
                     </div>
                     <div className="space-y-1.5">
@@ -1556,15 +1680,15 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
                       <select
                         value={bulkYear}
                         onChange={(e) => setBulkYear(e.target.value)}
-                        className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-indigo-500/50 cursor-pointer"
+                        className="w-full bg-black/40 border border-[#D4AF37]/20 rounded-xl px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-indigo-500/50 cursor-pointer"
                       >
-                        <option value="2024">2024</option>
-                        <option value="2025">2025</option>
-                        <option value="2026">2026</option>
-                        <option value="2027">2027</option>
-                        <option value="2028">2028</option>
-                        <option value="2029">2029</option>
-                        <option value="2030">2030</option>
+                        <option value="2024" className="bg-[#0c0806] text-[#F0EFE8]">2024</option>
+                        <option value="2025" className="bg-[#0c0806] text-[#F0EFE8]">2025</option>
+                        <option value="2026" className="bg-[#0c0806] text-[#F0EFE8]">2026</option>
+                        <option value="2027" className="bg-[#0c0806] text-[#F0EFE8]">2027</option>
+                        <option value="2028" className="bg-[#0c0806] text-[#F0EFE8]">2028</option>
+                        <option value="2029" className="bg-[#0c0806] text-[#F0EFE8]">2029</option>
+                        <option value="2030" className="bg-[#0c0806] text-[#F0EFE8]">2030</option>
                       </select>
                     </div>
                     <button
@@ -1577,166 +1701,147 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
                   </form>
                 )}
               </div>
+              )}
 
               {/* Assign Badge Form */}
-              <div className="bg-[#11111A]/40 border border-white/5 p-5 rounded-2xl space-y-4 shadow-md">
-                <h6 className="text-[10px] font-black uppercase tracking-wider text-[#F0EFE8] pb-2 border-b border-white/5">Assign Badge to Member</h6>
+              {badgeTab === 'badges' && subTab === 'assign' && (
+              <div className="bg-[#11111A]/40 border border-[#D4AF37]/15 p-5 rounded-2xl space-y-4 shadow-md">
+                <h6 className="text-[10px] font-black uppercase tracking-wider text-[#F0EFE8] pb-2 border-b border-[#D4AF37]/15">Assign Badge to Member</h6>
                 <form onSubmit={handleAssignAward} className="space-y-4">
                   <div className="space-y-1.5">
                     <label className="text-[9px] font-black uppercase text-[#A09E9A] tracking-wider">Select Created Badge</label>
-                    <select value={assignAwardId} onChange={e => setAssignAwardId(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-indigo-500/50 cursor-pointer" required>
-                      <option value="">-- Select Badge --</option>
+                    <select value={assignAwardId} onChange={e => setAssignAwardId(e.target.value)} className="w-full bg-black/40 border border-[#D4AF37]/20 rounded-xl px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-indigo-500/50 cursor-pointer" required>
+                      <option value="" className="bg-[#0c0806] text-[#F0EFE8]">-- Select Badge --</option>
                       {opsAwards.map(a => <option key={a.id} value={a.id}>{a.name} ({a.color})</option>)}
                     </select>
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-[9px] font-black uppercase text-[#A09E9A] tracking-wider">Filter by Role</label>
-                    <select value={assignRoleFilter} onChange={e => setAssignRoleFilter(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-indigo-500/50 cursor-pointer">
-                      <option value="All">All Roles (Excl. Director)</option>
-                      <option value="Host">Host / Talent</option>
-                      <option value="Manager">Manager</option>
-                      <option value="Agent">Agent</option>
-                      <option value="Admin">Admin</option>
-                      <option value="Head Admin">Head Admin</option>
-                    </select>
+                    <label className="text-[9px] font-black uppercase text-[#A09E9A] tracking-wider">Search Member</label>
+                    <input
+                      type="text"
+                      value={assignMemberSearch}
+                      onChange={e => setAssignMemberSearch(e.target.value)}
+                      className="w-full bg-black/40 border border-[#D4AF37]/20 rounded-xl px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-indigo-500/50"
+                      placeholder="Nickname or Poppo ID"
+                    />
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-[9px] font-black uppercase text-[#A09E9A] tracking-wider">Select Member</label>
-                    <select value={assignHostId} onChange={e => setAssignHostId(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-indigo-500/50 cursor-pointer" required>
-                      <option value="">-- Choose Member --</option>
+                    <select value={assignHostId} onChange={e => setAssignHostId(e.target.value)} className="w-full bg-black/40 border border-[#D4AF37]/20 rounded-xl px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-indigo-500/50 cursor-pointer" required>
+                      <option value="" className="bg-[#0c0806] text-[#F0EFE8]">-- Choose Member --</option>
                       {filteredAssignHosts.map(h => <option key={h.id} value={h.id}>{h.nickname || h.name} - {h.id} ({String(h.role || 'Host').toUpperCase()})</option>)}
                     </select>
                   </div>
                   {assignAwardId && (
                     <div className="space-y-1.5">
                       <label className="text-[9px] font-black uppercase text-[#A09E9A] tracking-wider">Effectivity Period</label>
-                      <div className="grid grid-cols-2 gap-3 bg-black/20 p-3 rounded-lg border border-white/5 text-xs text-[#F0EFE8] font-mono">
+                      <div className="grid grid-cols-2 gap-3 bg-black/20 p-3 rounded-lg border border-[#D4AF37]/15 text-xs text-[#F0EFE8] font-mono">
                         <div>
                           <span className="text-[8px] text-[#A09E9A] block uppercase mb-0.5">Start Date</span>
                           {awardStartDate || 'N/A'}
                         </div>
-                        <div>
-                          <span className="text-[8px] text-[#A09E9A] block uppercase mb-0.5">End Date</span>
-                          {awardEndDate || 'N/A'}
-                        </div>
                       </div>
+                      <button type="submit" disabled={isCreatingAward} className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer shadow-md">
+                        {isCreatingAward ? 'Assigning...' : 'Assign Badge'}
+                      </button>
                     </div>
                   )}
-                  <button type="submit" disabled={isAssigningAward} className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer shadow-md">
-                    {isAssigningAward ? 'Assigning...' : 'Assign Badge'}
-                  </button>
                 </form>
               </div>
+              )}
 
               {/* Available Badges & Active Assignments stacked */}
-              <div className="space-y-4">
-                <div className="bg-[#11111A]/40 border border-white/5 p-5 rounded-2xl shadow-md space-y-3">
-                  <div className="flex items-center justify-between border-b border-[#D4AF37]/20 pb-2">
-                    <span className="text-[10px] font-black uppercase tracking-wider text-[#F0EFE8]">Available Badges</span>
-                    <span className="text-[9px] text-[#A09E9A]/60 font-mono">{opsAwards.length} created</span>
-                  </div>
-                  <div className="overflow-y-auto max-h-[200px] custom-scrollbar space-y-2.5 pr-1.5">
-                    {opsAwards.length === 0 ? (
-                      <p className="text-xs text-[#A09E9A]/30 italic py-4 text-center">No badges created yet.</p>
-                    ) : (
-                      opsAwards.map(a => {
-                        let labelStyle = 'bg-amber-500/10 text-amber-400 border-amber-500/20';
-                        if (a.color === 'Purple') labelStyle = 'bg-purple-500/10 text-purple-400 border-purple-500/20';
-                        else if (a.color === 'Emerald') labelStyle = 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
-                        else if (a.color === 'Blue') labelStyle = 'bg-blue-500/10 text-blue-400 border-blue-500/20';
-                        else if (a.color === 'Red') labelStyle = 'bg-red-500/10 text-red-400 border-red-500/20';
-                        else if (a.color === 'Orange') labelStyle = 'bg-orange-500/10 text-orange-400 border-orange-500/20';
+              {badgeTab === 'badges' && subTab === 'unassigned' && (
+                <div className="space-y-4">
+                  <div className="bg-[#11111A]/40 border border-[#D4AF37]/15 p-5 rounded-2xl shadow-md space-y-3">
+                    <div className="flex items-center justify-between border-b border-[#D4AF37]/20 pb-2">
+                      <span className="text-[10px] font-black uppercase tracking-wider text-[#F0EFE8]">Available Badges</span>
+                      <span className="text-[9px] text-[#A09E9A]/60 font-mono">{opsAwards.length} created</span>
+                    </div>
+                    <div className="overflow-y-auto max-h-[200px] custom-scrollbar space-y-2.5 pr-1.5">
+                      {opsAwards.length === 0 ? (
+                        <p className="text-xs text-[#A09E9A]/30 italic py-4 text-center">No badges created yet.</p>
+                      ) : (
+                        opsAwards.map(a => {
+                          let labelStyle = 'bg-amber-500/10 text-amber-400 border-amber-500/20';
+                          if (a.color === 'Purple') labelStyle = 'bg-purple-500/10 text-purple-400 border-purple-500/20';
+                          else if (a.color === 'Emerald') labelStyle = 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
+                          else if (a.color === 'Blue') labelStyle = 'bg-blue-500/10 text-blue-400 border-blue-500/20';
+                          else if (a.color === 'Red') labelStyle = 'bg-red-500/10 text-red-400 border-red-500/20';
+                          else if (a.color === 'Orange') labelStyle = 'bg-orange-500/10 text-orange-400 border-orange-500/20';
 
-                        return (
-                          <div key={a.id} className="bg-black/30 border border-white/5 rounded-xl p-3 flex items-center justify-between transition-all hover:bg-black/40">
-                            <div className="space-y-1 min-w-0">
-                              <span className={cn("text-[9px] font-black uppercase px-2 py-0.5 rounded-full border tracking-wider", labelStyle)}>
-                                {a.name}
-                              </span>
-                              <div className="text-[9px] text-[#A09E9A] font-mono mt-1">
-                                {a.startDate || 'N/A'} to {a.endDate || 'N/A'}
+                          return (
+                            <div key={a.id} className="bg-black/30 border border-[#D4AF37]/15 rounded-xl p-3 flex items-center justify-between transition-all hover:bg-black/40">
+                              <div className="space-y-1 min-w-0">
+                                <span className={cn("text-[9px] font-black uppercase px-2 py-0.5 rounded-full border tracking-wider", labelStyle)}>{a.name}</span>
+                                <div className="text-[9px] text-[#A09E9A] font-mono mt-1">{a.startDate || 'N/A'} to {a.endDate || 'N/A'}</div>
                               </div>
+                              <button type="button" onClick={() => setAssignAwardId(a.id)} className="text-[9px] font-black uppercase text-[#D4AF37] hover:bg-[#D4AF37]/10 px-2.5 py-1 border border-[#D4AF37]/35 rounded-lg transition-all cursor-pointer">Assign</button>
                             </div>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setAssignAwardId(a.id);
-                              }}
-                              className="text-[9px] font-black uppercase text-[#D4AF37] hover:bg-[#D4AF37]/10 px-2.5 py-1 border border-[#D4AF37]/35 rounded-lg transition-all cursor-pointer"
-                            >
-                              Assign
-                            </button>
-                          </div>
-                        );
-                      })
-                    )}
+                          );
+                        })
+                      )}
+                    </div>
                   </div>
                 </div>
+              )}
+              {badgeTab === 'badges' && subTab === 'assigned' && (
+                <div className="space-y-4">
+                  <div className="bg-[#11111A]/40 border border-[#D4AF37]/15 p-5 rounded-2xl shadow-md space-y-3">
+                    <div className="flex items-center justify-between border-b border-[#D4AF37]/20 pb-2">
+                      <span className="text-[10px] font-black uppercase tracking-wider text-[#F0EFE8]">Active Badge Assignments</span>
+                      <span className="text-[9px] text-[#A09E9A]/60 font-mono">{opsAwardAssignments.length} assigned</span>
+                    </div>
+                    <div className="overflow-y-auto max-h-[200px] custom-scrollbar space-y-2.5 pr-1.5">
+                      {opsAwardAssignments.length === 0 ? (
+                        <p className="text-xs text-[#A09E9A]/30 italic py-4 text-center">No badges assigned.</p>
+                      ) : (
+                        opsAwardAssignments.map(a => {
+                          let labelStyle = 'bg-amber-500/10 text-amber-400 border-amber-500/20';
+                          if (a.awardColor === 'Purple') labelStyle = 'bg-purple-500/10 text-purple-400 border-purple-500/20';
+                          else if (a.awardColor === 'Emerald') labelStyle = 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
+                          else if (a.awardColor === 'Blue') labelStyle = 'bg-blue-500/10 text-blue-400 border-blue-500/20';
+                          else if (a.awardColor === 'Red') labelStyle = 'bg-red-500/10 text-red-400 border-red-500/20';
+                          else if (a.awardColor === 'Orange') labelStyle = 'bg-orange-500/10 text-orange-400 border-orange-500/20';
 
-                <div className="bg-[#11111A]/40 border border-white/5 p-5 rounded-2xl shadow-md space-y-3">
-                  <div className="flex items-center justify-between border-b border-[#D4AF37]/20 pb-2">
-                    <span className="text-[10px] font-black uppercase tracking-wider text-[#F0EFE8]">Active Badge Assignments</span>
-                    <span className="text-[9px] text-[#A09E9A]/60 font-mono">{opsAwardAssignments.length} assigned</span>
-                  </div>
-                  <div className="overflow-y-auto max-h-[200px] custom-scrollbar space-y-2.5 pr-1.5">
-                    {opsAwardAssignments.length === 0 ? (
-                      <p className="text-xs text-[#A09E9A]/30 italic py-4 text-center">No badges assigned.</p>
-                    ) : (
-                      opsAwardAssignments.map(a => {
-                        let labelStyle = 'bg-amber-500/10 text-amber-400 border-amber-500/20';
-                        if (a.awardColor === 'Purple') labelStyle = 'bg-purple-500/10 text-purple-400 border-purple-500/20';
-                        else if (a.awardColor === 'Emerald') labelStyle = 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
-                        else if (a.awardColor === 'Blue') labelStyle = 'bg-blue-500/10 text-blue-400 border-blue-500/20';
-                        else if (a.awardColor === 'Red') labelStyle = 'bg-red-500/10 text-red-400 border-red-500/20';
-                        else if (a.awardColor === 'Orange') labelStyle = 'bg-orange-500/10 text-orange-400 border-orange-500/20';
-
-                        return (
-                          <div key={a.id} className="bg-black/30 border border-white/5 rounded-xl p-3 flex items-center justify-between transition-all hover:bg-black/40">
-                            <div className="space-y-1 min-w-0">
-                              <p className="text-xs font-bold text-[#F0EFE8] truncate">{a.hostNickname}</p>
-                              <div className="flex flex-wrap items-center gap-1.5 mt-1">
-                                <span className={cn("text-[8px] font-black uppercase px-1.5 py-0.5 rounded border tracking-wider", labelStyle)}>
-                                  {a.awardName}
-                                </span>
-                                <span className="text-[9px] text-white/30 font-mono">
-                                  {a.startDate} to {a.endDate}
-                                </span>
+                          return (
+                            <div key={a.id} className="bg-black/30 border border-[#D4AF37]/15 rounded-xl p-3 flex items-center justify-between transition-all hover:bg-black/40">
+                              <div className="space-y-1 min-w-0">
+                                <p className="text-xs font-bold text-[#F0EFE8] truncate">{a.hostNickname}</p>
+                                <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                                  <span className={cn("text-[8px] font-black uppercase px-1.5 py-0.5 rounded border tracking-wider", labelStyle)}>{a.awardName}</span>
+                                  <span className="text-[9px] text-white/30 font-mono">{a.startDate} to {a.endDate}</span>
+                                </div>
                               </div>
+                              <button type="button" onClick={() => handleRevokeAssignment(a.id)} className="text-[9px] font-black uppercase text-red-400 hover:bg-red-500/10 px-2 py-1 border border-red-500/35 rounded-lg transition-all cursor-pointer">Revoke</button>
                             </div>
-                            <button
-                              type="button"
-                              onClick={() => handleRevokeAssignment(a.id)}
-                              className="text-[9px] font-black uppercase text-red-400 hover:bg-red-500/10 px-2 py-1 border border-red-500/35 rounded-lg transition-all cursor-pointer"
-                            >
-                              Revoke
-                            </button>
-                          </div>
-                        );
-                      })
-                    )}
+                          );
+                        })
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
             </div>
 
             {/* RIGHT COLUMN: Task (former Task Board) */}
             <div className="space-y-6">
-              <div className="flex items-center gap-2 border-b border-white/5 pb-2">
+              <div className="flex items-center gap-2 border-b border-[#D4AF37]/15 pb-2">
                 <ListTodo size={18} className="text-indigo-400" />
                 <h5 className="font-black text-xs uppercase tracking-wider text-[#F0EFE8]">Task</h5>
               </div>
 
               {/* Delegate Task Form */}
-              <div className="bg-[#11111A]/40 border border-white/5 p-5 rounded-2xl space-y-4 shadow-md">
-                <h6 className="text-[10px] font-black uppercase tracking-wider text-[#F0EFE8] pb-2 border-b border-white/5">Delegate New Task</h6>
+              <div className="bg-[#11111A]/40 border border-[#D4AF37]/15 p-5 rounded-2xl space-y-4 shadow-md">
+                <h6 className="text-[10px] font-black uppercase tracking-wider text-[#F0EFE8] pb-2 border-b border-[#D4AF37]/15">Delegate New Task</h6>
                 <form onSubmit={handleCreateTask} className="space-y-4">
                   <div className="space-y-1.5">
                     <label className="text-[9px] font-black uppercase text-[#A09E9A] tracking-wider">Task Title</label>
-                    <input type="text" value={taskTitle} onChange={e => setTaskTitle(e.target.value)} placeholder="e.g. Boost solo live hours" className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-indigo-500/50" required />
+                    <input type="text" value={taskTitle} onChange={e => setTaskTitle(e.target.value)} placeholder="e.g. Boost solo live hours" className="w-full bg-black/40 border border-[#D4AF37]/20 rounded-xl px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-indigo-500/50" required />
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-[9px] font-black uppercase text-[#A09E9A] tracking-wider">Guidelines</label>
-                    <textarea value={taskDescription} onChange={e => setTaskDescription(e.target.value)} placeholder="Provide steps..." className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-indigo-500/50 h-24 resize-none" required />
+                    <textarea value={taskDescription} onChange={e => setTaskDescription(e.target.value)} placeholder="Provide steps..." className="w-full bg-black/40 border border-[#D4AF37]/20 rounded-xl px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-indigo-500/50 h-24 resize-none" required />
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-[9px] font-black uppercase text-[#A09E9A] tracking-wider">Due Date</label>
@@ -1749,12 +1854,12 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
               </div>
 
               {/* Active Agency Tasks table */}
-              <div className="bg-[#11111A]/40 border border-white/5 p-5 rounded-2xl shadow-md space-y-3">
-                <h6 className="text-[10px] font-black uppercase tracking-wider text-[#F0EFE8] pb-2 border-b border-white/5">Active Agency Tasks</h6>
+              <div className="bg-[#11111A]/40 border border-[#D4AF37]/15 p-5 rounded-2xl shadow-md space-y-3">
+                <h6 className="text-[10px] font-black uppercase tracking-wider text-[#F0EFE8] pb-2 border-b border-[#D4AF37]/15">Active Agency Tasks</h6>
                 <div className="overflow-x-auto custom-scrollbar">
                   <table className="w-full text-left text-xs">
                     <thead>
-                      <tr className="border-b border-white/5 text-[8px] font-black text-[#A09E9A]/40 uppercase">
+                      <tr className="border-b border-[#D4AF37]/15 text-[8px] font-black text-[#A09E9A]/40 uppercase">
                         <th className="px-3 py-2.5">Assignee</th>
                         <th className="px-3 py-2.5">Details</th>
                         <th className="px-3 py-2.5">Due Date</th>
@@ -1785,7 +1890,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
             </div>
 
           </div>
-        )}
+        ) : null}
       </div>
     );
   };
@@ -1898,8 +2003,8 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
 
   const renderAdminFanbaseReportSection = () => {
     return (
-      <div className="bg-white/5 backdrop-blur-xl border border-white/10 p-5 rounded-3xl transition-all duration-300 hover:border-[#D4AF37]/30 group space-y-6 shadow-lg">
-        <div className="flex items-center gap-4 pb-4 border-b border-white/5">
+      <div className="bg-[#120D0A]/75 backdrop-blur-xl border border-[#D4AF37]/20 p-5 rounded-3xl transition-all duration-300 hover:border-[#D4AF37]/30 group space-y-6 shadow-lg">
+        <div className="flex items-center gap-4 pb-4 border-b border-[#D4AF37]/15">
           <div className="p-3 rounded-2xl bg-[#D4AF37]/10 text-[#D4AF37] border border-[#D4AF37]/20">
             <Users size={24} />
           </div>
@@ -1943,11 +2048,11 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
                   }
                 }}
                 onFocus={() => setIsHostDropdownOpen(true)}
-                className="w-full bg-[#0D0D14] border border-white/10 rounded-xl px-4 py-3 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37]/30 transition-all font-bold placeholder:text-white/20"
+                className="w-full bg-[#0c0806] border border-[#D4AF37]/20 rounded-xl px-4 py-3 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37]/30 transition-all font-bold placeholder:text-white/20"
                 required={!selectedHostUser}
               />
               {isHostDropdownOpen && filteredHostUsersForSearch.length > 0 && (
-                <div className="absolute left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-[#11111A]/95 border border-white/10 backdrop-blur-md rounded-xl shadow-2xl z-55 custom-scrollbar p-1">
+                <div className="absolute left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-[#11111A]/95 border border-[#D4AF37]/20 backdrop-blur-md rounded-xl shadow-2xl z-55 custom-scrollbar p-1">
                   {filteredHostUsersForSearch.map((user) => (
                     <button
                       key={user.id}
@@ -1980,8 +2085,8 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
           </div>
 
           {/* Metrics */}
-          <div className="bg-[#0D0D14]/50 p-6 rounded-2xl border border-white/5 space-y-6">
-            <span className="text-[10px] font-black text-[#A09E9A] uppercase tracking-widest block border-b border-white/5 pb-2">Fanbase Health Indicators</span>
+          <div className="bg-[#0c0806]/50 p-6 rounded-2xl border border-[#D4AF37]/15 space-y-6">
+            <span className="text-[10px] font-black text-[#A09E9A] uppercase tracking-widest block border-b border-[#D4AF37]/15 pb-2">Fanbase Health Indicators</span>
             
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
               {/* Followers */}
@@ -1995,7 +2100,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
                   placeholder="e.g. 15000"
                   required
                   min="0"
-                  className="w-full bg-[#0D0D14] border border-white/10 rounded-xl px-4 py-3 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
+                  className="w-full bg-[#0c0806] border border-[#D4AF37]/20 rounded-xl px-4 py-3 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
                 />
               </div>
 
@@ -2010,7 +2115,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
                   placeholder="e.g. 120"
                   required
                   min="0"
-                  className="w-full bg-[#0D0D14] border border-white/10 rounded-xl px-4 py-3 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
+                  className="w-full bg-[#0c0806] border border-[#D4AF37]/20 rounded-xl px-4 py-3 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
                 />
               </div>
 
@@ -2025,7 +2130,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
                   placeholder="e.g. 450"
                   required
                   min="0"
-                  className="w-full bg-[#0D0D14] border border-white/10 rounded-xl px-4 py-3 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
+                  className="w-full bg-[#0c0806] border border-[#D4AF37]/20 rounded-xl px-4 py-3 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
                 />
               </div>
             </div>
@@ -2042,7 +2147,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
                   placeholder="Updates count"
                   required
                   min="0"
-                  className="w-full bg-[#0D0D14] border border-white/10 rounded-xl px-4 py-3 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
+                  className="w-full bg-[#0c0806] border border-[#D4AF37]/20 rounded-xl px-4 py-3 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
                 />
               </div>
 
@@ -2057,19 +2162,19 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
                   placeholder="Updates count"
                   required
                   min="0"
-                  className="w-full bg-[#0D0D14] border border-white/10 rounded-xl px-4 py-3 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
+                  className="w-full bg-[#0c0806] border border-[#D4AF37]/20 rounded-xl px-4 py-3 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
                 />
               </div>
             </div>
           </div>
 
           {/* Submitter & Host Metadata */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-[10px] font-bold text-[#A09E9A] uppercase tracking-wider bg-black/20 p-4 rounded-xl border border-white/5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-[10px] font-bold text-[#A09E9A] uppercase tracking-wider bg-black/20 p-4 rounded-xl border border-[#D4AF37]/15">
             <div className="space-y-1">
               <span className="block">SubmittedBy: <span className="text-[#F0EFE8]">{rootAuth.nickname || rootAuth.name} (Role: {rootAuth.role})</span></span>
               <span className="block font-mono">ReporterID: {rootAuth.poppo_id || rootAuth.poppoId || 'SystemAdmin'}</span>
             </div>
-            <div className="space-y-1 border-t sm:border-t-0 sm:border-l border-white/5 pt-2 sm:pt-0 sm:pl-4">
+            <div className="space-y-1 border-t sm:border-t-0 sm:border-l border-[#D4AF37]/15 pt-2 sm:pt-0 sm:pl-4">
               {selectedHostUser ? (
                 <>
                   <span className="block">TargetHost: <span className="text-[#D4AF37]">{selectedHostUser.nickname || selectedHostUser.name || 'Unknown'}</span></span>
@@ -2381,8 +2486,8 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
 
   const renderAdminsLogSection = () => {
     return (
-      <div className="bg-white/5 backdrop-blur-xl border border-white/10 p-5 rounded-3xl transition-all duration-300 hover:border-[#D4AF37]/30 group space-y-6 shadow-lg text-left">
-        <div className="flex items-center justify-between pb-4 border-b border-white/5">
+      <div className="bg-[#120D0A]/75 backdrop-blur-xl border border-[#D4AF37]/20 p-5 rounded-3xl transition-all duration-300 hover:border-[#D4AF37]/30 group space-y-6 shadow-lg text-left">
+        <div className="flex items-center justify-between pb-4 border-b border-[#D4AF37]/15">
           <div className="flex items-center gap-4">
             <div className="p-3 rounded-2xl bg-[#D4AF37]/10 text-[#D4AF37] border border-[#D4AF37]/20">
               <ClipboardList size={24} />
@@ -2392,13 +2497,13 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
               <p className="text-[10px] text-[#A09E9A] uppercase font-black tracking-widest mt-0.5">Your aggregated report & event history</p>
             </div>
           </div>
-          <div className="text-[10px] bg-black/40 border border-white/5 px-3 py-1 rounded-full font-bold text-[#A09E9A] uppercase">
+          <div className="text-[10px] bg-black/40 border border-[#D4AF37]/15 px-3 py-1 rounded-full font-bold text-[#A09E9A] uppercase">
             Total entries: {combinedAdminLogs.length}
           </div>
         </div>
 
         {combinedAdminLogs.length > 0 ? (
-          <div className="overflow-x-auto no-scrollbar rounded-2xl border border-white/5">
+          <div className="overflow-x-auto no-scrollbar rounded-2xl border border-[#D4AF37]/15">
             <table className="w-full text-left text-xs divide-y divide-white/5">
               <thead className="bg-black/30 text-[#A09E9A] text-[9px] font-black uppercase tracking-wider">
                 <tr>
@@ -2458,7 +2563,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
                             <button
                               type="button"
                               onClick={() => handleOpenLogEditModal(item)}
-                              className="px-2 py-1 bg-white/5 hover:bg-white/10 text-[#F0EFE8] border border-white/10 rounded-lg text-[9px] font-black uppercase tracking-wider flex items-center gap-1 cursor-pointer transition-all"
+                              className="px-2 py-1 bg-white/5 hover:bg-white/10 text-[#F0EFE8] border border-[#D4AF37]/20 rounded-lg text-[9px] font-black uppercase tracking-wider flex items-center gap-1 cursor-pointer transition-all"
                             >
                               <Edit2 size={9} /> Edit
                             </button>
@@ -2481,7 +2586,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
             </table>
           </div>
         ) : (
-          <div className="p-12 text-center text-[#A09E9A]/30 italic text-xs bg-black/20 rounded-2xl border border-white/5">
+          <div className="p-12 text-center text-[#A09E9A]/30 italic text-xs bg-black/20 rounded-2xl border border-[#D4AF37]/15">
             No submissions recorded by you yet.
           </div>
         )}
@@ -2494,7 +2599,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
 
     return (
       <div className="fixed inset-0 z-55 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
-        <div className="w-full max-w-lg bg-[#13131E] border border-white/10 rounded-3xl p-6 shadow-2xl relative my-8 text-left">
+        <div className="w-full max-w-lg bg-[#120D0A]/95 border border-[#D4AF37]/20 rounded-3xl p-6 shadow-2xl relative my-8 text-left">
           <button
             type="button"
             title="Close"
@@ -2526,7 +2631,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
           <form onSubmit={handleEditLogItemSubmit} className="space-y-4">
             {editTargetLogItem.logType === 'fanbase' && (
               <div className="space-y-4">
-                <div className="p-3 bg-black/20 rounded-xl border border-white/5 text-[10px] text-[#A09E9A] font-bold uppercase space-y-1">
+                <div className="p-3 bg-black/20 rounded-xl border border-[#D4AF37]/15 text-[10px] text-[#A09E9A] font-bold uppercase space-y-1">
                   <div>Target Host: <span className="text-[#D4AF37]">{editTargetLogItem.nickname || 'Unknown'}</span></div>
                   <div>Poppo ID: <span className="text-[#F0EFE8] font-mono">{editTargetLogItem.poppoId || editTargetLogItem.poppo_id}</span></div>
                 </div>
@@ -2540,7 +2645,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
                       value={editRangeStart}
                       onChange={(e) => setEditRangeStart(e.target.value)}
                       required
-                      className="w-full bg-[#0D0D14] border border-white/10 rounded-xl px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
+                      className="w-full bg-[#0c0806] border border-[#D4AF37]/20 rounded-xl px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
                     />
                   </div>
                   <div className="space-y-1">
@@ -2551,7 +2656,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
                       value={editRangeEnd}
                       onChange={(e) => setEditRangeEnd(e.target.value)}
                       required
-                      className="w-full bg-[#0D0D14] border border-white/10 rounded-xl px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
+                      className="w-full bg-[#0c0806] border border-[#D4AF37]/20 rounded-xl px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
                     />
                   </div>
                 </div>
@@ -2566,7 +2671,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
                       value={editFollowers}
                       onChange={(e) => setEditFollowers(e.target.value)}
                       required
-                      className="w-full bg-[#0D0D14] border border-white/10 rounded-xl px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
+                      className="w-full bg-[#0c0806] border border-[#D4AF37]/20 rounded-xl px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
                     />
                   </div>
                   <div className="space-y-1">
@@ -2578,7 +2683,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
                       value={editSubscribers}
                       onChange={(e) => setEditSubscribers(e.target.value)}
                       required
-                      className="w-full bg-[#0D0D14] border border-white/10 rounded-xl px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
+                      className="w-full bg-[#0c0806] border border-[#D4AF37]/20 rounded-xl px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
                     />
                   </div>
                   <div className="space-y-1">
@@ -2590,7 +2695,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
                       value={editGcMembers}
                       onChange={(e) => setEditGcMembers(e.target.value)}
                       required
-                      className="w-full bg-[#0D0D14] border border-white/10 rounded-xl px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
+                      className="w-full bg-[#0c0806] border border-[#D4AF37]/20 rounded-xl px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
                     />
                   </div>
                 </div>
@@ -2605,7 +2710,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
                       value={editGcUpdatesHost}
                       onChange={(e) => setEditGcUpdatesHost(e.target.value)}
                       required
-                      className="w-full bg-[#0D0D14] border border-white/10 rounded-xl px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
+                      className="w-full bg-[#0c0806] border border-[#D4AF37]/20 rounded-xl px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
                     />
                   </div>
                   <div className="space-y-1">
@@ -2617,7 +2722,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
                       value={editGcUpdatesFans}
                       onChange={(e) => setEditGcUpdatesFans(e.target.value)}
                       required
-                      className="w-full bg-[#0D0D14] border border-white/10 rounded-xl px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
+                      className="w-full bg-[#0c0806] border border-[#D4AF37]/20 rounded-xl px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
                     />
                   </div>
                 </div>
@@ -2633,15 +2738,15 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
                     type="text"
                     value={editEventTitle}
                     disabled
-                    className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-xs text-[#A09E9A] outline-none font-bold"
+                    className="w-full bg-white/5 border border-[#D4AF37]/20 rounded-xl px-3 py-2 text-xs text-[#A09E9A] outline-none font-bold"
                   />
                 </div>
 
                 {/* Attendees Selection */}
-                <div className="border border-white/5 rounded-xl bg-black/40 p-4 space-y-3">
+                <div className="border border-[#D4AF37]/15 rounded-xl bg-black/40 p-4 space-y-3">
                   <span className="text-[9px] font-black text-[#A09E9A] uppercase tracking-widest block text-left">Edit Attendees ({editAttendees.length})</span>
                   
-                  <div className="flex flex-wrap gap-1.5 min-h-[40px] p-2 bg-[#0D0D14]/80 rounded-lg border border-white/5">
+                  <div className="flex flex-wrap gap-1.5 min-h-[40px] p-2 bg-[#0c0806]/80 rounded-lg border border-[#D4AF37]/15">
                     {editAttendees.map((att, idx) => (
                       <span key={idx} className="px-2 py-0.5 rounded bg-[#D4AF37]/10 border border-[#D4AF37]/20 text-[10px] text-[#D4AF37] font-bold flex items-center gap-1">
                         {att.nickname || att.name}
@@ -2666,13 +2771,13 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
                         value={editSearch}
                         onChange={(e) => setEditSearch(e.target.value)}
                         placeholder="Search users..."
-                        className="flex-1 bg-[#0A0B0E] border border-white/10 rounded-lg px-3 py-1.5 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
+                        className="flex-1 bg-[#0A0B0E] border border-[#D4AF37]/20 rounded-lg px-3 py-1.5 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
                       />
                       <select
                         value={editRoleFilter}
                         onChange={(e) => setEditRoleFilter(e.target.value)}
                         title="Role Filter"
-                        className="bg-[#0A0B0E] border border-white/10 rounded-lg px-2 text-xs text-[#F0EFE8] outline-none cursor-pointer font-bold"
+                        className="bg-[#0A0B0E] border border-[#D4AF37]/20 rounded-lg px-2 text-xs text-[#F0EFE8] outline-none cursor-pointer font-bold"
                       >
                         <option value="All Roles">All Roles</option>
                         <option value="hosts">Hosts</option>
@@ -2682,7 +2787,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
                       </select>
                     </div>
 
-                    <div className="max-h-[120px] overflow-y-auto border border-white/5 rounded-lg bg-black/20 divide-y divide-white/5 custom-scrollbar">
+                    <div className="max-h-[120px] overflow-y-auto border border-[#D4AF37]/15 rounded-lg bg-black/20 divide-y divide-white/5 custom-scrollbar">
                       {filteredEditUsers.map(user => {
                         const userPoppo = user.poppo_id || user.id;
                         const isAdded = editAttendees.some(a => (a.poppoId || a.id || a.poppo_id) === userPoppo);
@@ -2728,7 +2833,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
                     value={editFeedback}
                     onChange={(e) => setEditFeedback(e.target.value)}
                     placeholder="Attendance records notes or comments..."
-                    className="w-full bg-[#0D0D14] border border-white/10 rounded-xl px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37] resize-none"
+                    className="w-full bg-[#0c0806] border border-[#D4AF37]/20 rounded-xl px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37] resize-none"
                   />
                 </div>
               </div>
@@ -2744,7 +2849,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
                       type="text"
                       value={editCalTitle}
                       disabled
-                      className="w-full bg-[#0D0D14]/50 border border-white/10 rounded-xl px-3 py-2 text-xs text-slate-500 cursor-not-allowed outline-none"
+                      className="w-full bg-[#0c0806]/50 border border-[#D4AF37]/20 rounded-xl px-3 py-2 text-xs text-slate-500 cursor-not-allowed outline-none"
                     />
                   </div>
                   <div className="space-y-1">
@@ -2753,7 +2858,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
                       id="edit-cal-type"
                       value={editCalType}
                       disabled
-                      className="w-full bg-[#0D0D14]/50 border border-white/10 rounded-xl px-3 py-2 text-xs text-slate-500 cursor-not-allowed outline-none"
+                      className="w-full bg-[#0c0806]/50 border border-[#D4AF37]/20 rounded-xl px-3 py-2 text-xs text-slate-500 cursor-not-allowed outline-none"
                     >
                       <option value="solo livehouse">Solo Livehouse</option>
                       <option value="party livehouse">Party Livehouse</option>
@@ -2771,7 +2876,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
                       type="date"
                       value={editCalDate}
                       disabled
-                      className="w-full bg-[#0D0D14]/50 border border-white/10 rounded-xl px-3 py-2 text-xs text-slate-500 cursor-not-allowed outline-none"
+                      className="w-full bg-[#0c0806]/50 border border-[#D4AF37]/20 rounded-xl px-3 py-2 text-xs text-slate-500 cursor-not-allowed outline-none"
                     />
                   </div>
                   <div className="space-y-1">
@@ -2781,7 +2886,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
                       type="text"
                       value={editCalTime}
                       disabled
-                      className="w-full bg-[#0D0D14]/50 border border-white/10 rounded-xl px-3 py-2 text-xs text-slate-500 cursor-not-allowed outline-none"
+                      className="w-full bg-[#0c0806]/50 border border-[#D4AF37]/20 rounded-xl px-3 py-2 text-xs text-slate-500 cursor-not-allowed outline-none"
                     />
                   </div>
                 </div>
@@ -2793,15 +2898,15 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
                     type="text"
                     value={editCalLocation}
                     disabled
-                    className="w-full bg-[#0D0D14]/50 border border-white/10 rounded-xl px-3 py-2 text-xs text-slate-500 cursor-not-allowed outline-none"
+                    className="w-full bg-[#0c0806]/50 border border-[#D4AF37]/20 rounded-xl px-3 py-2 text-xs text-slate-500 cursor-not-allowed outline-none"
                   />
                 </div>
 
                 {/* Calendar Participants */}
-                <div className="border border-white/5 rounded-xl bg-black/40 p-4 space-y-3">
+                <div className="border border-[#D4AF37]/15 rounded-xl bg-black/40 p-4 space-y-3">
                   <span className="text-[9px] font-black text-[#A09E9A] uppercase tracking-widest block text-left">Edit Participants ({editCalParticipants.length})</span>
                   
-                  <div className="flex flex-wrap gap-1.5 min-h-[40px] p-2 bg-[#0D0D14]/80 rounded-lg border border-white/5">
+                  <div className="flex flex-wrap gap-1.5 min-h-[40px] p-2 bg-[#0c0806]/80 rounded-lg border border-[#D4AF37]/15">
                     {editCalParticipants.map((part, idx) => (
                       <span key={idx} className="px-2 py-0.5 rounded bg-[#D4AF37]/10 border border-[#D4AF37]/20 text-[10px] text-[#D4AF37] font-bold flex items-center gap-1">
                         {part.nickname || part.name}
@@ -2826,13 +2931,13 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
                         value={editCalSearch}
                         onChange={(e) => setEditCalSearch(e.target.value)}
                         placeholder="Search users..."
-                        className="flex-1 bg-[#0A0B0E] border border-white/10 rounded-lg px-3 py-1.5 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
+                        className="flex-1 bg-[#0A0B0E] border border-[#D4AF37]/20 rounded-lg px-3 py-1.5 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
                       />
                       <select
                         value={editCalRoleFilter}
                         onChange={(e) => setEditCalRoleFilter(e.target.value)}
                         title="Role Filter"
-                        className="bg-[#0A0B0E] border border-white/10 rounded-lg px-2 text-xs text-[#F0EFE8] outline-none cursor-pointer font-bold"
+                        className="bg-[#0A0B0E] border border-[#D4AF37]/20 rounded-lg px-2 text-xs text-[#F0EFE8] outline-none cursor-pointer font-bold"
                       >
                         <option value="All Roles">All Roles</option>
                         <option value="hosts">Hosts</option>
@@ -2842,7 +2947,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
                       </select>
                     </div>
 
-                    <div className="max-h-[120px] overflow-y-auto border border-white/5 rounded-lg bg-black/20 divide-y divide-white/5 custom-scrollbar">
+                    <div className="max-h-[120px] overflow-y-auto border border-[#D4AF37]/15 rounded-lg bg-black/20 divide-y divide-white/5 custom-scrollbar">
                       {filteredEditCalUsers.map(user => {
                         const userPoppo = user.poppo_id || user.id;
                         const isAdded = editCalParticipants.some(p => (p.poppoId || p.id || p.poppo_id) === userPoppo);
@@ -2887,13 +2992,13 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
                     rows={2}
                     value={editCalDescription}
                     disabled
-                    className="w-full bg-[#0D0D14]/50 border border-white/10 rounded-xl px-3 py-2 text-xs text-slate-500 cursor-not-allowed outline-none resize-none"
+                    className="w-full bg-[#0c0806]/50 border border-[#D4AF37]/20 rounded-xl px-3 py-2 text-xs text-slate-500 cursor-not-allowed outline-none resize-none"
                   />
                 </div>
               </div>
             )}
 
-            <div className="flex justify-end gap-2 pt-2 border-t border-white/5">
+            <div className="flex justify-end gap-2 pt-2 border-t border-[#D4AF37]/15">
               <button
                 type="button"
                 onClick={() => setEditTargetLogItem(null)}
@@ -2938,7 +3043,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
           badgeText: 'text-[#D4AF37]',
           accentColor: '#D4AF37',
           topTrim: 'border-t-[#D4AF37] border-t-2',
-          gradientBg: 'bg-gradient-to-br from-[#D4AF37]/20 via-[#D4AF37]/5 to-[#1A1A28]/80',
+          gradientBg: 'bg-gradient-to-br from-[#D4AF37]/20 via-[#D4AF37]/5 to-[#120D0A]/80',
         };
       }
       if (norm === 's idol') {
@@ -2948,7 +3053,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
           badgeText: 'text-[#ec4899]',
           accentColor: '#ec4899',
           topTrim: 'border-t-[#ec4899] border-t-2',
-          gradientBg: 'bg-gradient-to-br from-[#ec4899]/20 via-[#ec4899]/5 to-[#1A1A28]/80',
+          gradientBg: 'bg-gradient-to-br from-[#ec4899]/20 via-[#ec4899]/5 to-[#120D0A]/80',
         };
       }
       if (norm === 'rocket host') {
@@ -2958,7 +3063,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
           badgeText: 'text-[#3b82f6]',
           accentColor: '#3b82f6',
           topTrim: 'border-t-[#3b82f6] border-t-2',
-          gradientBg: 'bg-gradient-to-br from-[#3b82f6]/20 via-[#3b82f6]/5 to-[#1A1A28]/80',
+          gradientBg: 'bg-gradient-to-br from-[#3b82f6]/20 via-[#3b82f6]/5 to-[#120D0A]/80',
         };
       }
       if (norm === 'esport host' || norm.includes('esport')) {
@@ -2968,17 +3073,17 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
           badgeText: 'text-[#a855f7]',
           accentColor: '#a855f7',
           topTrim: 'border-t-[#a855f7] border-t-2',
-          gradientBg: 'bg-gradient-to-br from-[#a855f7]/20 via-[#a855f7]/5 to-[#1A1A28]/80',
+          gradientBg: 'bg-gradient-to-br from-[#a855f7]/20 via-[#a855f7]/5 to-[#120D0A]/80',
         };
       }
       // Regular Host
       return {
-        borderColor: 'border-white/5',
+        borderColor: 'border-[#D4AF37]/15',
         shadow: 'shadow-md',
         badgeText: 'text-[#F0EFE8]',
         accentColor: '#ffffff',
-        topTrim: 'border-t-white/10 border-t-2',
-        gradientBg: 'bg-gradient-to-br from-white/10 via-white/5 to-[#1A1A28]/80',
+        topTrim: 'border-t-[#D4AF37]/20 border-t-2',
+        gradientBg: 'bg-gradient-to-br from-white/10 via-white/5 to-[#120D0A]/80',
       };
     };
     return getCategoryStyles(host.tier_pay || '');
@@ -2989,9 +3094,15 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
   const [editPhotoUrl, setEditPhotoUrl] = useState(host.photoUrl || '');
   const [editDescription, setEditDescription] = useState(host.description || '');
   const [editRole, setEditRole] = useState<string>(host.role || 'Host');
-  const [editTeam, setEditTeam] = useState<string>(host.teamAnchor || host.team || 'Unassigned');
-  const [editManager, setEditManager] = useState<string>(host.manager || 'Nine Management');
-  const [editBaseSalaryCategory, setEditBaseSalaryCategory] = useState<string>(host.tier_pay || 'N/A');
+  const [editTeam, setEditTeam] = useState<string>(() => {
+    const val = host.teamAnchor || host.team || '';
+    return (val.toLowerCase() === 'unassigned' || val.toLowerCase() === 'none') ? '' : val;
+  });
+  const [editManager, setEditManager] = useState<string>(host.manager && host.manager !== 'Nine Management' ? host.manager : '');
+  const [editBaseSalaryCategory, setEditBaseSalaryCategory] = useState<string>(() => {
+    const val = host.tier_pay || '';
+    return BASE_SALARY_POLICIES.includes(val as any) ? val : 'Regular Host';
+  });
   const [editStatus, setEditStatus] = useState<string>(host.status || 'Active');
 
   const [editLevel, setEditLevel] = useState<number>(host.level || 1);
@@ -3088,7 +3199,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
   });
   const [isAddEventFormOpen, setIsAddEventFormOpen] = useState(false);
   const [isSubmittingEvent, setIsSubmittingEvent] = useState(false);
-  const [eventActiveTab, setEventActiveTab] = useState<'exposure' | 'attendance' | 'recognitions'>('exposure');
+  const [eventActiveTab, setEventActiveTab] = useState<'exposure' | 'attendance'>('exposure');
   const [rpkMetadata, setRpkMetadata] = useState<any>(null);
   
   // AI report states
@@ -3103,9 +3214,16 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
     setEditPhotoUrl(host.photoUrl || '');
     setEditDescription(host.description || '');
     setEditRole(host.role || 'Host');
-    setEditTeam(host.teamAnchor || host.team || 'Unassigned');
-    setEditManager(host.manager || 'Nine Management');
-    setEditBaseSalaryCategory(host.tier_pay || 'N/A');
+    setEditTeam(() => {
+      const val = host.teamAnchor || host.team || '';
+      return (val.toLowerCase() === 'unassigned' || val.toLowerCase() === 'none') ? '' : val;
+    });
+    setEditManager(host.manager && host.manager !== 'Nine Management' ? host.manager : '');
+    setEditBaseSalaryCategory(
+      host.tier_pay && BASE_SALARY_POLICIES.includes(host.tier_pay as any)
+        ? host.tier_pay
+        : 'Regular Host'
+    );
     setEditStatus(host.status || 'Active');
 
     setEditLevel(host.level || 1);
@@ -3493,12 +3611,22 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
       try {
         const allHosts = await FirebaseService.getAllHosts();
         const mgrs = allHosts
-          .filter(h => (h.role || '').toLowerCase() === 'manager' || (h.role || '').toLowerCase() === 'agent')
+          .filter(h => {
+            const role = (h.role || '').toLowerCase();
+            return role === 'manager' || role === 'agent';
+          })
           .map(h => ({ 
             id: h.id || (h as any).poppoId || (h as any).poppo_id, 
             name: h.nickname || h.name || h.id,
             photoUrl: h.photoUrl
-          }));
+          }))
+          .filter(m => {
+            const nameLower = (m.name || '').toLowerCase();
+            return nameLower !== 'nine management' && 
+                   nameLower !== 'test manager' && 
+                   nameLower !== 'test agent' &&
+                   nameLower !== 'unknown';
+          });
         setManagersList(mgrs);
       } catch (err) {
         console.error("Failed to load managers list:", err);
@@ -3534,7 +3662,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
             const ctx = canvas.getContext('2d');
             if (ctx) {
               // Fill background with theme color #0D0D14
-              ctx.fillStyle = '#0D0D14';
+              ctx.fillStyle = '#0c0806';
               ctx.fillRect(0, 0, 1080, 1080);
               
               // Calculate scale to fit original image entirely inside the 1080x1080 square box
@@ -3764,8 +3892,9 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
         const assignedManagerId = selectedMgr ? selectedMgr.id : null;
         updatedFields.nickname = editNickname.trim();
         updatedFields.role = editRole;
-        updatedFields.manager = editManager;
-        updatedFields.assignedManagerId = assignedManagerId;
+        const isHost = String(editRole).toLowerCase() === 'host';
+        updatedFields.manager = isHost ? editManager : '';
+        updatedFields.assignedManagerId = isHost ? assignedManagerId : null;
         updatedFields.status = editStatus;
         updatedFields.teamAnchor = editTeam;
       }
@@ -3855,6 +3984,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
         Storage.setAuthState(newAuth);
       }
 
+      setHost(updatedHost);
       setIsSelfEditing(false);
       if (onProfileUpdated) onProfileUpdated();
     } catch (err) {
@@ -4329,10 +4459,10 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
   const renderPerformanceMetricsAndDiversity = () => {
     if (performanceReports.length === 0) return null;
     return (
-      <div className={cn("space-y-4 bg-white/5 backdrop-blur-xl border border-white/10 p-5 rounded-3xl transition-all duration-300 hover:border-amber-500/30 group", styles.shadow)}>
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-2 pb-2 border-b border-white/5">
+      <div className={cn("space-y-4 bg-[#120D0A]/75 backdrop-blur-xl border border-[#D4AF37]/20 p-5 rounded-3xl transition-all duration-300 hover:border-amber-500/30 group", styles.shadow)}>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-2 pb-2 border-b border-[#D4AF37]/15">
           {/* Tab Switcher on the left */}
-          <div className="flex items-center gap-1 bg-black/40 p-1 rounded-xl border border-white/5 self-start">
+          <div className="flex items-center gap-1 bg-black/40 p-1 rounded-xl border border-[#D4AF37]/15 self-start">
             <button
               type="button"
               onClick={() => setPerfActiveTab('metrics')}
@@ -4363,30 +4493,32 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
           <div className="flex items-center gap-2 relative z-10 self-end sm:self-center">
             {perfActiveTab === 'metrics' ? (
               <>
-                <select
-                  title="Filter by Year"
-                  value={analyticsYear}
-                  onChange={e => setAnalyticsYear(e.target.value)}
-                  className="bg-[#0D0D14] border border-[#D4AF37]/20 rounded-lg px-3 py-1.5 text-xs font-bold text-[#F0EFE8] outline-none focus:border-[#D4AF37] cursor-pointer shadow-inner transition-all hover:border-[#D4AF37]/50"
-                >
-                  <option value="all">All Years</option>
-                  {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
-                </select>
-                <select
-                  title="Filter by Month"
-                  value={analyticsMonth}
-                  onChange={e => setAnalyticsMonth(e.target.value)}
-                  className="bg-[#0D0D14] border border-[#D4AF37]/20 rounded-lg px-3 py-1.5 text-xs font-bold text-[#F0EFE8] outline-none focus:border-[#D4AF37] cursor-pointer shadow-inner transition-all hover:border-[#D4AF37]/50"
-                >
-                  <option value="all">All Months</option>
-                  {MONTH_ORDER.map(m => <option key={m} value={m}>{m}</option>)}
-                </select>
+                {renderStyledSelect({
+                  title: "Filter by Year",
+                  value: analyticsYear,
+                  onChange: (e) => setAnalyticsYear(e.target.value),
+                  className: "border-[#D4AF37]/20 hover:border-[#D4AF37]/50 transition-all",
+                  children: <>
+                    <option value="all" className="bg-[#0c0806] text-[#F0EFE8]">All Years</option>
+                    {availableYears.map(y => <option key={y} value={y} className="bg-[#0c0806] text-[#F0EFE8]">{y}</option>)}
+                  </>
+                })}
+                {renderStyledSelect({
+                  title: "Filter by Month",
+                  value: analyticsMonth,
+                  onChange: (e) => setAnalyticsMonth(e.target.value),
+                  className: "border-[#D4AF37]/20 hover:border-[#D4AF37]/50 transition-all",
+                  children: <>
+                    <option value="all" className="bg-[#0c0806] text-[#F0EFE8]">All Months</option>
+                    {MONTH_ORDER.map(m => <option key={m} value={m} className="bg-[#0c0806] text-[#F0EFE8]">{m}</option>)}
+                  </>
+                })}
               </>
             ) : (
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => setSortAscending(prev => !prev)}
-                  className="p-1.5 bg-[#0D0D14] hover:bg-white/5 border border-amber-500/20 hover:border-amber-500/40 rounded-lg text-[#A09E9A] hover:text-amber-400 transition-all cursor-pointer shadow-sm flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider"
+                  className="p-1.5 bg-[#0c0806] hover:bg-white/5 border border-amber-500/20 hover:border-amber-500/40 rounded-lg text-[#A09E9A] hover:text-amber-400 transition-all cursor-pointer shadow-sm flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider"
                   title="Toggle Chronological Sort"
                 >
                   <ArrowUpDown size={12} className="text-amber-400" />
@@ -4413,7 +4545,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                     key={i} 
                     style={{ background: tile.bgGradient }}
                     className={cn(
-                      "border border-white/5 p-3 sm:p-4.5 rounded-2xl flex flex-col items-center justify-center text-center min-h-[90px] transition-all duration-300 transform group-hover:translate-y-[-2px] shadow-lg gap-1.5",
+                      "border border-[#D4AF37]/15 p-3 sm:p-4.5 rounded-2xl flex flex-col items-center justify-center text-center min-h-[90px] transition-all duration-300 transform group-hover:translate-y-[-2px] shadow-lg gap-1.5",
                       tile.hoverBorder
                     )}
                   >
@@ -4477,7 +4609,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
     if (trendChartData.length === 0) return null;
 
     return (
-      <div className={cn("space-y-4 bg-white/5 backdrop-blur-xl border border-white/10 p-5 rounded-3xl transition-all duration-300 hover:border-indigo-500/30 group", styles.shadow)}>
+      <div className={cn("space-y-4 bg-[#120D0A]/75 backdrop-blur-xl border border-[#D4AF37]/20 p-5 rounded-3xl transition-all duration-300 hover:border-indigo-500/30 group", styles.shadow)}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
              <div className="w-8 h-8 rounded-full bg-indigo-500/20 flex items-center justify-center text-indigo-400 text-sm shadow-inner">📊</div>
@@ -4485,7 +4617,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
           </div>
         </div>
         
-        <div className="flex items-center justify-between mt-2 pt-2 border-t border-white/5">
+        <div className="flex items-center justify-between mt-2 pt-2 border-t border-[#D4AF37]/15">
           {/* Legend */}
           <div className="flex gap-3 text-[9px] font-black uppercase tracking-widest">
             <span className="text-[#D4AF37] drop-shadow-sm">● Points</span>
@@ -4493,7 +4625,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
           </div>
 
           {/* View Toggle */}
-          <div className="flex items-center gap-1 bg-black/40 p-1 rounded-xl border border-white/5">
+          <div className="flex items-center gap-1 bg-black/40 p-1 rounded-xl border border-[#D4AF37]/15">
             <button
               type="button"
               onClick={() => setTrendChartViewMode('area')}
@@ -4554,7 +4686,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                   tickFormatter={(value) => `${value.toFixed(0)}h`}
                 />
                 <Tooltip 
-                  contentStyle={{ backgroundColor: '#13131E', borderColor: '#ffffff20', borderRadius: '12px', fontSize: '10px', fontWeight: 'bold' }}
+                  contentStyle={{ backgroundColor: '#120D0A', borderColor: '#ffffff20', borderRadius: '12px', fontSize: '10px', fontWeight: 'bold' }}
                   itemStyle={{ color: '#F0EFE8' }}
                   labelStyle={{ color: '#D4AF37', marginBottom: '4px' }}
                 />
@@ -4576,7 +4708,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                   name="Live Duration"
                   stroke="#06b6d4" 
                   strokeWidth={3}
-                  dot={{ r: 4, fill: '#13131E', stroke: '#06b6d4', strokeWidth: 2 }}
+                  dot={{ r: 4, fill: '#120D0A', stroke: '#06b6d4', strokeWidth: 2 }}
                   activeDot={{ r: 6, fill: '#06b6d4', stroke: '#F0EFE8', strokeWidth: 2 }}
                   animationDuration={1000}
                 />
@@ -4608,7 +4740,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                   tickFormatter={(value) => `${value.toFixed(0)}h`}
                 />
                 <Tooltip 
-                  contentStyle={{ backgroundColor: '#13131E', borderColor: '#ffffff20', borderRadius: '12px', fontSize: '10px', fontStyle: 'normal', fontWeight: 'bold' }}
+                  contentStyle={{ backgroundColor: '#120D0A', borderColor: '#ffffff20', borderRadius: '12px', fontSize: '10px', fontStyle: 'normal', fontWeight: 'bold' }}
                   itemStyle={{ color: '#F0EFE8' }}
                   labelStyle={{ color: '#D4AF37', marginBottom: '4px' }}
                 />
@@ -4638,6 +4770,44 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
     );
   };
 
+    const renderStyledSelect = ({
+    title,
+    value,
+    onChange,
+    disabled = false,
+    className = "",
+    children,
+  }: {
+    title: string;
+    value: string;
+    onChange: (e: React.ChangeEvent<HTMLSelectElement>) => void;
+    disabled?: boolean;
+    className?: string;
+    children: React.ReactNode;
+  }) => {
+    return (
+      <div className="relative w-full">
+        <select
+          title={title}
+          value={value}
+          onChange={onChange}
+          disabled={disabled}
+          className={cn(
+            "appearance-none w-full bg-[#0c0806] border border-[#D4AF37]/20 rounded-lg pl-3 pr-8 py-1.5 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37] font-bold disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer",
+            className
+          )}
+        >
+          {children}
+        </select>
+        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2.5 text-[#A09E9A]/60">
+          <svg className="h-3.5 w-3.5 fill-current" viewBox="0 0 20 20">
+            <path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" />
+          </svg>
+        </div>
+      </div>
+    );
+  };
+
   const renderSelfEditModal = () => {
     if (!isSelfEditing) return null;
     const currentAuth = Storage.getAuthState();
@@ -4647,17 +4817,17 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
 
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-        <div className="bg-[#13131E] border border-white/10 rounded-2xl w-full p-5 shadow-2xl relative max-h-[90vh] overflow-y-auto transition-all duration-300 max-w-lg">
+        <div className="bg-[#120D0A]/95 border border-[#D4AF37]/20 rounded-2xl w-full p-5 shadow-2xl relative max-h-[90vh] overflow-y-auto transition-all duration-300 max-w-lg">
           <button
             title="Close"
             onClick={() => setIsSelfEditing(false)}
-            className="absolute top-4 right-4 p-1.5 bg-[#1A1A28] border border-white/10 rounded-full text-[#A09E9A] hover:text-[#F0EFE8] cursor-pointer"
+            className="absolute top-4 right-4 p-1.5 bg-[#0e0a08]/90 border border-[#D4AF37]/20 rounded-full text-[#A09E9A] hover:text-[#F0EFE8] cursor-pointer"
           >
             <X size={14} />
           </button>
 
           <h3 className="text-sm font-black uppercase tracking-wider text-[#F0EFE8] mb-0.5">
-            Edit Host Profile
+            Edit User Profile
           </h3>
           <p className="text-[10px] text-[#A09E9A] mb-4">
             Update administrative fields (Director/Head Admin only) or public profile settings (Profile owner only).
@@ -4665,11 +4835,11 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
 
           <div className="space-y-4">
             {/* 1. Administrative Fields Section */}
-            <div className="bg-[#1A1A28] border border-white/5 p-4 rounded-xl space-y-3">
-              <div className="border-b border-white/5 pb-1 flex justify-between items-center">
+            <div className="bg-[#0e0a08]/90 border border-[#D4AF37]/15 p-4 rounded-xl space-y-3">
+              <div className="border-b border-[#D4AF37]/15 pb-1 flex justify-between items-center">
                 <span className="text-[9px] font-black text-[#D4AF37] uppercase tracking-wider">Administrative Fields</span>
                 {!isDirectorOrHeadAdmin && (
-                  <span className="text-[7.5px] font-black text-[#A09E9A]/50 uppercase tracking-widest border border-white/10 px-1.5 py-0.5 rounded bg-white/5">Read-Only</span>
+                  <span className="text-[7.5px] font-black text-[#A09E9A]/50 uppercase tracking-widest border border-[#D4AF37]/20 px-1.5 py-0.5 rounded bg-white/5">Read-Only</span>
                 )}
               </div>
               
@@ -4682,49 +4852,46 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                     placeholder="Nickname"
                     value={editNickname}
                     onChange={(e) => setEditNickname(e.target.value)}
-                    className="w-full bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-1.5 text-xs font-bold text-[#F0EFE8] outline-none focus:border-[#D4AF37] disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full bg-[#0c0806] border border-[#D4AF37]/20 rounded-lg px-3 py-1.5 text-xs font-bold text-[#F0EFE8] outline-none focus:border-[#D4AF37] disabled:opacity-50 disabled:cursor-not-allowed"
                     required
                     disabled={!isDirectorOrHeadAdmin}
                   />
                 </div>
                 <div className="space-y-1">
                   <label className="text-[8px] font-black text-[#A09E9A] uppercase tracking-widest block">Role</label>
-                  <select
-                    title="Role"
-                    value={editRole}
-                    onChange={(e) => setEditRole(e.target.value)}
-                    className="w-full bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-1.5 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37] font-bold disabled:opacity-50 disabled:cursor-not-allowed"
-                    disabled={!isDirectorOrHeadAdmin}
-                  >
-                    {['Host', 'Manager', 'Admin', 'Head Admin', 'Agent']
+                  {renderStyledSelect({
+                    title: "Role",
+                    value: editRole,
+                    onChange: (e) => setEditRole(e.target.value),
+                    disabled: !isDirectorOrHeadAdmin,
+                    children: ['Host', 'Manager', 'Admin', 'Head Admin', 'Agent']
                       .concat(host.role === 'Director' ? ['Director'] : [])
                       .map(r => (
-                        <option key={r} value={r} className="bg-[#1A1A28] text-[#F0EFE8]">{r}</option>
+                        <option key={r} value={r} className="bg-[#0c0806] text-[#F0EFE8]">{r}</option>
                       ))
-                    }
-                  </select>
+                  })}
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="text-[8px] font-black text-[#A09E9A] uppercase tracking-widest block">Assigned Manager</label>
-                  <select
-                    title="Assigned Manager"
-                    value={editManager}
-                    onChange={(e) => setEditManager(e.target.value)}
-                    className="w-full bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-1.5 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37] font-bold disabled:opacity-50 disabled:cursor-not-allowed"
-                    disabled={!isDirectorOrHeadAdmin}
-                  >
-                    {!managersList.some(m => m.name === editManager) && editManager && (
-                      <option value={editManager} className="bg-[#1A1A28] text-[#F0EFE8]">{editManager}</option>
-                    )}
-                    {managersList.map(mgr => (
-                      <option key={mgr.id} value={mgr.name} className="bg-[#1A1A28] text-[#F0EFE8]">{mgr.name}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="space-y-1">
+                {String(editRole).toLowerCase() === 'host' && (
+                  <div className="space-y-1">
+                    <label className="text-[8px] font-black text-[#A09E9A] uppercase tracking-widest block">Assigned Manager</label>
+                    {renderStyledSelect({
+                      title: "Assigned Manager",
+                      value: editManager,
+                      onChange: (e) => setEditManager(e.target.value),
+                      disabled: !isDirectorOrHeadAdmin,
+                      children: <>
+                        <option value="" className="bg-[#0c0806] text-[#F0EFE8]">Unassigned</option>
+                        {managersList.map(mgr => (
+                          <option key={mgr.id} value={mgr.name} className="bg-[#0c0806] text-[#F0EFE8]">{mgr.name}</option>
+                        ))}
+                      </>
+                    })}
+                  </div>
+                )}
+                <div className={cn("space-y-1", String(editRole).toLowerCase() !== 'host' && "col-span-2")}>
                   <label className="text-[8px] font-black text-[#A09E9A] uppercase tracking-widest block">Team Anchor</label>
                   <input
                     type="text"
@@ -4732,7 +4899,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                     placeholder="Team Anchor"
                     value={editTeam}
                     onChange={(e) => setEditTeam(e.target.value)}
-                    className="w-full bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-1.5 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37] disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full bg-[#0c0806] border border-[#D4AF37]/20 rounded-lg px-3 py-1.5 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37] disabled:opacity-50 disabled:cursor-not-allowed"
                     disabled={!isDirectorOrHeadAdmin}
                   />
                 </div>
@@ -4741,37 +4908,46 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1 col-span-2">
                   <label className="text-[8px] font-black text-[#A09E9A] uppercase tracking-widest block">Status</label>
-                  <select
-                    title="Status"
-                    value={editStatus}
-                    onChange={(e) => setEditStatus(e.target.value)}
-                    className={cn(
-                      "w-full bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-1.5 text-xs outline-none focus:border-[#D4AF37] font-bold disabled:opacity-50 disabled:cursor-not-allowed",
-                      editStatus === 'Active' ? "text-emerald-400" : "text-[#F0EFE8]"
-                    )}
-                    disabled={!isDirectorOrHeadAdmin}
-                  >
-                    {['Active', 'Intermittent', 'Released', 'Inactive'].map(s => (
-                      <option key={s} value={s} className="bg-[#1A1A28] text-[#F0EFE8]">{s}</option>
-                    ))}
-                  </select>
+                  {renderStyledSelect({
+                    title: "Status",
+                    value: editStatus,
+                    onChange: (e) => setEditStatus(e.target.value),
+                    disabled: !isDirectorOrHeadAdmin,
+                    className: editStatus === 'Active' ? "text-emerald-400 font-bold" :
+                               editStatus === 'Intermittent' ? "text-yellow-400 font-bold" :
+                               editStatus === 'Releasing' ? "text-red-400 font-bold" :
+                               editStatus === 'Released' ? "text-red-600 font-bold" :
+                               editStatus === 'Inactive' ? "text-orange-400 font-bold" :
+                               "text-[#F0EFE8] font-bold",
+                    children: ['Active', 'Intermittent', 'Released', 'Releasing', 'Inactive'].map(s => {
+                      let colorClass = 'text-[#F0EFE8]';
+                      if (s === 'Active') colorClass = 'text-emerald-400 font-bold';
+                      else if (s === 'Intermittent') colorClass = 'text-yellow-400 font-bold';
+                      else if (s === 'Releasing') colorClass = 'text-red-400 font-bold';
+                      else if (s === 'Released') colorClass = 'text-red-600 font-bold';
+                      else if (s === 'Inactive') colorClass = 'text-orange-400 font-bold';
+                      return (
+                        <option key={s} value={s} className={cn("bg-[#0c0806]", colorClass)}>{s}</option>
+                      );
+                    })
+                  })}
                 </div>
               </div>
             </div>
 
             {/* 2. Profile Details & Pay Tier (Owner or Admin) */}
-            <div className="bg-[#1A1A28]/50 border border-white/5 p-4 rounded-xl space-y-3">
-              <div className="border-b border-white/5 pb-1 flex justify-between items-center">
+            <div className="bg-[#0e0a08]/90/50 border border-[#D4AF37]/15 p-4 rounded-xl space-y-3">
+              <div className="border-b border-[#D4AF37]/15 pb-1 flex justify-between items-center">
                 <span className="text-[9px] font-black text-[#D4AF37] uppercase tracking-wider">Profile Info &amp; Pay Tier</span>
                 {!isOwnProfile && !isDirectorOrHeadAdmin && (
-                  <span className="text-[7.5px] font-black text-[#A09E9A]/50 uppercase tracking-widest border border-white/10 px-1.5 py-0.5 rounded bg-white/5">Read-Only</span>
+                  <span className="text-[7.5px] font-black text-[#A09E9A]/50 uppercase tracking-widest border border-[#D4AF37]/20 px-1.5 py-0.5 rounded bg-white/5">Read-Only</span>
                 )}
               </div>
 
               <div className="space-y-1">
                 <label className="text-[8px] font-black text-[#A09E9A] uppercase tracking-widest block">Photo Upload &amp; URL</label>
                 <div className="flex gap-2 items-center">
-                  <label className={cn("px-3 py-2 bg-[#222235] border border-white/10 rounded-lg text-[9px] font-black uppercase tracking-wider text-[#F0EFE8] whitespace-nowrap", !isOwnProfile && !isDirectorOrHeadAdmin ? "opacity-50 cursor-not-allowed pointer-events-none" : "hover:bg-[#2A2A3F] cursor-pointer")}>
+                  <label className={cn("px-3 py-2 bg-[#140e0a] border border-[#D4AF37]/20 rounded-lg text-[9px] font-black uppercase tracking-wider text-[#F0EFE8] whitespace-nowrap", !isOwnProfile && !isDirectorOrHeadAdmin ? "opacity-50 cursor-not-allowed pointer-events-none" : "hover:bg-[#1c1511] cursor-pointer")}>
                     {isProcessingPhoto ? 'Uploading...' : 'Choose File'}
                     <input type="file" accept="image/*" onChange={handleFileChange} className="hidden" disabled={!isOwnProfile && !isDirectorOrHeadAdmin} />
                   </label>
@@ -4780,7 +4956,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                     placeholder="Or paste photo URL..." 
                     value={editPhotoUrl}
                     onChange={(e) => setEditPhotoUrl(e.target.value)}
-                    className="w-full bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-1.5 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37] disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full bg-[#0c0806] border border-[#D4AF37]/20 rounded-lg px-3 py-1.5 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37] disabled:opacity-50 disabled:cursor-not-allowed"
                     disabled={!isOwnProfile && !isDirectorOrHeadAdmin}
                   />
                 </div>
@@ -4788,17 +4964,15 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
 
               <div className="space-y-1">
                 <label className="text-[8px] font-black text-[#A09E9A] uppercase tracking-widest block">Tier Pay</label>
-                <select
-                  title="Tier Pay"
-                  value={editBaseSalaryCategory}
-                  onChange={(e) => setEditBaseSalaryCategory(e.target.value)}
-                  className="w-full bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-1.5 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37] font-bold disabled:opacity-50 disabled:cursor-not-allowed"
-                  disabled={!isOwnProfile && !isDirectorOrHeadAdmin}
-                >
-                  {BASE_SALARY_POLICIES.map(policy => (
-                    <option key={policy} value={policy} className="bg-[#1A1A28] text-[#F0EFE8]">{policy}</option>
-                  ))}
-                </select>
+                {renderStyledSelect({
+                  title: "Tier Pay",
+                  value: editBaseSalaryCategory,
+                  onChange: (e) => setEditBaseSalaryCategory(e.target.value),
+                  disabled: !isOwnProfile && !isDirectorOrHeadAdmin,
+                  children: BASE_SALARY_POLICIES.map(policy => (
+                    <option key={policy} value={policy} className="bg-[#0c0806] text-[#F0EFE8]">{policy}</option>
+                  ))
+                })}
               </div>
             </div>
 
@@ -4814,7 +4988,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                 value={selfBio}
                 onChange={e => setSelfBio(e.target.value.slice(0, 100))}
                 placeholder="Enter your public message (max 100 characters)..."
-                className="w-full bg-[#0D0D14] border border-white/10 rounded-xl px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37] resize-none disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full bg-[#0c0806] border border-[#D4AF37]/20 rounded-xl px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37] resize-none disabled:opacity-50 disabled:cursor-not-allowed"
                 disabled={!isOwnProfile && !isDirectorOrHeadAdmin}
               />
             </div>
@@ -4837,7 +5011,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                       value={value}
                       onChange={e => setter(e.target.value)}
                       placeholder={placeholder}
-                      className="w-full bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-1.5 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37] disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="w-full bg-[#0c0806] border border-[#D4AF37]/20 rounded-lg px-3 py-1.5 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37] disabled:opacity-50 disabled:cursor-not-allowed"
                       disabled={!isOwnProfile && !isDirectorOrHeadAdmin}
                     />
                   </div>
@@ -4868,7 +5042,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                     type="text" value={slot.from}
                     onChange={e => { const s = [...selfStreamSlots]; s[idx] = { ...s[idx], from: e.target.value }; setSelfStreamSlots(s); }}
                     placeholder="From (e.g. 08:00 AM)"
-                    className="flex-1 bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-1.5 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37] disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="flex-1 bg-[#0c0806] border border-[#D4AF37]/20 rounded-lg px-3 py-1.5 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37] disabled:opacity-50 disabled:cursor-not-allowed"
                     disabled={!isOwnProfile && !isDirectorOrHeadAdmin}
                   />
                   <span className="text-[#A09E9A]/40 text-xs">→</span>
@@ -4876,7 +5050,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                     type="text" value={slot.to}
                     onChange={e => { const s = [...selfStreamSlots]; s[idx] = { ...s[idx], to: e.target.value }; setSelfStreamSlots(s); }}
                     placeholder="To (e.g. 10:00 PM)"
-                    className="flex-1 bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-1.5 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37] disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="flex-1 bg-[#0c0806] border border-[#D4AF37]/20 rounded-lg px-3 py-1.5 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37] disabled:opacity-50 disabled:cursor-not-allowed"
                     disabled={!isOwnProfile && !isDirectorOrHeadAdmin}
                   />
                   {(isOwnProfile || isDirectorOrHeadAdmin) && selfStreamSlots.length > 1 && (
@@ -4890,7 +5064,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
           </div>
 
           <div className="flex gap-3 mt-5">
-            <button onClick={() => setIsSelfEditing(false)} className="flex-1 py-2.5 bg-[#1A1A28] border border-white/10 text-[#A09E9A] rounded-xl text-[9px] font-black uppercase tracking-wider hover:bg-[#222235] transition-all cursor-pointer">
+            <button onClick={() => setIsSelfEditing(false)} className="flex-1 py-2.5 bg-[#0e0a08]/90 border border-[#D4AF37]/20 text-[#A09E9A] rounded-xl text-[9px] font-black uppercase tracking-wider hover:bg-[#140e0a] transition-all cursor-pointer">
               Cancel
             </button>
             <button
@@ -4937,7 +5111,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
     if (!hasLink) {
       return (
         <div 
-          className="w-9 h-9 rounded-xl bg-white/[0.02] border border-white/5 flex items-center justify-center text-[#A09E9A]/20 cursor-not-allowed transition-all duration-300"
+          className="w-9 h-9 rounded-xl bg-white/[0.02] border border-[#D4AF37]/15 flex items-center justify-center text-[#A09E9A]/20 cursor-not-allowed transition-all duration-300"
           title={`${label} (Not linked)`}
         >
           {icon}
@@ -4951,7 +5125,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
         target="_blank"
         rel="noopener noreferrer"
         className={cn(
-          "w-9 h-9 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center transition-all duration-300 shadow-md cursor-pointer",
+          "w-9 h-9 rounded-xl bg-white/5 border border-[#D4AF37]/20 flex items-center justify-center transition-all duration-300 shadow-md cursor-pointer",
           colorClass
         )}
         title={`Visit ${label}: ${url}`}
@@ -4977,7 +5151,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
       <div className={cn("backdrop-blur-xl border-2 rounded-3xl overflow-hidden flex flex-col relative group/card transition-all duration-300", styles.gradientBg, styles.borderColor, styles.shadow, styles.topTrim)}>
         
         {/* Full-width square profile photo acting as a header banner */}
-        <div className="w-full aspect-square relative bg-[#0D0D14]">
+        <div className="w-full aspect-square relative bg-[#0c0806]">
           {isProcessingPhoto && (
             <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-20">
               <Loader2 size={24} className="animate-spin text-[#D4AF37]" />
@@ -5004,18 +5178,18 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
           {lastMonthAwards.length > 0 && (
             <div className="absolute top-4 left-4 z-20 flex flex-col gap-1.5 max-w-[60%] pointer-events-auto">
               {lastMonthAwards.map((a: any) => {
-                let badgeColorStyle = 'bg-amber-500/20 text-amber-400 border-amber-500/30';
-                if (a.awardColor === 'Purple') badgeColorStyle = 'bg-purple-500/20 text-purple-400 border-purple-500/30';
-                else if (a.awardColor === 'Emerald') badgeColorStyle = 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30';
-                else if (a.awardColor === 'Blue') badgeColorStyle = 'bg-blue-500/20 text-blue-400 border-blue-500/30';
-                else if (a.awardColor === 'Red') badgeColorStyle = 'bg-red-500/20 text-red-400 border-red-500/30';
-                else if (a.awardColor === 'Orange') badgeColorStyle = 'bg-orange-500/20 text-orange-400 border-orange-500/30';
+                let badgeColorStyle = 'border-amber-500 text-amber-200 bg-amber-500/20 shadow-[0_0_12px_rgba(245,158,11,0.4)]';
+                if (a.awardColor === 'Purple') badgeColorStyle = 'border-purple-500 text-purple-200 bg-purple-500/20 shadow-[0_0_12px_rgba(168,85,247,0.4)]';
+                else if (a.awardColor === 'Emerald') badgeColorStyle = 'border-emerald-500 text-emerald-200 bg-emerald-500/20 shadow-[0_0_12px_rgba(16,185,129,0.4)]';
+                else if (a.awardColor === 'Blue') badgeColorStyle = 'border-blue-500 text-blue-200 bg-blue-500/20 shadow-[0_0_12px_rgba(59,130,246,0.4)]';
+                else if (a.awardColor === 'Red') badgeColorStyle = 'border-red-500 text-red-200 bg-red-500/20 shadow-[0_0_12px_rgba(239,68,68,0.4)]';
+                else if (a.awardColor === 'Orange') badgeColorStyle = 'border-orange-500 text-orange-200 bg-orange-500/20 shadow-[0_0_12px_rgba(249,115,22,0.4)]';
 
                 return (
                   <span 
                     key={a.id} 
                     className={cn(
-                      "text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg border backdrop-blur-md shadow-lg truncate block max-w-full",
+                      "text-[9px] font-black uppercase tracking-wider px-3 py-1.5 rounded-xl border backdrop-blur-md text-white text-center block truncate max-w-full",
                       badgeColorStyle
                     )}
                     title={`Last Month's Award: ${a.awardName}`}
@@ -5028,12 +5202,19 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
           )}
 
           {/* Absolute positioned status badge overlaying the image top-right */}
-          <div className="absolute top-4 right-4 z-20">
-             <span className={cn("text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full border backdrop-blur-md shadow-lg", 
-                host.status === 'Active' ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30" : "bg-amber-500/20 text-amber-400 border-amber-500/30")}>
-                {host.status || 'Active'}
-             </span>
-          </div>
+          {host.status && host.status.toLowerCase() !== 'active' && (
+            <div className="absolute top-4 right-4 z-20">
+               <span className={cn("text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full border backdrop-blur-md shadow-lg", 
+                  host.status === 'Intermittent' ? "bg-yellow-500/20 text-yellow-400 border-yellow-500/30" :
+                  host.status === 'Releasing' ? "bg-red-500/20 text-red-400 border-red-500/30" :
+                  host.status === 'Released' ? "bg-red-700/20 text-red-600 border-red-700/30" :
+                  host.status === 'Inactive' ? "bg-orange-500/20 text-orange-400 border-orange-500/30" :
+                  "bg-neutral-500/20 text-neutral-400 border-neutral-500/30"
+               )}>
+                  {host.status}
+               </span>
+            </div>
+          )}
 
         </div>
 
@@ -5048,7 +5229,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
               <div className="shrink-0">
                 <button
                   onClick={() => setIsSelfEditing(true)}
-                  className="w-10 h-10 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 flex items-center justify-center text-[#A09E9A] hover:text-[#F0EFE8] transition-all shadow-xl cursor-pointer"
+                  className="w-10 h-10 rounded-full bg-white/5 hover:bg-white/10 border border-[#D4AF37]/20 flex items-center justify-center text-[#A09E9A] hover:text-[#F0EFE8] transition-all shadow-xl cursor-pointer"
                   title="Edit Profile"
                 >
                   <Edit2 size={16} />
@@ -5061,7 +5242,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
           <div className="grid grid-cols-2 gap-x-4 items-center">
             {/* Left Column: ID and Awards */}
             <div className="flex items-center flex-wrap gap-2">
-              <span className={cn("text-xs font-mono font-bold", styles.badgeText)}>ID: {host.id}</span>
+              <span className="text-sm font-mono font-bold text-[#D4AF37]">{host.id}</span>
               {activeAwards.map(a => {
                 let badgeStyle = 'bg-amber-500/10 text-amber-400 border-amber-500/20';
                 if (a.awardColor === 'Purple') badgeStyle = 'bg-purple-500/10 text-purple-400 border-purple-500/20';
@@ -5083,14 +5264,16 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
             </div>
 
             {/* Right Column: Tier Pay Badge */}
-            <div>
-              <span className={cn("text-[9px] font-black uppercase tracking-widest px-2.5 py-0.5 rounded-full border backdrop-blur-md shadow-[0_0_12px_rgba(212,175,55,0.25)] inline-block", styles.badgeText, styles.borderColor, "bg-black/40")}>
-                {host.tier_pay || 'Regular Host'}
-              </span>
-            </div>
+            {!(String(host.role || '').toLowerCase() !== 'host' && (host.tier_pay || 'Regular Host').toLowerCase() === 'regular host') && (
+              <div>
+                <span className={cn("text-[9px] font-black uppercase tracking-widest px-2.5 py-0.5 rounded-full border backdrop-blur-md shadow-[0_0_12px_rgba(212,175,55,0.25)] inline-block", styles.badgeText, styles.borderColor, "bg-black/40")}>
+                  {host.tier_pay || 'Regular Host'}
+                </span>
+              </div>
+            )}
           </div>
 
-          <div className="grid grid-cols-2 gap-y-2 gap-x-4 pt-1.5 border-t border-white/5 text-xs text-[#A09E9A]">
+          <div className="grid grid-cols-2 gap-y-2 gap-x-4 pt-1.5 border-t border-[#D4AF37]/15 text-xs text-[#A09E9A]">
             {String(host.role || '').toLowerCase() === 'host' || String(host.role || '').toLowerCase() === 'talent' ? (
               <div className="flex flex-col">
                 <span className="text-[9px] font-black uppercase tracking-widest mb-1 text-white/40">Assigned Manager</span>
@@ -5098,16 +5281,18 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                   {assignedManager?.photoUrl ? (
                     <img 
                       src={assignedManager.photoUrl} 
-                      alt={assignedManager.name || host.manager} 
-                      className="w-12 h-12 rounded-full object-cover border border-white/10 shrink-0 shadow-inner"
+                      alt={assignedManager.name || (host.manager && host.manager !== 'Nine Management' && host.manager.toLowerCase() !== 'unassigned' && host.manager.toLowerCase() !== 'none' ? host.manager : 'Unassigned')} 
+                      className="w-12 h-12 rounded-full object-cover border border-[#D4AF37]/20 shrink-0 shadow-inner"
                       referrerPolicy="no-referrer"
                     />
                   ) : (
-                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#1A1A28] to-[#0D0D14] border border-white/10 flex items-center justify-center text-base font-black text-indigo-400 shrink-0 shadow-inner">
-                      {(assignedManager?.name || host.manager || 'M')[0].toUpperCase()}
+                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#1A1A28] to-[#0D0D14] border border-[#D4AF37]/20 flex items-center justify-center text-base font-black text-[#D4AF37] shrink-0 shadow-inner">
+                      {(assignedManager?.name || (host.manager && host.manager !== 'Nine Management' && host.manager.toLowerCase() !== 'unassigned' && host.manager.toLowerCase() !== 'none' ? host.manager : 'Unassigned'))[0].toUpperCase()}
                     </div>
                   )}
-                  <span className={cn("font-bold truncate", styles.badgeText)}>{assignedManager?.name || host.manager}</span>
+                  <span className="font-bold truncate text-[#D4AF37]">
+                    {assignedManager?.name || (host.manager && host.manager !== 'Nine Management' && host.manager.toLowerCase() !== 'unassigned' && host.manager.toLowerCase() !== 'none' ? host.manager : 'Unassigned')}
+                  </span>
                 </div>
               </div>
             ) : (
@@ -5118,7 +5303,12 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
             )}
             <div className="flex flex-col">
               <span className="text-[9px] font-black uppercase tracking-widest mb-1 text-white/40">Team Anchor</span>
-              <span className="text-indigo-400 font-bold">{host.teamAnchor || host.team}</span>
+              <span className="text-[#D4AF37] font-bold">
+                {(() => {
+                  const val = host.teamAnchor || host.team || '';
+                  return (val.toLowerCase() === 'unassigned' || val.toLowerCase() === 'none') ? '' : val;
+                })()}
+              </span>
               {(() => {
                 const igLink = getSocialLink('instagram', host.social_links?.ig);
                 const tiktokLink = getSocialLink('tiktok', host.social_links?.tiktok);
@@ -5185,14 +5375,14 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
           </div>
 
           {host.streaming_hours && host.streaming_hours.length > 0 && (
-            <div className="pt-2 border-t border-white/5 space-y-2">
+            <div className="pt-2 border-t border-[#D4AF37]/15 space-y-2">
               <span className="text-[9px] font-black text-white/40 uppercase tracking-widest block">Streaming Schedule</span>
               <div className="grid grid-cols-2 gap-3">
                 {host.streaming_hours.slice(0, 2).map((slot, idx) => (
                   <div 
                     key={idx} 
                     className={cn(
-                      "bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl px-3 py-2 text-center shadow-inner min-w-0",
+                      "bg-white/5 backdrop-blur-sm border border-[#D4AF37]/20 rounded-xl px-3 py-2 text-center shadow-inner min-w-0",
                       host.streaming_hours.length === 1 && "col-span-2"
                     )}
                   >
@@ -5204,9 +5394,9 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
           )}
 
           {/* Host Public Message */}
-          <div className="pt-2 border-t border-white/5 space-y-1.5">
+          <div className="pt-2 border-t border-[#D4AF37]/15 space-y-1.5">
             <span className="text-[9px] font-black text-white/40 uppercase tracking-widest block">Host Public Message</span>
-            <p className="text-xs text-[#A09E9A] leading-relaxed italic whitespace-pre-wrap bg-black/20 p-3 rounded-xl border border-white/5">
+            <p className="text-xs text-[#A09E9A] leading-relaxed italic whitespace-pre-wrap bg-black/20 p-3 rounded-xl border border-[#D4AF37]/15">
               "{String(host.bio || host.description || 'No public message set.').slice(0, 100)}"
             </p>
           </div>
@@ -5225,7 +5415,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
     const isStaffUser = ['manager', 'agent', 'admin', 'head admin', 'director'].includes(userRoleLower);
 
     return (
-      <div className={cn("space-y-4 flex-1 bg-white/5 backdrop-blur-xl border border-white/10 p-5 rounded-3xl transition-all duration-300 hover:border-amber-500/30 group", styles.shadow)}>
+      <div className={cn("space-y-4 flex-1 bg-[#120D0A]/75 backdrop-blur-xl border border-[#D4AF37]/20 p-5 rounded-3xl transition-all duration-300 hover:border-amber-500/30 group", styles.shadow)}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
              <div className="w-8 h-8 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-400 text-sm shadow-inner">⚔️</div>
@@ -5272,7 +5462,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
               key={idx} 
               style={{ background: cell.bgGradient }}
               className={cn(
-                "border border-white/5 p-2.5 sm:p-4 rounded-2xl flex flex-col justify-between min-h-[85px] sm:min-h-[90px] transition-all duration-300 transform group-hover:translate-y-[-2px] shadow-lg", 
+                "border border-[#D4AF37]/15 p-2.5 sm:p-4 rounded-2xl flex flex-col justify-between min-h-[85px] sm:min-h-[90px] transition-all duration-300 transform group-hover:translate-y-[-2px] shadow-lg", 
                 cell.hoverBorder
               )}
             >
@@ -5313,9 +5503,9 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
     const presencePercentage = Math.round(presenceRatio * 100);
 
     return (
-      <div className={cn("space-y-4 flex-1 bg-white/5 backdrop-blur-xl border border-white/10 p-5 rounded-3xl transition-all duration-300 hover:border-amber-500/30 group", styles.shadow)}>
+      <div className={cn("space-y-4 flex-1 bg-[#120D0A]/75 backdrop-blur-xl border border-[#D4AF37]/20 p-5 rounded-3xl transition-all duration-300 hover:border-amber-500/30 group", styles.shadow)}>
         <div className="flex items-center justify-between gap-3">
-          <div className="flex-1 bg-black/40 p-1 rounded-xl border border-white/5 flex">
+          <div className="flex-1 bg-black/40 p-1 rounded-xl border border-[#D4AF37]/15 flex">
             <button
               type="button"
               onClick={() => setEventActiveTab('exposure')}
@@ -5340,18 +5530,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
             >
               ATTENDANCE
             </button>
-            <button
-              type="button"
-              onClick={() => setEventActiveTab('recognitions')}
-              className={cn(
-                "flex-1 py-2 rounded-lg text-xs font-black uppercase tracking-wider transition-all cursor-pointer text-center",
-                eventActiveTab === 'recognitions'
-                  ? "bg-amber-500/20 text-amber-400 border border-amber-500/30"
-                  : "text-white/40 hover:text-white/70 border border-transparent"
-              )}
-            >
-              RECOGNITIONS
-            </button>
+            
           </div>
         </div>
 
@@ -5378,18 +5557,24 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                     ? formatToLocalTimezone(localTimeObj)
                     : undefined;
 
+                  const statusVal = e.status || 'Scheduled';
+                  const isScheduled = statusVal.toLowerCase() === 'scheduled';
+                  const statusBadgeClass = isScheduled
+                    ? "text-emerald-400 bg-emerald-500/10 border-emerald-500/20"
+                    : "text-amber-400 bg-amber-400/10 border-amber-400/20";
+
                   return (
                     <div 
                       key={idx} 
-                      className="bg-white/5 border border-white/10 p-3 rounded-xl hover:border-amber-500/30 transition-all duration-300 shadow-sm flex flex-col gap-1.5 group/item cursor-help"
+                      className="bg-white/5 border border-[#D4AF37]/20 p-3 rounded-xl hover:border-amber-500/30 transition-all duration-300 shadow-sm flex flex-col gap-1.5 group/item cursor-help"
                       title={localTooltip}
                     >
                       <div className="flex items-start justify-between gap-4">
                         <h4 className="font-bold text-[#F0EFE8] text-sm group-hover/item:text-amber-400 transition-colors truncate">
                           {displayTitle}
                         </h4>
-                        <span className="text-[9px] font-mono text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded border border-amber-400/20 inline-block uppercase tracking-wider shrink-0">
-                          {e.status || 'Scheduled'}
+                        <span className={`text-[9px] font-mono px-2 py-0.5 rounded border inline-block uppercase tracking-wider shrink-0 ${statusBadgeClass}`}>
+                          {statusVal}
                         </span>
                       </div>
                       <div className="text-xs text-[#A09E9A]">
@@ -5440,7 +5625,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                   key={idx} 
                   style={{ background: cell.bgGradient }}
                   className={cn(
-                    "border border-white/5 p-2.5 sm:p-4 rounded-2xl flex flex-col justify-between min-h-[85px] transition-all duration-300 transform group-hover:translate-y-[-2px] shadow-lg",
+                    "border border-[#D4AF37]/15 p-2.5 sm:p-4 rounded-2xl flex flex-col justify-between min-h-[85px] transition-all duration-300 transform group-hover:translate-y-[-2px] shadow-lg",
                     cell.hoverBorder
                   )}
                 >
@@ -5462,7 +5647,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
 
             {/* Progress Bar */}
             <div className="px-1 py-1 mt-2.5">
-              <div className="w-full bg-black/40 rounded-full h-1.5 border border-white/5 overflow-hidden">
+              <div className="w-full bg-black/40 rounded-full h-1.5 border border-[#D4AF37]/15 overflow-hidden">
                 <div 
                   className="bg-gradient-to-r from-amber-600 via-orange-500 to-yellow-400 h-1.5 rounded-full transition-all duration-500" 
                   style={{ width: `${Math.min(100, Math.max(0, presencePercentage))}%` }}
@@ -5476,16 +5661,16 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                 attendedEvents.map((e, idx) => {
                   const eventDate = formatDateStandard(e.eventDate || e.date);
                   return (
-                    <div key={idx} className="bg-gradient-to-r from-white/5 to-white/[0.02] border border-white/10 p-4 rounded-2xl hover:border-amber-500/30 transition-all duration-300 shadow-sm space-y-2 group/item">
+                    <div key={idx} className="bg-gradient-to-r from-white/5 to-white/[0.02] border border-[#D4AF37]/20 p-4 rounded-2xl hover:border-amber-500/30 transition-all duration-300 shadow-sm space-y-2 group/item">
                       <div className="flex items-center justify-between">
                         <p className="text-sm font-black text-[#F0EFE8] leading-tight truncate group-hover/item:text-amber-400 transition-colors">{e.eventTitle || e.eventType || 'Unnamed Event'}</p>
-                        <span className="text-[9px] font-black uppercase tracking-widest bg-black/40 border border-white/10 px-3 py-1 rounded-full text-amber-400 shrink-0 shadow-inner">
+                        <span className="text-[9px] font-black uppercase tracking-widest bg-black/40 border border-[#D4AF37]/20 px-3 py-1 rounded-full text-amber-400 shrink-0 shadow-inner">
                           Attended
                         </span>
                       </div>
                       <p className="text-[10px] text-white/50 font-bold tracking-wide">{eventDate} • {e.timeslot || 'N/A'}</p>
                       {e.eventFeedback && (
-                        <div className="bg-black/20 border border-white/5 p-3 rounded-xl mt-1.5">
+                        <div className="bg-black/20 border border-[#D4AF37]/15 p-3 rounded-xl mt-1.5">
                           <p className="text-xs text-[#A09E9A] leading-relaxed font-medium">
                             <span className="font-bold text-[#F0EFE8]/70">Feedback: </span>
                             {e.eventFeedback}
@@ -5502,73 +5687,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
           </>
         )}
 
-        {eventActiveTab === 'recognitions' && (() => {
-          const activeCount = assignedAwards.filter(a => a.startDate && a.endDate && getIsLastMonth(a.startDate, a.endDate)).length;
 
-          return (
-            <>
-              {/* Header stats inside tab */}
-              <div className="flex items-center justify-between bg-black/20 border border-white/5 p-3 rounded-2xl">
-                <span className="text-[10px] font-black uppercase text-[#A09E9A] tracking-wider">Agency Badges & Recognitions</span>
-                <span className="px-2.5 py-0.5 text-[9px] font-black text-amber-400 border border-amber-500/20 bg-amber-500/10 rounded-full uppercase tracking-widest shadow-inner">
-                  {activeCount} active / {assignedAwards.length} total
-                </span>
-              </div>
-
-              {/* Badges list */}
-              <div className="space-y-3 mt-4 max-h-48 overflow-y-auto custom-scrollbar pr-1">
-                {assignedAwards.length > 0 ? (
-                  <div className="grid grid-cols-2 gap-2.5 pt-1">
-                    {assignedAwards.map((a: any) => {
-                      const isActive = getIsLastMonth(a.startDate, a.endDate);
-
-                      let glowStyle = '';
-                      if (isActive) {
-                        if (a.awardColor === 'Purple') glowStyle = 'border-purple-500 text-purple-200 bg-purple-500/20 shadow-[0_0_12px_rgba(168,85,247,0.4)] opacity-100';
-                        else if (a.awardColor === 'Emerald') glowStyle = 'border-emerald-500 text-emerald-200 bg-emerald-500/20 shadow-[0_0_12px_rgba(16,185,129,0.4)] opacity-100';
-                        else if (a.awardColor === 'Blue') glowStyle = 'border-blue-500 text-blue-200 bg-blue-500/20 shadow-[0_0_12px_rgba(59,130,246,0.4)] opacity-100';
-                        else if (a.awardColor === 'Red') glowStyle = 'border-red-500 text-red-200 bg-red-500/20 shadow-[0_0_12px_rgba(239,68,68,0.4)] opacity-100';
-                        else if (a.awardColor === 'Orange') glowStyle = 'border-orange-500 text-orange-200 bg-orange-500/20 shadow-[0_0_12px_rgba(249,115,22,0.4)] opacity-100';
-                        else glowStyle = 'border-amber-500 text-amber-200 bg-amber-500/20 shadow-[0_0_12px_rgba(245,158,11,0.4)] opacity-100';
-                      } else {
-                        if (a.awardColor === 'Purple') glowStyle = 'bg-purple-500/5 text-purple-400/50 border-purple-500/10 opacity-40 hover:opacity-80';
-                        else if (a.awardColor === 'Emerald') glowStyle = 'bg-emerald-500/5 text-emerald-400/50 border-emerald-500/10 opacity-40 hover:opacity-80';
-                        else if (a.awardColor === 'Blue') glowStyle = 'bg-blue-500/5 text-blue-400/50 border-blue-500/10 opacity-40 hover:opacity-80';
-                        else if (a.awardColor === 'Red') glowStyle = 'bg-red-500/5 text-red-400/50 border-red-500/10 opacity-40 hover:opacity-80';
-                        else if (a.awardColor === 'Orange') glowStyle = 'bg-orange-500/5 text-orange-400/50 border-orange-500/10 opacity-40 hover:opacity-80';
-                        else glowStyle = 'bg-amber-500/5 text-amber-400/50 border-amber-500/10 opacity-40 hover:opacity-80';
-                      }
-
-                      return (
-                        <div 
-                          key={a.id} 
-                          className={cn(
-                            "flex flex-col justify-center items-center border rounded-xl px-3 py-1.5 transition-all duration-300 hover:scale-[1.02] hover:border-amber-500/50 shadow-md cursor-help relative group/badge w-full min-w-0 text-center", 
-                            glowStyle
-                          )}
-                          title={`Award: ${a.awardName}\nDuration: ${a.startDate} to ${a.endDate}\nStatus: ${isActive ? 'Active Badge' : 'Past Award'}`}
-                        >
-                          <div className="flex flex-col min-w-0 items-center justify-center">
-                            <span className={cn("text-[9px] font-black uppercase tracking-wider leading-tight truncate w-full", isActive ? "text-white" : "text-[#F0EFE8]/70")}>
-                              {abbreviateMonths(a.awardName)}
-                            </span>
-                            {isActive && (
-                              <span className="text-[7px] font-bold uppercase tracking-wider mt-0.5 opacity-90 text-white animate-pulse">
-                                Active
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <p className="text-xs text-[#A09E9A]/40 italic text-center py-6 font-medium">No agency badges or recognitions found for this host.</p>
-                )}
-              </div>
-            </>
-          );
-        })()}
         {participatedEvents.length > 0 && (() => {
           const latestEvent = participatedEvents[0];
           return renderCardFooter(
@@ -5577,6 +5696,64 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
             latestEvent.attendanceSubmittedBy?.name || latestEvent.created_by_name || latestEvent.createdBy
           );
         })()}
+      </div>
+    );
+  };
+
+  const renderRecognitionsBlock = () => {
+    if (!assignedAwards || assignedAwards.length === 0) return null;
+    const activeCount = assignedAwards.filter(a => a.startDate && a.endDate && getIsLastMonth(a.startDate, a.endDate)).length;
+    return (
+      <div className={cn("space-y-4 bg-[#120D0A]/75 backdrop-blur-xl border border-[#D4AF37]/20 p-5 rounded-3xl transition-all duration-300 hover:border-amber-500/30 group", styles.shadow)}>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+             <div className="w-8 h-8 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-400 text-sm shadow-inner">🏆</div>
+             <h4 className="text-xs font-black uppercase tracking-widest text-[#F0EFE8]">Agency Badges &amp; Recognitions</h4>
+          </div>
+          <span className="px-2.5 py-1.5 text-[9px] font-black text-amber-400 border border-amber-500/20 bg-amber-500/10 rounded-full uppercase tracking-widest shadow-inner">
+            {activeCount} / {assignedAwards.length}
+          </span>
+        </div>
+        <div className="space-y-3 mt-4 pr-1">
+          <div className="grid grid-cols-2 gap-2.5 pt-1">
+            {assignedAwards.map((a: any) => {
+              const isActive = getIsLastMonth(a.startDate, a.endDate);
+              let glowStyle = '';
+              if (isActive) {
+                if (a.awardColor === 'Purple') glowStyle = 'border-purple-500 text-purple-200 bg-purple-500/20 shadow-[0_0_12px_rgba(168,85,247,0.4)] opacity-100';
+                else if (a.awardColor === 'Emerald') glowStyle = 'border-emerald-500 text-emerald-200 bg-emerald-500/20 shadow-[0_0_12px_rgba(16,185,129,0.4)] opacity-100';
+                else if (a.awardColor === 'Blue') glowStyle = 'border-blue-500 text-blue-200 bg-blue-500/20 shadow-[0_0_12px_rgba(59,130,246,0.4)] opacity-100';
+                else if (a.awardColor === 'Red') glowStyle = 'border-red-500 text-red-200 bg-red-500/20 shadow-[0_0_12px_rgba(239,68,68,0.4)] opacity-100';
+                else if (a.awardColor === 'Orange') glowStyle = 'border-orange-500 text-orange-200 bg-orange-500/20 shadow-[0_0_12px_rgba(249,115,22,0.4)] opacity-100';
+                else glowStyle = 'border-amber-500 text-amber-200 bg-amber-500/20 shadow-[0_0_12px_rgba(245,158,11,0.4)] opacity-100';
+              } else {
+                if (a.awardColor === 'Purple') glowStyle = 'bg-purple-500/5 text-purple-400/70 border-purple-500/20 opacity-70 hover:opacity-95';
+                else if (a.awardColor === 'Emerald') glowStyle = 'bg-emerald-500/5 text-emerald-400/70 border-emerald-500/20 opacity-70 hover:opacity-95';
+                else if (a.awardColor === 'Blue') glowStyle = 'bg-blue-500/5 text-blue-400/70 border-blue-500/20 opacity-70 hover:opacity-95';
+                else if (a.awardColor === 'Red') glowStyle = 'bg-red-500/5 text-red-400/70 border-red-500/20 opacity-70 hover:opacity-95';
+                else if (a.awardColor === 'Orange') glowStyle = 'bg-orange-500/5 text-orange-400/70 border-orange-500/20 opacity-70 hover:opacity-95';
+                else glowStyle = 'bg-amber-500/5 text-amber-400/70 border-amber-500/20 opacity-70 hover:opacity-95';
+              }
+              return (
+                <div 
+                  key={a.id} 
+                  className={cn(
+                    "flex flex-col justify-center items-center border rounded-xl px-3 py-1.5 transition-all duration-300 hover:scale-[1.02] hover:border-amber-500/50 shadow-md cursor-help relative group/badge w-full min-w-0 text-center", 
+                    glowStyle
+                  )}
+                  title={`Award: ${a.awardName}\nDuration: ${a.startDate} to ${a.endDate}\nStatus: ${isActive ? 'Active Badge' : 'Past Award'}`}
+                >
+                  <div className="flex flex-col min-w-0 items-center justify-center">
+                    <span className={cn("text-[9px] font-black uppercase tracking-wider leading-tight truncate w-full", isActive ? "text-white" : "text-[#F0EFE8]/70")}>
+                      {abbreviateMonths(a.awardName)}
+                    </span>
+                    
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
       </div>
     );
   };
@@ -5591,7 +5768,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
     const canSubmitFanbase = isOwnProfile || isAssignedManagerAgent || isElevatedStaff;
 
     return (
-      <div className={cn("space-y-4 bg-white/5 backdrop-blur-xl border border-white/10 p-5 rounded-3xl transition-all duration-300 hover:border-pink-500/30 group", styles.shadow)}>
+      <div className={cn("space-y-4 bg-[#120D0A]/75 backdrop-blur-xl border border-[#D4AF37]/20 p-5 rounded-3xl transition-all duration-300 hover:border-pink-500/30 group", styles.shadow)}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
              <div className="w-8 h-8 rounded-full bg-pink-500/20 flex items-center justify-center text-pink-400 text-sm shadow-inner">💖</div>
@@ -5612,28 +5789,28 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
         <div className="grid grid-cols-4 gap-3 pt-2 w-full">
           {[
             { 
-              label: 'Followers', 
+              label: 'Follows', 
               value: fanbaseLatest?.total_followers != null ? formatNumber(fanbaseLatest.total_followers) : '—', 
               bgGradient: 'linear-gradient(to bottom right, #3A2A18, #221A15)', 
               accentColor: '#FFB800', 
               hoverBorder: 'hover:border-[#FFB800]/50' 
             },
             { 
-              label: 'FC Subs', 
+              label: 'Subs', 
               value: fanbaseLatest?.fanclub_subscribers != null ? formatNumber(fanbaseLatest.fanclub_subscribers) : '—', 
               bgGradient: 'linear-gradient(to bottom right, #3D221C, #221515)', 
               accentColor: '#FF7B00', 
               hoverBorder: 'hover:border-[#FF7B00]/50' 
             },
             { 
-              label: 'GC Members', 
+              label: 'Members', 
               value: fanbaseLatest?.fanclub_gc_members != null ? formatNumber(fanbaseLatest.fanclub_gc_members) : '—', 
               bgGradient: 'linear-gradient(to bottom right, #3A1C28, #20131A)', 
               accentColor: '#FF3B5C', 
               hoverBorder: 'hover:border-[#FF3B5C]/50' 
             },
             { 
-              label: 'GC Activity', 
+              label: 'Activeness', 
               value: fanbaseLatest && (fanbaseLatest.gc_activity_count_host != null || fanbaseLatest.gc_activity_count_fans != null)
                 ? formatNumber(Number(fanbaseLatest.gc_activity_count_host || 0) + Number(fanbaseLatest.gc_activity_count_fans || 0)) 
                 : '—', 
@@ -5646,7 +5823,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
               key={idx} 
               style={{ background: cell.bgGradient }}
               className={cn(
-                "border border-white/5 p-2.5 sm:p-4 rounded-2xl flex flex-col justify-between min-h-[85px] sm:min-h-[90px] transition-all duration-300 transform group-hover:translate-y-[-2px] shadow-lg w-full min-w-0", 
+                "border border-[#D4AF37]/15 p-2.5 sm:p-4 rounded-2xl flex flex-col justify-between min-h-[85px] sm:min-h-[90px] transition-all duration-300 transform group-hover:translate-y-[-2px] shadow-lg w-full min-w-0", 
                 cell.hoverBorder
               )}
             >
@@ -5683,13 +5860,13 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
       (userRoleLower === 'director');
 
     return (
-      <div className={cn("space-y-4 bg-white/5 backdrop-blur-xl border border-white/10 p-5 rounded-3xl transition-all duration-300 hover:border-[#D4AF37]/30 group", styles.shadow)}>
+      <div className={cn("space-y-4 bg-[#120D0A]/75 backdrop-blur-xl border border-[#D4AF37]/20 p-5 rounded-3xl transition-all duration-300 hover:border-[#D4AF37]/30 group", styles.shadow)}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
              <div className="w-8 h-8 rounded-full bg-[#D4AF37]/20 flex items-center justify-center text-[#D4AF37] text-sm shadow-inner">🤖</div>
-             <h4 className="text-xs font-black uppercase tracking-widest text-[#F0EFE8]">AI Performance Analysis</h4>
+             <h4 className="text-xs font-black uppercase tracking-widest text-[#F0EFE8]">Performance Analysis</h4>
           </div>
-          <span className="px-3 py-1 text-[9px] font-black text-[#D4AF37] border border-[#D4AF37]/30 bg-[#D4AF37]/10 rounded-full uppercase tracking-widest shadow-[0_0_10px_rgba(212,175,55,0.2)]">Gemini AI</span>
+          <span className="px-3 py-1 text-[9px] font-black text-[#D4AF37] border border-[#D4AF37]/30 bg-[#D4AF37]/10 rounded-full uppercase tracking-widest shadow-[0_0_10px_rgba(212,175,55,0.2)]">Gemini</span>
         </div>
 
         {/* Generate button (Only visible to managers/admins who can generate) */}
@@ -5699,14 +5876,14 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
             className="w-full py-4 mt-2 rounded-2xl border border-[#D4AF37]/30 bg-gradient-to-r from-[#D4AF37]/20 to-[#D4AF37]/5 text-[#D4AF37] font-black text-xs uppercase tracking-widest hover:from-[#D4AF37]/30 hover:border-[#D4AF37]/50 transition-all active:scale-[0.99] cursor-pointer flex items-center justify-center gap-2.5 shadow-lg shadow-[#D4AF37]/10"
           >
             <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z"/></svg>
-            Generate AI Report
+            Generate Performance Report
           </button>
         )}
 
         {/* Placeholder if no report exists and user cannot generate one */}
         {!isGeneratingAI && !aiReport && !canGenerateAI && (
-          <div className="bg-black/20 border border-white/5 p-6 rounded-2xl text-center text-white/40 italic text-xs font-medium">
-            No AI performance analysis has been posted by management yet.
+          <div className="bg-black/20 border border-[#D4AF37]/15 p-6 rounded-2xl text-center text-white/40 italic text-xs font-medium">
+            No performance analysis has been posted by management yet.
           </div>
         )}
 
@@ -5799,11 +5976,11 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
     
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-        <div className="bg-[#13131E] border border-white/10 rounded-2xl max-w-sm w-full p-5 shadow-2xl relative">
+        <div className="bg-[#120D0A]/95 border border-[#D4AF37]/20 rounded-2xl max-w-sm w-full p-5 shadow-2xl relative">
           <button 
             title="Close"
             onClick={() => setIsRpkFormOpen(false)}
-            className="absolute top-4 right-4 p-1.5 bg-[#1A1A28] border border-white/10 rounded-full text-[#A09E9A] hover:text-[#F0EFE8] cursor-pointer"
+            className="absolute top-4 right-4 p-1.5 bg-[#0e0a08]/90 border border-[#D4AF37]/20 rounded-full text-[#A09E9A] hover:text-[#F0EFE8] cursor-pointer"
           >
             <X size={14} />
           </button>
@@ -5833,7 +6010,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                 placeholder="e.g. 75%"
                 value={rpkFormData.pk_wins_percent}
                 onChange={(e) => setRpkFormData({...rpkFormData, pk_wins_percent: e.target.value})}
-                className="w-full bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
+                className="w-full bg-[#0c0806] border border-[#D4AF37]/20 rounded-lg px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
               />
             </div>
 
@@ -5844,7 +6021,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                 placeholder="Total PK Points"
                 value={rpkFormData.pk_points}
                 onChange={(e) => setRpkFormData({...rpkFormData, pk_points: e.target.value})}
-                className="w-full bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
+                className="w-full bg-[#0c0806] border border-[#D4AF37]/20 rounded-lg px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
               />
             </div>
 
@@ -5855,14 +6032,14 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                 placeholder="Total Sessions"
                 value={rpkFormData.pk_sessions}
                 onChange={(e) => setRpkFormData({...rpkFormData, pk_sessions: e.target.value})}
-                className="w-full bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
+                className="w-full bg-[#0c0806] border border-[#D4AF37]/20 rounded-lg px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
               />
             </div>
 
             <button 
               type="submit"
               disabled={isSubmittingRpk}
-              className="w-full mt-2 py-2.5 bg-[#D4AF37] hover:bg-[#C5A028] text-black rounded-xl text-[11px] font-black uppercase tracking-widest transition-all cursor-pointer disabled:opacity-50"
+              className="w-full mt-2 py-2.5 bg-[#140e0a] hover:bg-[#1c1511] border border-[#D4AF37]/20 hover:border-[#D4AF37]/45 text-[#D4AF37] hover:text-[#F0EFE8] rounded-xl text-[11px] font-black uppercase tracking-widest transition-all cursor-pointer disabled:opacity-50"
             >
               {isSubmittingRpk ? 'Submitting...' : 'Submit Report'}
             </button>
@@ -5881,17 +6058,17 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
     
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-        <div className="bg-[#13131E] border border-white/10 rounded-2xl max-w-sm w-full p-5 shadow-2xl relative max-h-[90vh] overflow-y-auto custom-scrollbar">
+        <div className="bg-[#120D0A]/95 border border-[#D4AF37]/20 rounded-2xl max-w-sm w-full p-5 shadow-2xl relative max-h-[90vh] overflow-y-auto custom-scrollbar">
           <button 
             title="Close"
             onClick={() => setIsFanbaseFormOpen(false)}
-            className="absolute top-4 right-4 p-1.5 bg-[#1A1A28] border border-white/10 rounded-full text-[#A09E9A] hover:text-[#F0EFE8] cursor-pointer"
+            className="absolute top-4 right-4 p-1.5 bg-[#0e0a08]/90 border border-[#D4AF37]/20 rounded-full text-[#A09E9A] hover:text-[#F0EFE8] cursor-pointer"
           >
             <X size={14} />
           </button>
           
           <h3 className="text-sm font-black uppercase tracking-wider text-[#F0EFE8] mb-1">Submit Fanbase Report</h3>
-          <p className="text-[10px] text-[#A09E9A] mb-4">Submitting data for Host: <span className="text-indigo-400 font-bold">{host.nickname || host.name}</span></p>
+          <p className="text-[10px] text-[#A09E9A] mb-4">Submitting data for Host: <span className="text-[#D4AF37] font-bold">{host.nickname || host.name}</span></p>
 
           <form onSubmit={handleFanbaseSubmit} className="space-y-3">
             {isElevatedStaff && (
@@ -5914,7 +6091,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                 placeholder="0"
                 value={fanbaseFormData.total_followers}
                 onChange={(e) => setFanbaseFormData({...fanbaseFormData, total_followers: e.target.value})}
-                className="w-full bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-indigo-500"
+                className="w-full bg-[#0c0806] border border-[#D4AF37]/20 rounded-lg px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
               />
             </div>
 
@@ -5926,7 +6103,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                   placeholder="0"
                   value={fanbaseFormData.fanclub_subscribers}
                   onChange={(e) => setFanbaseFormData({...fanbaseFormData, fanclub_subscribers: e.target.value})}
-                  className="w-full bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-indigo-500"
+                  className="w-full bg-[#0c0806] border border-[#D4AF37]/20 rounded-lg px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
                 />
               </div>
               <div className="space-y-1">
@@ -5936,7 +6113,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                   placeholder="0"
                   value={fanbaseFormData.fanclub_gc_members}
                   onChange={(e) => setFanbaseFormData({...fanbaseFormData, fanclub_gc_members: e.target.value})}
-                  className="w-full bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-indigo-500"
+                  className="w-full bg-[#0c0806] border border-[#D4AF37]/20 rounded-lg px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
                 />
               </div>
             </div>
@@ -5950,7 +6127,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                     placeholder="0"
                     value={fanbaseFormData.gc_activity_count_host}
                     onChange={(e) => setFanbaseFormData({...fanbaseFormData, gc_activity_count_host: e.target.value})}
-                    className="w-full bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-indigo-500"
+                    className="w-full bg-[#0c0806] border border-[#D4AF37]/20 rounded-lg px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
                   />
                 </div>
                 <div className="space-y-1">
@@ -5960,7 +6137,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                     placeholder="0"
                     value={fanbaseFormData.gc_activity_count_fans}
                     onChange={(e) => setFanbaseFormData({...fanbaseFormData, gc_activity_count_fans: e.target.value})}
-                    className="w-full bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-indigo-500"
+                    className="w-full bg-[#0c0806] border border-[#D4AF37]/20 rounded-lg px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
                   />
                 </div>
               </div>
@@ -5973,14 +6150,14 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                 rows={2}
                 value={fanbaseFormData.notes}
                 onChange={(e) => setFanbaseFormData({...fanbaseFormData, notes: e.target.value})}
-                className="w-full bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-indigo-500 resize-none"
+                className="w-full bg-[#0c0806] border border-[#D4AF37]/20 rounded-lg px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37] resize-none"
               />
             </div>
 
             <button 
               type="submit"
               disabled={isSubmittingFanbase}
-              className="w-full mt-2 py-2.5 bg-indigo-500 hover:bg-indigo-400 text-white rounded-xl text-[11px] font-black uppercase tracking-widest transition-all cursor-pointer disabled:opacity-50"
+              className="w-full mt-2 py-2.5 bg-[#140e0a] hover:bg-[#1c1511] border border-[#D4AF37]/20 hover:border-[#D4AF37]/45 text-[#D4AF37] hover:text-[#F0EFE8] rounded-xl text-[11px] font-black uppercase tracking-widest transition-all cursor-pointer disabled:opacity-50"
             >
               {isSubmittingFanbase ? 'Submitting...' : 'Submit Report'}
             </button>
@@ -5995,33 +6172,33 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
 
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-        <div className="bg-[#13131E] border border-white/10 rounded-2xl max-w-sm w-full p-5 shadow-2xl relative">
+        <div className="bg-[#120D0A]/95 border border-[#D4AF37]/20 rounded-2xl max-w-sm w-full p-5 shadow-2xl relative">
           <button 
             title="Close"
             onClick={() => setIsAddEventFormOpen(false)}
-            className="absolute top-4 right-4 p-1.5 bg-[#1A1A28] border border-white/10 rounded-full text-[#A09E9A] hover:text-[#F0EFE8] cursor-pointer"
+            className="absolute top-4 right-4 p-1.5 bg-[#0e0a08]/90 border border-[#D4AF37]/20 rounded-full text-[#A09E9A] hover:text-[#F0EFE8] cursor-pointer"
           >
             <X size={14} />
           </button>
           
           <h3 className="text-sm font-black uppercase tracking-wider text-[#F0EFE8] mb-1">Add Event Exposure</h3>
-          <p className="text-[10px] text-[#A09E9A] mb-4">Registering past event for Host: <span className="text-indigo-400 font-bold">{host.nickname || host.name}</span></p>
+          <p className="text-[10px] text-[#A09E9A] mb-4">Registering past event for Host: <span className="text-[#D4AF37] font-bold">{host.nickname || host.name}</span></p>
 
           <form onSubmit={handleAddEventSubmit} className="space-y-3">
             <div className="space-y-1">
               <label className="text-[9px] font-black uppercase tracking-wider text-[#A09E9A]">Event Type</label>
               <select 
-                title="Event Type"
+                 title="Event Type"
                 value={eventFormData.eventType}
                 onChange={(e) => setEventFormData({...eventFormData, eventType: e.target.value})}
-                className="w-full bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-indigo-500"
+                className="w-full bg-[#0c0806] border border-[#D4AF37]/20 rounded-lg px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
               >
-                <option value="SOLO LIVEHOUSE" className="bg-[#1A1A28]">SOLO LIVEHOUSE</option>
-                <option value="PARTY LIVEHOUSE" className="bg-[#1A1A28]">PARTY LIVEHOUSE</option>
-                <option value="OFFICIAL PK" className="bg-[#1A1A28]">OFFICIAL PK</option>
-                <option value="AGENCY EVENT" className="bg-[#1A1A28]">AGENCY EVENT</option>
-                <option value="POPPO EVENT" className="bg-[#1A1A28]">POPPO EVENT</option>
-                <option value="EXTERNAL EVENT" className="bg-[#1A1A28]">EXTERNAL EVENT</option>
+                <option value="SOLO LIVEHOUSE" className="bg-[#0e0a08]/90">SOLO LIVEHOUSE</option>
+                <option value="PARTY LIVEHOUSE" className="bg-[#0e0a08]/90">PARTY LIVEHOUSE</option>
+                <option value="OFFICIAL PK" className="bg-[#0e0a08]/90">OFFICIAL PK</option>
+                <option value="AGENCY EVENT" className="bg-[#0e0a08]/90">AGENCY EVENT</option>
+                <option value="POPPO EVENT" className="bg-[#0e0a08]/90">POPPO EVENT</option>
+                <option value="EXTERNAL EVENT" className="bg-[#0e0a08]/90">EXTERNAL EVENT</option>
               </select>
             </div>
 
@@ -6042,7 +6219,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                 placeholder="08:00 PM - 10:00 PM (Manila Time)"
                 value={eventFormData.timeslot}
                 onChange={(e) => setEventFormData({...eventFormData, timeslot: e.target.value})}
-                className="w-full bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-indigo-500"
+                className="w-full bg-[#0c0806] border border-[#D4AF37]/20 rounded-lg px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37]"
               />
             </div>
 
@@ -6054,14 +6231,14 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                 rows={3}
                 value={eventFormData.description}
                 onChange={(e) => setEventFormData({...eventFormData, description: e.target.value})}
-                className="w-full bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-indigo-500 resize-none"
+                className="w-full bg-[#0c0806] border border-[#D4AF37]/20 rounded-lg px-3 py-2 text-xs text-[#F0EFE8] outline-none focus:border-[#D4AF37] resize-none"
               />
             </div>
 
             <button 
               type="submit"
               disabled={isSubmittingEvent}
-              className="w-full mt-2 py-2.5 bg-indigo-500 hover:bg-indigo-400 text-white rounded-xl text-[11px] font-black uppercase tracking-widest transition-all cursor-pointer disabled:opacity-50"
+              className="w-full mt-2 py-2.5 bg-[#140e0a] hover:bg-[#1c1511] border border-[#D4AF37]/20 hover:border-[#D4AF37]/45 text-[#D4AF37] hover:text-[#F0EFE8] rounded-xl text-[11px] font-black uppercase tracking-widest transition-all cursor-pointer disabled:opacity-50 shadow-md"
             >
               {isSubmittingEvent ? 'Submitting...' : 'Register Event'}
             </button>
@@ -6206,6 +6383,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
   };
 
   const renderTrendBadge = () => {
+    if (isSpotlight) return null;
     if (performanceReports.length === 0) return null;
     const { trend, pct } = trendData;
     const cfg: Record<string, { icon: React.ReactNode; color: string; bg: string; border: string; label: string }> = {
@@ -6218,9 +6396,9 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
     const insights = generateCategorizedInsights();
 
     return (
-      <div className={cn("bg-[#1A1A28] border-2 rounded-2xl p-5 space-y-4 transition-all duration-300", styles.borderColor, styles.shadow, styles.topTrim)}>
+      <div className={cn("bg-[#0e0a08]/90 border-2 rounded-2xl p-5 space-y-4 transition-all duration-300", styles.borderColor, styles.shadow, styles.topTrim)}>
         {/* Header with main badge */}
-        <div className="flex items-center justify-between pb-3 border-b border-white/5">
+        <div className="flex items-center justify-between pb-3 border-b border-[#D4AF37]/15">
           <div className="flex items-center gap-2">
             <TrendingUp size={14} className="text-[#D4AF37]" />
             <h4 className="text-[10px] font-black uppercase tracking-[0.15em] text-[#A09E9A] font-outfit">Performance Trend Insights</h4>
@@ -6233,37 +6411,37 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
         {/* Categories */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
           {/* a. General Summary Insight & Recommendation */}
-          <div className="bg-[#0D0D14]/40 border border-white/5 rounded-xl p-3 space-y-1">
+          <div className="bg-[#0c0806]/40 border border-[#D4AF37]/15 rounded-xl p-3 space-y-1">
             <p className="text-[9px] font-black text-[#D4AF37] uppercase tracking-wider">a. General Summary Insight &amp; Recommendation</p>
             <p className="text-[#A09E9A] leading-relaxed font-medium">{insights.general}</p>
           </div>
 
           {/* b. Earnings & Duration Analysis */}
-          <div className="bg-[#0D0D14]/40 border border-white/5 rounded-xl p-3 space-y-1">
+          <div className="bg-[#0c0806]/40 border border-[#D4AF37]/15 rounded-xl p-3 space-y-1">
             <p className="text-[9px] font-black text-cyan-400 uppercase tracking-wider">b. Earnings &amp; Duration Analysis</p>
             <p className="text-[#A09E9A] leading-relaxed font-medium">{insights.earningsDuration}</p>
           </div>
 
           {/* c. Earning Diversity Summary */}
-          <div className="bg-[#0D0D14]/40 border border-white/5 rounded-xl p-3 space-y-1">
+          <div className="bg-[#0c0806]/40 border border-[#D4AF37]/15 rounded-xl p-3 space-y-1">
             <p className="text-[9px] font-black text-indigo-400 uppercase tracking-wider">c. Earning Diversity Summary</p>
             <p className="text-[#A09E9A] leading-relaxed font-medium">{insights.diversity}</p>
           </div>
 
           {/* d. PK Performance */}
-          <div className="bg-[#0D0D14]/40 border border-white/5 rounded-xl p-3 space-y-1">
+          <div className="bg-[#0c0806]/40 border border-[#D4AF37]/15 rounded-xl p-3 space-y-1">
             <p className="text-[9px] font-black text-amber-400 uppercase tracking-wider">d. PK Performance</p>
             <p className="text-[#A09E9A] leading-relaxed font-medium">{insights.pk}</p>
           </div>
 
           {/* e. Event Exposure */}
-          <div className="bg-[#0D0D14]/40 border border-white/5 rounded-xl p-3 space-y-1">
+          <div className="bg-[#0c0806]/40 border border-[#D4AF37]/15 rounded-xl p-3 space-y-1">
             <p className="text-[9px] font-black text-emerald-400 tracking-wider">e. Event Exposure</p>
             <p className="text-[#A09E9A] leading-relaxed font-medium">{insights.event}</p>
           </div>
 
           {/* f. Fanbase Health */}
-          <div className="bg-[#0D0D14]/40 border border-white/5 rounded-xl p-3 space-y-1">
+          <div className="bg-[#0c0806]/40 border border-[#D4AF37]/15 rounded-xl p-3 space-y-1">
             <p className="text-[9px] font-black text-pink-400 uppercase tracking-wider">f. Fanbase Health</p>
             <p className="text-[#A09E9A] leading-relaxed font-medium">{insights.fanbase}</p>
           </div>
@@ -6279,7 +6457,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
   const renderWeeklyLiveStats = () => {
     if (weeklyLiveData.length === 0) return null;
     return (
-      <div className={cn("space-y-4 bg-white/5 backdrop-blur-xl border border-white/10 p-5 rounded-3xl transition-all duration-300 hover:border-emerald-500/30 group", styles.shadow)}>
+      <div className={cn("space-y-4 bg-[#120D0A]/75 backdrop-blur-xl border border-[#D4AF37]/20 p-5 rounded-3xl transition-all duration-300 hover:border-emerald-500/30 group", styles.shadow)}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
              <div className="w-8 h-8 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-400 text-sm shadow-inner">📊</div>
@@ -6292,7 +6470,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="border-b border-white/5 text-[#A09E9A] font-black text-[8px] uppercase tracking-wider">
+              <tr className="border-b border-[#D4AF37]/15 text-[#A09E9A] font-black text-[8px] uppercase tracking-wider">
                 <th className="py-2 px-1">Period</th>
                 <th className="py-2 px-1 text-right">Avg Viewers</th>
                 <th className="py-2 px-1 text-right">New Fans</th>
@@ -6330,7 +6508,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
       Feedback: 'text-emerald-400 border-emerald-500/20 bg-emerald-500/5',
     };
     return (
-      <div className={cn("space-y-4 bg-white/5 backdrop-blur-xl border border-white/10 p-5 rounded-3xl transition-all duration-300 hover:border-indigo-500/30 group", styles.shadow)}>
+      <div className={cn("space-y-4 bg-[#120D0A]/75 backdrop-blur-xl border border-[#D4AF37]/20 p-5 rounded-3xl transition-all duration-300 hover:border-indigo-500/30 group", styles.shadow)}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
              <div className="w-8 h-8 rounded-full bg-indigo-500/20 flex items-center justify-center text-indigo-400 text-sm shadow-inner">📝</div>
@@ -6342,7 +6520,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
         </div>
         <div className="space-y-2 max-h-48 overflow-y-auto custom-scrollbar">
           {agentNotes.map((note: any, i: number) => (
-            <div key={i} className="bg-[#0D0D14] border border-white/5 rounded-xl p-3 space-y-1.5">
+            <div key={i} className="bg-[#0c0806] border border-[#D4AF37]/15 rounded-xl p-3 space-y-1.5">
               <div className="flex items-center gap-2">
                 <span className={`text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded border ${TYPE_STYLES[note.type] || TYPE_STYLES.Note}`}>{note.type || 'Note'}</span>
                 <span className="text-[8px] font-mono text-[#A09E9A]/40 ml-auto">{note.createdAt ? formatDateStandard(note.createdAt) : ''}</span>
@@ -6365,7 +6543,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
     if (userRoleLower !== 'agent' && userRoleLower !== 'manager') return null;
 
     return (
-      <div className="space-y-4 bg-white/5 backdrop-blur-xl border border-white/10 p-5 rounded-3xl transition-all duration-300 hover:border-indigo-500/30 group shadow-lg">
+      <div className="space-y-4 bg-[#120D0A]/75 backdrop-blur-xl border border-[#D4AF37]/20 p-5 rounded-3xl transition-all duration-300 hover:border-indigo-500/30 group shadow-lg">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-full bg-indigo-500/20 flex items-center justify-center text-indigo-400 text-sm shadow-inner">👤</div>
@@ -6392,7 +6570,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                   {/* Photo Container */}
                   <div 
                     onClick={() => setSpotlightHost(h)}
-                    className="relative overflow-hidden flex items-center justify-center rounded-xl border border-white/10 bg-gradient-to-br from-[#1E2838] to-[#0E131C] w-full h-[76px] transition-all duration-300 hover:-translate-y-0.5 hover:border-white/20 cursor-pointer select-none"
+                    className="relative overflow-hidden flex items-center justify-center rounded-xl border border-[#D4AF37]/20 bg-gradient-to-br from-[#1E2838] to-[#0E131C] w-full h-[76px] transition-all duration-300 hover:-translate-y-0.5 hover:border-[#D4AF37]/30 cursor-pointer select-none"
                   >
                     {h.photoUrl ? (
                       <img src={h.photoUrl} alt={nickname} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
@@ -6423,8 +6601,8 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
     if (userRole !== 'Agent' && userRole !== 'agent') return null;
 
     return (
-      <div className="bg-white/5 backdrop-blur-xl border border-white/10 p-5 rounded-3xl transition-all duration-300 hover:border-indigo-500/30 group shadow-lg">
-        <div className="flex items-center gap-2 mb-4 border-b border-white/5 pb-3">
+      <div className="bg-[#120D0A]/75 backdrop-blur-xl border border-[#D4AF37]/20 p-5 rounded-3xl transition-all duration-300 hover:border-indigo-500/30 group shadow-lg">
+        <div className="flex items-center gap-2 mb-4 border-b border-[#D4AF37]/15 pb-3">
           <div className="w-8 h-8 rounded-full bg-indigo-500/20 flex items-center justify-center text-indigo-400 text-sm shadow-inner">📥</div>
           <div>
             <h4 className="text-xs font-black uppercase tracking-widest text-[#F0EFE8]">Request Host Intake</h4>
@@ -6441,7 +6619,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                 value={intakePoppoId}
                 onChange={(e) => setIntakePoppoId(e.target.value)}
                 placeholder="e.g. 1234567"
-                className="w-full bg-[#0D0D14] border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white placeholder-white/20 focus:outline-none focus:border-indigo-500/50"
+                className="w-full bg-[#0c0806] border border-[#D4AF37]/20 rounded-xl px-3 py-1.5 text-xs text-white placeholder-white/20 focus:outline-none focus:border-indigo-500/50"
                 required
                 title="Poppo ID"
               />
@@ -6454,7 +6632,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                 value={intakeNickname}
                 onChange={(e) => setIntakeNickname(e.target.value)}
                 placeholder="e.g. SweetHost"
-                className="w-full bg-[#0D0D14] border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white placeholder-white/20 focus:outline-none focus:border-indigo-500/50"
+                className="w-full bg-[#0c0806] border border-[#D4AF37]/20 rounded-xl px-3 py-1.5 text-xs text-white placeholder-white/20 focus:outline-none focus:border-indigo-500/50"
                 required
                 title="Nickname"
               />
@@ -6599,9 +6777,9 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
     const categories = ['Exposure & Scheduling', 'Coaching & Retention', 'Live & Engagement', 'Fanbase & Communication'];
 
     return (
-      <div className="bg-white/5 backdrop-blur-xl border border-white/10 p-5 rounded-3xl transition-all duration-300 hover:border-indigo-500/30 group shadow-lg space-y-4">
+      <div className="bg-[#120D0A]/75 backdrop-blur-xl border border-[#D4AF37]/20 p-5 rounded-3xl transition-all duration-300 hover:border-indigo-500/30 group shadow-lg space-y-4">
         {/* Header and Tabs */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/5 pb-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#D4AF37]/15 pb-3">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-full bg-indigo-500/20 flex items-center justify-center text-indigo-400 text-sm shadow-inner">📝</div>
             <div>
@@ -6610,12 +6788,12 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
             </div>
           </div>
           
-          <div className="flex bg-black/20 p-1 rounded-xl border border-white/5 self-end sm:self-center">
+          <div className="flex bg-black/20 p-1 rounded-xl border border-[#D4AF37]/15 self-end sm:self-center">
             <button
               type="button"
-              onClick={() => setActiveTab('todo')}
+              onClick={() => setNotesTab('todo')}
               className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer ${
-                activeTab === 'todo'
+                notesTab === 'todo'
                   ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
                   : 'text-[#A09E9A] hover:text-white'
               }`}
@@ -6624,9 +6802,9 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
             </button>
             <button
               type="button"
-              onClick={() => setActiveTab('add')}
+              onClick={() => setNotesTab('add')}
               className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer ${
-                activeTab === 'add'
+                notesTab === 'add'
                   ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
                   : 'text-[#A09E9A] hover:text-white'
               }`}
@@ -6635,9 +6813,9 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
             </button>
             <button
               type="button"
-              onClick={() => setActiveTab('history')}
+              onClick={() => setNotesTab('history')}
               className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer ${
-                activeTab === 'history'
+                notesTab === 'history'
                   ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
                   : 'text-[#A09E9A] hover:text-white'
               }`}
@@ -6648,7 +6826,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
         </div>
 
         {/* Tab Content */}
-        {activeTab === 'todo' && (
+        {notesTab === 'todo' && (
           <div className="space-y-5">
             <form
               onSubmit={(e) => {
@@ -6658,9 +6836,9 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                 setNewTodoTitle('');
                 setNewTodoHostId('');
               }}
-              className="bg-[#0D0D14]/80 border border-white/5 p-4 rounded-2xl space-y-3"
+              className="bg-[#0c0806]/80 border border-[#D4AF37]/15 p-4 rounded-2xl space-y-3"
             >
-              <div className="text-[10px] font-black uppercase tracking-widest text-[#A09E9A] border-b border-white/5 pb-1">
+              <div className="text-[10px] font-black uppercase tracking-widest text-[#A09E9A] border-b border-[#D4AF37]/15 pb-1">
                 Create New Task
               </div>
               <div className="flex flex-col sm:flex-row gap-3">
@@ -6670,7 +6848,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                     value={newTodoTitle}
                     onChange={(e) => setNewTodoTitle(e.target.value)}
                     placeholder="E.g., Host exposure check, attendance sync..."
-                    className="w-full bg-black/30 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder-white/20 focus:outline-none focus:border-indigo-500/50"
+                    className="w-full bg-black/30 border border-[#D4AF37]/20 rounded-xl px-3 py-2 text-xs text-white placeholder-white/20 focus:outline-none focus:border-indigo-500/50"
                     required
                     title="Task Title"
                   />
@@ -6679,7 +6857,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                   <select
                     value={newTodoHostId}
                     onChange={(e) => setNewTodoHostId(e.target.value)}
-                    className="w-full bg-black/30 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500/50 cursor-pointer"
+                    className="w-full bg-black/30 border border-[#D4AF37]/20 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500/50 cursor-pointer"
                     title="Assign Host"
                   >
                     <option value="">-- General Roster --</option>
@@ -6705,19 +6883,19 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                   <span>📌</span> Active Tasks ({todoList.filter(t => !t.completed).length})
                 </div>
                 {todoList.filter(t => !t.completed).length === 0 ? (
-                  <p className="text-[11px] text-[#A09E9A]/40 italic py-4 text-center bg-[#0D0D14]/30 border border-dashed border-white/5 rounded-2xl">
+                  <p className="text-[11px] text-[#A09E9A]/40 italic py-4 text-center bg-[#0c0806]/30 border border-dashed border-[#D4AF37]/15 rounded-2xl">
                     No active tasks.
                   </p>
                 ) : (
                   <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1 custom-scrollbar">
                     {todoList.filter(t => !t.completed).map(todo => (
-                      <div key={todo.id || todo.todoId} className="flex items-center justify-between gap-3 bg-white/[0.02] hover:bg-white/[0.04] border border-white/5 hover:border-white/10 p-3 rounded-xl transition-all">
+                      <div key={todo.id || todo.todoId} className="flex items-center justify-between gap-3 bg-white/[0.02] hover:bg-white/[0.04] border border-[#D4AF37]/15 hover:border-[#D4AF37]/20 p-3 rounded-xl transition-all">
                         <div className="flex items-center gap-3">
                           <input
                             type="checkbox"
                             checked={false}
                             onChange={() => handleToggleTodo(todo)}
-                            className="w-4 h-4 rounded border-white/10 bg-black/40 text-indigo-600 focus:ring-0 cursor-pointer"
+                            className="w-4 h-4 rounded border-[#D4AF37]/20 bg-black/40 text-indigo-600 focus:ring-0 cursor-pointer"
                             title="Complete Task"
                           />
                           <div className="flex flex-col">
@@ -6745,7 +6923,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
             </div>
 
             {/* Smart Recommendations Section */}
-            <div className="space-y-4 pt-4 border-t border-white/5">
+            <div className="space-y-4 pt-4 border-t border-[#D4AF37]/15">
               <div className="text-[10px] font-black uppercase tracking-widest text-[#A09E9A] flex items-center gap-1.5 flex-wrap">
                 <span>✨</span> Coaching Recommendations
               </div>
@@ -6770,7 +6948,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                             : false;
 
                           return (
-                            <div key={template.id} className="bg-white/[0.02] border border-white/5 p-3 rounded-2xl flex flex-col justify-between gap-3 hover:border-indigo-500/20 transition-all">
+                            <div key={template.id} className="bg-white/[0.02] border border-[#D4AF37]/15 p-3 rounded-2xl flex flex-col justify-between gap-3 hover:border-indigo-500/20 transition-all">
                               <div className="space-y-2.5">
                                 <div className="flex items-center justify-between gap-2">
                                   <span className="text-[10px] font-black text-[#F0EFE8] leading-tight">
@@ -6789,7 +6967,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                                   <select
                                     value={selectedHostId}
                                     onChange={(e) => setRecSelectedHosts(prev => ({ ...prev, [template.id]: e.target.value }))}
-                                    className="w-full bg-black/40 border border-white/10 rounded-xl px-2.5 py-1.5 text-[11px] text-white focus:outline-none focus:border-indigo-500/50 cursor-pointer"
+                                    className="w-full bg-black/40 border border-[#D4AF37]/20 rounded-xl px-2.5 py-1.5 text-[11px] text-white focus:outline-none focus:border-indigo-500/50 cursor-pointer"
                                     title="Recommend Host"
                                   >
                                     <option value="">-- Choose Host --</option>
@@ -6819,7 +6997,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                                 className={cn(
                                   "w-full py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all cursor-pointer text-center border",
                                   !selectedHostId
-                                    ? "bg-black/20 border-white/5 text-[#A09E9A]/40 cursor-not-allowed"
+                                    ? "bg-black/20 border-[#D4AF37]/15 text-[#A09E9A]/40 cursor-not-allowed"
                                     : alreadyAdded
                                       ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400 cursor-not-allowed"
                                       : "bg-indigo-600/10 hover:bg-indigo-600 border-indigo-500/20 hover:border-indigo-500 text-indigo-400 hover:text-white"
@@ -6843,14 +7021,14 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
           </div>
         )}
 
-        {activeTab === 'add' && (
+        {notesTab === 'add' && (
           <form onSubmit={handleNoteSubmit} className="space-y-4 max-w-md">
             <div className="space-y-1.5">
               <label className="text-[9px] font-black uppercase text-[#A09E9A] tracking-wider">Select Host</label>
               <select
                 value={noteHostId}
                 onChange={(e) => setNoteHostId(e.target.value)}
-                className="w-full bg-[#0D0D14] border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500/50 appearance-none cursor-pointer"
+                className="w-full bg-[#0c0806] border border-[#D4AF37]/20 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500/50 appearance-none cursor-pointer"
                 required
                 title="Host Selection"
               >
@@ -6873,7 +7051,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                 value={noteContent}
                 onChange={(e) => setNoteContent(e.target.value)}
                 placeholder="Write notes, coaching feedback, or action steps..."
-                className="w-full bg-[#0D0D14] border border-white/10 rounded-xl px-3 py-2 text-xs text-white h-24 resize-none focus:outline-none focus:border-indigo-500/50"
+                className="w-full bg-[#0c0806] border border-[#D4AF37]/20 rounded-xl px-3 py-2 text-xs text-white h-24 resize-none focus:outline-none focus:border-indigo-500/50"
                 required
                 title="Note Content"
               />
@@ -6902,14 +7080,14 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
           </form>
         )}
 
-        {activeTab === 'history' && (
+        {notesTab === 'history' && (
           <div className="space-y-4">
             <div className="space-y-1.5 max-w-md">
               <label className="text-[9px] font-black uppercase text-[#A09E9A] tracking-wider">Select Host</label>
               <select
                 value={noteHostId}
                 onChange={(e) => setNoteHostId(e.target.value)}
-                className="w-full bg-[#0D0D14] border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500/50 appearance-none cursor-pointer"
+                className="w-full bg-[#0c0806] border border-[#D4AF37]/20 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500/50 appearance-none cursor-pointer"
                 title="Host Selection"
               >
                 <option value="">-- Choose Host --</option>
@@ -6927,22 +7105,22 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
 
             {/* History List */}
             {!noteHostId ? (
-              <div className="bg-[#0D0D14] border border-white/5 rounded-xl py-6 text-center text-xs text-[#A09E9A]/40 italic font-medium">
+              <div className="bg-[#0c0806] border border-[#D4AF37]/15 rounded-xl py-6 text-center text-xs text-[#A09E9A]/40 italic font-medium">
                 Please select a host to view their progress feedback logs.
               </div>
             ) : isLoadingNotes ? (
-              <div className="bg-[#0D0D14] border border-white/5 rounded-xl py-6 flex flex-col items-center justify-center gap-1.5">
+              <div className="bg-[#0c0806] border border-[#D4AF37]/15 rounded-xl py-6 flex flex-col items-center justify-center gap-1.5">
                 <Loader2 className="h-4 w-4 text-indigo-400 animate-spin" />
                 <span className="text-[8px] text-[#A09E9A] uppercase tracking-wider">Loading history...</span>
               </div>
             ) : notesHistory.length === 0 ? (
-              <div className="bg-[#0D0D14] border border-white/5 rounded-xl py-6 text-center text-xs text-[#A09E9A]/40 italic font-medium">
+              <div className="bg-[#0c0806] border border-[#D4AF37]/15 rounded-xl py-6 text-center text-xs text-[#A09E9A]/40 italic font-medium">
                 No notes recorded for this host yet.
               </div>
             ) : (
-              <div className="space-y-2.5 max-h-[200px] overflow-y-auto custom-scrollbar bg-[#0D0D14] border border-white/5 rounded-xl p-2.5">
+              <div className="space-y-2.5 max-h-[200px] overflow-y-auto custom-scrollbar bg-[#0c0806] border border-[#D4AF37]/15 rounded-xl p-2.5">
                 {notesHistory.map((note) => (
-                  <div key={note.id} className="bg-white/[0.02] border border-white/5 p-3 rounded-lg space-y-1.5">
+                  <div key={note.id} className="bg-white/[0.02] border border-[#D4AF37]/15 p-3 rounded-lg space-y-1.5">
                     <div className="flex items-center justify-between text-[9px] font-mono text-[#A09E9A]/60">
                       <span className="font-bold text-indigo-400">{note.managerName || 'Manager'}</span>
                       <span>{new Date(note.timestamp).toLocaleString()}</span>
@@ -7099,11 +7277,11 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
     }
 
     return (
-      <div className="bg-white/5 backdrop-blur-xl border border-white/10 p-5 rounded-3xl transition-all duration-300 hover:border-indigo-500/30 group shadow-lg space-y-5">
+      <div className="bg-[#120D0A]/75 backdrop-blur-xl border border-[#D4AF37]/20 p-5 rounded-3xl transition-all duration-300 hover:border-indigo-500/30 group shadow-lg space-y-5">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-white/5 pb-3">
+        <div className="flex items-center justify-between border-b border-[#D4AF37]/15 pb-3">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-full bg-[#1A1A28] border border-white/10 flex items-center justify-center text-indigo-400 text-sm shadow-inner">
+            <div className="w-8 h-8 rounded-full bg-[#0e0a08]/90 border border-[#D4AF37]/20 flex items-center justify-center text-indigo-400 text-sm shadow-inner">
               <Calendar size={16} />
             </div>
             <div>
@@ -7135,7 +7313,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Upcoming Events Column */}
           <div className="space-y-3">
-            <h5 className="text-[10px] font-black uppercase tracking-widest text-[#A09E9A] flex items-center gap-1.5 border-b border-white/5 pb-1.5">
+            <h5 className="text-[10px] font-black uppercase tracking-widest text-[#A09E9A] flex items-center gap-1.5 border-b border-[#D4AF37]/15 pb-1.5">
               <span>📅</span> Upcoming Events ({upcomingEvents.length})
             </h5>
             {isLoadingRosterData ? (
@@ -7144,7 +7322,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                 <span className="text-[8px] text-[#A09E9A] uppercase tracking-wider">Syncing Events...</span>
               </div>
             ) : upcomingEvents.length === 0 ? (
-              <p className="text-xs text-[#A09E9A]/40 italic py-6 text-center bg-[#0D0D14] border border-white/5 rounded-2xl">
+              <p className="text-xs text-[#A09E9A]/40 italic py-6 text-center bg-[#0c0806] border border-[#D4AF37]/15 rounded-2xl">
                 No upcoming events scheduled.
               </p>
             ) : (
@@ -7160,7 +7338,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                   });
 
                   return (
-                    <div key={evt.id || evt.event_id} className="bg-white/[0.02] hover:bg-white/[0.04] border border-white/5 hover:border-white/10 p-3 rounded-2xl transition-all space-y-2">
+                    <div key={evt.id || evt.event_id} className="bg-white/[0.02] hover:bg-white/[0.04] border border-[#D4AF37]/15 hover:border-[#D4AF37]/20 p-3 rounded-2xl transition-all space-y-2">
                       <div className="flex items-start justify-between gap-2">
                         <span className="text-xs font-black text-[#F0EFE8] leading-tight line-clamp-1">{evt.title}</span>
                         <span className="px-2 py-0.5 bg-indigo-500/10 border border-indigo-500/20 rounded-md text-[8px] font-black uppercase text-indigo-400 tracking-wider shrink-0">
@@ -7201,7 +7379,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
 
           {/* Recent Attendance Logs Column */}
           <div className="space-y-3">
-            <h5 className="text-[10px] font-black uppercase tracking-widest text-[#A09E9A] flex items-center gap-1.5 border-b border-white/5 pb-1.5">
+            <h5 className="text-[10px] font-black uppercase tracking-widest text-[#A09E9A] flex items-center gap-1.5 border-b border-[#D4AF37]/15 pb-1.5">
               <span>📋</span> Recent Attendance Logs ({filteredAttendance.length})
             </h5>
             {isLoadingRosterData ? (
@@ -7210,7 +7388,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                 <span className="text-[8px] text-[#A09E9A] uppercase tracking-wider">Syncing Attendance...</span>
               </div>
             ) : filteredAttendance.length === 0 ? (
-              <p className="text-xs text-[#A09E9A]/40 italic py-6 text-center bg-[#0D0D14] border border-white/5 rounded-2xl">
+              <p className="text-xs text-[#A09E9A]/40 italic py-6 text-center bg-[#0c0806] border border-[#D4AF37]/15 rounded-2xl">
                 No recent attendance records.
               </p>
             ) : (
@@ -7232,7 +7410,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                   const formattedDate = att.eventDate || (att.timestamp ? att.timestamp.split('T')[0] : '');
 
                   return (
-                    <div key={att.id || att.attendanceId} className="bg-white/[0.02] hover:bg-white/[0.04] border border-white/5 hover:border-white/10 p-3 rounded-2xl transition-all space-y-2">
+                    <div key={att.id || att.attendanceId} className="bg-white/[0.02] hover:bg-white/[0.04] border border-[#D4AF37]/15 hover:border-[#D4AF37]/20 p-3 rounded-2xl transition-all space-y-2">
                       <div className="flex items-start justify-between gap-2">
                         <span className="text-xs font-black text-[#F0EFE8] leading-tight line-clamp-1">{att.eventTitle || 'Event Attendance'}</span>
                         <span className="px-2 py-0.5 bg-emerald-500/10 border border-emerald-500/20 rounded-md text-[8px] font-black uppercase text-emerald-400 tracking-wider shrink-0">
@@ -7240,7 +7418,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                         </span>
                       </div>
                       {att.eventFeedback && (
-                        <p className="text-[10px] text-[#A09E9A] font-medium leading-relaxed bg-black/15 p-2 rounded-xl border border-white/5 italic">
+                        <p className="text-[10px] text-[#A09E9A] font-medium leading-relaxed bg-black/15 p-2 rounded-xl border border-[#D4AF37]/15 italic">
                           "{att.eventFeedback}"
                         </p>
                       )}
@@ -7286,26 +7464,25 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
     <div className={cn(
       "w-full text-[#F0EFE8] flex flex-col",
       isSpotlight 
-        ? cn("bg-[#13131E] p-5 space-y-5 relative mx-auto border border-white/5 rounded-[24px] shadow-2xl max-h-[calc(100dvh-2rem)] overflow-y-auto custom-scrollbar", hidePerformanceStats ? "max-w-4xl" : "max-w-md") 
+        ? cn("bg-[#120D0A]/95 p-5 space-y-5 relative mx-auto border border-[#D4AF37]/15 rounded-[24px] shadow-2xl shadow-black/80 max-h-[calc(100dvh-2rem)] overflow-y-auto custom-scrollbar", hidePerformanceStats ? "max-w-4xl" : "max-w-md") 
         : "space-y-6 max-w-4xl mx-auto pb-12 pt-2"
     )}>
       
       {/* Top Header Grid line style */}
       {isSpotlight ? (
-        <div className="flex items-center justify-between pb-3 border-b border-white/5 shrink-0">
+        <div className="flex items-center justify-between pb-3 border-b border-[#D4AF37]/15 shrink-0">
           <div className="flex items-center gap-3">
             {onClose && (
               <button 
                 onClick={onClose}
-                className="p-1.5 rounded-full bg-[#1A1A28] hover:bg-[#222235] text-[#A09E9A] hover:text-[#F0EFE8] transition-all border border-white/10 cursor-pointer"
+                className="p-1.5 rounded-full bg-[#0e0a08]/90 hover:bg-[#140e0a] text-[#A09E9A] hover:text-[#F0EFE8] transition-all border border-[#D4AF37]/20 cursor-pointer"
                 aria-label="Back to Roster"
               >
                 <ChevronLeft size={18} />
               </button>
             )}
             <div className="flex flex-col">
-              <span className="text-sm font-black text-[#F0EFE8] leading-tight tracking-[0.05em]">NINERS</span>
-              <span className="text-[8px] font-bold uppercase tracking-[0.2em] text-[#D4AF37]">APP</span>
+              <span className="text-xs font-black text-[#F0EFE8] leading-tight tracking-[0.05em]">{host.nickname || host.name}'s Profile</span>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -7313,7 +7490,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
             {onClose && (
               <button 
                 onClick={onClose}
-                className="w-7 h-7 rounded-full bg-[#1A1A28] border border-white/10 flex items-center justify-center text-[#A09E9A] hover:text-[#F0EFE8] hover:border-[#D4AF37]/45 hover:bg-[#222235] transition-all shadow-md cursor-pointer"
+                className="w-7 h-7 rounded-full bg-[#0e0a08]/90 border border-[#D4AF37]/20 flex items-center justify-center text-[#A09E9A] hover:text-[#F0EFE8] hover:border-[#D4AF37]/45 hover:bg-[#140e0a] transition-all shadow-md cursor-pointer"
                 aria-label="Close Profile Spotlight"
               >
                 <X size={12} />
@@ -7322,7 +7499,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
           </div>
         </div>
       ) : (
-        <div className="flex items-center justify-between pb-4 border-b border-white/5 shrink-0">
+        <div className="flex items-center justify-between pb-4 border-b border-[#D4AF37]/15 shrink-0">
           <div className="flex flex-col">
             <span className="text-lg font-black text-[#F0EFE8] leading-tight tracking-[0.05em]">MY PROFILE &amp; SETTINGS</span>
             <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#D4AF37]">Niners App Portal</span>
@@ -7367,6 +7544,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                 {renderRandomPK()}
                 {renderExposuresAndAttendance()}
               </div>
+              {renderRecognitionsBlock()}
               {renderMonthlyTrend()}
               {renderPerformanceMetricsAndDiversity()}
               {renderTrendBadge()}
@@ -7376,7 +7554,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
               {onClose && (
                 <button
                   onClick={onClose}
-                  className="w-full mt-4 py-3 bg-[#222235] hover:bg-[#2A2A3F] border border-white/10 hover:border-[#D4AF37]/45 hover:text-[#D4AF37] rounded-xl text-xs font-black uppercase tracking-widest transition-all cursor-pointer text-center"
+                  className="w-full mt-4 py-3 bg-[#140e0a] hover:bg-[#1c1511] border border-[#D4AF37]/20 hover:border-[#D4AF37]/45 hover:text-[#D4AF37] rounded-xl text-xs font-black uppercase tracking-widest transition-all cursor-pointer text-center"
                 >
                   Close Profile Spotlight
                 </button>
@@ -7397,6 +7575,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                   {renderRandomPK()}
                   {renderExposuresAndAttendance()}
                 </div>
+                {renderRecognitionsBlock()}
                 {!hidePerformanceStats && (
                   <>
                     {renderMonthlyTrend()}
@@ -7410,7 +7589,7 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                 {isSpotlight && onClose && (
                   <button
                     onClick={onClose}
-                    className="w-full mt-4 py-3 bg-[#222235] hover:bg-[#2A2A3F] border border-white/10 hover:border-[#D4AF37]/45 hover:text-[#D4AF37] rounded-xl text-xs font-black uppercase tracking-widest transition-all cursor-pointer text-center"
+                    className="w-full mt-4 py-3 bg-[#140e0a] hover:bg-[#1c1511] border border-[#D4AF37]/20 hover:border-[#D4AF37]/45 hover:text-[#D4AF37] rounded-xl text-xs font-black uppercase tracking-widest transition-all cursor-pointer text-center"
                   >
                     Close Profile Spotlight
                   </button>

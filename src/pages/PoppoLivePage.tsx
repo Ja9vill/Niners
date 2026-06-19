@@ -5,7 +5,7 @@ import { PoppoSEOArticle } from '../components/PoppoSEOArticle';
 
 export const PoppoLivePage = () => {
   return (
-    <div className="w-full flex flex-col items-center min-h-[100dvh] bg-[#0A0A0F] selection:bg-[#D4AF37]/30">
+    <div className="w-full flex flex-col items-center min-h-[100dvh] bg-transparent selection:bg-[#D4AF37]/30">
       
       {/* 1. Hero Section */}
       <section className="relative w-full pt-32 pb-20 px-4 flex flex-col items-center justify-center text-center overflow-hidden border-b border-white/5">

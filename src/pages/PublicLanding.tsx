@@ -5,7 +5,7 @@ import { Link } from 'react-router-dom';
 
 export const PublicLanding = () => {
   return (
-    <div className="w-full min-h-screen bg-[#0A0A0F] text-[#F0EFE8] flex flex-col items-center justify-center px-4 py-20 overflow-hidden relative">
+    <div className="w-full min-h-screen bg-transparent text-[#F0EFE8] flex flex-col items-center justify-center px-4 py-20 overflow-hidden relative">
       
       {/* Background Orbs */}
       <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-[#D4AF37]/20 rounded-full blur-[120px] pointer-events-none" />

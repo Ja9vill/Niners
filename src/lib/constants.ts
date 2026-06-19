@@ -5,7 +5,7 @@ export const MANAGERS = [
 ];
 
 export const BASE_SALARY_POLICIES: BaseSalaryTier[] = [
-  'Regular Host', 'Rocket Host', 'Star Host', 'S idol', 'ESport Host', 'N/A'
+  'Regular Host', 'Rocket Host', 'Star Host', 'S idol', 'ESport Host'
 ];
 
 export const INITIAL_HOSTS: Host[] = [];

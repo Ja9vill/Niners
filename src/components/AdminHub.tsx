@@ -4,7 +4,7 @@ import {
   CheckCircle2, AlertCircle, Save, Send, Search, UserMinus, UserPlus, Info,
   ClipboardList, Edit, X, Check, MessageSquare, Loader2, Copy
 } from 'lucide-react';
-import { collection, addDoc, Timestamp, doc, setDoc, onSnapshot, query, where, deleteDoc } from 'firebase/firestore';
+import { collection, addDoc, Timestamp, doc, setDoc, onSnapshot, query, where, deleteDoc, getDocs } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { Storage } from '../lib/storage';
 import { FirebaseService } from '../lib/firebaseService';
@@ -18,6 +18,7 @@ export const AdminHub: React.FC = () => {
   const [hosts, setHosts] = useState<any[]>([]);
   const [allUsers, setAllUsers] = useState<any[]>([]);
   const [calendarEvents, setCalendarEvents] = useState<any[]>([]);
+  const [attendanceRecords, setAttendanceRecords] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errors, setErrors] = useState<string[]>([]);
   const [successMsg, setSuccessMsg] = useState('');
@@ -45,6 +46,11 @@ export const AdminHub: React.FC = () => {
       const events = await FirebaseService.getCalendarEvents();
       events.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
       setCalendarEvents(events);
+
+      // Fetch existing attendance records
+      const attSnapshot = await getDocs(collection(db, 'attendance'));
+      const attList = attSnapshot.docs.map(d => d.data());
+      setAttendanceRecords(attList);
     } catch (err: any) {
       console.error('[AdminHub] Error loading metadata:', err);
       setErrors([err.message || 'Failed to sync registry details from Database']);
@@ -174,29 +180,48 @@ export const AdminHub: React.FC = () => {
 
   // Filter users based on search query and role filter (excluding director role)
   const filteredUsers = useMemo(() => {
-    return allUsers.filter(u => {
-      const userRole = String(u.role || '').toLowerCase();
-      // Exclude director role
-      if (userRole === 'director') return false;
+    return allUsers
+      .filter(u => {
+        const userRole = String(u.role || '').toLowerCase();
+        // Exclude director role
+        if (userRole === 'director') return false;
 
-      // Filter by role selection
-      if (attendanceRoleFilter !== 'All Roles') {
-        if (attendanceRoleFilter === 'hosts' && userRole !== 'host' && userRole !== 'talent') return false;
-        if (attendanceRoleFilter === 'managers' && userRole !== 'manager') return false;
-        if (attendanceRoleFilter === 'agents' && userRole !== 'agent') return false;
-        if (attendanceRoleFilter === 'admins' && userRole !== 'admin' && userRole !== 'head admin') return false;
-      }
+        // Filter by role selection
+        if (attendanceRoleFilter !== 'All Roles') {
+          if (attendanceRoleFilter === 'hosts' && userRole !== 'host' && userRole !== 'talent') return false;
+          if (attendanceRoleFilter === 'managers' && userRole !== 'manager') return false;
+          if (attendanceRoleFilter === 'agents' && userRole !== 'agent') return false;
+          if (attendanceRoleFilter === 'admins' && userRole !== 'admin' && userRole !== 'head admin') return false;
+        }
 
-      // Search matching poppoId or nickname
-      const searchStr = attendanceSearch.toLowerCase().trim();
-      if (searchStr) {
-        const nickname = String(u.nickname || u.name || '').toLowerCase();
-        const poppoId = String(u.poppo_id || u.poppoId || u.id || '').toLowerCase();
-        return nickname.includes(searchStr) || poppoId.includes(searchStr);
-      }
+        // Search matching poppoId or nickname
+        const searchStr = attendanceSearch.toLowerCase().trim();
+        if (searchStr) {
+          const nickname = String(u.nickname || u.name || '').toLowerCase();
+          const poppoId = String(u.poppo_id || u.poppoId || u.id || '').toLowerCase();
+          return nickname.includes(searchStr) || poppoId.includes(searchStr);
+        }
 
-      return true;
-    });
+        return true;
+      })
+      .sort((a, b) => {
+        const aRole = String(a.role || '').toLowerCase();
+        const bRole = String(b.role || '').toLowerCase();
+        const aIsHost = aRole === 'host' || aRole === 'talent';
+        const bIsHost = bRole === 'host' || bRole === 'talent';
+        const aHasPhoto = !!a.photoUrl;
+        const bHasPhoto = !!b.photoUrl;
+
+        const aFirst = aIsHost && aHasPhoto;
+        const bFirst = bIsHost && bHasPhoto;
+
+        if (aFirst && !bFirst) return -1;
+        if (!aFirst && bFirst) return 1;
+
+        const aName = String(a.nickname || a.name || '').toLowerCase();
+        const bName = String(b.nickname || b.name || '').toLowerCase();
+        return aName.localeCompare(bName);
+      });
   }, [allUsers, attendanceSearch, attendanceRoleFilter]);
 
   const handleAddAttendee = (user: any) => {
@@ -232,7 +257,8 @@ export const AdminHub: React.FC = () => {
       const eventDate = selectedEvent ? selectedEvent.date : '';
       const timeslot = selectedEvent ? selectedEvent.time : '';
 
-      const attendanceId = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 15);
+      const existing = attendanceRecords.find(r => r.eventId === selectedEventId);
+      const attendanceId = existing?.attendanceId || (crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 15));
 
       const attendanceData = {
         attendanceId,
@@ -256,6 +282,13 @@ export const AdminHub: React.FC = () => {
 
       // Direct write to attendance collection
       await setDoc(doc(db, 'attendance', attendanceId), attendanceData);
+
+      // Update local state attendanceRecords
+      const updatedRecords = [
+        ...attendanceRecords.filter(r => r.attendanceId !== attendanceId),
+        attendanceData
+      ];
+      setAttendanceRecords(updatedRecords);
 
       await FirebaseService.logSystemActivity(`Logged attendance for Event: "${eventTitle}" on ${eventDate} at ${timeslot} - Attendees: ${attendanceAttendees.map(a => `${a.nickname || a.name} (#${a.poppo_id || a.id})`).join(', ')}`, 'Info');
 
@@ -708,7 +741,11 @@ export const AdminHub: React.FC = () => {
                 className="px-8 py-3.5 btn-gold rounded-xl text-xs font-black uppercase tracking-widest flex items-center gap-2 active:scale-95 disabled:opacity-50 cursor-pointer shadow-lg w-full sm:w-auto"
               >
                 <Send size={14} className="text-[#0D0D14]" />
-                {isProcessing ? 'Processing...' : 'Record Attendance logs'}
+                {isProcessing 
+                  ? 'Processing...' 
+                  : (selectedEventId && attendanceRecords.some(r => r.eventId === selectedEventId) 
+                      ? 'Update Attendance' 
+                      : 'Submit Attendance')}
               </button>
             </div>
           </form>

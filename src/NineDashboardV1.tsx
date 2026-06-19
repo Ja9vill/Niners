@@ -1161,7 +1161,7 @@ export const OverviewTab = ({ commissions, hosts }: { commissions: CommissionEnt
 
   const SortIcon = ({ column }: { column: string }) => {
     if (sortConfig?.key !== column) return <span className="opacity-0 group-hover:opacity-100 ml-1">⇅</span>;
-    return sortConfig.direction === 'asc' ? <span className="ml-1 text-indigo-400">↑</span> : <span className="ml-1 text-indigo-400">↓</span>;
+    return sortConfig.direction === 'asc' ? <span className="ml-1 text-[#D4AF37]">↑</span> : <span className="ml-1 text-[#D4AF37]">↓</span>;
   };
 
   if (hosts.length === 0) {
@@ -1171,12 +1171,12 @@ export const OverviewTab = ({ commissions, hosts }: { commissions: CommissionEnt
         <div className="space-y-2">
           <h3 className="text-xl font-bold text-[#A09E9A]/50">Agency Overview Empty</h3>
           <p className="text-sm text-[#A09E9A]/30 max-w-sm mx-auto leading-relaxed">
-            There is currently no data in the system. Go to the <span className="text-indigo-400 font-bold">Director Hub</span> to upload your first MasterSheet and initialize the dashboard.
+            There is currently no data in the system. Go to the <span className="text-[#D4AF37] font-bold">Director Hub</span> to upload your first MasterSheet and initialize the dashboard.
           </p>
         </div>
         <div className="flex gap-4">
           <div className="w-24 h-1 bg-white/5 rounded-full overflow-hidden">
-            <div className="w-1/3 h-full bg-indigo-500/50 animate-pulse" />
+            <div className="w-1/3 h-full bg-[#D4AF37]/50 animate-pulse" />
           </div>
         </div>
       </div>
@@ -1184,7 +1184,38 @@ export const OverviewTab = ({ commissions, hosts }: { commissions: CommissionEnt
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 overview-container">
+      <style>{`
+        /* Force black background for the entire overview page elements */
+        body,
+        .app-bg,
+        main {
+          background-color: #000000 !important;
+          background-image: none !important;
+        }
+        /* Override overview tab glass cards to solid pure black */
+        .overview-container .glass-card {
+          background: #000000 !important;
+          background-color: #000000 !important;
+          border-color: rgba(212, 175, 55, 0.15) !important;
+          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.8), 0 0 25px rgba(212, 175, 55, 0.03) !important;
+        }
+        /* Override inputs and selects to black */
+        .overview-container select {
+          background-color: #000000 !important;
+          border-color: rgba(212, 175, 55, 0.25) !important;
+          color: #f0efe8 !important;
+        }
+        .overview-container select option {
+          background-color: #000000 !important;
+          color: #f0efe8 !important;
+        }
+        .overview-container .glass {
+          background-color: #000000 !important;
+          background: #000000 !important;
+        }
+      `}</style>
+
       {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {kpis.map((kpi, i) => (
@@ -1205,8 +1236,8 @@ export const OverviewTab = ({ commissions, hosts }: { commissions: CommissionEnt
                 {kpi.subValue && <span className="text-xs text-cyan-400 font-medium">{kpi.subValue}</span>}
               </div>
             </div>
-            <div className="w-9 h-9 rounded-xl bg-white/5 flex items-center justify-center transition-colors group-hover:bg-indigo-500/20">
-              <kpi.icon size={18} className="text-[#A09E9A]/20 group-hover:text-indigo-400 transition-colors" />
+            <div className="w-9 h-9 rounded-xl bg-white/5 flex items-center justify-center transition-colors group-hover:bg-[#D4AF37]/20">
+              <kpi.icon size={18} className="text-[#A09E9A]/20 group-hover:text-[#D4AF37] transition-colors" />
             </div>
           </div>
         ))}
@@ -1217,7 +1248,7 @@ export const OverviewTab = ({ commissions, hosts }: { commissions: CommissionEnt
         <div className="lg:col-span-2 glass-card space-y-6">
           <div className="flex items-center justify-between">
             <h3 className="font-bold text-lg flex items-center gap-2">
-              <Activity size={18} className="text-purple-400" />
+              <Activity size={18} className="text-[#D4AF37]" />
               Commission Timeline
               {auth.level < 2 && <Lock size={14} className="text-[#A09E9A]/20 ml-2" />}
             </h3>
@@ -1262,7 +1293,7 @@ export const OverviewTab = ({ commissions, hosts }: { commissions: CommissionEnt
                   />
                   <Bar dataKey="value" radius={[4, 4, 0, 0]}>
                     {aggregatedData.map((_entry, index) => (
-                      <Cell key={`cell-${index}`} fill="#8b5cf6" fillOpacity={0.8} />
+                      <Cell key={`cell-${index}`} fill="#D4AF37" fillOpacity={0.8} />
                     ))}
                   </Bar>
                 </BarChart>
@@ -1276,7 +1307,7 @@ export const OverviewTab = ({ commissions, hosts }: { commissions: CommissionEnt
               <span>Total Volume Analysis</span>
              </div>
              <div className="relative h-2 bg-white/5 rounded-full overflow-hidden">
-                <div className="absolute inset-y-0 left-0 w-full bg-gradient-to-r from-indigo-500/20 via-purple-500/40 to-emerald-500/20" />
+                <div className="absolute inset-y-0 left-0 w-full bg-gradient-to-r from-[#D4AF37]/20 via-orange-500/40 to-emerald-500/20" />
              </div>
           </div>
         </div>

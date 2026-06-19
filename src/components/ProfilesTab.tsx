@@ -98,7 +98,7 @@ export const ProfilesTab: React.FC<ProfilesTabProps> = ({ isReadOnly = false }) 
   };
 
   const filteredHosts = useMemo(() => {
-    return hosts.filter(host => {
+    const filtered = hosts.filter(host => {
       // 1. Search Filter
       const searchStr = searchTerm.toLowerCase();
       const hostName = (host.nickname || host.name || '').toLowerCase();
@@ -118,6 +118,27 @@ export const ProfilesTab: React.FC<ProfilesTabProps> = ({ isReadOnly = false }) 
       }
 
       return true;
+    });
+
+    return filtered.sort((a, b) => {
+      // 1. Role priority: 'host' or 'talent' first
+      const roleA = (a.role || '').toLowerCase();
+      const roleB = (b.role || '').toLowerCase();
+      const isHostA = roleA === 'host' || roleA === 'talent';
+      const isHostB = roleB === 'host' || roleB === 'talent';
+      if (isHostA && !isHostB) return -1;
+      if (!isHostA && isHostB) return 1;
+
+      // 2. Photo presence priority
+      const hasPhotoA = !!a.photoUrl && a.photoUrl.trim() !== '';
+      const hasPhotoB = !!b.photoUrl && b.photoUrl.trim() !== '';
+      if (hasPhotoA && !hasPhotoB) return -1;
+      if (!hasPhotoA && hasPhotoB) return 1;
+      
+      // 3. Name priority A-Z
+      const nameA = (a.nickname || a.name || '').toLowerCase();
+      const nameB = (b.nickname || b.name || '').toLowerCase();
+      return nameA.localeCompare(nameB);
     });
   }, [hosts, searchTerm, roleFilter, tierFilter]);
 
@@ -247,8 +268,16 @@ export const ProfilesTab: React.FC<ProfilesTabProps> = ({ isReadOnly = false }) 
                     <Star size={10} />
                     {host.tier_pay || 'N/A'}
                   </div>
-                  {host.status === 'Active' && (
-                    <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"></div>
+                  {host.status && (
+                    <div className={cn(
+                      "w-2 h-2 rounded-full",
+                      host.status === 'Active' ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" :
+                      host.status === 'Intermittent' ? "bg-yellow-500 shadow-[0_0_8px_rgba(234,179,8,0.5)]" :
+                      host.status === 'Releasing' ? "bg-red-400 shadow-[0_0_8px_rgba(248,113,113,0.5)]" :
+                      host.status === 'Released' ? "bg-red-600 shadow-[0_0_8px_rgba(220,38,38,0.5)]" :
+                      host.status === 'Inactive' ? "bg-orange-500 shadow-[0_0_8px_rgba(249,115,22,0.5)]" :
+                      "bg-neutral-500 shadow-[0_0_8px_rgba(115,115,115,0.5)]"
+                    )}></div>
                   )}
                 </div>
               </div>

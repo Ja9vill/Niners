@@ -107,7 +107,7 @@ export const SingleDatePicker: React.FC<SingleDatePickerProps> = ({
         title={title}
         disabled={disabled}
         onClick={() => setIsOpen(prev => !prev)}
-        className="w-full flex items-center justify-between bg-[#0D0D14] border border-white/10 rounded-xl px-4 py-3 text-xs text-[#F0EFE8] outline-none hover:border-[#D4AF37]/50 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37]/30 transition-all cursor-pointer disabled:opacity-55 disabled:cursor-not-allowed"
+        className="w-full flex items-center justify-between bg-[#0c0806] border border-[#D4AF37]/20 rounded-xl px-4 py-3 text-xs text-[#F0EFE8] outline-none hover:border-[#D4AF37]/50 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37]/30 transition-all cursor-pointer disabled:opacity-55 disabled:cursor-not-allowed"
       >
         <span className={value ? 'text-[#F0EFE8] font-medium' : 'text-[#A09E9A]'}>
           {value ? formatDateStr(selectedDate, dateFormat) : placeholder}
@@ -132,7 +132,7 @@ export const SingleDatePicker: React.FC<SingleDatePickerProps> = ({
           />
 
           {/* Calendar Picker Card */}
-          <div className="fixed md:absolute top-1/2 md:top-full left-1/2 md:left-0 -translate-x-1/2 md:translate-x-0 -translate-y-1/2 md:translate-y-0 md:mt-2 w-[300px] bg-[#13131E] border border-white/10 rounded-2xl p-4 shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-150">
+          <div className="fixed md:absolute top-1/2 md:top-full left-1/2 md:left-0 -translate-x-1/2 md:translate-x-0 -translate-y-1/2 md:translate-y-0 md:mt-2 w-[300px] bg-[#120D0A]/95 backdrop-blur-xl border border-[#D4AF37]/20 rounded-2xl p-4 shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-150">
             {/* Calendar Header */}
             <div className="flex items-center justify-between pb-3 border-b border-white/5 mb-3">
               <button 
@@ -179,7 +179,7 @@ export const SingleDatePicker: React.FC<SingleDatePickerProps> = ({
                     onClick={() => handleDaySelect(day)}
                     className={`h-9 w-full flex flex-col items-center justify-center text-xs font-bold transition-all relative rounded-lg cursor-pointer ${
                       isSelected
-                        ? 'bg-[#D4AF37] text-[#0D0D14] font-black'
+                        ? 'bg-[#D4AF37] text-[#0c0806] font-black'
                         : isCurrentMonth
                           ? 'text-[#F0EFE8] hover:bg-white/5 hover:text-white'
                           : 'text-[#A09E9A]/20 hover:bg-white/[0.01]'
@@ -307,7 +307,7 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
         type="button"
         disabled={disabled}
         onClick={() => setIsOpen(prev => !prev)}
-        className="w-full flex items-center justify-between bg-[#0D0D14] border border-white/10 rounded-xl px-4 py-3 text-xs text-[#F0EFE8] outline-none hover:border-[#D4AF37]/50 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37]/30 transition-all cursor-pointer disabled:opacity-55 disabled:cursor-not-allowed text-left"
+        className="w-full flex items-center justify-between bg-[#0c0806] border border-[#D4AF37]/20 rounded-xl px-4 py-3 text-xs text-[#F0EFE8] outline-none hover:border-[#D4AF37]/50 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37]/30 transition-all cursor-pointer disabled:opacity-55 disabled:cursor-not-allowed text-left"
       >
         <div className="flex items-center gap-2 flex-1 min-w-0">
           <span className={startDate ? 'text-[#F0EFE8] font-mono' : 'text-[#A09E9A]'}>
@@ -338,7 +338,7 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
           />
 
           {/* Range Picker Calendar Panel */}
-          <div className="fixed md:absolute top-1/2 md:top-full left-1/2 md:left-0 -translate-x-1/2 md:translate-x-0 -translate-y-1/2 md:translate-y-0 md:mt-2 w-[300px] bg-[#13131E] border border-white/10 rounded-2xl p-4 shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-150">
+          <div className="fixed md:absolute top-1/2 md:top-full left-1/2 md:left-0 -translate-x-1/2 md:translate-x-0 -translate-y-1/2 md:translate-y-0 md:mt-2 w-[300px] bg-[#120D0A]/95 backdrop-blur-xl border border-[#D4AF37]/20 rounded-2xl p-4 shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-150">
             {/* Header */}
             <div className="flex items-center justify-between pb-3 border-b border-white/5 mb-3">
               <button 
@@ -385,7 +385,7 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
                 }
 
                 if (isStart || isEnd) {
-                  dayStyle = 'bg-[#D4AF37] text-[#0D0D14] font-black rounded-lg';
+                  dayStyle = 'bg-[#D4AF37] text-[#0c0806] font-black rounded-lg';
                 } else if (isInRange) {
                   dayStyle = 'bg-[#D4AF37]/15 text-[#D4AF37] rounded-none';
                 } else if (isHoverRange) {

@@ -228,7 +228,12 @@ export const Overview = () => {
       byHost[id].months += 1;
       byHost[id].commission += getAgentComm(r);
     });
-    return Object.values(byHost).sort((a, b) => b.points - a.points);
+    return Object.values(byHost).sort((a, b) => {
+      if (b.commission !== a.commission) {
+        return b.commission - a.commission;
+      }
+      return b.points - a.points;
+    });
   }, [lbReports, hostLookup]);
 
   const lbTotalPeriodCommission = useMemo(() => {
@@ -328,6 +333,15 @@ export const Overview = () => {
         data['Rocket Host'].hosts.push(h);
       }
     });
+
+    // Sort hosts in each tier alphabetically A-Z by nickname/name
+    Object.keys(data).forEach(key => {
+      data[key].hosts.sort((a, b) => {
+        const nameA = (a.nickname || a.name || 'Unnamed').toLowerCase();
+        const nameB = (b.nickname || b.name || 'Unnamed').toLowerCase();
+        return nameA.localeCompare(nameB);
+      });
+    });
     
     return data;
   }, [hosts]);
@@ -356,7 +370,7 @@ export const Overview = () => {
       <div className="flex flex-col gap-6">
         <div className="flex items-center gap-3">
           <LayoutDashboard className="text-[#D4AF37]" size={24} />
-          <h2 className="text-2xl font-black text-white uppercase tracking-widest">Dashboard Overview</h2>
+          <h2 className="text-2xl font-black text-white uppercase tracking-widest">Agency Overview</h2>
         </div>
         <OverviewTab commissions={commissions} hosts={hosts} />
       </div>
@@ -371,70 +385,109 @@ export const Overview = () => {
   const CHART_COLORS = ['#D4AF37','#6366f1','#ec4899','#10b981','#f59e0b','#06b6d4','#a78bfa'];
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-6 overview-container">
       {/* INJECTED DYNAMIC CSS TO BYPASS INLINE STYLES LINTER */}
       <style>{`
+        /* Force 40% black background with fiery gold/orange ambient radial glow on the body/layout */
+        body,
+        .app-bg,
+        main {
+          background-color: rgba(0, 0, 0, 0.4) !important;
+          background-image: radial-gradient(at 15% 0%, rgba(212, 175, 55, 0.08) 0%, transparent 50%), radial-gradient(at 85% 100%, rgba(255, 123, 0, 0.06) 0%, transparent 50%) !important;
+          background-attachment: fixed !important;
+        }
+
+        /* Scoped style overrides for dropdowns and inputs in Overview page */
+        .overview-container select {
+          background-color: rgba(0, 0, 0, 0.4) !important;
+          border-color: rgba(212, 175, 55, 0.25) !important;
+          color: #f0efe8 !important;
+        }
+        .overview-container select:focus {
+          border-color: rgba(212, 175, 55, 0.6) !important;
+          box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.08) !important;
+        }
+        .overview-container select option {
+          background-color: #000000 !important;
+          color: #f0efe8 !important;
+        }
+
+        /* Add fiery gold border and shadow glow to all main page cards, and force 40% black background */
+        .overview-container .backdrop-blur-xl,
+        .overview-container .bg-\\[\\#000000\\\]\\/75,
+        .overview-container .bg-\\[\\#000000\\\]\\/95,
+        .overview-container .bg-\\[\\#000000\\\]\\/90,
+        .overview-container .bg-\\[\\#000000\\\] {
+          background-color: rgba(0, 0, 0, 0.4) !important;
+          background: rgba(0, 0, 0, 0.4) !important;
+          border-color: rgba(212, 175, 55, 0.28) !important;
+          box-shadow: 0 12px 45px rgba(0, 0, 0, 0.85), 0 0 35px rgba(212, 175, 55, 0.09) !important;
+        }
+
         .global-block-1 {
-          background: linear-gradient(to bottom right, #3A2A18, #221A15);
-          border: 1px solid rgba(255, 184, 0, 0.12);
+          background: linear-gradient(135deg, rgba(255, 184, 0, 0.15) 0%, #000000 100%) !important;
+          border: 1px solid rgba(255, 184, 0, 0.18) !important;
         }
         .global-block-1:hover {
-          border-color: rgba(255, 184, 0, 0.35);
+          border-color: rgba(255, 184, 0, 0.38) !important;
+          box-shadow: 0 0 18px rgba(255, 184, 0, 0.15) !important;
         }
         .global-block-2 {
-          background: linear-gradient(to bottom right, #3D221C, #221515);
-          border: 1px solid rgba(255, 123, 0, 0.12);
+          background: linear-gradient(135deg, rgba(255, 123, 0, 0.15) 0%, #000000 100%) !important;
+          border: 1px solid rgba(255, 123, 0, 0.18) !important;
         }
         .global-block-2:hover {
-          border-color: rgba(255, 123, 0, 0.35);
+          border-color: rgba(255, 123, 0, 0.38) !important;
+          box-shadow: 0 0 18px rgba(255, 123, 0, 0.15) !important;
         }
         .global-block-3 {
-          background: linear-gradient(to bottom right, #3A1C28, #20131A);
-          border: 1px solid rgba(255, 59, 92, 0.12);
+          background: linear-gradient(135deg, rgba(255, 59, 92, 0.15) 0%, #000000 100%) !important;
+          border: 1px solid rgba(255, 59, 92, 0.18) !important;
         }
         .global-block-3:hover {
-          border-color: rgba(255, 59, 92, 0.35);
+          border-color: rgba(255, 59, 92, 0.38) !important;
+          box-shadow: 0 0 18px rgba(255, 59, 92, 0.15) !important;
         }
 
         .global-tier-1 {
-          background: linear-gradient(to bottom right, #3B1B3A, #1A101C);
-          border: 1px solid rgba(245, 0, 87, 0.15);
+          background: linear-gradient(135deg, rgba(245, 0, 87, 0.15) 0%, #000000 100%) !important;
+          border: 1px solid rgba(245, 0, 87, 0.2) !important;
         }
         .global-tier-1:hover, .global-tier-1.active-tier {
-          border-color: rgba(245, 0, 87, 0.45);
-          box-shadow: 0 0 10px rgba(245, 0, 87, 0.1);
+          border-color: rgba(245, 0, 87, 0.45) !important;
+          box-shadow: 0 0 15px rgba(245, 0, 87, 0.2) !important;
         }
         .global-tier-2 {
-          background: linear-gradient(to bottom right, #2E203B, #17111E);
-          border: 1px solid rgba(213, 0, 249, 0.15);
+          background: linear-gradient(135deg, rgba(213, 0, 249, 0.15) 0%, #000000 100%) !important;
+          border: 1px solid rgba(213, 0, 249, 0.2) !important;
         }
         .global-tier-2:hover, .global-tier-2.active-tier {
-          border-color: rgba(213, 0, 249, 0.45);
-          box-shadow: 0 0 10px rgba(213, 0, 249, 0.1);
+          border-color: rgba(213, 0, 249, 0.45) !important;
+          box-shadow: 0 0 15px rgba(213, 0, 249, 0.2) !important;
         }
         .global-tier-3 {
-          background: linear-gradient(to bottom right, #373322, #1B1A12);
-          border: 1px solid rgba(255, 234, 0, 0.15);
+          background: linear-gradient(135deg, rgba(255, 234, 0, 0.15) 0%, #000000 100%) !important;
+          border: 1px solid rgba(255, 234, 0, 0.2) !important;
         }
         .global-tier-3:hover, .global-tier-3.active-tier {
-          border-color: rgba(255, 234, 0, 0.45);
-          box-shadow: 0 0 10px rgba(255, 234, 0, 0.1);
+          border-color: rgba(255, 234, 0, 0.45) !important;
+          box-shadow: 0 0 15px rgba(255, 234, 0, 0.2) !important;
         }
         .global-tier-4 {
-          background: linear-gradient(to bottom right, #1E2838, #0E131C);
-          border: 1px solid rgba(0, 229, 255, 0.15);
+          background: linear-gradient(135deg, rgba(0, 136, 255, 0.15) 0%, #000000 100%) !important;
+          border: 1px solid rgba(0, 136, 255, 0.2) !important;
         }
         .global-tier-4:hover, .global-tier-4.active-tier {
-          border-color: rgba(0, 229, 255, 0.45);
-          box-shadow: 0 0 10px rgba(0, 229, 255, 0.1);
+          border-color: rgba(0, 136, 255, 0.45) !important;
+          box-shadow: 0 0 15px rgba(0, 136, 255, 0.2) !important;
         }
       `}</style>
 
       {/* Base Salary Tiers Block */}
-      <div className="bg-[#1A1A28]/80 backdrop-blur-md border border-[#D4AF37]/15 shadow-2xl rounded-2xl p-5 relative overflow-hidden">
+      <div className="bg-[#000000]/20 backdrop-blur-xl border border-[#D4AF37]/20 shadow-2xl shadow-[0_0_30px_rgba(212,175,55,0.05)] rounded-2xl p-5 relative overflow-hidden">
         {/* Subtle background glow for the entire section */}
-        <div className="absolute -top-24 -left-24 w-48 h-48 bg-[#D4AF37]/5 blur-3xl rounded-full pointer-events-none"></div>
-        <div className="absolute -bottom-24 -right-24 w-48 h-48 bg-indigo-500/5 blur-3xl rounded-full pointer-events-none"></div>
+        <div className="absolute -top-24 -left-24 w-48 h-48 bg-[#D4AF37]/15 blur-3xl rounded-full pointer-events-none"></div>
+        <div className="absolute -bottom-24 -right-24 w-48 h-48 bg-[#FF7B00]/10 blur-3xl rounded-full pointer-events-none"></div>
         
         <p className="text-[9px] font-black text-[#A09E9A] uppercase tracking-[0.2em] mb-4 relative z-10 flex items-center gap-2">
           <span className="w-1.5 h-1.5 rounded-full bg-[#D4AF37] animate-pulse"></span>
@@ -446,7 +499,7 @@ export const Overview = () => {
             { label: 'S idol', key: 'S idol', class: 'global-tier-1', color: '#F50057' },
             { label: 'Esports', key: 'Esports', class: 'global-tier-2', color: '#D500F9' },
             { label: 'Star Host', key: 'Star Host', class: 'global-tier-3', color: '#FFEA00' },
-            { label: 'Rocket Host', key: 'Rocket Host', class: 'global-tier-4', color: '#00E5FF' }
+            { label: 'Rocket Host', key: 'Rocket Host', class: 'global-tier-4', color: '#0088FF' }
           ].map((item, idx) => {
             const dataVal = baseSalaryTiersData[item.key];
             const isActive = selectedTierForList === item.key;
@@ -476,7 +529,7 @@ export const Overview = () => {
 
         {/* Expanded Tier Members List */}
         {selectedTierForList && (
-          <div className="bg-[#0D0D14]/95 border border-[#D4AF37]/15 rounded-xl p-4 mt-3 transition-all duration-300 relative z-10">
+          <div className="bg-[#000000]/20 border border-[#D4AF37]/15 rounded-xl p-4 mt-3 transition-all duration-300 relative z-10">
             <div className="flex items-center justify-between mb-3 border-b border-white/5 pb-2">
               <p className="text-[10px] font-black text-[#A09E9A] uppercase tracking-wider">
                 {selectedTierForList} Tier Members ({baseSalaryTiersData[selectedTierForList]?.hosts.length || 0})
@@ -518,7 +571,7 @@ export const Overview = () => {
         <div className="flex items-center gap-3">
           <LayoutDashboard className="text-[#D4AF37]" size={24} />
           <div>
-            <h2 className="text-2xl font-black text-white uppercase tracking-widest">Dashboard Overview</h2>
+            <h2 className="text-2xl font-black text-white uppercase tracking-widest">Agency Overview</h2>
             <p className="text-xs text-[#A09E9A] font-mono">{reports.length} performance records loaded</p>
           </div>
         </div>
@@ -528,7 +581,7 @@ export const Overview = () => {
             title="Filter by Year"
             value={selectedYear}
             onChange={e => setSelectedYear(e.target.value)}
-            className="bg-[#0D0D14] border border-[#D4AF37]/20 rounded-lg px-3 py-1.5 text-xs font-bold text-[#F0EFE8] outline-none focus:border-[#D4AF37] cursor-pointer shadow-inner"
+            className="bg-[#000000]/20 border border-[#D4AF37]/20 rounded-lg px-3 py-1.5 text-xs font-bold text-[#F0EFE8] outline-none focus:border-[#D4AF37] cursor-pointer shadow-inner"
           >
             <option value="all">All Years</option>
             {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
@@ -537,7 +590,7 @@ export const Overview = () => {
             title="Filter by Month"
             value={selectedMonth}
             onChange={e => setSelectedMonth(e.target.value)}
-            className="bg-[#0D0D14] border border-[#D4AF37]/20 rounded-lg px-3 py-1.5 text-xs font-bold text-[#F0EFE8] outline-none focus:border-[#D4AF37] cursor-pointer shadow-inner"
+            className="bg-[#000000]/20 border border-[#D4AF37]/20 rounded-lg px-3 py-1.5 text-xs font-bold text-[#F0EFE8] outline-none focus:border-[#D4AF37] cursor-pointer shadow-inner"
           >
             <option value="all">All Months</option>
             {MONTH_ORDER.map(m => <option key={m} value={m}>{m}</option>)}
@@ -546,9 +599,9 @@ export const Overview = () => {
       </div>
 
       {/* Agency Performance Metrics */}
-      <div className="bg-[#1A1A28]/80 backdrop-blur-md border border-[#D4AF37]/15 shadow-2xl rounded-2xl p-4 sm:p-5 relative overflow-hidden">
+      <div className="bg-[#000000]/20 backdrop-blur-xl border border-[#D4AF37]/20 shadow-2xl shadow-[0_0_30px_rgba(212,175,55,0.05)] rounded-2xl p-4 sm:p-5 relative overflow-hidden">
         {/* Subtle background glow for the entire section */}
-        <div className="absolute -top-24 -right-24 w-48 h-48 bg-[#D4AF37]/5 blur-3xl rounded-full pointer-events-none"></div>
+        <div className="absolute -top-24 -right-24 w-48 h-48 bg-[#D4AF37]/15 blur-3xl rounded-full pointer-events-none"></div>
         <p className="text-[9px] font-black text-[#A09E9A] uppercase tracking-[0.2em] mb-4 sm:mb-5 relative z-10 flex items-center gap-2">
           <span className="w-1.5 h-1.5 rounded-full bg-[#D4AF37] animate-pulse"></span>
           AGENCY PERFORMANCE METRICS
@@ -613,10 +666,10 @@ export const Overview = () => {
             </div>
           </div>
 
-          {/* COLUMN 3: ACTIVE MEMBERS */}
+          {/* COLUMN 3: ACTIVENESS */}
           <div className="flex flex-col gap-2.5 min-w-0">
             <h4 className="text-[9px] sm:text-[10px] font-bold text-[#A09E9A] uppercase tracking-widest pl-2 border-l-2 border-[#FF3B5C]/40 mb-1">
-              ACTIVE MEMBERS
+              ACTIVENESS
             </h4>
 
             {/* Row 1 Block 3: Active Host */}
@@ -646,7 +699,7 @@ export const Overview = () => {
 
 
       {monthlyTrend.length > 0 && (
-        <div className="bg-[#1A1A28] border border-[#D4AF37]/10 rounded-2xl p-5">
+        <div className="bg-[#000000]/20 backdrop-blur-xl border border-[#D4AF37]/20 shadow-2xl shadow-[0_0_30px_rgba(212,175,55,0.05)] rounded-2xl p-5">
           <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
             <div className="flex items-center gap-2">
               <TrendingUp size={16} className="text-[#D4AF37]" />
@@ -655,7 +708,7 @@ export const Overview = () => {
             
             <div className="flex items-center gap-3">
               <span className="text-[10px] text-[#A09E9A] font-mono hidden sm:inline">All hosts combined</span>
-              <div className="flex bg-[#0D0D14] p-0.5 rounded-lg border border-[#D4AF37]/15">
+              <div className="flex bg-[#000000]/20 p-0.5 rounded-lg border border-[#D4AF37]/15">
                 <button
                   onClick={() => setChartType('area')}
                   className={cn(
@@ -704,7 +757,7 @@ export const Overview = () => {
                   <XAxis dataKey="label" tickFormatter={formatXAxisLabel} tick={{ fontSize: 9, fill: '#A09E9A', fontWeight: 'bold' }} axisLine={false} tickLine={false} />
                   <YAxis tick={{ fontSize: 9, fill: '#A09E9A' }} axisLine={false} tickLine={false} tickFormatter={v => formatPts(v)} />
                   <Tooltip
-                    contentStyle={{ backgroundColor: '#13131E', borderColor: 'rgba(212, 175, 55, 0.2)', borderRadius: '12px', fontSize: '11px' }}
+                    contentStyle={{ backgroundColor: '#000000', borderColor: 'rgba(212, 175, 55, 0.2)', borderRadius: '12px', fontSize: '11px' }}
                     itemStyle={{ color: '#F0EFE8' }}
                     formatter={(v: number) => [`${formatPts(v)} pts`, 'Points']}
                     labelStyle={{ color: '#D4AF37', fontWeight: 'bold', marginBottom: '4px' }}
@@ -727,7 +780,7 @@ export const Overview = () => {
                   <XAxis dataKey="label" tickFormatter={formatXAxisLabel} tick={{ fontSize: 9, fill: '#A09E9A', fontWeight: 'bold' }} axisLine={false} tickLine={false} />
                   <YAxis tick={{ fontSize: 9, fill: '#A09E9A' }} axisLine={false} tickLine={false} tickFormatter={v => formatPts(v)} />
                   <Tooltip
-                    contentStyle={{ backgroundColor: '#13131E', borderColor: 'rgba(212, 175, 55, 0.2)', borderRadius: '12px', fontSize: '11px' }}
+                    contentStyle={{ backgroundColor: '#000000', borderColor: 'rgba(212, 175, 55, 0.2)', borderRadius: '12px', fontSize: '11px' }}
                     itemStyle={{ color: '#F0EFE8' }}
                     formatter={(v: number) => [`${formatPts(v)} pts`, 'Points']}
                     labelStyle={{ color: '#D4AF37', fontWeight: 'bold', marginBottom: '4px' }}
@@ -750,20 +803,20 @@ export const Overview = () => {
       )}
 
       {/* Merged Agency Leaderboard & Spotlight Block */}
-      <div className="bg-[#1A1A28]/80 backdrop-blur-md border border-[#D4AF37]/15 rounded-2xl p-5 relative overflow-hidden flex flex-col gap-4">
-        <div className="absolute -top-10 -right-10 w-32 h-32 bg-indigo-500/10 blur-3xl rounded-full pointer-events-none"></div>
+      <div className="bg-[#000000]/20 backdrop-blur-xl border border-[#D4AF37]/20 shadow-2xl shadow-[0_0_30px_rgba(212,175,55,0.05)] rounded-2xl p-5 relative overflow-hidden flex flex-col gap-4">
+        <div className="absolute -top-10 -right-10 w-32 h-32 bg-[#FF7B00]/15 blur-3xl rounded-full pointer-events-none"></div>
         
         {/* Combined Header */}
         <div className="flex items-center justify-between flex-wrap gap-4 border-b border-[#D4AF37]/10 pb-4">
           <div className="flex items-center gap-2">
             <Award size={16} className="text-[#D4AF37]" />
-            <h3 className="font-bold text-[#F0EFE8] text-sm uppercase tracking-widest whitespace-nowrap">Host Leaderboard & Contribution</h3>
+            <h3 className="font-bold text-[#F0EFE8] text-sm uppercase tracking-widest whitespace-nowrap">Contribution & Leaderboard</h3>
           </div>
           <div className="flex items-center gap-2 relative z-10">
             <select
               value={lbYear}
               onChange={e => setLbYear(e.target.value)}
-              className="bg-[#0D0D14] border border-[#D4AF37]/20 rounded-lg px-3 py-1.5 text-xs font-bold text-[#F0EFE8] outline-none focus:border-[#D4AF37] cursor-pointer shadow-inner"
+              className="bg-[#000000]/20 border border-[#D4AF37]/20 rounded-lg px-3 py-1.5 text-xs font-bold text-[#F0EFE8] outline-none focus:border-[#D4AF37] cursor-pointer shadow-inner"
             >
               <option value="all">All Years</option>
               {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
@@ -771,7 +824,7 @@ export const Overview = () => {
             <select
               value={lbMonth}
               onChange={e => setLbMonth(e.target.value)}
-              className="bg-[#0D0D14] border border-[#D4AF37]/20 rounded-lg px-3 py-1.5 text-xs font-bold text-[#F0EFE8] outline-none focus:border-[#D4AF37] cursor-pointer shadow-inner"
+              className="bg-[#000000]/20 border border-[#D4AF37]/20 rounded-lg px-3 py-1.5 text-xs font-bold text-[#F0EFE8] outline-none focus:border-[#D4AF37] cursor-pointer shadow-inner"
             >
               <option value="all">All Months</option>
               {MONTH_ORDER.map(m => <option key={m} value={m}>{m}</option>)}
@@ -794,9 +847,9 @@ export const Overview = () => {
           const hasContribution = userComm > 0;
           
           return (
-            <div className="bg-[#0D0D14] border border-[#D4AF37]/15 rounded-xl p-4 flex flex-row justify-between items-center gap-4 transition-all">
+            <div className="bg-[#000000]/20 border border-[#D4AF37]/20 rounded-xl p-4 flex flex-row justify-between items-center gap-4 transition-all">
               <div className="flex flex-col">
-                <p className="text-base font-black text-[#D4AF37]">{lbTotalPeriodCommission.toLocaleString()} Pts</p>
+                <p className="text-base font-black text-[#D4AF37]">{lbTotalPeriodCommission.toLocaleString()}</p>
                 <p className="text-[10px] font-bold text-[#A09E9A]/60 uppercase tracking-widest mt-0.5">Agency Commission</p>
               </div>
               <div className="flex flex-col text-right items-end">
@@ -822,21 +875,21 @@ export const Overview = () => {
 
           <div className="space-y-1.5">
             {topPerformers.slice(0, 15).map((h, idx) => {
-              const maxPts = topPerformers[0]?.points || 1;
-              const pct = (h.points / maxPts) * 100;
+              const maxComm = topPerformers[0]?.commission || 1;
+              const pct = (h.commission / maxComm) * 100;
               const medals = ['🥇', '🥈', '🥉'];
               
               // Define fading colors for Top 9: Light Yellow -> Gold -> Orange -> Red
               const top9Styles = [
-                "bg-gradient-to-r from-[#fef08a]/15 via-[#fef08a]/4 to-[#1A1A28]/40 border-[#fef08a]/35 shadow-md shadow-[#fef08a]/5",
-                "bg-gradient-to-r from-[#facc15]/15 via-[#facc15]/4 to-[#1A1A28]/40 border-[#facc15]/35 shadow-md shadow-[#facc15]/5",
-                "bg-gradient-to-r from-[#D4AF37]/15 via-[#D4AF37]/4 to-[#1A1A28]/40 border-[#D4AF37]/35 shadow-md shadow-[#D4AF37]/5",
-                "bg-gradient-to-r from-[#fb923c]/15 via-[#fb923c]/4 to-[#1A1A28]/40 border-[#fb923c]/30",
-                "bg-gradient-to-r from-[#f97316]/15 via-[#f97316]/4 to-[#1A1A28]/40 border-[#f97316]/30",
-                "bg-gradient-to-r from-[#ea580c]/15 via-[#ea580c]/4 to-[#1A1A28]/40 border-[#ea580c]/30",
-                "bg-gradient-to-r from-[#f87171]/15 via-[#f87171]/4 to-[#1A1A28]/40 border-[#f87171]/30",
-                "bg-gradient-to-r from-[#ef4444]/15 via-[#ef4444]/4 to-[#1A1A28]/40 border-[#ef4444]/30",
-                "bg-gradient-to-r from-[#dc2626]/15 via-[#dc2626]/4 to-[#1A1A28]/40 border-[#dc2626]/30"
+                "bg-gradient-to-r from-[#fef08a]/15 via-[#fef08a]/4 to-[#000000]/20 border-[#fef08a]/35 shadow-md shadow-[#fef08a]/5",
+                "bg-gradient-to-r from-[#facc15]/15 via-[#facc15]/4 to-[#000000]/20 border-[#facc15]/35 shadow-md shadow-[#facc15]/5",
+                "bg-gradient-to-r from-[#D4AF37]/15 via-[#D4AF37]/4 to-[#000000]/20 border-[#D4AF37]/35 shadow-md shadow-[#D4AF37]/5",
+                "bg-gradient-to-r from-[#fb923c]/15 via-[#fb923c]/4 to-[#000000]/20 border-[#fb923c]/30",
+                "bg-gradient-to-r from-[#f97316]/15 via-[#f97316]/4 to-[#000000]/20 border-[#f97316]/30",
+                "bg-gradient-to-r from-[#ea580c]/15 via-[#ea580c]/4 to-[#000000]/20 border-[#ea580c]/30",
+                "bg-gradient-to-r from-[#f87171]/15 via-[#f87171]/4 to-[#000000]/20 border-[#f87171]/30",
+                "bg-gradient-to-r from-[#ef4444]/15 via-[#ef4444]/4 to-[#000000]/20 border-[#ef4444]/30",
+                "bg-gradient-to-r from-[#dc2626]/15 via-[#dc2626]/4 to-[#000000]/20 border-[#dc2626]/30"
               ];
               
               const top9Colors = [
@@ -909,7 +962,7 @@ export const Overview = () => {
 
       {/* Breakdown Table */}
       {reports.length > 0 && (
-        <div className="border border-[#D4AF37]/15 rounded-2xl p-5 relative overflow-hidden backdrop-blur-md shadow-2xl" style={{ background: 'linear-gradient(to bottom right, #1E1C24, #121017)' }}>
+        <div className="border border-[#D4AF37]/20 rounded-2xl p-5 relative overflow-hidden backdrop-blur-xl shadow-[0_0_50px_rgba(212,175,55,0.08)] bg-[#000000]/20">
           <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
             <div className="flex items-center gap-2">
               <LayoutDashboard size={16} className="text-emerald-400" />
@@ -923,7 +976,7 @@ export const Overview = () => {
                   title="Sort Records"
                   value={recordsSortOption}
                   onChange={e => setRecordsSortOption(e.target.value as any)}
-                  className="bg-[#0D0D14] border border-[#D4AF37]/20 rounded-lg px-3 py-1.5 text-xs font-bold text-[#F0EFE8] outline-none focus:border-[#D4AF37] cursor-pointer shadow-inner"
+                  className="bg-[#000000]/20 border border-[#D4AF37]/20 rounded-lg px-3 py-1.5 text-xs font-bold text-[#F0EFE8] outline-none focus:border-[#D4AF37] cursor-pointer shadow-inner"
                 >
                   <option value="default">Default Sort</option>
                   <option value="name">Name A-Z</option>
@@ -932,7 +985,7 @@ export const Overview = () => {
               )}
               <button
                 onClick={() => setShowRecords(!showRecords)}
-                className="bg-[#0D0D14] border border-[#D4AF37]/20 hover:border-[#D4AF37] px-4 py-1.5 rounded-lg text-xs font-bold text-[#F0EFE8] transition-all cursor-pointer hover:bg-white/[0.02] shadow-sm select-none"
+                className="bg-[#000000]/20 border border-[#D4AF37]/20 hover:border-[#D4AF37] px-4 py-1.5 rounded-lg text-xs font-bold text-[#F0EFE8] transition-all cursor-pointer hover:bg-white/[0.02] shadow-sm select-none"
               >
                 {showRecords ? 'Hide Records' : 'Show Records'}
               </button>

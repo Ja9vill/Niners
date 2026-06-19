@@ -1923,7 +1923,7 @@ export const DirectorTab = () => {
                           name: String(formData.get('name')),
                           nickname: String(formData.get('name')),
                           role: 'Talent',
-                          teamAnchor: String(formData.get('teamAnchor') || 'Unassigned'),
+                          teamAnchor: String(formData.get('teamAnchor') || ''),
                           manager: 'Nine Management',
                           anchor_type: 'Nine Agency',
                           tier_pay: 'N/A',
@@ -1949,7 +1949,7 @@ export const DirectorTab = () => {
                         name: String(formData.get('name')),
                         nickname: String(formData.get('name')),
                         role: 'Talent',
-                        teamAnchor: String(formData.get('teamAnchor') || 'Unassigned'),
+                        teamAnchor: String(formData.get('teamAnchor') || ''),
                         manager: String(formData.get('manager') || 'Nine Management'),
                         anchor_type: 'Nine Agency',
                         tier_pay: 'N/A',
@@ -2330,13 +2330,29 @@ export const DirectorTab = () => {
                                       alert("Failed to update status");
                                     }
                                   }}
-                                  className={`bg-transparent border-none rounded text-xs focus:ring-1 focus:ring-indigo-500 cursor-pointer font-bold ${host.status === 'Active' ? 'text-emerald-400' : 'text-[#A09E9A] hover:text-[#F0EFE8]'}`}
+                                  className={`bg-transparent border-none rounded text-xs focus:ring-1 focus:ring-indigo-500 cursor-pointer font-bold ${
+                                    host.status === 'Active' ? 'text-emerald-400' :
+                                    host.status === 'Intermittent' ? 'text-yellow-400' :
+                                    host.status === 'Releasing' ? 'text-red-400' :
+                                    host.status === 'Released' ? 'text-red-600' :
+                                    host.status === 'Inactive' ? 'text-orange-400' :
+                                    'text-neutral-400'
+                                  }`}
                                   title="Select status"
                                   aria-label="Select status"
+                                  style={{ colorScheme: 'dark' }}
                                 >
-                                  {['Active', 'Intermittent', 'Released', 'Inactive'].map(s => (
-                                    <option key={s} value={s} className="bg-[#0A0A0B] text-[#F0EFE8]">{s}</option>
-                                  ))}
+                                  {['Active', 'Intermittent', 'Released', 'Releasing', 'Inactive'].map(s => {
+                                    let colorClass = 'text-[#F0EFE8]';
+                                    if (s === 'Active') colorClass = 'text-emerald-400 font-bold';
+                                    else if (s === 'Intermittent') colorClass = 'text-yellow-400 font-bold';
+                                    else if (s === 'Releasing') colorClass = 'text-red-400 font-bold';
+                                    else if (s === 'Released') colorClass = 'text-red-600 font-bold';
+                                    else if (s === 'Inactive') colorClass = 'text-orange-400 font-bold';
+                                    return (
+                                      <option key={s} value={s} className={colorClass} style={{ backgroundColor: '#0A0A0B' }}>{s}</option>
+                                    );
+                                  })}
                                 </select>
                               </td>
                               <td className="px-6 py-4">

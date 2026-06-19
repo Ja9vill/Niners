@@ -139,18 +139,20 @@ export const Login = () => {
   };
 
   // ── Shared styles ──────────────────────────────────────────────────────────
-  const inputCls = 'w-full bg-[#0D0D14] border border-white/10 rounded-xl pl-4 pr-12 py-3 text-sm tracking-widest focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37]/50 outline-none transition-all text-[#F0EFE8] placeholder-white/20';
+  const inputCls = 'w-full bg-[#0C0806] border border-white/10 rounded-xl pl-4 pr-12 py-3 text-sm tracking-widest focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37]/50 outline-none transition-all text-[#F0EFE8] placeholder-white/20';
   const labelCls = 'text-[10px] font-black text-[#A09E9A]/60 uppercase tracking-[0.20em] ml-1 block';
   const btnCls   = 'w-full py-3.5 rounded-xl bg-[#D4AF37] text-black text-xs font-black uppercase tracking-[0.25em] transition-all flex items-center justify-center gap-2 active:scale-95 shadow-[0_0_20px_rgba(212,175,55,0.3)] hover:bg-[#c4a133] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed';
 
   return (
-    <div className="w-full flex flex-col items-center justify-center p-4 bg-[#0A0A0F] relative overflow-hidden min-h-[100dvh]">
-      {/* Ambient glow */}
-      <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-[400px] h-[400px] rounded-full bg-[#D4AF37]/5 blur-[120px]" />
+    <div className="w-full flex flex-col items-center justify-center p-4 bg-transparent relative overflow-hidden min-h-[100dvh]">
+      {/* Ambient glow / Fiery gold spotlight */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden">
+        <div className="absolute top-1/4 left-1/4 w-[300px] h-[300px] rounded-full bg-[#D4AF37]/10 blur-[100px]" />
+        <div className="absolute bottom-1/4 right-1/4 w-[350px] h-[350px] rounded-full bg-[#FF6B00]/10 blur-[120px]" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] rounded-full bg-[#D4AF37]/5 blur-[130px]" />
       </div>
 
-      <div className="w-full max-w-sm border border-[#D4AF37]/20 rounded-[24px] p-6 space-y-6 bg-[#1A1A28] shadow-2xl relative z-10">
+      <div className="w-full max-w-sm border border-[#D4AF37]/20 rounded-[24px] p-6 space-y-6 bg-[#120D0A]/75 backdrop-blur-xl shadow-[0_0_50px_rgba(212,175,55,0.12)] relative z-10">
 
         {/* Header */}
         <div className="border-b border-t border-white/5 py-3 flex items-center justify-center gap-2">
