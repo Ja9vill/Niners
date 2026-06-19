@@ -1,0 +1,3 @@
+"scripts": {
+  "new:block": "powershell -ExecutionPolicy Bypass ./scripts/new-block.ps1"
+}
