@@ -53,17 +53,17 @@ export const PublicLanding = () => {
       >
         <div className="glass-card p-8 rounded-3xl border border-white/10 bg-white/[0.03] backdrop-blur-2xl hover:bg-white/[0.06] hover:border-white/20 transition-all shadow-[0_8px_32px_rgba(0,0,0,0.3)]">
           <Star className="text-white mb-4" size={32} />
-          <h3 className="text-lg font-black text-white mb-2 uppercase tracking-wide">Elite Network</h3>
+          <h2 className="text-lg font-black text-white mb-2 uppercase tracking-wide">Elite Network</h2>
           <p className="text-sm text-[#A09E9A] leading-relaxed">Join a curated network of the highest earning hosts in the ecosystem. Access exclusive networking and collaborations.</p>
         </div>
         <div className="glass-card p-8 rounded-3xl border border-[#D4AF37]/20 bg-gradient-to-br from-[#D4AF37]/10 to-transparent backdrop-blur-2xl hover:bg-[#D4AF37]/10 hover:border-[#D4AF37]/40 transition-all shadow-[0_8px_32px_rgba(0,0,0,0.3)]">
           <Trophy className="text-[#D4AF37] mb-4" size={32} />
-          <h3 className="text-lg font-black text-[#D4AF37] mb-2 uppercase tracking-wide">Weekly Rewards</h3>
+          <h2 className="text-lg font-black text-[#D4AF37] mb-2 uppercase tracking-wide">Weekly Rewards</h2>
           <p className="text-sm text-[#A09E9A] leading-relaxed">Top performers receive agency-exclusive bonuses, spotlight features, and custom award badges.</p>
         </div>
         <div className="glass-card p-8 rounded-3xl border border-white/10 bg-white/[0.03] backdrop-blur-2xl hover:bg-white/[0.06] hover:border-white/20 transition-all shadow-[0_8px_32px_rgba(0,0,0,0.3)]">
           <Sparkles className="text-white mb-4" size={32} />
-          <h3 className="text-lg font-black text-white mb-2 uppercase tracking-wide">Growth Tools</h3>
+          <h2 className="text-lg font-black text-white mb-2 uppercase tracking-wide">Growth Tools</h2>
           <p className="text-sm text-[#A09E9A] leading-relaxed">Access data-driven insights, livehouse queuing systems, and dedicated talent managers to boost your hours.</p>
         </div>
       </motion.div>

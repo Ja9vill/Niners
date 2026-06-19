@@ -297,8 +297,18 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
     setLivehouseRequests(updatedRequests);
     Storage.setLivehouseRequests(updatedRequests);
     // Create Calendar Event
+    const uuid = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 15);
     const newEvent: CalendarEvent = {
-      event_id: crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 15),
+      id: uuid,
+      type_of_event: req.livehouseType || 'SOLO LIVEHOUSE',
+      event_date: req.date,
+      participants_id: [req.poppoId],
+      created_by_id: auth.poppo_id || 'Unknown',
+      created_by_name: auth.nickname || auth.name || 'Admin',
+      created_by_role: auth.role || 'Admin',
+      timestamp: new Date().toISOString(),
+
+      event_id: uuid,
       poppo_id: req.poppoId,
       event_host_id: req.poppoId,
       title: `Livehouse: ${req.name}`,
@@ -307,13 +317,9 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
       time: req.timeslot,
       type: (req.livehouseType || 'SOLO LIVEHOUSE') as EventType,
       location: 'VIRTUAL ROOM (LIVEHOUSE)',
-      created_by_name: auth.nickname || auth.name || 'Admin',
-      created_by_role: auth.role || 'Admin',
-      created_by_id: auth.poppo_id || auth.id || 'Unknown',
       visibility: 'All',
       participants: [req.poppoId],
-      participantIds: [req.poppoId],
-      timestamp: new Date().toISOString()
+      participantIds: [req.poppoId]
     };
 
     const updatedEvents = [...events, newEvent];
@@ -491,23 +497,32 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
     const formData = new FormData(e.currentTarget);
     const isTalent = auth.role === 'Talent';
 
+    const uuid = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 15);
+    const eventType = formData.get('type') as string || 'Agency Event';
+    const eventDate = formData.get('date') as string;
+
     const newEvent: CalendarEvent = {
-      event_id: crypto.randomUUID(),
+      id: uuid,
+      type_of_event: eventType,
+      event_date: eventDate,
+      participants_id: [...selectedParticipants],
+      created_by_id: auth.poppo_id || 'Unknown',
+      created_by_name: auth.name,
+      created_by_role: auth.role,
+      timestamp: new Date().toISOString(),
+
+      event_id: uuid,
       poppo_id: isTalent ? auth.poppo_id : (formData.get('hostId') as string || 'Agency'),
       event_host_id: formData.get('eventHostId') as string || '',
       title: formData.get('title') as string,
       description: formData.get('description') as string,
-      date: formData.get('date') as string,
+      date: eventDate,
       time: formData.get('time') as string,
-      type: formData.get('type') as string || 'Agency Event',
+      type: eventType,
       location: formData.get('location') as string || 'ONLINE',
-      created_by_name: auth.name,
-      created_by_role: auth.role,
-      created_by_id: auth.poppo_id || auth.id || 'Unknown',
       visibility: formData.get('visibility') as any || 'All',
       participants: [...selectedParticipants],
-      participantIds: [...selectedParticipants], // alias for Firestore array-contains queries
-      timestamp: new Date().toISOString()
+      participantIds: [...selectedParticipants] // alias for Firestore array-contains queries
     };
     
     const updated = [...events, newEvent];
@@ -535,8 +550,9 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
         {/* Main Calendar Section */}
         <div className="space-y-6">
           {/* View Toggles & Navigation controls */}
-          <div className="flex flex-col sm:flex-row items-center justify-between bg-[#0F1117] border border-[#D4AF37]/40 p-4 rounded-2xl gap-4 shadow-[0_0_15px_rgba(212,175,55,0.15)]">
-            <div className="flex items-center gap-2 bg-[#0A0B0E] p-1.5 rounded-xl border border-[#D4AF37]/20 w-full sm:w-auto">
+          <div className="relative overflow-hidden flex flex-col sm:flex-row items-center justify-between backdrop-blur-xl bg-gradient-to-br from-[#120F0A]/90 via-[#0C0C12]/95 to-[#22180A]/80 border border-[#D4AF37]/35 p-4 rounded-2xl gap-4 shadow-[0_8px_32px_0_rgba(0,0,0,0.5),0_0_20px_rgba(212,175,55,0.15)]">
+            <div className="absolute inset-0 bg-gradient-to-tr from-[#FF9F0D]/5 via-transparent to-[#FF3B00]/5 pointer-events-none rounded-2xl" />
+            <div className="relative z-10 flex items-center gap-2 bg-[#0A0B0E]/60 p-1.5 rounded-xl border border-[#D4AF37]/20 w-full sm:w-auto">
               <button 
                 onClick={() => setViewMode('week')}
                 className={cn(
@@ -557,7 +573,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
               </button>
             </div>
 
-            <div className="flex items-center gap-4">
+            <div className="relative z-10 flex items-center gap-4">
               <button 
                 title="Previous"
                 onClick={viewMode === 'week' ? goToPreviousWeek : goToPreviousMonth} 
@@ -586,48 +602,54 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
           {viewMode === 'week' ? (
             /* 7-Day Calendar Grid */
             <div className="overflow-x-auto pb-4 -mx-4 px-4 sm:mx-0 sm:px-0 custom-scrollbar">
-              <div className="grid grid-cols-7 gap-2 md:gap-4 bg-[#0B0D12] p-4 rounded-3xl border border-[#D4AF37]/40 shadow-[0_0_15px_rgba(212,175,55,0.15)] min-w-[700px]">
-                {weekDays.map((day, idx) => {
-                  const dayName = format(day, 'EEEE');
-                  const dayAbbr = format(day, 'EEE').toUpperCase();
-                  const dayNum = format(day, 'd');
-                  const isSelected = isSameDay(day, selectedDate);
-                  const dayEventsCount = getEventsForDay(day).length;
+              <div className="relative overflow-hidden bg-gradient-to-br from-[#120F0A]/90 via-[#0C0C12]/95 to-[#22180A]/80 p-4 rounded-3xl border border-[#D4AF37]/35 shadow-[0_8px_32px_0_rgba(0,0,0,0.5),0_0_20px_rgba(212,175,55,0.15)] min-w-[700px]">
+                <div className="absolute inset-0 bg-gradient-to-tr from-[#FF9F0D]/5 via-transparent to-[#FF3B00]/5 pointer-events-none rounded-3xl" />
+                <div className="relative z-10 grid grid-cols-7 gap-2 md:gap-4">
+                  {weekDays.map((day, idx) => {
+                    const dayName = format(day, 'EEEE');
+                    const dayAbbr = format(day, 'EEE').toUpperCase();
+                    const dayNum = format(day, 'd');
+                    const isSelected = isSameDay(day, selectedDate);
+                    const dayEventsCount = getEventsForDay(day).length;
+                    const isToday = isSameDay(day, new Date());
 
-                  return (
-                    <div key={idx} className="flex flex-col items-center gap-2">
-                      <span className="text-[9px] font-black uppercase tracking-[0.1em] text-white/30 text-center truncate w-full">
-                        {dayName}
-                      </span>
-                      <button
-                        onClick={() => handleDateClick(day)}
-                        className={cn(
-                          "w-full py-4 rounded-2xl flex flex-col items-center justify-center gap-1.5 transition-all border cursor-pointer select-none relative bg-gradient-to-br",
-                          isSelected 
-                            ? "from-indigo-950 to-slate-900 ring-1 ring-purple-500 shadow-[0_0_15px_rgba(168,85,247,0.4)] border-transparent" 
-                            : "from-[#0F1117] to-[#13161F] border-[#D4AF37]/10 hover:border-purple-500/50 hover:from-slate-900 hover:to-indigo-950/40 text-white"
-                        )}
-                      >
-                        <span className={cn("text-[9px] font-black tracking-widest uppercase", isSelected ? "text-purple-400" : "text-white/40")}>{dayAbbr}</span>
-                        <span className={cn("text-lg font-black tracking-tight", isSelected ? "text-white" : "")}>{dayNum}</span>
-                        {dayEventsCount > 0 && !isSelected && <span className="absolute bottom-1.5 w-1.5 h-1.5 rounded-full bg-purple-500 shadow-[0_0_8px_rgba(168,85,247,0.8)]" />}
-                      </button>
-                    </div>
-                  );
-                })}
+                    return (
+                      <div key={idx} className="flex flex-col items-center gap-2">
+                        <span className="text-[9px] font-black uppercase tracking-[0.1em] text-white/30 text-center truncate w-full">
+                          {dayName}
+                        </span>
+                        <button
+                          onClick={() => handleDateClick(day)}
+                          className={cn(
+                            "w-full py-4 rounded-2xl flex flex-col items-center justify-center gap-1.5 transition-all border cursor-pointer select-none relative bg-gradient-to-br",
+                            isSelected 
+                              ? "from-[#550A61]/90 via-[#37043F]/95 to-[#1A011E]/90 ring-1 ring-[#9216a4] shadow-[0_0_15px_rgba(146,22,164,0.45)] border-transparent" 
+                              : "from-[#1C1710]/40 to-[#0F0E0A]/60 border-[#D4AF37]/10 hover:border-[#D4AF37]/40 hover:from-[#261F12]/60 hover:to-[#17130B]/80 text-white",
+                            isToday && !isSelected && "ring-1 ring-[#FF5E36] border-transparent"
+                          )}
+                        >
+                          <span className={cn("text-[9px] font-black tracking-widest uppercase", isSelected ? "text-[#E88BEA]" : "text-white/40")}>{dayAbbr}</span>
+                          <span className={cn("text-lg font-black tracking-tight", isSelected ? "text-[#E88BEA]" : isToday ? "text-[#FF5E36]" : "")}>{dayNum}</span>
+                          {dayEventsCount > 0 && !isSelected && <span className="absolute bottom-1.5 w-1.5 h-1.5 rounded-full bg-[#E8C44A] shadow-[0_0_8px_rgba(232,196,74,0.8)]" />}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             </div>
           ) : (
             /* Monthly Grid View */
-            <div className="bg-[#0B0D12] p-4 rounded-3xl border border-[#D4AF37]/10 shadow-xl">
-              <div className="grid grid-cols-7 gap-1 mb-2">
+            <div className="relative overflow-hidden backdrop-blur-xl bg-gradient-to-br from-[#120F0A]/90 via-[#0C0C12]/95 to-[#22180A]/80 p-4 rounded-3xl border border-[#D4AF37]/35 shadow-[0_8px_32px_0_rgba(0,0,0,0.5),0_0_20px_rgba(212,175,55,0.15)]">
+              <div className="absolute inset-0 bg-gradient-to-tr from-[#FF9F0D]/5 via-transparent to-[#FF3B00]/5 pointer-events-none rounded-3xl" />
+              <div className="relative z-10 grid grid-cols-7 gap-1 mb-2">
                 {['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'].map(day => (
                   <div key={day} className="text-center text-[9px] font-black uppercase tracking-widest text-white/30 py-2">
                     {day}
                   </div>
                 ))}
               </div>
-              <div className="grid grid-cols-7 gap-1 sm:gap-2">
+              <div className="relative z-10 grid grid-cols-7 gap-1 sm:gap-2">
                 {monthDays.map((day, idx) => {
                   const isCurrentMonth = isSameMonth(day, currentDate);
                   const isSelected = isSameDay(day, selectedDate);
@@ -640,14 +662,14 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                       onClick={() => handleDateClick(day)}
                       className={cn(
                         "aspect-square p-1 sm:p-2 rounded-xl border flex flex-col items-center justify-start gap-1 transition-all cursor-pointer relative group bg-gradient-to-br",
-                        !isCurrentMonth ? "opacity-30 border-transparent hover:opacity-100" : "border-[#D4AF37]/5 hover:border-purple-500/50",
-                        isSelected ? "from-indigo-950 to-slate-900 ring-1 ring-purple-500 shadow-[0_0_15px_rgba(168,85,247,0.4)] border-transparent" : "from-[#0F1117] to-[#13161F] hover:from-slate-900 hover:to-indigo-950/40",
-                        isToday && !isSelected && "ring-1 ring-[#ec4899] border-transparent"
+                        !isCurrentMonth ? "opacity-30 border-transparent hover:opacity-100" : "border-[#D4AF37]/5 hover:border-[#D4AF37]/40",
+                        isSelected ? "from-[#550A61]/90 via-[#37043F]/95 to-[#1A011E]/90 ring-1 ring-[#9216a4] shadow-[0_0_15px_rgba(146,22,164,0.45)] border-transparent" : "from-[#1C1710]/40 to-[#0F0E0A]/60 hover:from-[#261F12]/60 hover:to-[#17130B]/80",
+                        isToday && !isSelected && "ring-1 ring-[#FF5E36] border-transparent"
                       )}
                     >
                       <span className={cn(
                         "text-xs sm:text-sm font-black tracking-tight mt-1",
-                        isSelected ? "text-purple-400" : isToday ? "text-[#ec4899]" : "text-white"
+                        isSelected ? "text-[#E88BEA]" : isToday ? "text-[#FF5E36]" : "text-white"
                       )}>
                         {format(day, 'd')}
                       </span>
@@ -668,34 +690,34 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
           )}
 
           {/* Scheduled Events Panel */}
-          <div className="bg-gradient-to-br from-[#0F1117] to-[#12141A] rounded-3xl border border-[#D4AF37]/40 p-5 space-y-4 shadow-[0_0_15px_rgba(212,175,55,0.15)] relative overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-tr from-purple-500/5 via-transparent to-indigo-500/5 pointer-events-none" />
+          <div className="relative overflow-hidden backdrop-blur-xl bg-gradient-to-br from-[#120F0A]/90 via-[#0C0C12]/95 to-[#22180A]/80 rounded-3xl border border-[#D4AF37]/35 p-5 space-y-4 shadow-[0_8px_32px_0_rgba(0,0,0,0.5),0_0_20px_rgba(212,175,55,0.15)]">
+            <div className="absolute inset-0 bg-gradient-to-tr from-[#FF9F0D]/5 via-transparent to-[#FF3B00]/5 pointer-events-none rounded-3xl" />
             
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-[#D4AF37]/20 pb-4 gap-4">
+            <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between border-b border-[#D4AF37]/20 pb-4 gap-4">
               <div className="flex items-center gap-3">
-                <div className="w-2.5 h-2.5 rounded-full bg-purple-400 shadow-[0_0_8px_rgba(168,85,247,0.8)]" />
+                <div className="w-2.5 h-2.5 rounded-full bg-[#E8C44A] shadow-[0_0_8px_rgba(232,196,74,0.8)]" />
                 <h3 className="text-xs font-black uppercase tracking-widest text-white/90">
                   Scheduled Events
                 </h3>
               </div>
               
               <div className="flex items-center gap-2">
-                <Globe size={14} className="text-purple-400" />
+                <Globe size={14} className="text-[#E8C44A]" />
                 <select 
                   title="Select timezone"
                   aria-label="Select timezone"
                   value={selectedTimezone}
                   onChange={(e) => setSelectedTimezone(e.target.value)}
-                  className="bg-[#0A0B0E] border border-purple-500/30 rounded-lg px-2 py-1 text-[10px] font-bold text-white/80 focus:border-purple-400 focus:ring-1 focus:ring-purple-400 outline-none cursor-pointer tracking-widest uppercase appearance-none"
+                  className="bg-[#0A0B0E]/60 border border-[#D4AF37]/30 rounded-lg px-2 py-1 text-[10px] font-bold text-white/80 focus:border-[#E8C44A] focus:ring-1 focus:ring-[#E8C44A] outline-none cursor-pointer tracking-widest uppercase appearance-none"
                 >
                   {TIMEZONES.map(tz => (
-                    <option key={tz.value} value={tz.value}>{tz.label}</option>
+                    <option key={tz.value} value={tz.value} className="bg-[#120F0A]">{tz.label}</option>
                   ))}
                 </select>
               </div>
             </div>
 
-            <div className="space-y-3 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
+            <div className="relative z-10 space-y-3 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
               {selectedDayEvents.length > 0 ? (
                 selectedDayEvents
                   .sort((a, b) => a.time.localeCompare(b.time))
@@ -711,16 +733,16 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                     <button
                       key={e.event_id}
                       onClick={() => setSelectedEventId(e.event_id)}
-                      className="w-full text-left p-4 rounded-xl bg-gradient-to-r from-[#0A0B0E] to-[#13161F] border border-[#D4AF37]/5 hover:border-purple-500/50 transition-all flex gap-4 group items-center cursor-pointer shadow-lg hover:shadow-purple-500/10"
+                      className="w-full text-left p-4 rounded-xl bg-gradient-to-r from-[#16120C]/40 to-[#0F0E0A]/60 border border-[#D4AF37]/10 hover:border-[#D4AF37]/45 transition-all flex gap-4 group items-center cursor-pointer shadow-lg hover:shadow-[#D4AF37]/10"
                     >
                       <div className={cn("w-1 h-10 rounded-full shrink-0 bg-gradient-to-b", colorConfig.gradient)} />
                       <div className="flex-1 min-w-0 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                         <div>
-                          <h4 className="text-sm font-black text-white truncate group-hover:text-purple-400 transition-colors">{e.title}</h4>
+                          <h4 className="text-sm font-black text-white truncate group-hover:text-[#E8C44A] transition-colors">{e.title}</h4>
                           <p className="text-[10px] text-slate-300 mt-0.5 line-clamp-1">{e.description || 'No description provided.'}</p>
                         </div>
                         <div className="flex flex-col sm:items-end gap-1 shrink-0">
-                          <span className="text-xs font-black text-purple-300 tracking-wider bg-purple-500/10 px-2 py-1 rounded-md border border-purple-500/20">{displayTime}</span>
+                          <span className="text-xs font-black text-[#E8C44A] tracking-wider bg-[#D4AF37]/10 px-2 py-1 rounded-md border border-[#D4AF37]/20">{displayTime}</span>
                         </div>
                       </div>
                     </button>
@@ -738,11 +760,11 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
             
             {/* Action Buttons for interactive page only */}
             {!isReadOnly && (
-              <div className="pt-4 border-t border-purple-500/10 flex flex-col sm:flex-row gap-3">
+              <div className="relative z-10 pt-4 border-t border-[#D4AF37]/15 flex flex-col sm:flex-row gap-3">
                 {auth.level > 0 && (
                   <button 
                     onClick={() => setIsAdding(true)} 
-                    className="flex-1 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-black uppercase tracking-wider text-xs py-3.5 rounded-xl cursor-pointer flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(168,85,247,0.4)] transition-all transform active:scale-95 border border-purple-400/50"
+                    className="flex-1 bg-gradient-to-r from-[#D4AF37] to-[#FF9F0D] hover:from-[#E8C44A] hover:to-[#FFB74D] text-black font-black uppercase tracking-wider text-xs py-3.5 rounded-xl cursor-pointer flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(212,175,55,0.4)] transition-all transform active:scale-95 border border-[#FFAC1C]/50"
                   >
                     <Plus size={16} />
                     Add Event Entry
@@ -752,7 +774,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                 {['talent', 'host'].includes(auth.role?.toLowerCase() || '') && (
                   <button 
                     onClick={() => setIsReservingLivehouse(true)} 
-                    className="flex-1 bg-slate-900 border border-purple-500/50 hover:bg-purple-500/10 text-purple-400 hover:text-white font-black uppercase tracking-[0.2em] text-xs py-3.5 rounded-xl cursor-pointer flex items-center justify-center gap-2 shadow-xl transition-all transform active:scale-95"
+                    className="flex-1 bg-slate-900 border border-[#D4AF37]/50 hover:bg-[#D4AF37]/10 text-[#D4AF37] hover:text-white font-black uppercase tracking-[0.2em] text-xs py-3.5 rounded-xl cursor-pointer flex items-center justify-center gap-2 shadow-xl transition-all transform active:scale-95"
                   >
                     <Clock size={16} />
                     SCHEDULE LIVEHOUSE
