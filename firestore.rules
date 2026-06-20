@@ -131,20 +131,15 @@ service cloud.firestore {
       allow read: if isSignedIn();
 <<<<<<< HEAD
       // Regular creates are allowed (if not bulk), updates must respect the lock
-      allow create: if isLeadership() || isAdmin() || isAgent();
-      allow update, delete: if isLeadership() || ((isAdmin() || isAgent()) && isNotLocked());
-    }
-    match /performance_weekly_reports/{reportId} {
-      allow read: if isSignedIn();
-      allow create: if isLeadership() || isAdmin() || isAgent();
-      allow update, delete: if isLeadership() || ((isAdmin() || isAgent()) && isNotLocked());
-=======
       allow write: if isLeadership() || isAdmin();
     }
     match /performance_weekly_reports/{reportId} {
       allow read: if isSignedIn();
       allow write: if isLeadership() || isAdmin();
->>>>>>> 2b42d3ae84c3e300e1faeb35e7009a759158d1e9
+    }
+    match /user_performance_reports/{reportId} {
+      allow read: if isSignedIn();
+      allow write: if isLeadership() || isAdmin();
     }
 
     // 3. fanbase_reports Collection Rules
@@ -155,21 +150,12 @@ service cloud.firestore {
       allow update, delete: if isLeadership() || (isAdmin() && isNotLocked());
 =======
       allow write: if isSignedIn();
->>>>>>> 2b42d3ae84c3e300e1faeb35e7009a759158d1e9
+      allow write: if isSignedIn();
     }
 
     // 4. pk_reports Collection Rules
     match /pk_reports/{reportId} {
       allow read: if isSignedIn();
-<<<<<<< HEAD
-      allow create: if isSignedIn();
-      allow update, delete: if isLeadership() || (isAdmin() && isNotLocked());
-=======
-      allow write: if isSignedIn();
->>>>>>> 2b42d3ae84c3e300e1faeb35e7009a759158d1e9
-    }
-
-<<<<<<< HEAD
     // 5. events Collection Rules
     match /events/{eventId} {
       // Hidden events (marked as Director Only) can only be read by Directors
@@ -271,6 +257,12 @@ service cloud.firestore {
     
     // 7. Director specific collections
     match /activity_logs/{logId} {
+      allow read, write: if isLeadership();
+    }
+    match /activity_audit_logs/{logId} {
+      allow read, write: if isLeadership();
+    }
+    match /system_logs/{logId} {
       allow read, write: if isLeadership();
     }
     match /earnings_summaries/{summaryId} {
