@@ -183,16 +183,15 @@ async function runInitialization() {
 
   // attendance template
   const attendanceTemplate = {
-    eventDate: admin.firestore.Timestamp.now(),
-    timeslot: "",
-    eventType: "",
-    description: "",
-    participantIds: [],
-    status: "",
-    actualParticipants: [],
-    adminFeedback: "",
-    createdBy: "",
-    attendanceSubmittedBy: {}
+    poppo_id: "",
+    event_id: "",
+    event_date: "",
+    attendees: [],
+    created_by_id: "",
+    created_by_name: "",
+    created_by_role: "",
+    created_at: admin.firestore.Timestamp.now(),
+    attendance_rating: 0
   };
   await db.collection("attendance").doc("_schema_template").set(attendanceTemplate);
   console.log("✅ Initialized 'attendance' collection template.");
