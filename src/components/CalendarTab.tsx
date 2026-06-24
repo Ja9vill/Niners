@@ -933,7 +933,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
       try {
         const currentAuth = Storage.getAuthState();
         const token = currentAuth?.token || '';
-        const res = await fetch('/api/audit/attendance', {
+        const res = await fetch('/api/attendance', {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         if (!res.ok) {
