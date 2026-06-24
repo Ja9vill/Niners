@@ -335,6 +335,33 @@ router.post("/reports/performance", verifyFirebaseToken, async (req: any, res: a
   }
 });
 
+// GET: attendance records (all or filtered by event_id)
+router.get("/attendance", verifyFirebaseToken, async (req: any, res: any) => {
+  try {
+    const db = getAdminFirestore();
+    const { event_id } = req.query;
+
+    if (event_id) {
+      const docSnap = await db.collection("attendance").doc(String(event_id)).get();
+      if (docSnap.exists) {
+        return res.json([{ id: docSnap.id, ...docSnap.data() }]);
+      }
+      const snap = await db.collection("attendance").where("event_id", "==", String(event_id)).get();
+      if (!snap.empty) {
+        return res.json(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      }
+      const snap2 = await db.collection("attendance").where("eventId", "==", String(event_id)).get();
+      return res.json(snap2.docs.map(d => ({ id: d.id, ...d.data() })));
+    }
+
+    const snap = await db.collection("attendance").get();
+    return res.json(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+  } catch (error: any) {
+    console.error("Error in GET /attendance:", error);
+    return res.status(500).json({ error: error?.message || "Internal server error" });
+  }
+});
+
 // POST: attendance
 router.post("/attendance", verifyFirebaseToken, async (req: any, res: any) => {
   try {

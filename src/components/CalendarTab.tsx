@@ -927,20 +927,26 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
   const [attErrors, setAttErrors] = useState<string[]>([]);
   const [attSuccessMsg, setAttSuccessMsg] = useState('');
 
-  // Load attendance records from Firestore on mount
+  // Load attendance records from server API on mount (client SDK lacks permission for attendance collection)
   useEffect(() => {
     const loadAttendance = async () => {
       try {
-        const snapshot = await getDocs(collection(db, 'attendance'));
-        const list = snapshot.docs.map(d => {
-          const data = d.data() as any;
-          return {
-            ...data,
-            id: d.id,
-            eventId: data.event_id || data.eventId || '',
-            event_id: data.event_id || data.eventId || ''
-          };
+        const currentAuth = Storage.getAuthState();
+        const token = currentAuth?.token || '';
+        const res = await fetch('/api/audit/attendance', {
+          headers: { 'Authorization': `Bearer ${token}` }
         });
+        if (!res.ok) {
+          console.warn("Attendance API returned", res.status);
+          return;
+        }
+        const rawData = await res.json();
+        const list = (Array.isArray(rawData) ? rawData : []).map((d: any) => ({
+          ...d,
+          id: d.id || '',
+          eventId: d.event_id || d.eventId || '',
+          event_id: d.event_id || d.eventId || ''
+        }));
         setAttendanceRecords(list);
       } catch (err) {
         console.error("Failed to load attendance logs in CalendarTab:", err);
