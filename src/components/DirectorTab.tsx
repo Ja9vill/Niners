@@ -107,8 +107,6 @@ export const DirectorTab = () => {
   const hasAccess = isDirector || isHeadAdmin || isAgent;
 
   // Sidebar views: roster_management, financials, system_logs, create_user
-  const [activeView, setActiveView] = useState<string>('roster_management');
-  
   const [activeView, setActiveView] = useState<string>(isAgent && !isDirector && !isHeadAdmin ? 'financials' : 'roster_management');
 
   // Data State

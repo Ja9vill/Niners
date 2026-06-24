@@ -3528,7 +3528,6 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
 
   const [editLevel, setEditLevel] = useState<number>(host.level || 1);
   const [isProcessingPhoto, setIsProcessingPhoto] = useState(false);
-  const [managersList, setManagersList] = useState<{ id: string; name: string; photoUrl?: string }[]>([]);
   const [managersList, setManagersList] = useState<any[]>([]);
 
   const assignedManager = useMemo(() => {

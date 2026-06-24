@@ -2046,15 +2046,16 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                                 <div className={`grid gap-3 ${isLarge ? 'grid-cols-4' : 'grid-cols-4 sm:grid-cols-6'}`}>
                                   {displayAttendees.map((att: any, idx: number) => {
                                     const pid = typeof att === 'string' ? att : (att.poppoId || att.poppo_id || att.id || att.participantId);
+                                    const attendeeNickname = typeof att === 'string' ? pid : (att.nickname || att.name || pid);
+                                    const attendeeRole = typeof att === 'string' ? '' : (att.role || '');
                                     const pUser = allUsers.find(u => String(u.poppo_id || u.poppoId || u.id) === String(pid));
-                                    const pName = pUser ? (pUser.nickname || pUser.name) : pid;
                                     const pPhoto = pUser ? (pUser.photoUrl || pUser.profilePhotoUrl || pUser.photoURL) : null;
-                                    const avatar = pPhoto || `https://ui-avatars.com/api/?name=${encodeURIComponent(pName)}&background=0a0806&color=D4AF37`;
+                                    const avatar = pPhoto || `https://ui-avatars.com/api/?name=${encodeURIComponent(attendeeNickname)}&background=0a0806&color=D4AF37`;
                                     
                                     return (
                                       <div key={idx} className="flex flex-col items-center justify-start gap-1.5 p-1 transition-transform hover:scale-105">
-                                        <img src={avatar} alt={pName} className={`${isLarge ? 'w-14 h-14 sm:w-16 sm:h-16' : 'w-10 h-10'} rounded-full border border-[#D4AF37]/30 object-cover shadow-[0_0_10px_rgba(212,175,55,0.1)]`} />
-                                        <span className={`${isLarge ? 'text-[10px] sm:text-xs' : 'text-[9px]'} font-bold text-white/80 text-center leading-tight line-clamp-1 w-full`} title={pName}>{pName}</span>
+                                        <img src={avatar} alt={attendeeNickname} className={`${isLarge ? 'w-14 h-14 sm:w-16 sm:h-16' : 'w-10 h-10'} rounded-full border border-[#D4AF37]/30 object-cover shadow-[0_0_10px_rgba(212,175,55,0.1)]`} />
+                                        <span className={`${isLarge ? 'text-[10px] sm:text-xs' : 'text-[9px]'} font-bold text-white/80 text-center leading-tight line-clamp-1 w-full`} title={attendeeNickname}>{attendeeNickname}</span>
                                       </div>
                                     )
                                   })}

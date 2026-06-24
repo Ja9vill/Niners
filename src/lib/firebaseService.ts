@@ -609,6 +609,42 @@ export const FirebaseService = {
         errors.push(`${col}: ${error.message}`);
       }
     }
+
+    // 3. Fetch from {role}_profile collections to get photos and extra data
+    const profileCols = ['host_profile', 'manager_profile', 'admin_profile', 'head_admin_profile', 'agent_profile', 'director_profile'];
+    for (const col of profileCols) {
+      try {
+        const snapshot = await getDocs(collection(db, col));
+        snapshot.docs.forEach(d => {
+          const id = d.id;
+          const data = d.data();
+          const poppoId = data.poppo_id || id;
+
+          // Merge profile data into existing user record (profile OVERWRITES users data)
+          if (metadataMap[poppoId]) {
+            metadataMap[poppoId] = {
+              ...metadataMap[poppoId],
+              ...data,
+              poppo_id: poppoId,
+              id: poppoId
+            };
+          } else {
+            // Create a new entry if user wasn't in users collection
+            metadataMap[poppoId] = {
+              ...data,
+              id: poppoId,
+              poppo_id: poppoId,
+            };
+          }
+
+          const normRole = normalizeRoleTypography(metadataMap[poppoId].role || col.replace('_profile', ''));
+          metadataMap[poppoId] = sanitizeDocumentByRole(metadataMap[poppoId], normRole);
+        });
+      } catch (error: any) {
+        console.warn(`Could not fetch metadata for profile collection: ${col}`, error);
+        errors.push(`${col}: ${error.message}`);
+      }
+    }
     
     const allMetadata = Object.values(metadataMap).map(item => {
       const data = item as any;
@@ -1242,7 +1278,34 @@ export const FirebaseService = {
     const path = 'calendar';
     try {
       const snapshot = await getDocs(collection(db, path));
-      return snapshot.docs.map(d => d.data() as CalendarEvent);
+      return snapshot.docs.map(d => {
+        const raw = d.data();
+        const eventId = raw.event_id || raw.eventId || d.id;
+        const participants = raw.panticipantids || raw.participantids || raw.participantIds || raw.participants || [];
+        const participantNicknames = raw.participant_nicknames || [];
+        return {
+          ...raw,
+          id: eventId,
+          event_id: eventId,
+          date: raw.event_date || raw.date || '',
+          title: raw.event_tittle || raw.title || '',
+          type: raw.event_type || raw.type || '',
+          time: raw.from_time && raw.to_time ? `${raw.from_time} - ${raw.to_time}` : (raw.time || ''),
+          poppo_id: raw.event_host_id || raw.poppo_id || '',
+          event_host_id: raw.event_host_id || '',
+          description: raw.event_description || raw.description || '',
+          participants: participants,
+          participantIds: participants,
+          participants_id: participants,
+          created_by_id: raw.created_by_id || '',
+          created_by_name: raw.created_by_name || raw.event_host_name || '',
+          created_by_role: raw.created_by_role || '',
+          timestamp: raw.timestamp || '',
+          visibility: raw.visibility || '',
+          location: raw.location || '',
+          is_automated: raw.is_automated || false,
+        } as CalendarEvent;
+      });
     } catch (error) {
       handleFirestoreError(error, OperationType.LIST, path);
       return [];

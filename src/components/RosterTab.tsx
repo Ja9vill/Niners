@@ -430,7 +430,7 @@ export const RosterTab: React.FC<RosterTabProps> = ({ isReadOnly = false }) => {
           <p className="text-xs text-[#A09E9A]/40 mt-1">Please adjust your filters or search query above.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 gap-3 sm:gap-4">
           {filteredHosts.map(host => {
             const tierPay = String(host.tier_pay || 'N/A');
             const getTierStyle = () => {
