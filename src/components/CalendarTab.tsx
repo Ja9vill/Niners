@@ -159,39 +159,45 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
     try {
       let data = null;
 
-      // 1. Try direct doc lookup by event_id as document ID
+      // 0. Try local cache first (attendanceRecords loaded on mount)
       if (event.event_id) {
-        const docRef = doc(db, 'attendance', event.event_id);
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) {
-          data = { ...docSnap.data(), id: docSnap.id };
+        const localMatch = attendanceRecords.find(r => r.event_id === event.event_id || r.eventId === event.event_id);
+        if (localMatch) {
+          data = { ...localMatch };
         }
+      }
+
+      // 1. Try direct doc lookup by event_id as document ID
+      if (!data && event.event_id) {
+        try {
+          const docRef = doc(db, 'attendance', event.event_id);
+          const docSnap = await getDoc(docRef);
+          if (docSnap.exists()) {
+            data = { ...docSnap.data(), id: docSnap.id };
+          }
+        } catch (e) { /* permission denied or not found */ }
       }
 
       // 2. Fallback: query by event_id or eventId field
       if (!data && event.event_id) {
-        const q = query(collection(db, 'attendance'), where('event_id', '==', event.event_id));
-        const qs = await getDocs(q);
-        if (!qs.empty) {
-          data = { ...qs.docs[0].data(), id: qs.docs[0].id };
-        }
+        try {
+          const q = query(collection(db, 'attendance'), where('event_id', '==', event.event_id));
+          const qs = await getDocs(q);
+          if (!qs.empty) {
+            data = { ...qs.docs[0].data(), id: qs.docs[0].id };
+          }
+        } catch (e) { /* permission denied or not found */ }
       }
 
       // 2b. Fallback: query by eventId (camelCase)
       if (!data && event.event_id) {
-        const q2 = query(collection(db, 'attendance'), where('eventId', '==', event.event_id));
-        const qs2 = await getDocs(q2);
-        if (!qs2.empty) {
-          data = { ...qs2.docs[0].data(), id: qs2.docs[0].id };
-        }
-      }
-
-      // 3. Fallback: check locally loaded attendanceRecords
-      if (!data && event.event_id) {
-        const localMatch = attendanceRecords.find(r => r.event_id === event.event_id || r.eventId === event.event_id);
-        if (localMatch) {
-          data = localMatch;
-        }
+        try {
+          const q2 = query(collection(db, 'attendance'), where('eventId', '==', event.event_id));
+          const qs2 = await getDocs(q2);
+          if (!qs2.empty) {
+            data = { ...qs2.docs[0].data(), id: qs2.docs[0].id };
+          }
+        } catch (e) { /* permission denied or not found */ }
       }
 
       if (data) {
@@ -244,39 +250,45 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
     try {
       let data = null;
 
-      // 1. Try direct doc lookup by event_id as document ID
+      // 0. Try local cache first (attendanceRecords loaded on mount)
       if (event.event_id) {
-        const docRef = doc(db, 'attendance', event.event_id);
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) {
-          data = { ...docSnap.data(), id: docSnap.id };
+        const localMatch = attendanceRecords.find(r => r.event_id === event.event_id || r.eventId === event.event_id);
+        if (localMatch) {
+          data = { ...localMatch };
         }
+      }
+
+      // 1. Try direct doc lookup by event_id as document ID
+      if (!data && event.event_id) {
+        try {
+          const docRef = doc(db, 'attendance', event.event_id);
+          const docSnap = await getDoc(docRef);
+          if (docSnap.exists()) {
+            data = { ...docSnap.data(), id: docSnap.id };
+          }
+        } catch (e) { /* permission denied or not found */ }
       }
 
       // 2. Fallback: query by event_id or eventId field
       if (!data && event.event_id) {
-        const q = query(collection(db, 'attendance'), where('event_id', '==', event.event_id));
-        const qs = await getDocs(q);
-        if (!qs.empty) {
-          data = { ...qs.docs[0].data(), id: qs.docs[0].id };
-        }
+        try {
+          const q = query(collection(db, 'attendance'), where('event_id', '==', event.event_id));
+          const qs = await getDocs(q);
+          if (!qs.empty) {
+            data = { ...qs.docs[0].data(), id: qs.docs[0].id };
+          }
+        } catch (e) { /* permission denied or not found */ }
       }
 
       // 2b. Fallback: query by eventId (camelCase)
       if (!data && event.event_id) {
-        const q2 = query(collection(db, 'attendance'), where('eventId', '==', event.event_id));
-        const qs2 = await getDocs(q2);
-        if (!qs2.empty) {
-          data = { ...qs2.docs[0].data(), id: qs2.docs[0].id };
-        }
-      }
-
-      // 3. Fallback: check locally loaded attendanceRecords
-      if (!data && event.event_id) {
-        const localMatch = attendanceRecords.find(r => r.event_id === event.event_id || r.eventId === event.event_id);
-        if (localMatch) {
-          data = localMatch;
-        }
+        try {
+          const q2 = query(collection(db, 'attendance'), where('eventId', '==', event.event_id));
+          const qs2 = await getDocs(q2);
+          if (!qs2.empty) {
+            data = { ...qs2.docs[0].data(), id: qs2.docs[0].id };
+          }
+        } catch (e) { /* permission denied or not found */ }
       }
 
       if (data) {
@@ -920,7 +932,15 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
     const loadAttendance = async () => {
       try {
         const snapshot = await getDocs(collection(db, 'attendance'));
-        const list = snapshot.docs.map(d => ({ ...d.data(), id: d.id }));
+        const list = snapshot.docs.map(d => {
+          const data = d.data() as any;
+          return {
+            ...data,
+            id: d.id,
+            eventId: data.event_id || data.eventId || '',
+            event_id: data.event_id || data.eventId || ''
+          };
+        });
         setAttendanceRecords(list);
       } catch (err) {
         console.error("Failed to load attendance logs in CalendarTab:", err);
