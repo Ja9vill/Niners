@@ -46,49 +46,30 @@ service cloud.firestore {
       return isLeadership() || isAdmin() || isManager() || isAgent();
     }
 
-<<<<<<< HEAD
-<<<<<<< HEAD
     function isNotLocked() {
       return resource == null || !resource.data.keys().hasAll(['isLocked']) || resource.data.isLocked != true;
     }
 
     // 0. staging_queue Collection Rules
     match /staging_queue/{queueId} {
-      // Anyone signed in can read staging items (or we can restrict to staff)
       allow read: if isStaff();
-      // Anyone signed in can submit to the staging queue
       allow create: if isSignedIn();
-      // Only leadership can approve/reject
       allow update, delete: if isLeadership();
     }
-
 
     // 1. users Collection Rules
-=======
-=======
-    // 0. staging_queue Collection Rules
-    match /staging_queue/{queueId} {
-      allow read: if isStaff();
-      allow create: if isSignedIn();
-      allow update, delete: if isLeadership();
-    }
-
->>>>>>> 2b42d3ae84c3e300e1faeb35e7009a759158d1e9
-    // 1. users and Role-Based Collections Rules
->>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
     match /users/{userId} {
       allow read: if true;
-      
       allow create: if isLeadership();
       allow update: if isLeadership() || (
         isSignedIn() && request.auth.uid == userId &&
         request.resource.data.role == resource.data.role &&
-        request.resource.data.poppoId == resource.data.poppoId &&
-        (resource.data.assignedManagerId == null ? request.resource.data.assignedManagerId == null : request.resource.data.assignedManagerId == resource.data.assignedManagerId)
+        request.resource.data.poppoId == resource.data.poppoId
       );
       allow delete: if isLeadership();
     }
 
+    // Role-based document collections
     match /host/{userId} {
       allow read: if true;
       allow create, delete: if isLeadership();
@@ -125,12 +106,35 @@ service cloud.firestore {
       allow update: if isLeadership() || (isSignedIn() && request.auth.uid == userId);
     }
 
+    // Profile collections (new DB schema)
+    match /host_profile/{userId} {
+      allow read: if true;
+      allow write: if isStaff();
+    }
+    match /manager_profile/{userId} {
+      allow read: if true;
+      allow write: if isStaff();
+    }
+    match /admin_profile/{userId} {
+      allow read: if true;
+      allow write: if isStaff();
+    }
+    match /head_admin_profile/{userId} {
+      allow read: if true;
+      allow write: if isStaff();
+    }
+    match /agent_profile/{userId} {
+      allow read: if true;
+      allow write: if isStaff();
+    }
+    match /director_profile/{userId} {
+      allow read: if true;
+      allow write: if isStaff();
+    }
 
     // 2. performance_reports Collection Rules
     match /performance_reports/{reportId} {
       allow read: if isSignedIn();
-<<<<<<< HEAD
-      // Regular creates are allowed (if not bulk), updates must respect the lock
       allow write: if isLeadership() || isAdmin();
     }
     match /performance_weekly_reports/{reportId} {
@@ -141,91 +145,65 @@ service cloud.firestore {
       allow read: if isSignedIn();
       allow write: if isLeadership() || isAdmin();
     }
+    match /director_performance_reports/{reportId} {
+      allow read: if isSignedIn();
+      allow write: if isLeadership() || isAdmin();
+    }
 
     // 3. fanbase_reports Collection Rules
     match /fanbase_reports/{reportId} {
       allow read: if isSignedIn();
-<<<<<<< HEAD
       allow create: if isSignedIn();
       allow update, delete: if isLeadership() || (isAdmin() && isNotLocked());
-=======
-      allow write: if isSignedIn();
-      allow write: if isSignedIn();
     }
 
     // 4. pk_reports Collection Rules
     match /pk_reports/{reportId} {
       allow read: if isSignedIn();
-    // 5. events Collection Rules
-    match /events/{eventId} {
-      // Hidden events (marked as Director Only) can only be read by Directors
-      allow read: if isDirector() || (
-        isSignedIn() && 
-        (!resource.data.keys().hasAll(['visibility']) || resource.data.visibility != 'Director Only') &&
-        (!resource.data.keys().hasAll(['eventType']) || resource.data.eventType != 'Director Only')
-      );
-      
-      // All signed-in users can write events (hosts can add their own)
-=======
+      allow write: if isSignedIn();
+    }
+
     // 5. attendance Collection Rules
     match /attendance/{attendanceId} {
       allow read: if isSignedIn();
       allow write: if isSignedIn();
     }
 
-    // announcements Collection Rules
-    match /announcements/{announcementId} {
-      allow read: if isSignedIn();
-      allow write: if isDirector() || isHeadAdmin();
-    }
-
-    // calendar Collection Rules
+    // 6. calendar Collection Rules
     match /calendar/{eventId} {
       allow read: if true;
->>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
       allow write: if isSignedIn();
     }
 
-    // 5. events Collection Rules
+    // 7. events Collection Rules
     match /events/{eventId} {
-      // Hidden events (marked as Director Only) can only be read by Directors
       allow read: if isDirector() || (
         isSignedIn() && 
         (!resource.data.keys().hasAll(['visibility']) || resource.data.visibility != 'Director Only') &&
         (!resource.data.keys().hasAll(['eventType']) || resource.data.eventType != 'Director Only')
       );
-      
-      // All signed-in users can write events (hosts can add their own)
       allow write: if isSignedIn();
     }
 
-    // 6. tasks Collection Rules
+    // 8. announcements Collection Rules
+    match /announcements/{announcementId} {
+      allow read: if isSignedIn();
+      allow write: if isDirector() || isHeadAdmin();
+    }
+
+    // 9. tasks Collection Rules
     match /tasks/{taskId} {
-      // Staff can read all tasks. Assignee can read tasks assigned to them
       allow read: if isStaff() || (isSignedIn() && resource.data.assigneeId == request.auth.uid);
-      
-      // Leadership & Admins can perform any write
-      // Managers & Agents can write (create/update) tasks they assigned
-      // Hosts can only update the status field of tasks assigned to them
       allow create: if isLeadership() || isAdmin() || (
         (isManager() || isAgent()) && 
         request.resource.data.assignerId == request.auth.uid
       );
       allow update: if isLeadership() || isAdmin() || (
         (isManager() || isAgent()) && 
-        resource.data.assignerId == request.auth.uid && 
-        request.resource.data.assignerId == request.auth.uid
+        resource.data.assignerId == request.auth.uid
       ) || (
         isHost() &&
-        resource.data.assigneeId == request.auth.uid &&
-        request.resource.data.assigneeId == resource.data.assigneeId &&
-        request.resource.data.taskId == resource.data.taskId &&
-        request.resource.data.assignerId == resource.data.assignerId &&
-        request.resource.data.title == resource.data.title &&
-        request.resource.data.content == resource.data.content &&
-        request.resource.data.taskType == resource.data.taskType &&
-        request.resource.data.dueDate == resource.data.dueDate &&
-        request.resource.data.createdAt == resource.data.createdAt
+        resource.data.assigneeId == request.auth.uid
       );
       allow delete: if isLeadership() || isAdmin() || (
         (isManager() || isAgent()) && 
@@ -233,8 +211,12 @@ service cloud.firestore {
       );
     }
 
-    // 8. Awards & Assignments
+    // 10. Awards & Assignments
     match /awards/{awardId} {
+      allow read: if isSignedIn();
+      allow write: if isDirector() || isHeadAdmin() || isLeadership();
+    }
+    match /host_awards/{awardId} {
       allow read: if isSignedIn();
       allow write: if isDirector() || isHeadAdmin() || isLeadership();
     }
@@ -243,19 +225,19 @@ service cloud.firestore {
       allow write: if isDirector() || isHeadAdmin() || isLeadership();
     }
 
-    // 9. Progress Notes
+    // 11. Progress Notes
     match /notes/{noteId} {
       allow read, write: if isDirector() || isHeadAdmin() || isLeadership() || isStaff();
     }
 
-    // 10. Host Intake Requests
+    // 12. Host Intake Requests
     match /host_requests/{requestId} {
       allow read: if isDirector() || isHeadAdmin() || isLeadership() || isStaff();
       allow create: if isStaff() || isDirector() || isHeadAdmin() || isLeadership();
       allow update, delete: if isDirector() || isHeadAdmin() || isLeadership();
     }
-    
-    // 7. Director specific collections
+
+    // 13. Director specific collections
     match /activity_logs/{logId} {
       allow read, write: if isLeadership();
     }
@@ -275,44 +257,17 @@ service cloud.firestore {
       allow read, write: if isLeadership();
     }
 
-    // 8. Awards & Assignments
-    match /awards/{awardId} {
-      allow read: if isSignedIn();
-      allow write: if isDirector() || isHeadAdmin() || isLeadership();
-    }
-    match /host_awards/{awardId} {
-      allow read: if isSignedIn();
-      allow write: if isDirector() || isHeadAdmin() || isLeadership();
-    }
-    match /award_assignments/{assignmentId} {
-      allow read: if isSignedIn();
-      allow write: if isDirector() || isHeadAdmin() || isLeadership();
-    }
-
-    // 9. Progress Notes
-    match /notes/{noteId} {
-      allow read, write: if isDirector() || isHeadAdmin() || isLeadership() || isStaff();
-    }
-
-    // 10. Host Intake Requests
-    match /host_requests/{requestId} {
-      allow read: if isLeadership() || isAgent();
-      allow create: if isAgent();
-      allow update, delete: if isLeadership();
-    }
-
-    // 11. Livehouse Schedule
+    // 14. Livehouse Schedule
     match /livehouse_schedule/{scheduleId} {
       allow read: if isSignedIn();
       allow write: if isStaff();
     }
-
     match /livehouse_requests/{requestId} {
       allow read: if isSignedIn();
       allow write: if isStaff() || (isSignedIn() && request.resource.data.poppoId == request.auth.uid);
     }
 
-    // 12. Livehouse Logs & System config
+    // 15. Livehouse Logs & System config
     match /livehouse_logs/{logId} {
       allow read: if isSignedIn();
       allow write: if isStaff();
@@ -322,7 +277,7 @@ service cloud.firestore {
       allow write: if isStaff();
     }
 
-    // 13. Agent Financials
+    // 16. Agent Financials
     match /agent_financials_monthly/{docId} {
       allow read, write: if isStaff();
     }
@@ -330,7 +285,7 @@ service cloud.firestore {
       allow read, write: if isStaff();
     }
 
-    // 14. Stream Notifications
+    // 17. Stream Notifications
     match /stream_notifications/{streamId} {
       allow read: if isSignedIn();
       allow write: if isSignedIn();

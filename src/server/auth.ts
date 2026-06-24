@@ -57,7 +57,7 @@ export function getAdminStorage() {
 
 export function getAdminFirestore() {
   const app = getFirebaseAdminApp();
-  const db = getFirestore(app, "ai-studio-f578d03a-99b3-4c41-84dd-9901137e8386");
+  const db = getFirestore(app, "nine-talent-management");
   try {
     db.settings({ preferRest: true });
   } catch (err) {
@@ -278,22 +278,11 @@ router.post("/login", async (req, res) => {
           id: '19157913',
           name: "Miss Nine",
           nickname: "Miss Nine",
-<<<<<<< HEAD
-          role: "director",
-          level: 5,
-          team: "Management",
-          manager: "Self",
-          anchor_type: "Nine Agency",
-          base_salary_category: "N/A",
-          status: "Active",
-          tier: "Director",
-=======
           role: "Director",
           level: 5,
           tier_pay: "N/A",
           status: "Active",
 
->>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
           photoUrl: "",
           isActive: true,
           created_at: new Date().toISOString(),
@@ -301,10 +290,6 @@ router.post("/login", async (req, res) => {
         };
         try {
           const db = getAdminFirestore();
-<<<<<<< HEAD
-          await db.collection("users").doc('19157913').set(hostData);
-          console.log("✅ Auto-created missing Director doc in Firestore users collection during login bypass.");
-=======
           // Write auth info to users
           await db.collection("users").doc('19157913').set({
             poppo_id: hostData.id,
@@ -317,7 +302,6 @@ router.post("/login", async (req, res) => {
           // Write full profile to director collection
           await db.collection("director").doc('19157913').set(hostData, { merge: true });
           console.log("✅ Auto-created missing Director doc in Firestore during login bypass.");
->>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
         } catch (dbSaveErr) {
           console.error("Failed to auto-save Director doc in Firestore:", dbSaveErr);
         }
@@ -1356,120 +1340,6 @@ router.post(
       console.error("[CreateUser] Backend Error:", error);
       return res.status(500).json({ error: error?.message || "Internal server error during user creation." });
     }
-<<<<<<< HEAD
-
-    const cleanPoppoId = String(poppoId).trim();
-    const cleanNickname = String(nickname).trim();
-    const cleanRole = String(role).trim().toLowerCase();
-
-    if (!/^[a-zA-Z0-9]+$/.test(cleanPoppoId)) {
-      return res.status(400).json({ error: "Poppo ID must be alphanumeric." });
-    }
-
-    const allowedRoles = ["director", "admin", "manager", "agent", "host"];
-    if (!allowedRoles.includes(cleanRole)) {
-      return res.status(400).json({ error: `Invalid role. Allowed roles are: ${allowedRoles.join(", ")}` });
-    }
-
-    // Role-to-level mapping
-    const levelMap: Record<string, number> = {
-      director: 5,
-      admin: 4,
-      manager: 3,
-      agent: 2,
-      host: 1
-    };
-    const level = levelMap[cleanRole] || 1;
-
-    const db = getAdminFirestore();
-    const hostRef = db.collection("hosts").doc(cleanPoppoId);
-    const hostSnap = await hostRef.get();
-
-    if (hostSnap.exists) {
-      return res.status(400).json({ error: `User with Poppo ID '${cleanPoppoId}' already exists.` });
-    }
-
-    // Default temporary password
-    const defaultPassword = "Welcome123!";
-    const hashedPassword = await bcrypt.hash(defaultPassword, BCRYPT_ROUNDS);
-
-    const now = new Date().toISOString();
-    const creatorPoppoId = req.adminUser?.poppo_id || "admin";
-
-    // 1. Create in hosts collection
-    const hostData = {
-      id: cleanPoppoId,
-      name: cleanNickname,
-      nickname: cleanNickname,
-      role: cleanRole,
-      level,
-      team: "Alpha",
-      manager: "Unassigned",
-      anchor_type: "Nine Agency",
-      base_salary_category: "N/A",
-      status: "Active",
-      tier: "C",
-      photoUrl: "",
-      isActive: true,
-      is_temp_password: true,
-      password: hashedPassword,
-      created_at: now,
-      updated_at: now,
-      created_by: creatorPoppoId
-    };
-    await hostRef.set(hostData);
-
-    let assignedHosts = null;
-    let assignedManagerId = null;
-
-    if (level === 1) {
-      assignedManagerId = null;
-      assignedHosts = null;
-    } else if (level === 2) {
-      assignedManagerId = null;
-      assignedHosts = [];
-    } else {
-      assignedManagerId = null;
-      assignedHosts = null;
-    }
-
-    // 2. Create in users collection
-    const userData = {
-      poppoId: cleanPoppoId,
-      poppo_id: cleanPoppoId,
-      nickname: cleanNickname,
-      role: cleanRole,
-      level,
-      status: "active",
-      is_first_login: false,
-      is_temp_password: true,
-      password: hashedPassword,
-      password_hash: hashedPassword,
-      tempPassword: hashedPassword,
-      createdAt: now,
-      updatedAt: now,
-      created_at: now,
-      updated_at: now,
-      created_by: creatorPoppoId,
-      assignedManagerId: assignedManagerId,
-      assignedHosts: assignedHosts
-    };
-    await db.collection("users").doc(cleanPoppoId).set(userData);
-
-    // 3. Sync custom claims
-    await syncCustomClaims(cleanPoppoId, cleanRole, true);
-
-    console.log(`👤 User ${cleanPoppoId} created by ${req.adminUser?.nickname || "admin"}`);
-    return res.status(201).json({
-      success: true,
-      message: `User '${cleanNickname}' created successfully with temporary password: '${defaultPassword}'.`,
-      user: { poppoId: cleanPoppoId, nickname: cleanNickname, role: cleanRole }
-    });
-  } catch (error: any) {
-    console.error("Create user endpoint failed:", error);
-    return res.status(500).json({ error: error?.message || "Internal server error" });
-=======
->>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
   }
 );
 
@@ -1918,22 +1788,11 @@ router.post("/login-with-poppo", loginRateLimiter, async (req: any, res: any) =>
           id: '19157913',
           name: "Miss Nine",
           nickname: "Miss Nine",
-<<<<<<< HEAD
-          role: "director",
-          level: 5,
-          team: "Management",
-          manager: "Self",
-          anchor_type: "Nine Agency",
-          base_salary_category: "N/A",
-          status: "Active",
-          tier: "Director",
-=======
           role: "Director",
           level: 5,
           tier_pay: "N/A",
           status: "Active",
 
->>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
           photoUrl: "",
           isActive: true,
           created_at: new Date().toISOString(),
@@ -2174,7 +2033,7 @@ router.all("/diag", async (req: any, res: any) => {
     log.push("OAuth token acquired.");
 
     log.push("Querying Firestore REST API...");
-    const databaseId = "ai-studio-f578d03a-99b3-4c41-84dd-9901137e8386";
+    const databaseId = "nine-talent-management";
     const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${databaseId}/documents/performance_reports?pageSize=1000`;
     
     const response = await fetch(url, {
@@ -2276,7 +2135,7 @@ router.all("/cleanup-test-reports", async (req: any, res: any) => {
     const token = tokenResponse.token;
     if (!token) throw new Error("Failed to get access token.");
 
-    const databaseId = "ai-studio-f578d03a-99b3-4c41-84dd-9901137e8386";
+    const databaseId = "nine-talent-management";
     const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${databaseId}/documents/performance_reports?pageSize=1000`;
     
     const response = await fetch(url, {
@@ -2346,8 +2205,6 @@ router.all("/cleanup-test-reports", async (req: any, res: any) => {
   }
 });
 
-<<<<<<< HEAD
-=======
 /**
  * POST /api/admin/update-fanbase-report
  * Securely updates a fanbase report.
@@ -2528,5 +2385,4 @@ router.post("/delete-attendance-log", verifyFirebaseIdToken, async (req: any, re
   }
 });
 
->>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
 export default router;

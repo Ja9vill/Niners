@@ -1,6 +1,6 @@
 {
   "firestore": {
-    "database": "ai-studio-f578d03a-99b3-4c41-84dd-9901137e8386",
+    "database": "nine-talent-management",
     "rules": "firestore.rules"
   },
   "storage": {

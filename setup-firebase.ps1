@@ -43,7 +43,7 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 # 3. Create Custom Firestore Database (if not already existing)
-$DatabaseID = "ai-studio-f578d03a-99b3-4c41-84dd-9901137e8386"
+$DatabaseID = "nine-talent-management"
 Write-Host "`nEnsuring Firestore Database '$DatabaseID' exists..." -ForegroundColor Yellow
 
 $CreateDbResult = gcloud firestore databases create `

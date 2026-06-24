@@ -24,11 +24,14 @@ const getApiKey = () => {
   }
 };
 
+const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID;
+const storageBucket = import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || (projectId ? `${projectId}.appspot.com` : undefined);
+
 const firebaseConfig = {
   apiKey: getApiKey(),
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  projectId,
+  storageBucket,
   messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
   appId: import.meta.env.VITE_FIREBASE_APP_ID,
 };
@@ -37,7 +40,7 @@ const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
-export const db = getFirestore(app, "ai-studio-f578d03a-99b3-4c41-84dd-9901137e8386");
+export const db = getFirestore(app, "nine-talent-management");
 export const storage = getStorage(app);
 
 // Initialize Messaging (only on supported platforms)

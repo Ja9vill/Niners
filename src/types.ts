@@ -81,15 +81,6 @@ export interface Host {
   created_at: string;
   updated_at: string;
   isActive: boolean;
-<<<<<<< HEAD
-  // Google OAuth fields
-  googleUid?: string;
-  googleEmail?: string;
-  // Two-way relationship fields
-  assignedManagerId?: string | null;
-  assignedHosts?: string[] | null;
-  // Legacy fields for compatibility during transition
-=======
   reset_requested?: boolean;
 
   // Role specific
@@ -103,7 +94,6 @@ export interface Host {
   level?: number;
   team?: string;
   anchor_type?: AnchorType;
->>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
   anchor?: AnchorType;
 }
 
@@ -141,7 +131,7 @@ export interface PerformanceReportEntry {
   _isUnknownHost?: boolean;
   owner_id?: string;
   owner_role?: string;
-  report_type?: 'monthly' | 'weekly';
+  report_type?: 'monthly' | 'weekly' | 'daily';
 
   // legacy fallbacks
   total_points?: number;
@@ -385,8 +375,6 @@ export interface AwardAssignment {
   assignedAt: string;
 }
 
-<<<<<<< HEAD
-=======
 export interface ManagerNote {
   id: string;
   managerName: string;
@@ -394,9 +382,6 @@ export interface ManagerNote {
   content: string;
   timestamp: string;
 }
-<<<<<<< HEAD
->>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
-=======
 
 export interface PublicPageAsset {
   id: string;
@@ -441,4 +426,3 @@ export const emptyAuthState: AuthState = {
   profile_photo: "",
   token: "",
 };
->>>>>>> 2b42d3ae84c3e300e1faeb35e7009a759158d1e9
