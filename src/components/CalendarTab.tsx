@@ -164,16 +164,25 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
         const docRef = doc(db, 'attendance', event.event_id);
         const docSnap = await getDoc(docRef);
         if (docSnap.exists()) {
-          data = docSnap.data();
+          data = { ...docSnap.data(), id: docSnap.id };
         }
       }
 
-      // 2. Fallback: query by event_id field (underscore, as stored in Firestore)
+      // 2. Fallback: query by event_id or eventId field
       if (!data && event.event_id) {
         const q = query(collection(db, 'attendance'), where('event_id', '==', event.event_id));
         const qs = await getDocs(q);
         if (!qs.empty) {
-          data = qs.docs[0].data();
+          data = { ...qs.docs[0].data(), id: qs.docs[0].id };
+        }
+      }
+
+      // 2b. Fallback: query by eventId (camelCase)
+      if (!data && event.event_id) {
+        const q2 = query(collection(db, 'attendance'), where('eventId', '==', event.event_id));
+        const qs2 = await getDocs(q2);
+        if (!qs2.empty) {
+          data = { ...qs2.docs[0].data(), id: qs2.docs[0].id };
         }
       }
 
@@ -240,16 +249,25 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
         const docRef = doc(db, 'attendance', event.event_id);
         const docSnap = await getDoc(docRef);
         if (docSnap.exists()) {
-          data = docSnap.data();
+          data = { ...docSnap.data(), id: docSnap.id };
         }
       }
 
-      // 2. Fallback: query by event_id field (underscore, as stored in Firestore)
+      // 2. Fallback: query by event_id or eventId field
       if (!data && event.event_id) {
         const q = query(collection(db, 'attendance'), where('event_id', '==', event.event_id));
         const qs = await getDocs(q);
         if (!qs.empty) {
-          data = qs.docs[0].data();
+          data = { ...qs.docs[0].data(), id: qs.docs[0].id };
+        }
+      }
+
+      // 2b. Fallback: query by eventId (camelCase)
+      if (!data && event.event_id) {
+        const q2 = query(collection(db, 'attendance'), where('eventId', '==', event.event_id));
+        const qs2 = await getDocs(q2);
+        if (!qs2.empty) {
+          data = { ...qs2.docs[0].data(), id: qs2.docs[0].id };
         }
       }
 
@@ -310,12 +328,13 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
     setIsAttProcessing(true);
     try {
       const currentAuth = Storage.getAuthState();
-      const existing = attendanceRecords.find(r => r.eventId === attendanceModalEvent.event_id);
+      const existing = attendanceRecords.find(r => r.event_id === attendanceModalEvent.event_id || r.eventId === attendanceModalEvent.event_id);
       const attendanceId = existing?.attendanceId || (crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 15));
       const docId = existing?.attendanceId ? existing.attendanceId : generateSubmissionId(currentAuth?.poppo_id || '', currentAuth?.role || '', currentAuth?.name || currentAuth?.nickname || '');
 
       const payload = {
         attendanceId: docId,
+        event_id: attendanceModalEvent.event_id,
         eventId: attendanceModalEvent.event_id,
         eventTitle: attendanceModalEvent.title || 'Unknown Event',
         eventDate: attendanceModalEvent.date,
@@ -345,22 +364,22 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
       // If we are updating an existing record, we should write to the exact same doc ID to avoid duplicates.
       // If it's a new record, we use the new standardized docId format.
       // However, previously records were saved with `event_id` as the docId.
-      const targetDocId = existing ? (existing.id || existing.eventId || docId) : docId;
+      const targetDocId = existing ? (existing.id || existing.event_id || existing.eventId || docId) : (attendanceModalEvent.event_id || docId);
       await setDoc(doc(db, 'attendance', targetDocId), payload, { merge: true });
       
       // Update local state and trigger UI changes
-      setAttendanceRecord(payload);
+      setAttendanceRecord({ ...payload, id: targetDocId });
       setAttSuccessMsg('Attendance saved successfully!');
       
       // Update the attendanceRecords array locally so it reflects immediately
       setAttendanceRecords(prev => {
-        const idx = prev.findIndex(r => r.eventId === attendanceModalEvent.event_id);
+        const idx = prev.findIndex(r => r.event_id === attendanceModalEvent.event_id || r.eventId === attendanceModalEvent.event_id);
         if (idx >= 0) {
           const newArr = [...prev];
-          newArr[idx] = payload;
+          newArr[idx] = { ...payload, id: targetDocId };
           return newArr;
         }
-        return [...prev, payload];
+        return [...prev, { ...payload, id: targetDocId }];
       });
 
       // Give them a moment to read the success message before collapsing
@@ -901,7 +920,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
     const loadAttendance = async () => {
       try {
         const snapshot = await getDocs(collection(db, 'attendance'));
-        const list = snapshot.docs.map(d => d.data());
+        const list = snapshot.docs.map(d => ({ ...d.data(), id: d.id }));
         setAttendanceRecords(list);
       } catch (err) {
         console.error("Failed to load attendance logs in CalendarTab:", err);
@@ -973,7 +992,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
     setAttRoleFilter('All Roles');
 
     // Pre-populate if attendance log already exists
-    const existing = attendanceRecords.find(r => r.eventId === event.event_id);
+    const existing = attendanceRecords.find(r => r.event_id === event.event_id || r.eventId === event.event_id);
     if (existing) {
       setAttFeedback(existing.eventFeedback || '');
       const resolved = (existing.attendees || []).map((att: any) => ({
@@ -1013,7 +1032,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
       const eventDate = attendanceModalEvent.date || '';
       const timeslot = attendanceModalEvent.time || '';
 
-      const existing = attendanceRecords.find(r => r.eventId === eventId);
+      const existing = attendanceRecords.find(r => r.event_id === eventId || r.eventId === eventId);
       const reporterPoppoId = auth.poppo_id || auth.id || 'SystemAdmin';
       const reporterRoleStr = auth.role || 'Admin';
       const reporterNameStr = auth.nickname || auth.name || 'Admin';
@@ -1638,7 +1657,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                     const hostPhoto = hostUser ? (hostUser.photoUrl || hostUser.profilePhotoUrl || hostUser.photoURL) : null;
                     const avatarUrl = hostPhoto || `https://ui-avatars.com/api/?name=${encodeURIComponent(hostName)}&background=0a0806&color=D4AF37`;
                     
-                    const eventAttendance = attendanceRecords.find(r => r.eventId === e.event_id);
+                    const eventAttendance = attendanceRecords.find(r => r.event_id === e.event_id || r.eventId === e.event_id);
                     const displayAttendees = eventAttendance ? (eventAttendance.attendees || eventAttendance.attendeeIds || eventAttendance.actualParticipants || []) : [];
 
                     return (
@@ -1740,7 +1759,6 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                   <button 
                     onClick={() => setIsReservingLivehouse(true)} 
                     className="flex-1 bg-slate-900 border border-purple-500/50 hover:bg-purple-500/10 text-purple-400 hover:text-white font-black uppercase tracking-[0.2em] text-xs py-3.5 rounded-xl cursor-pointer flex items-center justify-center gap-2 shadow-xl transition-all transform active:scale-95"
-                    className="px-4 py-2 bg-black/20 border border-white/10 hover:bg-[#1a120e] hover:border-white/20 text-[#A09E9A] hover:text-[#F0EFE8] font-black text-[10px] uppercase tracking-widest rounded-xl transition-all active:scale-[0.99] cursor-pointer flex items-center gap-2 shadow-md"
                   >
                     <Clock size={14} />
                     Schedule Livehouse

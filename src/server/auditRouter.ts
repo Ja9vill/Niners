@@ -383,6 +383,8 @@ router.post("/attendance", verifyFirebaseToken, async (req: any, res: any) => {
       eventType,
       description,
       participantIds,
+      eventId: req.body.eventId || req.body.event_id || '',
+      event_id: req.body.eventId || req.body.event_id || '',
       status,
       actualParticipants,
       adminFeedback,
