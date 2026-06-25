@@ -37,7 +37,7 @@ const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
-export const db = getFirestore(app, "ai-studio-f578d03a-99b3-4c41-84dd-9901137e8386");
+export const db = getFirestore(app, "nine-talent-management");
 export const storage = getStorage(app);
 
 // Initialize Messaging (only on supported platforms)

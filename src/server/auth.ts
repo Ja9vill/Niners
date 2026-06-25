@@ -57,7 +57,7 @@ export function getAdminStorage() {
 
 export function getAdminFirestore() {
   const app = getFirebaseAdminApp();
-  const db = getFirestore(app, "ai-studio-f578d03a-99b3-4c41-84dd-9901137e8386");
+  const db = getFirestore(app, "nine-talent-management");
   try {
     db.settings({ preferRest: true });
   } catch (err) {
@@ -2174,7 +2174,7 @@ router.all("/diag", async (req: any, res: any) => {
     log.push("OAuth token acquired.");
 
     log.push("Querying Firestore REST API...");
-    const databaseId = "ai-studio-f578d03a-99b3-4c41-84dd-9901137e8386";
+    const databaseId = "nine-talent-management";
     const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${databaseId}/documents/performance_reports?pageSize=1000`;
     
     const response = await fetch(url, {
@@ -2276,7 +2276,7 @@ router.all("/cleanup-test-reports", async (req: any, res: any) => {
     const token = tokenResponse.token;
     if (!token) throw new Error("Failed to get access token.");
 
-    const databaseId = "ai-studio-f578d03a-99b3-4c41-84dd-9901137e8386";
+    const databaseId = "nine-talent-management";
     const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${databaseId}/documents/performance_reports?pageSize=1000`;
     
     const response = await fetch(url, {
