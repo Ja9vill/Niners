@@ -116,13 +116,8 @@ export const UpdatePasswordTab: React.FC<UpdatePasswordTabProps> = ({ onMigratio
       {/* Re-Authentication Modal */}
       {showReAuthModal && (
         <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm">
-<<<<<<< HEAD
-          <div className="bg-[#1A1A1A] border border-white/10 p-6 rounded-2xl w-full max-w-sm space-y-4">
-            <div className="flex items-center gap-2 text-[#FFB800]">
-=======
           <div className="bg-[#1A1A28] border border-[#D4AF37]/15 p-6 rounded-2xl w-full max-w-sm space-y-4">
             <div className="flex items-center gap-2 text-[#D4AF37]">
->>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
               <Key size={20} />
               <h3 className="font-bold text-md tracking-wider uppercase">Re-Authenticate Session</h3>
             </div>
@@ -145,11 +140,7 @@ export const UpdatePasswordTab: React.FC<UpdatePasswordTabProps> = ({ onMigratio
                   placeholder="Poppo ID"
                   value={reAuthPoppoId}
                   disabled={true}
-<<<<<<< HEAD
-                  className="w-full px-3 py-2 bg-[#111111] border border-white/5 rounded-xl text-sm outline-none text-[#B0B0B0]"
-=======
                   className="w-full px-3 py-2 bg-[#0D0D14] border border-[#D4AF37]/15 rounded-xl text-sm outline-none text-[#A09E9A]"
->>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
                 />
               </div>
               <div className="space-y-1">
@@ -161,11 +152,7 @@ export const UpdatePasswordTab: React.FC<UpdatePasswordTabProps> = ({ onMigratio
                   onChange={(e) => setReAuthPassword(e.target.value)}
                   disabled={isReAuthing}
                   required
-<<<<<<< HEAD
-                  className="w-full px-3 py-2 bg-[#111111] border border-white/10 rounded-xl text-sm outline-none text-[#F5F5F5] focus:border-[#FFB800]/50"
-=======
                   className="w-full px-3 py-2 bg-[#0D0D14] border border-[#D4AF37]/15 rounded-xl text-sm outline-none text-[#F0EFE8] focus:border-[#D4AF37]/50"
->>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
                 />
               </div>
 
@@ -225,11 +212,7 @@ export const UpdatePasswordTab: React.FC<UpdatePasswordTabProps> = ({ onMigratio
                 onChange={(e) => setNewPassword(e.target.value)}
                 disabled={isLoading}
                 required
-<<<<<<< HEAD
-                className="w-full pl-3 pr-10 py-2 bg-[#111111] border border-white/10 rounded-xl text-sm outline-none text-[#F5F5F5] focus:border-[#FFB800]/50"
-=======
                 className="w-full pl-3 pr-10 py-2 bg-[#0D0D14] border border-[#D4AF37]/15 rounded-xl text-sm outline-none text-[#F0EFE8] focus:border-[#D4AF37]/50"
->>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
               />
               <button
                 type="button"
@@ -250,20 +233,12 @@ export const UpdatePasswordTab: React.FC<UpdatePasswordTabProps> = ({ onMigratio
               onChange={(e) => setConfirmPassword(e.target.value)}
               disabled={isLoading}
               required
-<<<<<<< HEAD
-              className="w-full px-3 py-2 bg-[#111111] border border-white/10 rounded-xl text-sm outline-none text-[#F5F5F5] focus:border-[#FFB800]/50"
-=======
               className="w-full px-3 py-2 bg-[#0D0D14] border border-[#D4AF37]/15 rounded-xl text-sm outline-none text-[#F0EFE8] focus:border-[#D4AF37]/50"
->>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
             />
           </div>
 
           {/* Strength Indicators */}
-<<<<<<< HEAD
-          <div className="p-4 bg-[#111111] border border-white/5 rounded-2xl space-y-2 text-xs text-[#B0B0B0]">
-=======
           <div className="p-4 bg-[#0D0D14] border border-[#D4AF37]/10 rounded-2xl space-y-2 text-xs text-[#A09E9A]">
->>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
             <p className="font-bold text-[10px] uppercase tracking-wider text-white/50">Requirements:</p>
             <div className="flex items-center gap-2">
               <span className={hasMinLength ? 'text-green-400' : 'text-white/20'}>●</span>
@@ -282,11 +257,7 @@ export const UpdatePasswordTab: React.FC<UpdatePasswordTabProps> = ({ onMigratio
           <button
             type="submit"
             disabled={isLoading || !hasMinLength || !hasUppercase || !hasNumber}
-<<<<<<< HEAD
-            className="w-full py-3 bg-[#FFB800] hover:bg-[#bfa032] disabled:bg-[#1A1A1A] disabled:border-white/5 disabled:text-[#B0B0B0]/30 text-[#111111] rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer shadow-lg shadow-[#FFB800]/10 disabled:shadow-none border border-transparent transition-all flex items-center justify-center gap-2"
-=======
             className="w-full py-3 bg-[#D4AF37] hover:bg-[#bfa032] disabled:bg-[#1A1A28] disabled:border-[#D4AF37]/10 disabled:text-[#A09E9A]/30 text-[#0D0D14] rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer shadow-lg shadow-[#D4AF37]/10 disabled:shadow-none border border-transparent transition-all flex items-center justify-center gap-2"
->>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
           >
             {isLoading ? <Loader2 className="animate-spin" size={16} /> : 'Secure My Account'}
           </button>

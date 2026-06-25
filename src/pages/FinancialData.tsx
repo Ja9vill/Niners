@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FileUp, Trash2, CheckCircle2, AlertCircle, Loader2, Lock } from 'lucide-react';
+import { FileUp, Trash2, CheckCircle2, AlertCircle, Loader2, Lock, Save, Send } from 'lucide-react';
 import { FirebaseService } from '../lib/firebaseService';
 import { CommissionEntry } from '../types';
 import { Storage } from '../lib/storage';
@@ -13,9 +13,10 @@ export const FinancialData = ({ isAgentMode = false }: { isAgentMode?: boolean }
   const [successMessage, setSuccessMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const [financialTab, setFinancialTab] = useState<'monthly' | 'weekly'>('monthly');
+  const [financialTab, setFinancialTab] = useState<'monthly' | 'weekly' | 'daily'>('monthly');
   const [monthlyLedger, setMonthlyLedger] = useState<CommissionEntry[]>([]);
   const [weeklyLedger, setWeeklyLedger] = useState<CommissionEntry[]>([]);
+  const [dailyLedger, setDailyLedger] = useState<CommissionEntry[]>([]);
   const [selectedRows, setSelectedRows] = useState<Record<string, boolean>>({});
 
   const [pasteData, setPasteData] = useState('');
@@ -25,22 +26,21 @@ export const FinancialData = ({ isAgentMode = false }: { isAgentMode?: boolean }
   const [bulkEditField, setBulkEditField] = useState('agent_commission');
   const [bulkEditValue, setBulkEditValue] = useState('');
   const [hosts, setHosts] = useState<any[]>([]);
+  const [historyEntries, setHistoryEntries] = useState<{ timestamp: string; type: string; recordCount: number; reportName?: string; uploadedByRole?: string; uploaderId?: string; uploaderName?: string; uploaderRole?: string }[]>([]);
+  const [storageStatus, setStorageStatus] = useState<{ ok: boolean; dataExists: boolean; historyExists: boolean; reportCount: number; error?: string } | null>(null);
+  const [showHistory, setShowHistory] = useState(false);
 
   const loadData = async () => {
     try {
-      let c: CommissionEntry[] = [];
-      if (isAgentMode) {
-        const [monthly, weekly] = await Promise.all([
-          FirebaseService.getAgentCommissions(localAuth.poppo_id, false),
-          FirebaseService.getAgentCommissions(localAuth.poppo_id, true)
-        ]);
-        c = [...monthly, ...weekly];
-      } else {
-        c = await FirebaseService.getAllCommissions();
-      }
-      setCommissions(c);
-      setMonthlyLedger(c.filter(entry => entry.month));
-      setWeeklyLedger(c.filter(entry => entry.from_date && entry.to_date));
+      const role = isAgentMode ? 'agents' : 'director';
+      const [monthly, weekly, daily] = await Promise.all([
+        FirebaseService.loadFinancialDataFromStorage('monthly', role),
+        FirebaseService.loadFinancialDataFromStorage('weekly', role),
+        FirebaseService.loadFinancialDataFromStorage('daily', role)
+      ]);
+      setMonthlyLedger(monthly);
+      setWeeklyLedger(weekly);
+      setDailyLedger(daily);
     } catch (err) {
       setErrorMessage("Failed to load financial data.");
     } finally {
@@ -48,10 +48,60 @@ export const FinancialData = ({ isAgentMode = false }: { isAgentMode?: boolean }
     }
   };
 
+  const loadReportList = async () => {
+    try {
+      const role = isAgentMode ? 'agents' : 'director';
+      const entries = await FirebaseService.loadFinancialHistory(financialTab, role);
+      setHistoryEntries(entries);
+    } catch {
+      // silently fail
+    }
+  };
+
+  const checkStorage = async () => {
+    try {
+      const role = isAgentMode ? 'agents' : 'director';
+      const status = await FirebaseService.checkFinancialStorage(financialTab, role);
+      setStorageStatus(status);
+    } catch (e) {
+      setStorageStatus({ ok: false, dataExists: false, historyExists: false, reportCount: 0, error: String(e) });
+    }
+  };
+
+  useEffect(() => {
+    checkStorage();
+  }, [financialTab]);
+
+  const handleLoadReport = async (reportName: string) => {
+    try {
+      const role = isAgentMode ? 'agents' : 'director';
+      const data = await FirebaseService.loadFinancialReportFromStorage(`financial data/${role}/${financialTab}/reports/${reportName}.json`);
+      if (data.length > 0) {
+        if (financialTab === 'monthly') setMonthlyLedger(data);
+        else if (financialTab === 'weekly') setWeeklyLedger(data);
+        else setDailyLedger(data);
+        showSuccess(`Loaded report: ${reportName}`);
+        setShowHistory(false);
+      } else {
+        setErrorMessage('Report data not found.');
+      }
+    } catch {
+      setErrorMessage('Failed to load report.');
+    }
+  };
+
   useEffect(() => {
     loadData();
     FirebaseService.getAllHosts().then(setHosts).catch(console.error);
+    console.log('[FinancialData] Component mounted', { isAgentMode, role: localAuth.role });
+    // Force an initial storage check after a short delay to ensure everything is loaded
+    setTimeout(checkStorage, 1000);
   }, []);
+
+  useEffect(() => {
+    loadReportList();
+    checkStorage();
+  }, [financialTab]);
 
   const showSuccess = (msg: string) => {
     setSuccessMessage(msg);
@@ -63,10 +113,14 @@ export const FinancialData = ({ isAgentMode = false }: { isAgentMode?: boolean }
       const updated = [...monthlyLedger];
       updated[idx] = { ...updated[idx], [field]: val };
       setMonthlyLedger(updated);
-    } else {
+    } else if (financialTab === 'weekly') {
       const updated = [...weeklyLedger];
       updated[idx] = { ...updated[idx], [field]: val };
       setWeeklyLedger(updated);
+    } else {
+      const updated = [...dailyLedger];
+      updated[idx] = { ...updated[idx], [field]: val };
+      setDailyLedger(updated);
     }
   };
 
@@ -76,8 +130,8 @@ export const FinancialData = ({ isAgentMode = false }: { isAgentMode?: boolean }
       nickname: '',
       month: financialTab === 'monthly' ? '' : '',
       year: new Date().getFullYear(),
-      from_date: financialTab === 'weekly' ? '' : undefined,
-      to_date: financialTab === 'weekly' ? '' : undefined,
+      from_date: financialTab === 'monthly' ? undefined : '',
+      to_date: financialTab === 'monthly' ? undefined : '',
       level: 0,
       live_duration: 0,
       party_host_duration: 0,
@@ -95,48 +149,84 @@ export const FinancialData = ({ isAgentMode = false }: { isAgentMode?: boolean }
       agentweb_commission_rate: 0,
     };
     if (financialTab === 'monthly') setMonthlyLedger([newEntry, ...monthlyLedger]);
-    else setWeeklyLedger([newEntry, ...weeklyLedger]);
+    else if (financialTab === 'weekly') setWeeklyLedger([newEntry, ...weeklyLedger]);
+    else setDailyLedger([newEntry, ...dailyLedger]);
   };
 
   const handleDeleteSelection = async () => {
-    const isMonthly = financialTab === 'monthly';
-    const currentData = isMonthly ? monthlyLedger : weeklyLedger;
+    const currentData = financialTab === 'monthly' ? monthlyLedger : financialTab === 'weekly' ? weeklyLedger : dailyLedger;
     const itemsToDelete = currentData.filter((_, idx) => selectedRows[`${financialTab}_${idx}`]);
     
     if (!confirm(`Delete ${itemsToDelete.length} selected row(s)?`)) return;
 
     try {
-      for (const item of itemsToDelete) {
-        if (item.poppo_id && (item.month || (item.from_date && item.to_date))) {
-          if (isAgentMode) {
-            await FirebaseService.deleteAgentCommission(item.poppo_id, item.month || `${item.from_date}_${item.to_date}`, localAuth.poppo_id, financialTab === 'weekly');
-          } else {
-            await FirebaseService.deleteCommission(item.poppo_id, item.month || `${item.from_date}_${item.to_date}`);
-          }
-        }
-      }
+      const remaining = currentData.filter((_, idx) => !selectedRows[`${financialTab}_${idx}`]);
+      if (financialTab === 'monthly') setMonthlyLedger(remaining);
+      else if (financialTab === 'weekly') setWeeklyLedger(remaining);
+      else setDailyLedger(remaining);
       setSelectedRows({});
-      showSuccess(`Deleted ${itemsToDelete.length} entries.`);
-      loadData();
+      showSuccess(`Deleted ${itemsToDelete.length} entries locally. Save to persist.`);
     } catch (err) {
       setErrorMessage('Failed to delete some entries.');
     }
   };
 
+  const getUploaderInfo = () => ({
+    id: localAuth.poppo_id || localAuth.poppoId,
+    name: localAuth.nickname || localAuth.name,
+    role: localAuth.role
+  });
+
   const handleSaveGrid = async () => {
     try {
-      const dataToSave = financialTab === 'monthly' ? monthlyLedger : weeklyLedger;
+      const dataToSave = financialTab === 'monthly' ? monthlyLedger : financialTab === 'weekly' ? weeklyLedger : dailyLedger;
       const validData = dataToSave.filter(d => d.poppo_id && (d.month || d.from_date));
       if (validData.length > 0) {
-        if (isAgentMode) {
-          await FirebaseService.saveAgentCommissions(validData, localAuth.poppo_id, financialTab === 'weekly');
-        } else {
-          await FirebaseService.saveCommissions(validData, 'Admin', financialTab === 'weekly');
-        }
-        showSuccess(`Saved ${validData.length} records successfully.`);
+        const role = isAgentMode ? 'agents' : 'director';
+        await FirebaseService.saveFinancialDataToStorage(financialTab, validData, role, getUploaderInfo());
+        showSuccess(`Saved ${validData.length} records to storage successfully.`);
+        loadReportList();
       }
     } catch (err) {
       setErrorMessage('Failed to save grid changes.');
+    }
+  };
+
+  const handleCommitReport = async () => {
+    try {
+      const dataToSave = financialTab === 'monthly' ? monthlyLedger : financialTab === 'weekly' ? weeklyLedger : dailyLedger;
+      const validData = dataToSave.filter(d => d.poppo_id && (d.month || d.from_date));
+      if (validData.length === 0) {
+        setErrorMessage('No valid data to commit.');
+        return;
+      }
+      const role = isAgentMode ? 'agents' : 'director';
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+      const reportName = `${financialTab}_report_${timestamp}`;
+      await FirebaseService.commitFinancialReport(financialTab, reportName, validData, role, getUploaderInfo());
+      showSuccess(`Report "${reportName}" committed and saved successfully.`);
+      loadReportList();
+    } catch (err) {
+      setErrorMessage('Failed to commit report.');
+    }
+  };
+
+  const handleSaveReport = async () => {
+    try {
+      const dataToSave = financialTab === 'monthly' ? monthlyLedger : financialTab === 'weekly' ? weeklyLedger : dailyLedger;
+      const validData = dataToSave.filter(d => d.poppo_id && (d.month || d.from_date));
+      if (validData.length === 0) {
+        setErrorMessage('No valid data to save.');
+        return;
+      }
+      const role = isAgentMode ? 'agents' : 'director';
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+      const reportName = `${financialTab}_report_${timestamp}`;
+      await FirebaseService.saveFinancialReport(financialTab, reportName, validData, role, getUploaderInfo());
+      showSuccess(`Report "${reportName}" saved successfully.`);
+      loadReportList();
+    } catch (err) {
+      setErrorMessage('Failed to save report.');
     }
   };
 
@@ -264,10 +354,12 @@ export const FinancialData = ({ isAgentMode = false }: { isAgentMode?: boolean }
       if (parsedCommissions.length > 0) {
         if (financialTab === 'monthly') {
            setMonthlyLedger([...parsedCommissions, ...monthlyLedger]);
-        } else {
+        } else if (financialTab === 'weekly') {
            setWeeklyLedger([...parsedCommissions, ...weeklyLedger]);
+        } else {
+           setDailyLedger([...parsedCommissions, ...dailyLedger]);
         }
-        showSuccess(`Imported ${parsedCommissions.length} rows locally. Click "Save Changes" to upload.`);
+        showSuccess(`Imported ${parsedCommissions.length} rows locally. Click "Save" to upload.`);
         setPasteData('');
       }
     } catch (err) {
@@ -309,9 +401,18 @@ export const FinancialData = ({ isAgentMode = false }: { isAgentMode?: boolean }
   };
 
   const handleBulkEdit = () => {
-    const isMonthly = financialTab === 'monthly';
-    const ledger = isMonthly ? [...monthlyLedger] : [...weeklyLedger];
-    const setLedger = isMonthly ? setMonthlyLedger : setWeeklyLedger;
+    let ledger: CommissionEntry[];
+    let setLedger: React.Dispatch<React.SetStateAction<CommissionEntry[]>>;
+    if (financialTab === 'monthly') {
+      ledger = [...monthlyLedger];
+      setLedger = setMonthlyLedger;
+    } else if (financialTab === 'weekly') {
+      ledger = [...weeklyLedger];
+      setLedger = setWeeklyLedger;
+    } else {
+      ledger = [...dailyLedger];
+      setLedger = setDailyLedger;
+    }
     let count = 0;
     ledger.forEach((row, idx) => {
       if (selectedRows[`${financialTab}_${idx}`]) {
@@ -359,8 +460,10 @@ export const FinancialData = ({ isAgentMode = false }: { isAgentMode?: boolean }
     );
   }
 
+  console.log('[FinancialData] Rendering with storageStatus:', storageStatus, 'historyEntries:', historyEntries.length);
   return (
     <div className="space-y-8 pb-20">
+      <div className="text-[8px] font-mono text-[#A09E9A]/30 hidden">FinancialData mounted at {new Date().toISOString()}</div>
       <AnimatePresence>
         {errorMessage && (
           <motion.div initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} className="p-4 bg-red-500/10 border border-red-500/20 rounded-2xl flex items-start gap-3">
@@ -381,6 +484,50 @@ export const FinancialData = ({ isAgentMode = false }: { isAgentMode?: boolean }
         )}
       </AnimatePresence>
 
+      {showHistory && !isAgentMode && (
+        <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="tech-card overflow-hidden">
+          <div className="flex items-center justify-between mb-3">
+            <h4 className="text-[10px] font-black uppercase tracking-widest text-[#A09E9A]">Upload History — {financialTab.toUpperCase()}</h4>
+            <span className="text-[10px] text-[#A09E9A]/60">{historyEntries.length} upload(s)</span>
+          </div>
+          {historyEntries.length === 0 ? (
+            <p className="text-[11px] text-[#A09E9A]/40 italic py-4 text-center">No upload history yet. Save or commit data to create entries.</p>
+          ) : (
+            <div className="max-h-64 overflow-y-auto space-y-2">
+              {(() => {
+                const grouped: Record<string, { entries: typeof historyEntries; label: string }> = {};
+                for (const entry of historyEntries) {
+                  const key = entry.uploadedByRole || entry.uploaderRole || 'unknown';
+                  const label = entry.uploaderName ? `${entry.uploaderName} (${entry.uploaderRole || key})` : key;
+                  if (!grouped[key]) grouped[key] = { entries: [], label };
+                  grouped[key].entries.push(entry);
+                }
+                return Object.entries(grouped).map(([groupKey, group]) => (
+                  <div key={groupKey}>
+                    <div className="text-[9px] font-black uppercase tracking-widest text-[#D4AF37]/60 px-1 py-1">{group.label}</div>
+                    {group.entries.map((entry, idx) => (
+                      <div key={idx} className="flex items-center justify-between px-3 py-2 rounded-lg bg-[#0D0D14] hover:bg-[#1A1A28] transition-colors group">
+                        <div className="flex items-center gap-3">
+                          <FileUp size={12} className={cn(entry.type === 'commit' ? 'text-emerald-400' : entry.type === 'save_report' ? 'text-amber-400' : 'text-cyan-400')} />
+                          <span className="text-[11px] font-mono text-[#F0EFE8]">{entry.reportName || entry.type}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] text-[#A09E9A]/60">{new Date(entry.timestamp).toLocaleString()}</span>
+                          <span className="text-[10px] text-[#A09E9A]/40">{entry.recordCount} rec</span>
+                          {entry.type === 'commit' && entry.reportName && (
+                            <button onClick={() => handleLoadReport(entry.reportName!)} className="text-[10px] text-cyan-400 opacity-0 group-hover:opacity-100 transition-opacity font-bold uppercase">Load</button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ));
+              })()}
+            </div>
+          )}
+        </motion.div>
+      )}
+
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="space-y-1">
           <h3 className="font-bold text-xl flex items-center gap-2 text-[#F0EFE8]">
@@ -392,9 +539,15 @@ export const FinancialData = ({ isAgentMode = false }: { isAgentMode?: boolean }
           </p>
         </div>
         
-        <div className="flex gap-2 bg-[#13131E] p-1.5 rounded-xl border border-white/5">
-          <button onClick={() => setFinancialTab('monthly')} className={cn("px-4 py-2 rounded-lg text-xs font-black uppercase transition-all", financialTab === 'monthly' ? "bg-emerald-600 text-white shadow-md" : "text-[#A09E9A]")}>Monthly Ledger</button>
-          <button onClick={() => setFinancialTab('weekly')} className={cn("px-4 py-2 rounded-lg text-xs font-black uppercase transition-all", financialTab === 'weekly' ? "bg-emerald-600 text-white shadow-md" : "text-[#A09E9A]")}>Weekly Ledger</button>
+        <div className="flex items-center gap-3">
+          <div className="flex gap-2 bg-[#13131E] p-1.5 rounded-xl border border-white/5">
+            <button onClick={() => setFinancialTab('monthly')} className={cn("px-4 py-2 rounded-lg text-xs font-black uppercase transition-all", financialTab === 'monthly' ? "bg-emerald-600 text-white shadow-md" : "text-[#A09E9A]")}>Monthly</button>
+            <button onClick={() => setFinancialTab('weekly')} className={cn("px-4 py-2 rounded-lg text-xs font-black uppercase transition-all", financialTab === 'weekly' ? "bg-emerald-600 text-white shadow-md" : "text-[#A09E9A]")}>Weekly</button>
+            <button onClick={() => setFinancialTab('daily')} className={cn("px-4 py-2 rounded-lg text-xs font-black uppercase transition-all", financialTab === 'daily' ? "bg-emerald-600 text-white shadow-md" : "text-[#A09E9A]")}>Daily</button>
+          </div>
+          <div className={cn("text-[9px] font-mono uppercase px-2 py-1 rounded", !storageStatus ? "text-[#A09E9A]/30" : storageStatus.ok ? (storageStatus.dataExists ? "text-emerald-400" : "text-[#A09E9A]/40") : "text-red-400")}>
+            {!storageStatus ? '...' : storageStatus.ok ? (storageStatus.dataExists ? `data:${storageStatus.historyExists ? 'H' : 'noH'}` : 'empty') : 'ERR'}
+          </div>
         </div>
       </div>
 
@@ -486,7 +639,14 @@ export const FinancialData = ({ isAgentMode = false }: { isAgentMode?: boolean }
           <div className="flex items-center gap-3">
             <button onClick={handleAddRow} className="px-3.5 py-2 bg-emerald-550 hover:bg-emerald-600 text-white rounded-lg text-[10px] font-black uppercase transition-all">+ Add Row</button>
             <button onClick={handleDeleteSelection} className="px-3.5 py-2 bg-red-550 hover:bg-red-650 text-white rounded-lg text-[10px] font-black uppercase transition-all">🗑️ Delete</button>
-            <button onClick={handleSaveGrid} className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-[10px] font-black uppercase transition-all ml-4">💾 Save Changes</button>
+            <button onClick={handleSaveGrid} className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-[10px] font-black uppercase transition-all ml-4"><Save size={12} className="inline mr-1" />Save</button>
+            {!isAgentMode && (
+              <>
+                <button onClick={handleCommitReport} className="px-3.5 py-2 bg-emerald-700 hover:bg-emerald-600 text-white rounded-lg text-[10px] font-black uppercase transition-all flex items-center gap-1"><Send size={12} />Commit Report</button>
+                <button onClick={handleSaveReport} className="px-3.5 py-2 bg-amber-700 hover:bg-amber-600 text-white rounded-lg text-[10px] font-black uppercase transition-all flex items-center gap-1"><FileUp size={12} />Save Report</button>
+                <button onClick={() => { setShowHistory(!showHistory); if (!showHistory) loadReportList(); }} className={cn("px-3.5 py-2 rounded-lg text-[10px] font-black uppercase transition-all flex items-center gap-1", showHistory ? "bg-cyan-600 text-white" : "bg-[#1A1A28] text-[#A09E9A] border border-white/10")}><FileUp size={12} />History</button>
+              </>
+            )}
           </div>
           <div className="flex items-center gap-4">
             <input
@@ -497,7 +657,7 @@ export const FinancialData = ({ isAgentMode = false }: { isAgentMode?: boolean }
               className="px-3 py-1.5 bg-[#0D0D14] border border-white/10 rounded-lg text-xs text-white focus:outline-none focus:ring-1 focus:ring-[#D4AF37] w-64"
             />
             <div className="text-[10px] font-black uppercase tracking-widest text-[#A09E9A]">
-              {(financialTab === 'monthly' ? monthlyLedger : weeklyLedger).length} Total rows
+              {(financialTab === 'monthly' ? monthlyLedger : financialTab === 'weekly' ? weeklyLedger : dailyLedger).length} Total rows
             </div>
           </div>
         </div>
@@ -511,7 +671,7 @@ export const FinancialData = ({ isAgentMode = false }: { isAgentMode?: boolean }
                onChange={(e) => setBulkEditField(e.target.value)}
                className="bg-[#1A1A28] border border-white/10 text-white text-xs rounded px-2 py-1.5 focus:outline-none focus:border-[#D4AF37]"
              >
-                <option value="month">Month / From Date</option>
+                <option value="month">Month / From Date / Date</option>
                 <option value="to_date">To Date</option>
                 <option value="year">Year</option>
                 <option value="agent_commission">Agent Commission</option>
@@ -529,7 +689,7 @@ export const FinancialData = ({ isAgentMode = false }: { isAgentMode?: boolean }
                onClick={handleBulkEdit}
                className="px-3 py-1.5 bg-[#D4AF37] hover:bg-[#c9a832] text-[#0D0D14] rounded text-[10px] font-black uppercase tracking-wider transition-all shadow-md active:scale-95"
              >
-               Apply to Selected
+                Apply to Selected
              </button>
           </motion.div>
         )}
@@ -542,7 +702,7 @@ export const FinancialData = ({ isAgentMode = false }: { isAgentMode?: boolean }
               <tr className="border-b border-white/5 text-[9px] font-black text-[#A09E9A] uppercase bg-[#1A1A28] sticky top-0 z-20">
                 <th className="px-3 py-3 w-12 text-center sticky left-0 z-30 bg-[#13131E] border-r border-white/5">
                   <input type="checkbox" title="Select All Rows" onChange={(e) => {
-                      const data = financialTab === 'monthly' ? monthlyLedger : weeklyLedger;
+                      const data = financialTab === 'monthly' ? monthlyLedger : financialTab === 'weekly' ? weeklyLedger : dailyLedger;
                       const lowerSearch = ledgerSearch.toLowerCase();
                       const filtered = data.map((row, idx) => {
                         const isDup = data.some((other, otherIdx) => 
@@ -570,10 +730,14 @@ export const FinancialData = ({ isAgentMode = false }: { isAgentMode?: boolean }
                   <>
                     <th className="px-3 py-3 w-32 min-w-[120px]">Month</th>
                   </>
-                ) : (
+                ) : financialTab === 'weekly' ? (
                   <>
                     <th className="px-3 py-3 w-28 min-w-[110px]">From</th>
                     <th className="px-3 py-3 w-28 min-w-[110px]">To</th>
+                  </>
+                ) : (
+                  <>
+                    <th className="px-3 py-3 w-32 min-w-[120px]">Date</th>
                   </>
                 )}
                 <th className="px-3 py-3 w-24 min-w-[90px]">Year</th>
@@ -595,73 +759,75 @@ export const FinancialData = ({ isAgentMode = false }: { isAgentMode?: boolean }
             </thead>
             <tbody className="divide-y divide-white/5">
               {(() => {
-                 const data = financialTab === 'monthly' ? monthlyLedger : weeklyLedger;
-                 const lowerSearch = ledgerSearch.toLowerCase();
-                 const filtered = data.map((row, idx) => {
-                   const isDup = data.some((other, otherIdx) => 
-                      otherIdx !== idx && 
-                      other.poppo_id && other.poppo_id === row.poppo_id && 
-                      other.total_points === row.total_points
-                   );
-                   return { row: { ...row, _isDuplicate: isDup }, idx };
-                 }).filter(({ row }) => 
-                   !ledgerSearch || 
-                   String(row.poppo_id).toLowerCase().includes(lowerSearch) || 
-                   String(row.nickname || '').toLowerCase().includes(lowerSearch)
-                 );
-                 
-                 if (filtered.length === 0) {
-                   return (
-                     <tr>
-                       <td colSpan={20} className="py-12 text-center text-[#A09E9A] italic">
-                         {ledgerSearch ? "No ledger entries found matching your search." : "No ledger entries found. Click \"+ Add Row\" or paste data above."}
-                       </td>
-                     </tr>
-                   );
-                 }
-                 
-                 return filtered.map(({ row, idx }) => {
-                    const isChecked = !!selectedRows[`${financialTab}_${idx}`];
-                    const existsInUsers = hosts.some(h => String(h.id || h.poppo_id || h.poppoId).trim() === String(row.poppo_id).trim());
-                    const isHighlight = row.poppo_id && !existsInUsers;
+                  const data = financialTab === 'monthly' ? monthlyLedger : financialTab === 'weekly' ? weeklyLedger : dailyLedger;
+                  const lowerSearch = ledgerSearch.toLowerCase();
+                  const filtered = data.map((row, idx) => {
+                    const isDup = data.some((other, otherIdx) => 
+                       otherIdx !== idx && 
+                       other.poppo_id && other.poppo_id === row.poppo_id && 
+                       other.total_points === row.total_points
+                    );
+                    return { row: { ...row, _isDuplicate: isDup }, idx };
+                  }).filter(({ row }) => 
+                    !ledgerSearch || 
+                    String(row.poppo_id).toLowerCase().includes(lowerSearch) || 
+                    String(row.nickname || '').toLowerCase().includes(lowerSearch)
+                  );
+                  
+                  if (filtered.length === 0) {
                     return (
-                      <tr key={idx} className={cn(
-                        "transition-colors group",
-                        (row as any)._isDuplicate ? "bg-red-500/10 hover:bg-red-500/20" : 
-                        isHighlight ? "bg-amber-500/10 hover:bg-amber-500/20 border-l-2 border-amber-500" :
-                        "hover:bg-white/[0.01]"
-                      )}>
-                        <td className={cn(
-                          "px-3 py-2 text-center sticky left-0 z-10 border-r border-white/5 transition-colors",
-                          (row as any)._isDuplicate ? "bg-[#251010] group-hover:bg-[#301515]" : 
-                          isHighlight ? "bg-[#282010] group-hover:bg-[#352a15]" :
-                          "bg-[#13131E] group-hover:bg-[#1A1A28]"
-                        )}>
-                          <input type="checkbox" title="Select Row" checked={isChecked} onChange={e => setSelectedRows(prev => ({...prev, [`${financialTab}_${idx}`]: e.target.checked}))} className="rounded border-white/10 text-[#D4AF37] focus:ring-[#D4AF37] cursor-pointer" />
-                          {(row as any)._isDuplicate && (
-                            <div className="absolute top-1/2 -translate-y-1/2 left-8 text-xs cursor-help" title="Duplicate Entry Detected">⚠️</div>
-                          )}
-                          {!(row as any)._isDuplicate && isHighlight && (
-                            <div className="absolute top-1/2 -translate-y-1/2 left-8 text-xs cursor-help" title="Poppo ID not found in Users collection">⚠️</div>
-                          )}
+                      <tr>
+                        <td colSpan={20} className="py-12 text-center text-[#A09E9A] italic">
+                          {ledgerSearch ? "No ledger entries found matching your search." : "No ledger entries found. Click \"+ Add Row\" or paste data above."}
                         </td>
-                        <td className={cn(
-                          "px-4 py-2 sticky left-[48px] border-r border-white/5 z-10 font-mono font-bold transition-colors",
-                          (row as any)._isDuplicate ? "bg-[#251010] text-red-400 group-hover:bg-[#301515]" : 
-                          isHighlight ? "bg-[#282010] text-amber-400 group-hover:bg-[#352a15]" :
-                          "bg-[#13131E] text-indigo-400 group-hover:bg-[#1A1A28]"
-                        )}>
-                          <input type="text" value={row.poppo_id} onChange={e => handleCellChange(idx, 'poppo_id', e.target.value)} className={cn("bg-transparent border-none w-full outline-none", (row as any)._isDuplicate ? "text-red-400" : isHighlight ? "text-amber-400" : "text-indigo-400")} title="Poppo ID" />
-                        </td>
-                        <td className="px-3 py-2 w-32 min-w-[120px]"><input type="text" value={row.nickname || ''} onChange={e => handleCellChange(idx, 'nickname', e.target.value)} className="bg-transparent w-full text-white outline-none" title="Nickname" aria-label="Nickname" /></td>
-                        {financialTab === 'monthly' ? (
-                          <td className="px-3 py-2 w-32 min-w-[120px]"><input type="text" value={row.month || ''} onChange={e => handleCellChange(idx, 'month', e.target.value)} className="bg-transparent w-full text-white outline-none" title="Month" aria-label="Month" /></td>
-                        ) : (
-                          <>
-                            <td className="px-3 py-2 w-28 min-w-[110px]"><input type="text" value={row.from_date || ''} onChange={e => handleCellChange(idx, 'from_date', e.target.value)} className="bg-transparent w-full text-white outline-none" title="From date" aria-label="From date" /></td>
-                            <td className="px-3 py-2 w-28 min-w-[110px]"><input type="text" value={row.to_date || ''} onChange={e => handleCellChange(idx, 'to_date', e.target.value)} className="bg-transparent w-full text-white outline-none" title="To date" aria-label="To date" /></td>
-                          </>
-                        )}
+                      </tr>
+                    );
+                  }
+                  
+                  return filtered.map(({ row, idx }) => {
+                     const isChecked = !!selectedRows[`${financialTab}_${idx}`];
+                     const existsInUsers = hosts.some(h => String(h.id || h.poppo_id || h.poppoId).trim() === String(row.poppo_id).trim());
+                     const isHighlight = row.poppo_id && !existsInUsers;
+                     return (
+                       <tr key={idx} className={cn(
+                         "transition-colors group",
+                         (row as any)._isDuplicate ? "bg-red-500/10 hover:bg-red-500/20" : 
+                         isHighlight ? "bg-amber-500/10 hover:bg-amber-500/20 border-l-2 border-amber-500" :
+                         "hover:bg-white/[0.01]"
+                       )}>
+                         <td className={cn(
+                           "px-3 py-2 text-center sticky left-0 z-10 border-r border-white/5 transition-colors",
+                           (row as any)._isDuplicate ? "bg-[#251010] group-hover:bg-[#301515]" : 
+                           isHighlight ? "bg-[#282010] group-hover:bg-[#352a15]" :
+                           "bg-[#13131E] group-hover:bg-[#1A1A28]"
+                         )}>
+                           <input type="checkbox" title="Select Row" checked={isChecked} onChange={e => setSelectedRows(prev => ({...prev, [`${financialTab}_${idx}`]: e.target.checked}))} className="rounded border-white/10 text-[#D4AF37] focus:ring-[#D4AF37] cursor-pointer" />
+                           {(row as any)._isDuplicate && (
+                             <div className="absolute top-1/2 -translate-y-1/2 left-8 text-xs cursor-help" title="Duplicate Entry Detected">⚠️</div>
+                           )}
+                           {!(row as any)._isDuplicate && isHighlight && (
+                             <div className="absolute top-1/2 -translate-y-1/2 left-8 text-xs cursor-help" title="Poppo ID not found in Users collection">⚠️</div>
+                           )}
+                         </td>
+                         <td className={cn(
+                           "px-4 py-2 sticky left-[48px] border-r border-white/5 z-10 font-mono font-bold transition-colors",
+                           (row as any)._isDuplicate ? "bg-[#251010] text-red-400 group-hover:bg-[#301515]" : 
+                           isHighlight ? "bg-[#282010] text-amber-400 group-hover:bg-[#352a15]" :
+                           "bg-[#13131E] text-indigo-400 group-hover:bg-[#1A1A28]"
+                         )}>
+                           <input type="text" value={row.poppo_id} onChange={e => handleCellChange(idx, 'poppo_id', e.target.value)} className={cn("bg-transparent border-none w-full outline-none", (row as any)._isDuplicate ? "text-red-400" : isHighlight ? "text-amber-400" : "text-indigo-400")} title="Poppo ID" />
+                         </td>
+                         <td className="px-3 py-2 w-32 min-w-[120px]"><input type="text" value={row.nickname || ''} onChange={e => handleCellChange(idx, 'nickname', e.target.value)} className="bg-transparent w-full text-white outline-none" title="Nickname" aria-label="Nickname" /></td>
+                         {financialTab === 'monthly' ? (
+                           <td className="px-3 py-2 w-32 min-w-[120px]"><input type="text" value={row.month || ''} onChange={e => handleCellChange(idx, 'month', e.target.value)} className="bg-transparent w-full text-white outline-none" title="Month" aria-label="Month" /></td>
+                         ) : financialTab === 'weekly' ? (
+                           <>
+                             <td className="px-3 py-2 w-28 min-w-[110px]"><input type="text" value={row.from_date || ''} onChange={e => handleCellChange(idx, 'from_date', e.target.value)} className="bg-transparent w-full text-white outline-none" title="From date" aria-label="From date" /></td>
+                             <td className="px-3 py-2 w-28 min-w-[110px]"><input type="text" value={row.to_date || ''} onChange={e => handleCellChange(idx, 'to_date', e.target.value)} className="bg-transparent w-full text-white outline-none" title="To date" aria-label="To date" /></td>
+                           </>
+                          ) : (
+                            <td className="px-3 py-2 w-32 min-w-[120px]"><input type="text" value={row.from_date || row.month || ''} onChange={e => handleCellChange(idx, 'from_date', e.target.value)} className="bg-transparent w-full text-white outline-none" title="Date" aria-label="Date" /></td>
+                          )}
                         <td className="px-3 py-2 w-24 min-w-[90px]"><input type="number" value={row.year || new Date().getFullYear() || ''} onChange={e => handleCellChange(idx, 'year', parseInt(e.target.value) || 0)} className="bg-transparent w-full text-white outline-none" title="Year" aria-label="Year" /></td>
                         <td className="px-3 py-2"><input type="number" value={row.live_duration || 0} onChange={e => handleCellChange(idx, 'live_duration', parseFloat(e.target.value) || 0)} className="bg-transparent w-full text-white outline-none" title="Live duration" aria-label="Live duration" /></td>
                         <td className="px-3 py-2"><input type="number" value={row.party_host_duration || 0} onChange={e => handleCellChange(idx, 'party_host_duration', parseFloat(e.target.value) || 0)} className="bg-transparent w-full text-white outline-none" title="Party host duration" aria-label="Party host duration" /></td>

@@ -30,12 +30,7 @@ import {
   Lock,
   Award,
   ListTodo,
-<<<<<<< HEAD
-  Search,
-  Settings
-=======
   Check
->>>>>>> 2b42d3ae84c3e300e1faeb35e7009a759158d1e9
 } from 'lucide-react';
 import { Storage } from '../lib/storage';
 import {
@@ -111,19 +106,9 @@ export const DirectorTab = () => {
   const isAgent = localAuth.role?.toLowerCase() === 'agent';
   const hasAccess = isDirector || isHeadAdmin || isAgent;
 
-<<<<<<< HEAD
-  // Sidebar views: overview, awards, tasks, roster_admin, financials, firestore, auth, functions, storage, settings
-  const [activeView, setActiveView] = useState<'overview' | 'awards' | 'tasks' | 'roster_admin' | 'financials' | 'firestore' | 'auth' | 'functions' | 'storage' | 'settings'>('overview');
-=======
   // Sidebar views: roster_management, financials, system_logs, create_user
-<<<<<<< HEAD
-  const [activeView, setActiveView] = useState<string>('roster_management');
->>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
-  
-=======
   const [activeView, setActiveView] = useState<string>(isAgent && !isDirector && !isHeadAdmin ? 'financials' : 'roster_management');
 
->>>>>>> 2b42d3ae84c3e300e1faeb35e7009a759158d1e9
   // Data State
   const [hosts, setHosts] = useState<Host[]>([]);
   const [commissions, setCommissions] = useState<CommissionEntry[]>([]);
@@ -1206,24 +1191,6 @@ export const DirectorTab = () => {
             <Shield size={16} className="text-indigo-400" />
             <h4 className="text-[10px] font-black uppercase tracking-widest text-[#B0B0B0]/40">Director Portal</h4>
           </div>
-<<<<<<< HEAD
-          <div className="text-xs font-bold text-[#F5F5F5] truncate">{localAuth.name}</div>
-          <div className="text-[9px] text-[#FFB800] font-black mt-1 uppercase tracking-wider">Secure Session Active</div>
-        </div>
-
-        {[
-          { id: 'overview', label: 'Overview', icon: LayoutDashboard },
-          { id: 'awards', label: 'Awards & Badges', icon: Award },
-          { id: 'tasks', label: 'Tasks Desk', icon: ListTodo },
-          { id: 'roster_admin', label: 'Roster Admin', icon: Users },
-          { id: 'financials', label: 'Financials', icon: Database },
-          { id: 'firestore', label: 'Database', icon: Database },
-          { id: 'auth', label: 'Authentication', icon: Shield },
-          { id: 'functions', label: 'Cloud Functions', icon: Activity },
-          { id: 'storage', label: 'Storage', icon: FolderPlus },
-          { id: 'settings', label: 'Settings', icon: Settings },
-        ].map(item => (
-=======
           <div className="text-xs font-bold text-[#F0EFE8] truncate">{localAuth.name}</div>
           <div className="text-[9px] text-[#D4AF37] font-black mt-1 uppercase tracking-wider">Secure Session Active</div>
 
@@ -1338,21 +1305,14 @@ export const DirectorTab = () => {
           (isDirector || isAgent) && { id: 'financials', label: 'Financial Data', icon: FileUp },
           (isDirector || isHeadAdmin) && { id: 'system_logs', label: 'System Logs', icon: AlertCircle },
         ].filter((item): item is { id: string; label: string; icon: any } => !!item).map(item => (
->>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
           <button
             key={item.id}
             onClick={() => { setActiveView(item.id as any); setErrorMessage(null); }}
             className={cn(
               "w-full flex items-center gap-4 p-4 rounded-2xl transition-all group relative cursor-pointer",
-<<<<<<< HEAD
-              activeView === item.id 
-                ? "bg-[#1A1A1A] text-[#F5F5F5] border border-white/5 shadow-xl" 
-                : "text-[#B0B0B0] hover:bg-white/[0.02] hover:text-[#F5F5F5]"
-=======
               activeView === item.id
                 ? "bg-[#1A1A28] text-[#F0EFE8] border border-white/5 shadow-xl"
                 : "text-[#A09E9A] hover:bg-white/[0.02] hover:text-[#F0EFE8]"
->>>>>>> 2b42d3ae84c3e300e1faeb35e7009a759158d1e9
             )}
             title={`Switch to ${item.label} view`}
             aria-label={`Switch to ${item.label} view`}
@@ -1465,11 +1425,7 @@ export const DirectorTab = () => {
                           className={cn(
                             "p-6 rounded-3xl border flex flex-col justify-between h-56 tech-card",
                             item.priority === 'High' ? 'border-red-500/20 bg-red-500/[0.02]' :
-<<<<<<< HEAD
-                            item.priority === 'Medium' ? 'border-amber-500/20 bg-amber-500/[0.02]' : 'border-[#FFB800]/20 bg-[#FFB800]/[0.02]'
-=======
                               item.priority === 'Medium' ? 'border-amber-500/20 bg-amber-500/[0.02]' : 'border-[#D4AF37]/20 bg-[#D4AF37]/[0.02]'
->>>>>>> 2b42d3ae84c3e300e1faeb35e7009a759158d1e9
                           )}
                         >
                           <div>
@@ -1477,18 +1433,8 @@ export const DirectorTab = () => {
                               <span className={cn(
                                 "text-[8px] font-black uppercase px-2 py-0.5 rounded-full",
                                 item.priority === 'High' ? 'bg-red-500/10 text-red-400 border border-red-500/20' :
-<<<<<<< HEAD
-<<<<<<< HEAD
-                                item.priority === 'Medium' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
-                                'bg-[#FFB800]/10 text-[#FFB800] border border-[#FFB800]/20'
-=======
-                                item.priority === 'Medium' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
-                                'bg-[#D4AF37]/10 text-[#D4AF37] border border-[#D4AF37]/20'
->>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
-=======
                                   item.priority === 'Medium' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
                                     'bg-[#D4AF37]/10 text-[#D4AF37] border border-[#D4AF37]/20'
->>>>>>> 2b42d3ae84c3e300e1faeb35e7009a759158d1e9
                               )}>
                                 {item.priority} Priority
                               </span>
@@ -1544,13 +1490,8 @@ export const DirectorTab = () => {
                                 <span className={cn(
                                   "text-[8px] font-black uppercase px-2 py-0.5 rounded-full border",
                                   item.severity === 'High' ? 'bg-red-500/10 text-red-400 border-red-500/20' :
-<<<<<<< HEAD
-                                  item.severity === 'Medium' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
-                                  'bg-slate-500/10 text-[#B0B0B0] border-slate-500/20'
-=======
                                     item.severity === 'Medium' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
                                       'bg-slate-500/10 text-[#A09E9A] border-slate-500/20'
->>>>>>> 2b42d3ae84c3e300e1faeb35e7009a759158d1e9
                                 )}>
                                   {item.severity}
                                 </span>
@@ -1609,128 +1550,6 @@ export const DirectorTab = () => {
             {/* MODULE 2: AWARDS & BADGES */}
             {activeView === 'awards' && (
               <motion.div key="awards" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
-<<<<<<< HEAD
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  <div className="space-y-1">
-                    <h3 className="font-bold text-xl flex items-center gap-2">
-                      <Award size={20} className="text-[#FFB800]" />
-                      Custom Monthly Awards & Badges
-                    </h3>
-                    <p className="text-[10px] text-[#B0B0B0]/40 uppercase tracking-widest font-black">Assign badges to top performing talent</p>
-                  </div>
-                  
-                  <div className="flex items-center gap-3 bg-[#1A1A1A] p-2 px-4 rounded-xl border border-white/5">
-                    <span className="text-[9px] font-black uppercase tracking-widest text-[#B0B0B0]/50">Target Month:</span>
-                    <div className="flex items-center gap-1">
-                      <select 
-                        value={selectedMonth.split('-')[0]} 
-                        onChange={(e) => setSelectedMonth(`${e.target.value}-${selectedMonth.split('-')[1]}`)}
-                        className="bg-transparent text-indigo-400 font-bold text-xs outline-none cursor-pointer focus:ring-0"
-                        title="Target Year selection"
-                      >
-                        <option value="2024" className="bg-[#1A1A1A] text-[#F5F5F5]">2024</option>
-                        <option value="2025" className="bg-[#1A1A1A] text-[#F5F5F5]">2025</option>
-                        <option value="2026" className="bg-[#1A1A1A] text-[#F5F5F5]">2026</option>
-                        <option value="2027" className="bg-[#1A1A1A] text-[#F5F5F5]">2027</option>
-                      </select>
-                      <span className="text-white/20 text-xs">-</span>
-                      <select 
-                        value={selectedMonth.split('-')[1]} 
-                        onChange={(e) => setSelectedMonth(`${selectedMonth.split('-')[0]}-${e.target.value}`)}
-                        className="bg-transparent text-indigo-400 font-bold text-xs outline-none cursor-pointer focus:ring-0"
-                        title="Target Month selection"
-                      >
-                        {['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'].map(m => (
-                          <option key={m} value={m} className="bg-[#1A1A1A] text-[#F5F5F5]">{m}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="tech-card !p-0 overflow-hidden">
-                  <table className="w-full text-left text-xs">
-                    <thead>
-                      <tr className="border-b border-white/5 text-[9px] font-black text-[#B0B0B0]/40 uppercase tracking-widest bg-white/[0.02]">
-                        <th className="px-6 py-4">Poppo ID</th>
-                        <th className="px-6 py-4">Nickname</th>
-                        <th className="px-6 py-4">Month</th>
-                        <th className="px-6 py-4">Monthly Award Badge</th>
-                        <th className="px-6 py-4 text-right">Assign Action</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-white/5">
-                      {hosts.map(host => {
-                        const summary = earningsSummaries.find(s => s.poppoId === host.id);
-                        const currentBadge = summary?.profilePhotoUrl || 'None'; // profilePhotoUrl maps to local award badge here
-                        
-                        return (
-                          <tr key={host.id} className="hover:bg-white/[0.01] transition-colors">
-                            <td className="px-6 py-4 font-mono font-bold text-indigo-400">{host.id}</td>
-                            <td className="px-6 py-4 font-bold text-[#F5F5F5]">{host.nickname || host.name}</td>
-                            <td className="px-6 py-4 text-[#B0B0B0]/40">{selectedMonth}</td>
-                            <td className="px-6 py-4">
-                              <span className={cn(
-                                "text-[10px] font-bold px-2 py-0.5 rounded-full border",
-                                currentBadge !== 'None' ? 'bg-[#FFB800]/10 text-[#FFB800] border-[#FFB800]/20' : 'bg-[#222222] text-[#B0B0B0] border-transparent'
-                              )}>
-                                {currentBadge}
-                              </span>
-                            </td>
-                            <td className="px-6 py-4 text-right">
-                              <select
-                                onChange={async (e) => {
-                                  const val = e.target.value;
-                                  if (!val) return;
-                                  
-                                  const original = summary ? { ...summary } : null;
-                                  const updatedSummary: TopNinersEarningsSummary = summary ? {
-                                    ...summary,
-                                    profilePhotoUrl: val
-                                  } : {
-                                    summaryId: `${host.id}_${selectedMonth}`,
-                                    periodKey: selectedMonth,
-                                    month: parseInt(selectedMonth.split('-')[1]),
-                                    year: parseInt(selectedMonth.split('-')[0]),
-                                    poppoId: host.id,
-                                    nickname: host.nickname || host.name,
-                                    role: host.role || 'Host',
-                                    totalEarningsPoints: summary?.totalEarningsPoints || 0,
-                                    rank: summary?.rank || 99,
-                                    isPublished: true,
-                                    profilePhotoUrl: val
-                                  };
-
-                                  try {
-                                    await FirebaseService.saveTopNinersSummary([updatedSummary]);
-                                    await auditLogAction('ASSIGN_AWARD', original, updatedSummary);
-                                    showSuccess(`Award badge assigned to ${host.nickname || host.name}`);
-                                    const updated = await FirebaseService.getTopNinersSummary(selectedMonth);
-                                    setEarningsSummaries(updated);
-                                  } catch (err) {
-                                    alert("Failed to assign award badge");
-                                  }
-                                }}
-                                value={currentBadge}
-                                className="bg-[#1A1A1A] border border-white/10 rounded-lg px-2 py-1 text-xs text-[#FFB800] font-bold outline-none cursor-pointer"
-                                title="Assign award badge"
-                                aria-label="Assign award badge"
-                              >
-                                <option value="">-- Choose badge --</option>
-                                <option value="Top Earner">🏆 Top Earner</option>
-                                <option value="Rising Star">⭐ Rising Star</option>
-                                <option value="Gifting Queen">💖 Gifting Queen</option>
-                                <option value="PK Elite">⚔️ PK Elite</option>
-                                <option value="None">None (Remove Badge)</option>
-                              </select>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-=======
                 <AwardsManager
                   hosts={hosts}
                   earningsSummaries={earningsSummaries}
@@ -1742,198 +1561,18 @@ export const DirectorTab = () => {
                   }}
                   auditLogAction={auditLogAction}
                 />
->>>>>>> 2b42d3ae84c3e300e1faeb35e7009a759158d1e9
               </motion.div>
             )}
 
             {/* MODULE 3: TASKS MANAGEMENT DESK */}
             {activeView === 'tasks' && (
               <motion.div key="tasks" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
-<<<<<<< HEAD
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  <div className="space-y-1">
-                    <h3 className="font-bold text-xl flex items-center gap-2 text-[#F5F5F5]">
-                      <ListTodo size={20} className="text-indigo-400" />
-                      Tasks Coordination Desk
-                    </h3>
-                    <p className="text-[10px] text-[#B0B0B0]/40 uppercase tracking-widest font-black">Delegate instruction tasks to agency staff</p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                  {/* Create Task Form */}
-                  <div className="tech-card h-fit space-y-6">
-                    <h4 className="text-[10px] font-black uppercase tracking-widest text-[#FFB800] border-b border-white/5 pb-2">Delegate New Task</h4>
-                    
-                    <form 
-                      onSubmit={async (e) => {
-                        e.preventDefault();
-                        const formData = new FormData(e.currentTarget);
-                        const taskId = getUUID();
-                        const newTask: Task = {
-                          taskId,
-                          assignedToUserId: String(formData.get('assignedTo') || 'support_staff'),
-                          relatedPoppoId: String(formData.get('relatedPoppo') || ''),
-                          taskType: String(formData.get('type') || 'Coaching'),
-                          title: String(formData.get('title') || 'Coaching Task'),
-                          description: String(formData.get('description') || ''),
-                          status: 'Assigned',
-                          dueDate: String(formData.get('dueDate') || '')
-                        };
-
-                        try {
-                           await FirebaseService.saveTasks([newTask]);
-                           await auditLogAction('CREATE_TASK', null, newTask);
-                           showSuccess('Task delegated down successfully.');
-                           e.currentTarget.reset();
-                           loadData();
-                        } catch (err) {
-                           alert("Failed to create task.");
-                        }
-                      }}
-                      className="space-y-4"
-                    >
-                      <div className="space-y-1.5">
-                        <label htmlFor="task-assignee" className="text-[9px] font-black uppercase text-[#B0B0B0]/40 tracking-wider">Assignee Role</label>
-                        <select id="task-assignee" name="assignedTo" className="w-full bg-[#1A1A1A] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-[#F5F5F5]" title="Select assignee role" aria-label="Select assignee role">
-                          <option value="support_staff" className="bg-[#1A1A1A] text-[#F5F5F5]">Support Staff (Assistant)</option>
-                          <option value="Manager" className="bg-[#1A1A1A] text-[#F5F5F5]">Manager</option>
-                          <option value="Admin" className="bg-[#1A1A1A] text-[#F5F5F5]">Admin</option>
-                        </select>
-                      </div>
-
-                      <div className="space-y-1.5">
-                        <label htmlFor="task-related-poppo" className="text-[9px] font-black uppercase text-[#B0B0B0]/40 tracking-wider">Related Talent</label>
-                        <select id="task-related-poppo" name="relatedPoppo" className="w-full bg-[#1A1A1A] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-[#F5F5F5]" title="Select related talent" aria-label="Select related talent">
-                          <option value="" className="bg-[#1A1A1A] text-[#F5F5F5]">-- No Related Host --</option>
-                          {hosts.map(h => (
-                            <option key={h.id} value={h.id} className="bg-[#1A1A1A] text-[#F5F5F5]">{h.nickname || h.name} ({h.id})</option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div className="space-y-1.5">
-                        <label htmlFor="task-type" className="text-[9px] font-black uppercase text-[#B0B0B0]/40 tracking-wider">Task Type</label>
-                        <input id="task-type" name="type" type="text" placeholder="e.g. Coaching" className="w-full glass-input text-xs text-[#F5F5F5]" required title="Enter task type" aria-label="Enter task type" />
-                      </div>
-
-                      <div className="space-y-1.5">
-                        <label htmlFor="task-title" className="text-[9px] font-black uppercase text-[#B0B0B0]/40 tracking-wider">Task Title</label>
-                        <input id="task-title" name="title" type="text" placeholder="Complete Profile Info" className="w-full glass-input text-xs text-[#F5F5F5]" required title="Enter task title" aria-label="Enter task title" />
-                      </div>
-
-                      <div className="space-y-1.5">
-                        <label htmlFor="task-description" className="text-[9px] font-black uppercase text-[#B0B0B0]/40 tracking-wider">Task Description</label>
-                        <textarea id="task-description" name="description" placeholder="Specify missing fields or guidelines..." className="w-full glass-input text-xs text-[#F5F5F5] h-20 resize-none" required title="Enter task description" aria-label="Enter task description" />
-                      </div>
-
-                      <div className="space-y-1.5">
-<<<<<<< HEAD
-                        <label htmlFor="task-due-date" className="text-[9px] font-black uppercase text-[#B0B0B0]/40 tracking-wider">Due Date</label>
-                        <input id="task-due-date" name="dueDate" type="date" className="w-full glass-input text-xs text-[#F5F5F5] [color-scheme:dark]" required title="Select task due date" aria-label="Select task due date" />
-=======
-                        <label htmlFor="task-due-date" className="text-[9px] font-black uppercase text-[#A09E9A]/40 tracking-wider">Due Date</label>
-                        <SingleDatePicker 
-                          id="task-due-date" 
-                          name="dueDate" 
-                          value={taskDueDate} 
-                          onChange={(val) => setTaskDueDate(val)} 
-                          required 
-                          title="Select task due date" 
-                        />
->>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
-                      </div>
-
-                      <button type="submit" className="w-full py-3 btn-gold rounded-xl text-xs font-black uppercase tracking-widest text-[#111111] transition-all shadow-lg active:scale-95 cursor-pointer">
-                        Delegate Task
-                      </button>
-                    </form>
-                  </div>
-
-                  {/* Tasks List */}
-                  <div className="lg:col-span-2 space-y-4">
-                    <h4 className="text-[10px] font-black uppercase tracking-widest text-[#B0B0B0]/40">Active Assignments</h4>
-                    
-                    <div className="space-y-3">
-                      {tasks.length === 0 ? (
-                        <div className="text-center py-12 border border-dashed border-white/10 rounded-3xl text-[#B0B0B0]/30 italic text-xs">
-                          No delegated tasks found.
-                        </div>
-                      ) : (
-                        tasks.map(task => (
-                          <div key={task.taskId} className="tech-card !p-6 flex flex-col sm:flex-row justify-between sm:items-center gap-4 bg-white/[0.01]">
-                            <div className="space-y-1">
-                              <div className="flex items-center gap-2">
-                                <span className={cn(
-                                  "text-[8px] font-black uppercase px-2 py-0.5 rounded-full border",
-                                  task.status === 'Completed' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
-                                )}>
-                                  {task.status}
-                                </span>
-                                <span className="text-[9px] font-black text-indigo-400 uppercase tracking-wider">{task.taskType}</span>
-                              </div>
-                              <h5 className="font-black text-[#F5F5F5] text-sm">{task.title}</h5>
-                              <p className="text-xs text-[#B0B0B0]/60 leading-relaxed font-medium">{task.description}</p>
-                              <div className="text-[9px] text-[#B0B0B0]/40 font-bold flex gap-4 pt-1">
-                                <span>Assignee: {task.assignedToUserId}</span>
-                                <span>Related Poppo ID: {task.relatedPoppoId}</span>
-                                <span>Due: {task.dueDate}</span>
-                              </div>
-                            </div>
-
-                            <div className="flex gap-2">
-                              {task.status !== 'Completed' && (
-                                <button
-                                  onClick={async () => {
-                                    const original = { ...task };
-                                    const updated: Task = { ...task, status: 'Completed' };
-                                    try {
-                                      await FirebaseService.saveTasks([updated]);
-                                      await auditLogAction('UPDATE_TASK', original, updated);
-                                      showSuccess('Task marked as completed.');
-                                      loadData();
-                                    } catch (err) {
-                                      alert("Failed to complete task");
-                                    }
-                                  }}
-                                  className="px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500 text-emerald-400 hover:text-[#111111] rounded-lg text-[9px] font-black uppercase transition-all cursor-pointer"
-                                >
-                                  Complete
-                                </button>
-                              )}
-                              <button
-                                onClick={async () => {
-                                  if (!confirm("Hard delete this task assignment?")) return;
-                                  try {
-                                    await FirebaseService.deleteTask(task.taskId);
-                                    await auditLogAction('DELETE_TASK', task, null);
-                                    showSuccess('Task removed.');
-                                    loadData();
-                                  } catch (err) {
-                                    alert("Failed to delete task");
-                                  }
-                                }}
-                                className="p-2 bg-red-500/10 hover:bg-red-500 text-red-400 hover:text-[#111111] rounded-lg transition-all cursor-pointer"
-                                title="Delete task"
-                                aria-label="Delete task"
-                              >
-                                <Trash2 size={12} />
-                              </button>
-                            </div>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </div>
-                </div>
-=======
                 <TasksDesk
                   hosts={hosts}
                   tasks={tasks}
                   auditLogAction={auditLogAction}
                   onTasksUpdated={() => loadData()}
                 />
->>>>>>> 2b42d3ae84c3e300e1faeb35e7009a759158d1e9
               </motion.div>
             )}
 
@@ -2027,13 +1666,8 @@ export const DirectorTab = () => {
                       <input id="reg-name" name="name" type="text" placeholder="Display name" className="w-full glass-input text-xs text-[#F5F5F5]" required title="Enter Display Name" aria-label="Enter Display Name" />
                     </div>
                     <div className="space-y-1.5">
-<<<<<<< HEAD
-                      <label htmlFor="reg-team" className="text-[9px] font-black uppercase text-[#B0B0B0]/40 tracking-wider">Team Group</label>
-                      <input id="reg-team" name="team" type="text" placeholder="Unassigned" className="w-full glass-input text-xs text-[#F5F5F5]" title="Enter Team Group" aria-label="Enter Team Group" />
-=======
                       <label htmlFor="reg-team" className="text-[9px] font-black uppercase text-[#A09E9A]/40 tracking-wider">Team Anchor</label>
                       <input id="reg-team" name="teamAnchor" type="text" placeholder="Unassigned" className="w-full glass-input text-xs text-[#F0EFE8]" title="Enter Team Anchor" aria-label="Enter Team Anchor" />
->>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
                     </div>
                     <button type="submit" className="py-3 btn-gold rounded-xl text-xs font-black uppercase tracking-widest text-[#111111] transition-all shadow-lg active:scale-95 cursor-pointer">
                       Register Host
@@ -2309,15 +1943,9 @@ export const DirectorTab = () => {
                         <tbody className="divide-y divide-white/5 bg-transparent">
                           {hosts.map(host => (
                             <tr key={host.id} className="hover:bg-white/[0.01] transition-colors group">
-<<<<<<< HEAD
-                              <td className="px-6 py-4 font-mono font-bold text-indigo-400 sticky left-0 bg-[#0A0A0A] group-hover:bg-[#1A1A1A] transition-colors z-10 min-w-[100px] max-w-[100px] border-r border-white/5">{host.id}</td>
-                              <td className="px-6 py-4 font-bold text-[#F5F5F5] sticky left-[100px] bg-[#0A0A0A] group-hover:bg-[#1A1A1A] transition-colors z-10 min-w-[150px] max-w-[150px] border-r border-white/5">
-                                <input 
-=======
                               <td className="px-6 py-4 font-mono font-bold text-indigo-400 sticky left-0 bg-[#13131E] group-hover:bg-[#1A1A28] transition-colors z-10 min-w-[100px] max-w-[100px] border-r border-white/5">{host.id}</td>
                               <td className="px-6 py-4 font-bold text-[#F0EFE8] sticky left-[100px] bg-[#13131E] group-hover:bg-[#1A1A28] transition-colors z-10 min-w-[150px] max-w-[150px] border-r border-white/5">
                                 <input
->>>>>>> 2b42d3ae84c3e300e1faeb35e7009a759158d1e9
                                   type="text"
                                   defaultValue={host.nickname || host.name}
                                   onBlur={async (e) => {
@@ -2360,19 +1988,11 @@ export const DirectorTab = () => {
                                   title="Select role"
                                   aria-label="Select role"
                                 >
-<<<<<<< HEAD
-                                  
-                                    {['Talent', 'Manager', 'Admin', 'Director', 'Agent'].map(r => (
-                                      <option key={r} value={r} className="bg-[#0A0A0B] text-[#F5F5F5]">{r}</option>
-                                    ))}
-                                  
-=======
 
                                   {['Talent', 'Manager', 'Admin', 'Director', 'Agent'].map(r => (
                                     <option key={r} value={r} className="bg-[#0A0A0B] text-[#F0EFE8]">{r}</option>
                                   ))}
 
->>>>>>> 2b42d3ae84c3e300e1faeb35e7009a759158d1e9
                                 </select>
                               </td>
 
@@ -2392,21 +2012,12 @@ export const DirectorTab = () => {
                                       alert("Failed to update status");
                                     }
                                   }}
-<<<<<<< HEAD
-                                  className="bg-transparent border-none rounded text-xs text-[#B0B0B0] hover:text-[#F5F5F5] focus:ring-1 focus:ring-indigo-500 cursor-pointer"
-                                  title="Select status"
-                                  aria-label="Select status"
-                                >
-                                  {['Active', 'Inconsistent', 'Released', 'Inactive'].map(s => (
-                                    <option key={s} value={s} className="bg-[#0A0A0B] text-[#F5F5F5]">{s}</option>
-=======
                                   className={`bg-transparent border-none rounded text-xs focus:ring-1 focus:ring-indigo-500 cursor-pointer font-bold ${host.status === 'Active' ? 'text-emerald-400' : 'text-[#A09E9A] hover:text-[#F0EFE8]'}`}
                                   title="Select status"
                                   aria-label="Select status"
                                 >
                                   {['Active', 'Intermittent', 'Released', 'Inactive'].map(s => (
                                     <option key={s} value={s} className="bg-[#0A0A0B] text-[#F0EFE8]">{s}</option>
->>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
                                   ))}
                                 </select>
                               </td>
@@ -2431,11 +2042,7 @@ export const DirectorTab = () => {
                                   aria-label="Select salary category"
                                 >
                                   {['Rocket Host', 'Star Host', 'S idol', 'ESport Host'].map(s => (
-<<<<<<< HEAD
-                                    <option key={s} value={s} className="bg-[#0A0A0B] text-[#F5F5F5]">{s}</option>
-=======
                                     <option key={s} value={s} className="bg-[#0A0A0B] text-[#F0EFE8]">{s}</option>
->>>>>>> 2b42d3ae84c3e300e1faeb35e7009a759158d1e9
                                   ))}
                                 </select>
                               </td>
@@ -2481,7 +2088,6 @@ export const DirectorTab = () => {
                 </div>
               ) : (
                 <motion.div key="financials" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
-<<<<<<< HEAD
                 
                 {/* Header */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -2531,523 +2137,6 @@ export const DirectorTab = () => {
                     Weekly Financials
                   </button>
                 </div>
-
-<<<<<<< HEAD
-                <div className="mb-6">
-                  <FinancialUpload onUploadSuccess={loadData} />
-                </div>
-
-                {/* Bulk Intake & Paste Section (Flat-file Storage Ledger) */}
-                <div className="tech-card bg-[#1A1A1A] border border-white/5 p-6 rounded-2xl grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  {/* File Upload Area */}
-                  <div className="border-2 border-dashed border-white/10 rounded-2xl p-6 flex flex-col items-center justify-center gap-3 hover:border-[#FFB800]/50 hover:bg-[#FFB800]/[0.02] transition-all cursor-pointer relative group">
-                    <div className="w-10 h-10 rounded-full bg-[#FFB800]/10 flex items-center justify-center border border-[#FFB800]/20 group-hover:scale-105 transition-transform">
-                      <span className="text-[#FFB800]">📁</span>
-                    </div>
-                    <div className="text-center space-y-1">
-                      <p className="font-bold text-xs uppercase tracking-wider text-[#F5F5F5]">Upload Commission Report</p>
-                      <p className="text-[9px] text-[#B0B0B0]">Drag XLSX or CSV file here or click to browse</p>
-                    </div>
-                    <input 
-                      type="file" 
-                      accept=".csv,.xlsx" 
-                      onChange={async (e) => {
-                        const file = e.target.files?.[0];
-                        if (!file) return;
-                        setIsLoading(true);
-                        try {
-                          const reader = new FileReader();
-                          reader.onload = async (evt) => {
-                            const bstr = evt.target?.result as string;
-                            const wb = XLSX.read(bstr, { type: 'binary' });
-                            const wsname = wb.SheetNames[0];
-                            const ws = wb.Sheets[wsname];
-                            const data = XLSX.utils.sheet_to_json(ws);
-                            await handleXlsxImport(data);
-                          };
-                          reader.readAsBinaryString(file);
-                        } catch (err) {
-                          alert("Failed to parse report file");
-                        } finally {
-                          setIsLoading(false);
-                        }
-                      }}
-                      className="absolute inset-0 opacity-0 cursor-pointer"
-                      title="Upload Excel or CSV report"
-                    />
-                  </div>
-
-                  {/* Bulk Paste Textarea */}
-                  <div className="space-y-2 flex flex-col">
-                    <label htmlFor="bulk-ledger-paste" className="text-[9px] font-black uppercase tracking-wider text-[#B0B0B0]">
-                      Excel / Sheets Tabular Paste Intake
-                    </label>
-                    <div className="flex gap-2 flex-1">
-                      <textarea
-                        id="bulk-ledger-paste"
-                        placeholder={
-                          financialTab === 'monthly'
-                            ? "Paste monthly columns (tab-separated):\nPoppoID\tMonth\tYear\tNickname\tLiveHours\tPartyHours\tTotalPoints\tAgentCommission\tLiveEarnings\tPartyEarnings\tPrivateChat\tTips\tPlatformReward\tOtherEarnings\tHourlySalary\tSuperSalary\tSuperRank\tLevel"
-                            : "Paste weekly columns (tab-separated):\nPoppoID\tFromDate\tToDate\tNickname\tLiveHours\tPartyHours\tTotalPoints\tAgentCommission\tLiveEarnings\tPartyEarnings\tPrivateChat\tTips\tPlatformReward\tOtherEarnings\tHourlySalary\tSuperSalary\tSuperRank\tLevel"
-                        }
-                        className="flex-1 h-24 glass-input font-mono text-[9px] resize-none focus:ring-1 focus:ring-[#FFB800] text-[#F5F5F5] bg-[#111111] border border-white/10"
-                      />
-                      <button
-                        onClick={() => {
-                          const textarea = document.getElementById('bulk-ledger-paste') as HTMLTextAreaElement;
-                          if (textarea) {
-                            handleBulkPaste(textarea.value);
-                            textarea.value = '';
-                          }
-                        }}
-                        className="px-4 bg-[#FFB800]/10 hover:bg-[#FFB800]/25 text-[#FFB800] border border-[#FFB800]/25 hover:text-white transition-all font-black uppercase text-[10px] tracking-wider rounded-xl cursor-pointer"
-                      >
-                        Paste
-                      </button>
-                    </div>
-=======
-                {/* Unified Ingestion Zone */}
-                <div className="tech-card bg-[#1A1A28] border border-white/5 p-6 rounded-2xl">
-                  <div className="flex flex-col space-y-4">
-                    <div className="flex items-center justify-between">
-                      <label htmlFor="bulk-ledger-paste" className="text-sm font-black uppercase tracking-widest text-[#F0EFE8] flex items-center gap-2">
-                        <span className="text-[#D4AF37]">📋</span> Paste Raw Ledger Data
-                      </label>
-                      <span className="text-[9px] text-[#A09E9A] uppercase tracking-wider font-bold">
-                        Supports direct paste from Excel/Sheets
-                      </span>
-=======
-
-                  {/* Header */}
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    <div className="space-y-1">
-                      <h3 className="font-bold text-xl flex items-center gap-2 text-[#F0EFE8]">
-                        <Database size={20} className="text-[#D4AF37]" />
-                        High-Volume Financial Ledger
-                      </h3>
-                      <p className="text-[10px] text-slate-400 uppercase tracking-widest font-black">
-                        Bypasses Firestore. Files saved directly as flat JSON in Firebase Storage.
-                      </p>
->>>>>>> 2b42d3ae84c3e300e1faeb35e7009a759158d1e9
-                    </div>
-
-                    {/* Save Changes button with spinner state */}
-                    <button
-                      onClick={handleSaveChanges}
-                      disabled={isSavingFinancials}
-                      className="flex items-center gap-2 px-5 py-3 bg-[#D4AF37] hover:bg-[#c9a832] disabled:bg-slate-700 text-[#0D0D14] rounded-xl text-xs font-black uppercase tracking-widest transition-all cursor-pointer shadow-lg active:scale-95 shrink-0"
-                    >
-                      {isSavingFinancials ? (
-                        <span className="w-3.5 h-3.5 border-2 border-[#0D0D14]/20 border-t-[#0D0D14] rounded-full animate-spin" />
-                      ) : (
-                        <span>💾</span>
-                      )}
-                      {isSavingFinancials ? "Saving..." : "Save Changes"}
-                    </button>
->>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
-                  </div>
-
-<<<<<<< HEAD
-                {/* Ledger Interactive Spreadsheet Table */}
-                <div className="tech-card !p-0 border border-white/5 overflow-hidden bg-[#0A0A0A] shadow-xl">
-                  
-                  {/* Grid Action Bar */}
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border-b border-white/5 bg-[#1A1A1A]/40 gap-4">
-                    <div className="flex flex-wrap items-center gap-3">
-                      <div className="relative">
-                        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#B0B0B0]" />
-                        <input
-                          type="text"
-                          placeholder="Search ID, Nickname, Month, Year..."
-                          value={financialSearchTerm}
-                          onChange={(e) => setFinancialSearchTerm(e.target.value)}
-                          className="w-64 glass-input text-xs pl-8 py-2 text-[#F5F5F5]"
-                        />
-                      </div>
-                      <button
-                        onClick={handleAddRow}
-                        className="px-3.5 py-2 bg-emerald-550 hover:bg-emerald-600 text-white rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer shadow-sm shadow-emerald-500/10 active:scale-95"
-                      >
-                        + Add Row
-                      </button>
-                      <button
-                        onClick={handleDeleteSelection}
-                        disabled={!Object.keys(selectedRows).some(key => key.startsWith(`${financialTab}_`) && selectedRows[key])}
-                        className="px-3.5 py-2 bg-red-550 hover:bg-red-650 disabled:bg-[#222222] text-white disabled:text-[#B0B0B0]/40 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer shadow-sm active:scale-95"
-                      >
-                        🗑️ Delete Selection
-                      </button>
-                    </div>
-
-                    <div className="text-[10px] font-black uppercase tracking-widest text-[#B0B0B0]">
-                      {(financialTab === 'monthly' ? monthlyLedger : weeklyLedger).length} Total rows in workspace
-                    </div>
-                  </div>
-
-                  {/* Spreadsheet Grid Container */}
-                  <div className="overflow-x-auto overflow-y-auto max-h-[500px] relative custom-scrollbar">
-                    <table className="w-full text-left text-xs min-w-max border-collapse">
-                      <thead>
-                        <tr className="border-b border-white/5 text-[10px] font-bold text-[#B0B0B0] uppercase tracking-wider bg-[#1A1A1A] sticky top-0 z-20">
-                          <th className="px-3 py-3 w-12 text-center bg-[#0A0A0A] sticky left-0 z-30 border-r border-white/5">
-                            <input 
-                              type="checkbox"
-                              onChange={(e) => {
-                                const currentData = financialTab === 'monthly' ? monthlyLedger : weeklyLedger;
-                                const nextSelected = { ...selectedRows };
-                                currentData.forEach((_, idx) => {
-                                  nextSelected[`${financialTab}_${idx}`] = e.target.checked;
-                                });
-                                setSelectedRows(nextSelected);
-                              }}
-                              className="rounded border-white/10 text-[#FFB800] focus:ring-[#FFB800] cursor-pointer"
-                              title="Select all rows"
-                            />
-                          </th>
-                          {/* STICKY COLUMN FOR POPPO ID */}
-                          <th className="px-3 py-3 w-28 sticky left-[48px] bg-[#0A0A0A] z-30 border-r border-white/5 whitespace-nowrap">Poppo ID</th>
-                          {financialTab === 'monthly' ? (
-                            <>
-                              <th className="px-3 py-3 w-24 whitespace-nowrap">Month</th>
-                              <th className="px-3 py-3 w-24 whitespace-nowrap">Year</th>
-                            </>
-                          ) : (
-                            <>
-                              <th className="px-3 py-3 w-28 whitespace-nowrap">From Date</th>
-                              <th className="px-3 py-3 w-28 whitespace-nowrap">To Date</th>
-                            </>
-                          )}
-                          <th className="px-3 py-3 w-32 whitespace-nowrap">Nickname</th>
-                          <th className="px-3 py-3 w-28 whitespace-nowrap">Live Duration</th>
-                          <th className="px-3 py-3 w-28 whitespace-nowrap">Party Host</th>
-                          <th className="px-3 py-3 w-32 whitespace-nowrap">Total Earnings</th>
-                          <th className="px-3 py-3 w-32 whitespace-nowrap">Agent Comm.</th>
-                          <th className="px-3 py-3 w-28 whitespace-nowrap">Live Earnings</th>
-                          <th className="px-3 py-3 w-28 whitespace-nowrap">Party Earnings</th>
-                          <th className="px-3 py-3 w-28 whitespace-nowrap">Private Chat</th>
-                          <th className="px-3 py-3 w-24 whitespace-nowrap">Tips</th>
-                          <th className="px-3 py-3 w-28 whitespace-nowrap">Platform Rwd</th>
-                          <th className="px-3 py-3 w-28 whitespace-nowrap">Other Earnings</th>
-                          <th className="px-3 py-3 w-32 whitespace-nowrap">Hourly Salary</th>
-                          <th className="px-3 py-3 w-28 whitespace-nowrap">Super Salary</th>
-                          <th className="px-3 py-3 w-28 whitespace-nowrap">Super Rank</th>
-                          <th className="px-3 py-3 w-24 whitespace-nowrap">Level</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-white/5 bg-transparent">
-                        {(() => {
-                          const currentData = financialTab === 'monthly' ? monthlyLedger : weeklyLedger;
-                          if (currentData.length === 0) {
-                            return (
-                              <tr>
-                                <td colSpan={20} className="py-12 text-center text-[#B0B0B0] italic">
-                                  No ledger entries found. Click "+ Add Row" or paste data above.
-                                </td>
-                              </tr>
-                            );
-                          }
-
-                          const filtered = currentData.map((row, idx) => ({ row, idx })).filter(({ row }) => {
-                            if (!financialSearchTerm) return true;
-                            const s = financialSearchTerm.toLowerCase();
-                            return (
-                              (row.poppo_id || '').toLowerCase().includes(s) ||
-                              (row.nickname || '').toLowerCase().includes(s) ||
-                              (row.month || '').toLowerCase().includes(s) ||
-                              (row.year?.toString() || '').toLowerCase().includes(s) ||
-                              (row.from_date || '').toLowerCase().includes(s) ||
-                              (row.to_date || '').toLowerCase().includes(s)
-                            );
-                          });
-
-                          if (filtered.length === 0) {
-                            return (
-                              <tr>
-                                <td colSpan={20} className="py-12 text-center text-[#B0B0B0] italic">
-                                  No entries match your search.
-                                </td>
-                              </tr>
-                            );
-                          }
-
-                          return filtered.map(({ row, idx }) => {
-                            const isChecked = !!selectedRows[`${financialTab}_${idx}`];
-                            return (
-                              <tr key={idx} className="hover:bg-white/[0.01] transition-colors group">
-                                <td className="px-3 py-2 text-center bg-[#0A0A0A] group-hover:bg-[#1A1A1A] sticky left-0 z-10 border-r border-white/5 transition-colors">
-                                  <input
-                                    type="checkbox"
-                                    checked={isChecked}
-                                    onChange={(e) => {
-                                      setSelectedRows(prev => ({
-                                        ...prev,
-                                        [`${financialTab}_${idx}`]: e.target.checked
-                                      }));
-                                    }}
-                                    className="rounded border-white/10 text-[#FFB800] focus:ring-[#FFB800] cursor-pointer"
-                                    title="Select row"
-                                  />
-                                </td>
-                                
-                                {/* STICKY POPPO ID COLUMN - MONO SPACED READ WRITE WITH COPY SELECT-ALL */}
-                                <td className="px-3 py-2 sticky left-[48px] bg-[#0A0A0A] group-hover:bg-[#1A1A1A] transition-colors border-r border-white/5 z-10 font-mono font-bold text-indigo-500 w-28">
-                                  <input
-                                    type="text"
-                                    value={row.poppo_id || ''}
-                                    onChange={(e) => handleCellChange(idx, 'poppo_id', e.target.value)}
-                                    className="bg-transparent border-none w-full text-xs font-mono font-bold text-[#FFB800] select-all focus:ring-1 focus:ring-[#FFB800]/50 rounded px-1.5 py-0.5 outline-none"
-                                    placeholder="Enter Poppo ID"
-                                  />
-                                </td>
-
-                                {financialTab === 'monthly' ? (
-                                  <>
-                                    <td className="px-3 py-2">
-                                      <input
-                                        type="text"
-                                        value={row.month || ''}
-                                        onChange={(e) => handleCellChange(idx, 'month', e.target.value)}
-                                        className="bg-transparent border-none w-full text-xs focus:ring-1 focus:ring-[#FFB800]/50 rounded px-1.5 py-0.5 outline-none font-medium text-[#F5F5F5]"
-                                        placeholder="YYYY-MM"
-                                      />
-                                    </td>
-                                    <td className="px-3 py-2">
-                                      <input
-                                        type="number"
-                                        value={row.year ?? ''}
-                                        onChange={(e) => handleCellChange(idx, 'year', parseInt(e.target.value) || 0)}
-                                        className="bg-transparent border-none w-full text-xs focus:ring-1 focus:ring-[#FFB800]/50 rounded px-1.5 py-0.5 outline-none font-medium text-[#F5F5F5]"
-                                        placeholder="Year"
-                                      />
-                                    </td>
-                                  </>
-                                ) : (
-                                  <>
-                                    <td className="px-3 py-2">
-                                      <input
-                                        type="text"
-                                        value={row.from_date || ''}
-                                        onChange={(e) => handleCellChange(idx, 'from_date', e.target.value)}
-                                        className="bg-transparent border-none w-full text-xs focus:ring-1 focus:ring-[#FFB800]/50 rounded px-1.5 py-0.5 outline-none font-medium text-[#F5F5F5]"
-                                        placeholder="YYYY-MM-DD"
-                                      />
-                                    </td>
-                                    <td className="px-3 py-2">
-                                      <input
-                                        type="text"
-                                        value={row.to_date || ''}
-                                        onChange={(e) => handleCellChange(idx, 'to_date', e.target.value)}
-                                        className="bg-transparent border-none w-full text-xs focus:ring-1 focus:ring-[#FFB800]/50 rounded px-1.5 py-0.5 outline-none font-medium text-[#F5F5F5]"
-                                        placeholder="YYYY-MM-DD"
-                                      />
-                                    </td>
-                                  </>
-                                )}
-
-                                <td className="px-3 py-2">
-                                  <input
-                                    type="text"
-                                    value={row.nickname || ''}
-                                    onChange={(e) => handleCellChange(idx, 'nickname', e.target.value)}
-                                    className="bg-transparent border-none w-full text-xs font-semibold text-[#F5F5F5] focus:ring-1 focus:ring-[#FFB800]/50 rounded px-1.5 py-0.5 outline-none"
-                                    placeholder="Nickname"
-                                  />
-                                </td>
-
-                                <td className="px-3 py-2">
-                                  <input
-                                    type="number"
-                                    step="any"
-                                    value={row.live_duration ?? ''}
-                                    onChange={(e) => handleCellChange(idx, 'live_duration', parseFloat(e.target.value) || 0)}
-                                    title="Live duration (hours)"
-                                    placeholder="0"
-                                    className="bg-transparent border-none w-full text-xs focus:ring-1 focus:ring-[#FFB800]/50 rounded px-1.5 py-0.5 outline-none text-[#F5F5F5]"
-                                  />
-                                </td>
-
-                                <td className="px-3 py-2">
-                                  <input
-                                    type="number"
-                                    step="any"
-                                    value={row.party_host_duration ?? ''}
-                                    onChange={(e) => handleCellChange(idx, 'party_host_duration', parseFloat(e.target.value) || 0)}
-                                    title="Party host duration (hours)"
-                                    placeholder="0"
-                                    className="bg-transparent border-none w-full text-xs focus:ring-1 focus:ring-[#FFB800]/50 rounded px-1.5 py-0.5 outline-none text-[#F5F5F5]"
-                                  />
-                                </td>
-
-                                <td className="px-3 py-2 font-semibold">
-                                  <input
-                                    type="number"
-                                    value={row.total_points ?? ''}
-                                    onChange={(e) => handleCellChange(idx, 'total_points', parseInt(e.target.value) || 0)}
-                                    title="Total earnings of points"
-                                    placeholder="0"
-                                    className="bg-transparent border-none w-full text-xs font-semibold focus:ring-1 focus:ring-[#FFB800]/50 rounded px-1.5 py-0.5 outline-none text-[#F5F5F5]"
-                                  />
-                                </td>
-
-                                <td className="px-3 py-2 text-emerald-400 font-semibold">
-                                  <input
-                                    type="number"
-                                    value={row.agent_commission ?? ''}
-                                    onChange={(e) => handleCellChange(idx, 'agent_commission', parseInt(e.target.value) || 0)}
-                                    title="Agent commission"
-                                    placeholder="0"
-                                    className="bg-transparent border-none w-full text-xs text-emerald-400 font-semibold focus:ring-1 focus:ring-[#FFB800]/50 rounded px-1.5 py-0.5 outline-none"
-                                  />
-                                </td>
-
-                                <td className="px-3 py-2">
-                                  <input
-                                    type="number"
-                                    value={row.live_earnings ?? ''}
-                                    onChange={(e) => handleCellChange(idx, 'live_earnings', parseInt(e.target.value) || 0)}
-                                    title="Live earnings"
-                                    placeholder="0"
-                                    className="bg-transparent border-none w-full text-xs focus:ring-1 focus:ring-[#FFB800]/50 rounded px-1.5 py-0.5 outline-none text-[#F5F5F5]"
-                                  />
-                                </td>
-
-                                <td className="px-3 py-2">
-                                  <input
-                                    type="number"
-                                    value={row.party_earnings ?? ''}
-                                    onChange={(e) => handleCellChange(idx, 'party_earnings', parseInt(e.target.value) || 0)}
-                                    title="Party earnings"
-                                    placeholder="0"
-                                    className="bg-transparent border-none w-full text-xs focus:ring-1 focus:ring-[#FFB800]/50 rounded px-1.5 py-0.5 outline-none text-[#F5F5F5]"
-                                  />
-                                </td>
-
-                                <td className="px-3 py-2">
-                                  <input
-                                    type="number"
-                                    value={row.private_chat ?? ''}
-                                    onChange={(e) => handleCellChange(idx, 'private_chat', parseInt(e.target.value) || 0)}
-                                    title="Private chat earnings"
-                                    placeholder="0"
-                                    className="bg-transparent border-none w-full text-xs focus:ring-1 focus:ring-[#FFB800]/50 rounded px-1.5 py-0.5 outline-none text-[#F5F5F5]"
-                                  />
-                                </td>
-
-                                <td className="px-3 py-2">
-                                  <input
-                                    type="number"
-                                    value={row.tips ?? ''}
-                                    onChange={(e) => handleCellChange(idx, 'tips', parseInt(e.target.value) || 0)}
-                                    title="Tips"
-                                    placeholder="0"
-                                    className="bg-transparent border-none w-full text-xs focus:ring-1 focus:ring-[#FFB800]/50 rounded px-1.5 py-0.5 outline-none text-[#F5F5F5]"
-                                  />
-                                </td>
-
-                                <td className="px-3 py-2">
-                                  <input
-                                    type="number"
-                                    value={row.platform_reward ?? ''}
-                                    onChange={(e) => handleCellChange(idx, 'platform_reward', parseInt(e.target.value) || 0)}
-                                    title="Platform reward"
-                                    placeholder="0"
-                                    className="bg-transparent border-none w-full text-xs focus:ring-1 focus:ring-[#FFB800]/50 rounded px-1.5 py-0.5 outline-none text-[#F5F5F5]"
-                                  />
-                                </td>
-
-                                <td className="px-3 py-2">
-                                  <input
-                                    type="number"
-                                    value={row.other_earnings ?? row.other_earn ?? ''}
-                                    onChange={(e) => handleCellChange(idx, 'other_earnings', parseInt(e.target.value) || 0)}
-                                    title="Other earnings"
-                                    placeholder="0"
-                                    className="bg-transparent border-none w-full text-xs focus:ring-1 focus:ring-[#FFB800]/50 rounded px-1.5 py-0.5 outline-none text-[#F5F5F5]"
-                                  />
-                                </td>
-
-                                <td className="px-3 py-2">
-                                  <input
-                                    type="number"
-                                    value={row.platform_hourly_salary ?? ''}
-                                    onChange={(e) => handleCellChange(idx, 'platform_hourly_salary', parseInt(e.target.value) || 0)}
-                                    title="Platform hourly salary"
-                                    placeholder="0"
-                                    className="bg-transparent border-none w-full text-xs focus:ring-1 focus:ring-[#FFB800]/50 rounded px-1.5 py-0.5 outline-none text-[#F5F5F5]"
-                                  />
-                                </td>
-
-                                <td className="px-3 py-2">
-                                  <input
-                                    type="number"
-                                    value={row.super_salary ?? ''}
-                                    onChange={(e) => handleCellChange(idx, 'super_salary', parseInt(e.target.value) || 0)}
-                                    title="Super salary"
-                                    placeholder="0"
-                                    className="bg-transparent border-none w-full text-xs focus:ring-1 focus:ring-[#FFB800]/50 rounded px-1.5 py-0.5 outline-none text-[#F5F5F5]"
-                                  />
-                                </td>
-
-                                <td className="px-3 py-2">
-                                  <input
-                                    type="number"
-                                    value={row.super_rank ?? ''}
-                                    onChange={(e) => handleCellChange(idx, 'super_rank', parseInt(e.target.value) || 0)}
-                                    title="Super rank"
-                                    placeholder="0"
-                                    className="bg-transparent border-none w-full text-xs focus:ring-1 focus:ring-[#FFB800]/50 rounded px-1.5 py-0.5 outline-none text-[#F5F5F5]"
-                                  />
-                                </td>
-
-                                <td className="px-3 py-2 font-bold">
-                                  <input
-                                    type="number"
-                                    value={row.level ?? ''}
-                                    onChange={(e) => handleCellChange(idx, 'level', parseInt(e.target.value) || 0)}
-                                    title="Level"
-                                    placeholder="0"
-                                    className="bg-transparent border-none w-full text-xs font-bold focus:ring-1 focus:ring-[#FFB800]/50 rounded px-1.5 py-0.5 outline-none text-[#F5F5F5]"
-                                  />
-                                </td>
-                              </tr>
-                            );
-                          });
-                        })()}
-                      </tbody>
-                    </table>
-                  </div>
-
-                  {/* Spreadsheet footer info */}
-                  <div className="p-3 border-t border-white/5 bg-[#1A1A1A]/40 text-[10px] text-[#B0B0B0] font-medium flex items-center gap-1.5">
-                    <span>💡</span>
-                    <span>Poppo ID columns support copy-paste selection. Nicknames are cross-referenced with the active roster instantly. Changes are stored in memory until you click "Save Changes".</span>
-                  </div>
-                </div>
-
-              </motion.div>
-             )
-=======
-                  {/* Sub Tabs Selection */}
-                  <div className="flex border-b border-white/5 gap-6">
-                    <button
-                      onClick={() => { setFinancialTab('monthly'); setSelectedRows({}); }}
-                      className={cn(
-                        "pb-3 text-xs font-black uppercase tracking-widest border-b-2 transition-all cursor-pointer",
-                        financialTab === 'monthly' ? "border-[#D4AF37] text-[#F0EFE8]" : "border-transparent text-[#A09E9A] hover:text-[#F0EFE8]"
-                      )}
-                    >
-                      Monthly Financials
-                    </button>
-                    <button
-                      onClick={() => { setFinancialTab('weekly'); setSelectedRows({}); }}
-                      className={cn(
-                        "pb-3 text-xs font-black uppercase tracking-widest border-b-2 transition-all cursor-pointer",
-                        financialTab === 'weekly' ? "border-[#D4AF37] text-[#F0EFE8]" : "border-transparent text-[#A09E9A] hover:text-[#F0EFE8]"
-                      )}
-                    >
-                      Weekly Financials
-                    </button>
-                  </div>
 
                   {/* Unified Ingestion Zone */}
                   <div className="tech-card bg-[#1A1A28] border border-white/5 p-6 rounded-2xl">
@@ -3533,7 +2622,6 @@ export const DirectorTab = () => {
 
                 </motion.div>
               )
->>>>>>> 2b42d3ae84c3e300e1faeb35e7009a759158d1e9
             )}
 
             {activeView === 'roster_management' && (

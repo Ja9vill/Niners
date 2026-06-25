@@ -79,6 +79,8 @@ export const RosterManagementTab: React.FC<RosterManagementTabProps> = ({ hosts,
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const [isBackfilling, setIsBackfilling] = useState(false);
+  const [agentOptions, setAgentOptions] = useState<{ id: string; name: string }[]>([]);
+  const [manualAgentEntry, setManualAgentEntry] = useState<Record<string, { agent_id: string; agency_name: string }>>({});
 
   const handleRunBackfill = async () => {
     if (!window.confirm("Are you sure you want to run a database-wide sync to backfill all 'Assigned Host' fields for managers and agents? This will read all current hosts and rebuild manager mappings.")) {
@@ -171,6 +173,23 @@ export const RosterManagementTab: React.FC<RosterManagementTabProps> = ({ hosts,
       .filter(h => (h.role || '').toLowerCase() === 'manager' || (h.role || '').toLowerCase() === 'agent')
       .map(h => ({ id: h.poppo_id || h.poppoId || h.id, name: h.nickname || h.name }));
   }, [users]);
+
+  // Agent options for the 'Agent' dropdown
+  useEffect(() => {
+    const fetchAgents = async () => {
+      try {
+        const snapshot = await getDocs(collection(db, 'users'));
+        const agents = snapshot.docs
+          .map(d => ({ id: d.id, ...d.data() }))
+          .filter((u: any) => (u.role || '').toLowerCase() === 'agent')
+          .map((u: any) => ({ id: u.poppo_id || u.id, name: u.nickname || u.name }));
+        setAgentOptions(agents);
+      } catch (err) {
+        console.warn("Could not fetch agents:", err);
+      }
+    };
+    fetchAgents();
+  }, [saveSuccess]);
 
   // Filter out Directors, apply search/role filters, and sort completed hosts to the bottom
   const filteredHosts = useMemo(() => {
@@ -301,7 +320,6 @@ export const RosterManagementTab: React.FC<RosterManagementTabProps> = ({ hosts,
             await FirebaseService.updateRoleMetadata(updatedRole, id, updatedData);
           } catch (firebaseErr: any) {
             console.warn(`Firebase rejected update for ${id}, falling back to local storage:`, firebaseErr);
-            // Fallback: update local storage directly
             const currentLocalHosts = Storage.getHosts();
             const hostIndex = currentLocalHosts.findIndex(h => h.id === id);
             if (hostIndex >= 0) {
@@ -312,6 +330,22 @@ export const RosterManagementTab: React.FC<RosterManagementTabProps> = ({ hosts,
             Storage.setHosts(currentLocalHosts);
           }
 
+          // Also update {role}_profile collection with agent_id
+          if (updatedData.agent_id !== undefined) {
+            try {
+              const normRole = (updatedRole || '').toLowerCase();
+              const profileCol = normRole === 'agent' ? 'agent_profile' 
+                : normRole === 'manager' ? 'manager_profile'
+                : normRole === 'admin' ? 'admin_profile'
+                : normRole === 'head admin' || normRole === 'head_admin' ? 'head_admin_profile'
+                : normRole === 'director' ? 'director_profile'
+                : 'host_profile';
+              await setDoc(doc(db, profileCol, id), { agent_id: updatedData.agent_id, updated_at: new Date().toISOString() }, { merge: true });
+            } catch (profileErr) {
+              console.warn(`Could not update ${updatedRole}_profile for ${id}:`, profileErr);
+            }
+          }
+
           if (auditLogAction) {
             await auditLogAction('UPDATE_ROSTER_MEMBER', original, { ...original, ...updatedData });
           }
@@ -319,6 +353,7 @@ export const RosterManagementTab: React.FC<RosterManagementTabProps> = ({ hosts,
       }
       
       setEditedHosts({});
+      setManualAgentEntry({});
       setSaveSuccess(true);
       onUpdate();
       
@@ -460,6 +495,7 @@ export const RosterManagementTab: React.FC<RosterManagementTabProps> = ({ hosts,
                 <th className="px-6 py-4">WhatsApp</th>
                 <th className="px-6 py-4">Assigned Manager (Name)</th>
                 <th className="px-6 py-4">Manager Poppo ID</th>
+                <th className="px-6 py-4">Agent</th>
                 {onResetAccountAccess && <th className="px-6 py-4">Account Access</th>}
               </tr>
             </thead>
@@ -665,6 +701,82 @@ export const RosterManagementTab: React.FC<RosterManagementTabProps> = ({ hosts,
                         ) : (
                           <span className="text-[#A09E9A]/40 text-[10px] px-2 italic">N/A</span>
                         )}
+                      </td>
+
+                      <td className="px-6 py-3">
+                        {(() => {
+                          const currentAgentId = getDisplayValue(host, 'agent_id') as string || '';
+                          const isManual = manualAgentEntry[host.id]?.agent_id !== undefined;
+                          const manualVal = manualAgentEntry[host.id] || { agent_id: '', agency_name: '' };
+                          return (
+                            <div className="flex flex-col gap-1">
+                              {isManual ? (
+                                <>
+                                  <input
+                                    type="text"
+                                    value={manualVal.agent_id}
+                                    onChange={(e) => {
+                                      const prev = manualAgentEntry[host.id] || { agent_id: '', agency_name: '' };
+                                      setManualAgentEntry(prev2 => ({ ...prev2, [host.id]: { ...prev, agent_id: e.target.value } }));
+                                      handleFieldChange(host.id, 'agent_id', e.target.value);
+                                    }}
+                                    className="bg-transparent border border-transparent hover:border-white/10 focus:border-indigo-500 rounded px-2 py-1 outline-none text-[#F0EFE8] w-24 font-mono text-[10px]"
+                                    placeholder="Agent ID"
+                                  />
+                                  <input
+                                    type="text"
+                                    value={manualVal.agency_name}
+                                    onChange={(e) => {
+                                      const prev = manualAgentEntry[host.id] || { agent_id: '', agency_name: '' };
+                                      setManualAgentEntry(prev2 => ({ ...prev2, [host.id]: { ...prev, agency_name: e.target.value } }));
+                                    }}
+                                    className="bg-transparent border border-transparent hover:border-white/10 focus:border-indigo-500 rounded px-2 py-1 outline-none text-[#F0EFE8] w-28 text-[10px]"
+                                    placeholder="Agency Name"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setManualAgentEntry(prev2 => {
+                                        const next = { ...prev2 };
+                                        delete next[host.id];
+                                        return next;
+                                      });
+                                      handleFieldChange(host.id, 'agent_id', '');
+                                    }}
+                                    className="text-[9px] text-red-400/60 hover:text-red-400 cursor-pointer text-left px-1"
+                                  >
+                                    ✕ Clear manual
+                                  </button>
+                                </>
+                              ) : (
+                                <div className="flex flex-col gap-1">
+                                  <select
+                                    title="Select Agent"
+                                    value={currentAgentId}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      if (val === '__manual__') {
+                                        setManualAgentEntry(prev2 => ({ ...prev2, [host.id]: { agent_id: currentAgentId || '', agency_name: '' } }));
+                                      } else {
+                                        handleFieldChange(host.id, 'agent_id', val);
+                                      }
+                                    }}
+                                    className="bg-transparent border border-transparent hover:border-white/10 focus:border-indigo-500 rounded px-2 py-1 outline-none text-[#F0EFE8] w-36 text-[10px]"
+                                  >
+                                    <option value="" className="bg-[#1A1A28]">No Agent</option>
+                                    {agentOptions.map(a => (
+                                      <option key={a.id} value={a.id} className="bg-[#1A1A28]">{a.name} - {a.id}</option>
+                                    ))}
+                                    <option value="__manual__" className="bg-[#1A1A28]">✏️ Manual Entry...</option>
+                                  </select>
+                                  {currentAgentId && !isManual && (
+                                    <span className="text-[9px] text-[#A09E9A]/50 px-1 font-mono truncate" title={currentAgentId}>{currentAgentId}</span>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </td>
                       {onResetAccountAccess && (
                         <td className="px-6 py-3">

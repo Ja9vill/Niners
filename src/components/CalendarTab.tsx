@@ -6,21 +6,14 @@ import { FirebaseService, generateSubmissionId } from '../lib/firebaseService';
 import { cn } from '../lib/utils';
 import { format, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay, addWeeks, subWeeks, startOfMonth, endOfMonth, addMonths, subMonths, isSameMonth, parseISO } from 'date-fns';
 import { motion, AnimatePresence } from 'motion/react';
-<<<<<<< HEAD
-import { LivehouseMatrixService, LivehouseMatrixRow } from '../lib/sheetsService';
-=======
 import { SingleDatePicker } from './InteractiveDatePicker';
 import { AddEventForm } from './AddEventForm';
 import { EVENT_COLORS, TIMESLOTS } from '../lib/constants';
 import { collection, getDocs, getDoc, doc, setDoc, Timestamp, query, where } from 'firebase/firestore';
 import { db } from '../lib/firebase';
-<<<<<<< HEAD
->>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
-=======
 import { LivehouseCalendar } from './LivehouseCalendar';
 import { LivehouseBookingModal } from './LivehouseBookingModal';
 
->>>>>>> 2b42d3ae84c3e300e1faeb35e7009a759158d1e9
 
 
 const TIMESLOT_BLOCKS = [
@@ -127,15 +120,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
   const [reserveDate, setReserveDate] = useState(() => format(new Date(), 'yyyy-MM-dd'));
   const [reserveTimeslot, setReserveTimeslot] = useState('');
   const [reserveNotes, setReserveNotes] = useState('');
-<<<<<<< HEAD
-  const [selectedLivehouseType, setSelectedLivehouseType] = useState<'Solo Livehouse' | 'Party Livehouse'>('Solo Livehouse');
-
-  // Live Livehouse Matrix (fetched from Google Apps Script Web App)
-  const [livehouseMatrix, setLivehouseMatrix] = useState<LivehouseMatrixRow[]>([]);
-  const [matrixLoading, setMatrixLoading] = useState(false);
-=======
   const [selectedLivehouseType, setSelectedLivehouseType] = useState<'SOLO LIVEHOUSE' | 'PARTY LIVEHOUSE'>('SOLO LIVEHOUSE');
->>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
  
   // Proposal States (Alternative slot proposal by Manager/Admin)
   const [proposingRequestId, setProposingRequestId] = useState<string | null>(null);
@@ -173,22 +158,53 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
 
     try {
       let data = null;
-      const docRef = doc(db, 'attendance', event.event_id);
-      const docSnap = await getDoc(docRef);
-      if (docSnap.exists()) {
-        data = docSnap.data();
-      } else {
-        const q = query(collection(db, 'attendance'), where('eventId', '==', event.event_id));
-        const qs = await getDocs(q);
-        if (!qs.empty) {
-          data = qs.docs[0].data();
+
+      // 0. Try local cache first (attendanceRecords loaded on mount)
+      if (event.event_id) {
+        const localMatch = attendanceRecords.find(r => r.event_id === event.event_id || r.eventId === event.event_id);
+        if (localMatch) {
+          data = { ...localMatch };
         }
+      }
+
+      // 1. Try direct doc lookup by event_id as document ID
+      if (!data && event.event_id) {
+        try {
+          const docRef = doc(db, 'attendance', event.event_id);
+          const docSnap = await getDoc(docRef);
+          if (docSnap.exists()) {
+            data = { ...docSnap.data(), id: docSnap.id };
+          }
+        } catch (e) { /* permission denied or not found */ }
+      }
+
+      // 2. Fallback: query by event_id or eventId field
+      if (!data && event.event_id) {
+        try {
+          const q = query(collection(db, 'attendance'), where('event_id', '==', event.event_id));
+          const qs = await getDocs(q);
+          if (!qs.empty) {
+            data = { ...qs.docs[0].data(), id: qs.docs[0].id };
+          }
+        } catch (e) { /* permission denied or not found */ }
+      }
+
+      // 2b. Fallback: query by eventId (camelCase)
+      if (!data && event.event_id) {
+        try {
+          const q2 = query(collection(db, 'attendance'), where('eventId', '==', event.event_id));
+          const qs2 = await getDocs(q2);
+          if (!qs2.empty) {
+            data = { ...qs2.docs[0].data(), id: qs2.docs[0].id };
+          }
+        } catch (e) { /* permission denied or not found */ }
       }
 
       if (data) {
         setAttendanceRecord(data);
         
         // Map any available schema to the attAttendees format
+        // attendees can be: string[] of poppo_ids OR { poppoId, nickname, role }[] 
         let rawAttendees = data.attendees || [];
         if (rawAttendees.length === 0) {
           const ids = data.attendeeIds || data.actualParticipants || [];
@@ -197,13 +213,15 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
 
         if (rawAttendees.length > 0) {
            const initialParticipants = rawAttendees.map((att: any) => {
-             const pid = att.poppoId || att.poppo_id || att.id;
-             const u = allUsers.find(user => (user.poppo_id || user.poppoId || user.id) === pid);
+             // Handle both plain strings and objects
+             const pid = typeof att === 'string' ? att : (att.poppoId || att.poppo_id || att.id || '');
+             const u = allUsers.find(user => String(user.poppo_id || user.poppoId || user.id) === String(pid));
              return {
                id: pid,
                poppo_id: pid,
-               nickname: u ? (u.nickname || u.name) : (att.nickname || pid),
-               role: u ? u.role : (att.role || '')
+               nickname: u ? (u.nickname || u.name) : (typeof att === 'object' ? (att.nickname || att.name || pid) : pid),
+               role: u ? u.role : (typeof att === 'object' ? (att.role || '') : ''),
+               photoUrl: u ? (u.photoUrl || u.profilePhotoUrl || u.photoURL) : null,
              };
            });
            setAttAttendees(initialParticipants);
@@ -231,20 +249,51 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
 
     try {
       let data = null;
-      const docRef = doc(db, 'attendance', event.event_id);
-      const docSnap = await getDoc(docRef);
-      if (docSnap.exists()) {
-        data = docSnap.data();
-      } else {
-        const q = query(collection(db, 'attendance'), where('eventId', '==', event.event_id));
-        const qs = await getDocs(q);
-        if (!qs.empty) {
-          data = qs.docs[0].data();
+
+      // 0. Try local cache first (attendanceRecords loaded on mount)
+      if (event.event_id) {
+        const localMatch = attendanceRecords.find(r => r.event_id === event.event_id || r.eventId === event.event_id);
+        if (localMatch) {
+          data = { ...localMatch };
         }
+      }
+
+      // 1. Try direct doc lookup by event_id as document ID
+      if (!data && event.event_id) {
+        try {
+          const docRef = doc(db, 'attendance', event.event_id);
+          const docSnap = await getDoc(docRef);
+          if (docSnap.exists()) {
+            data = { ...docSnap.data(), id: docSnap.id };
+          }
+        } catch (e) { /* permission denied or not found */ }
+      }
+
+      // 2. Fallback: query by event_id or eventId field
+      if (!data && event.event_id) {
+        try {
+          const q = query(collection(db, 'attendance'), where('event_id', '==', event.event_id));
+          const qs = await getDocs(q);
+          if (!qs.empty) {
+            data = { ...qs.docs[0].data(), id: qs.docs[0].id };
+          }
+        } catch (e) { /* permission denied or not found */ }
+      }
+
+      // 2b. Fallback: query by eventId (camelCase)
+      if (!data && event.event_id) {
+        try {
+          const q2 = query(collection(db, 'attendance'), where('eventId', '==', event.event_id));
+          const qs2 = await getDocs(q2);
+          if (!qs2.empty) {
+            data = { ...qs2.docs[0].data(), id: qs2.docs[0].id };
+          }
+        } catch (e) { /* permission denied or not found */ }
       }
 
       if (data) {
         
+        // Map any available schema to the attAttendees format
         let rawAttendees = data.attendees || [];
         if (rawAttendees.length === 0) {
           const ids = data.attendeeIds || data.actualParticipants || [];
@@ -253,13 +302,15 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
 
         if (rawAttendees.length > 0) {
            const initialParticipants = rawAttendees.map((att: any) => {
-             const pid = att.poppoId || att.poppo_id || att.id;
-             const u = allUsers.find(user => (user.poppo_id || user.poppoId || user.id) === pid);
+             // Handle both plain strings and objects
+             const pid = typeof att === 'string' ? att : (att.poppoId || att.poppo_id || att.id || '');
+             const u = allUsers.find(user => String(user.poppo_id || user.poppoId || user.id) === String(pid));
              return {
                id: pid,
                poppo_id: pid,
-               nickname: u ? (u.nickname || u.name) : (att.nickname || pid),
-               role: u ? u.role : (att.role || '')
+               nickname: u ? (u.nickname || u.name) : (typeof att === 'object' ? (att.nickname || att.name || pid) : pid),
+               role: u ? u.role : (typeof att === 'object' ? (att.role || '') : ''),
+               photoUrl: u ? (u.photoUrl || u.profilePhotoUrl || u.photoURL) : null,
              };
            });
            setAttAttendees(initialParticipants);
@@ -289,12 +340,13 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
     setIsAttProcessing(true);
     try {
       const currentAuth = Storage.getAuthState();
-      const existing = attendanceRecords.find(r => r.eventId === attendanceModalEvent.event_id);
+      const existing = attendanceRecords.find(r => r.event_id === attendanceModalEvent.event_id || r.eventId === attendanceModalEvent.event_id);
       const attendanceId = existing?.attendanceId || (crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 15));
       const docId = existing?.attendanceId ? existing.attendanceId : generateSubmissionId(currentAuth?.poppo_id || '', currentAuth?.role || '', currentAuth?.name || currentAuth?.nickname || '');
 
       const payload = {
         attendanceId: docId,
+        event_id: attendanceModalEvent.event_id,
         eventId: attendanceModalEvent.event_id,
         eventTitle: attendanceModalEvent.title || 'Unknown Event',
         eventDate: attendanceModalEvent.date,
@@ -324,22 +376,22 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
       // If we are updating an existing record, we should write to the exact same doc ID to avoid duplicates.
       // If it's a new record, we use the new standardized docId format.
       // However, previously records were saved with `event_id` as the docId.
-      const targetDocId = existing ? (existing.id || existing.eventId || docId) : docId;
+      const targetDocId = existing ? (existing.id || existing.event_id || existing.eventId || docId) : (attendanceModalEvent.event_id || docId);
       await setDoc(doc(db, 'attendance', targetDocId), payload, { merge: true });
       
       // Update local state and trigger UI changes
-      setAttendanceRecord(payload);
+      setAttendanceRecord({ ...payload, id: targetDocId });
       setAttSuccessMsg('Attendance saved successfully!');
       
       // Update the attendanceRecords array locally so it reflects immediately
       setAttendanceRecords(prev => {
-        const idx = prev.findIndex(r => r.eventId === attendanceModalEvent.event_id);
+        const idx = prev.findIndex(r => r.event_id === attendanceModalEvent.event_id || r.eventId === attendanceModalEvent.event_id);
         if (idx >= 0) {
           const newArr = [...prev];
-          newArr[idx] = payload;
+          newArr[idx] = { ...payload, id: targetDocId };
           return newArr;
         }
-        return [...prev, payload];
+        return [...prev, { ...payload, id: targetDocId }];
       });
 
       // Give them a moment to read the success message before collapsing
@@ -473,40 +525,6 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
   // Livehouse Reservation availability checker
   // Prefers live data from the Google Apps Script matrix; falls back to local counts.
   const getTimeslotAvailability = (targetDate: string) => {
-<<<<<<< HEAD
-    const liveRows = LivehouseMatrixService.getDateAvailability(livehouseMatrix, targetDate);
-
-    if (liveRows.length > 0) {
-      // Live data path — trust the sheet directly
-      return liveRows.map(row => ({
-        slot: row.manilaLabel,
-        count: (row.slot1Available ? 0 : 1) + (row.slot2Available ? 0 : 1),
-        isTaken: row.fullyBooked,
-        label: row.fullyBooked
-          ? `${row.manilaLabel} [Fully Booked]`
-          : `${row.manilaLabel} (${row.slot1Available && row.slot2Available ? 2 : 1} slot${row.slot1Available && row.slot2Available ? 's' : ''} available)`,
-        // Pass through for reservation display
-        slot1Available: row.slot1Available,
-        slot1PoppoId:   row.slot1PoppoId,
-        slot2Available: row.slot2Available,
-        slot2PoppoId:   row.slot2PoppoId,
-        source: row.source_origin,
-      }));
-    }
-
-    // Fallback: derive counts from local calendar events + approved requests
-    const calendarEventsCount = events.reduce((acc, event) => {
-      if (event.date === targetDate && (event.type === 'Solo Livehouse' || event.type === 'Party Livehouse')) {
-        acc[event.time] = (acc[event.time] || 0) + 1;
-      }
-      return acc;
-    }, {} as Record<string, number>);
-
-    const approvedRequestsCount = livehouseRequests.reduce((acc, req) => {
-      if (req.date === targetDate && req.status === 'Approved') {
-        acc[req.timeslot] = (acc[req.timeslot] || 0) + 1;
-      }
-=======
     // Find approved calendar events for targetDate of type Solo/Party Livehouse
     const dayEvents = events.filter(event => {
       const evDate = event.date || event.event_date;
@@ -527,7 +545,6 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
     const pendingRequestsCount = pendingRequests.reduce((acc, req) => {
       const timeKey = req.timeslot || '';
       acc[timeKey] = (acc[timeKey] || 0) + 1;
->>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
       return acc;
     }, {} as Record<string, number>);
 
@@ -542,14 +559,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
     }, {} as Record<string, string[]>);
 
     return TIMESLOTS.map(slot => {
-<<<<<<< HEAD
-      const count = Math.max(
-        calendarEventsCount[slot] || 0,
-        approvedRequestsCount[slot] || 0
-      );
-=======
       const count = calendarEventsCount[slot] || 0;
->>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
       const isTaken = count >= 2;
       const pendingCount = pendingRequestsCount[slot] || 0;
       const eventTitles = timeslotTitles[slot] || [];
@@ -558,18 +568,9 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
         slot,
         count,
         isTaken,
-<<<<<<< HEAD
-        label: isTaken ? `${slot} [Fully Booked / Taken]` : `${slot} (${2 - count} slots available)`,
-        slot1Available: count < 1,
-        slot1PoppoId: '',
-        slot2Available: count < 2,
-        slot2PoppoId: '',
-        source: 'LOCAL_FALLBACK' as const,
-=======
         pendingCount,
         eventTitles,
         label: isTaken ? `${slot} [Fully Booked / Taken]` : `${slot} (${2 - count} slots available)`
->>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
       };
     });
   };
@@ -926,12 +927,26 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
   const [attErrors, setAttErrors] = useState<string[]>([]);
   const [attSuccessMsg, setAttSuccessMsg] = useState('');
 
-  // Load attendance records from Firestore on mount
+  // Load attendance records from server API on mount (client SDK lacks permission for attendance collection)
   useEffect(() => {
     const loadAttendance = async () => {
       try {
-        const snapshot = await getDocs(collection(db, 'attendance'));
-        const list = snapshot.docs.map(d => d.data());
+        const currentAuth = Storage.getAuthState();
+        const token = currentAuth?.token || '';
+        const res = await fetch('/api/attendance', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!res.ok) {
+          console.warn("Attendance API returned", res.status);
+          return;
+        }
+        const rawData = await res.json();
+        const list = (Array.isArray(rawData) ? rawData : []).map((d: any) => ({
+          ...d,
+          id: d.id || '',
+          eventId: d.event_id || d.eventId || '',
+          event_id: d.event_id || d.eventId || ''
+        }));
         setAttendanceRecords(list);
       } catch (err) {
         console.error("Failed to load attendance logs in CalendarTab:", err);
@@ -1003,7 +1018,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
     setAttRoleFilter('All Roles');
 
     // Pre-populate if attendance log already exists
-    const existing = attendanceRecords.find(r => r.eventId === event.event_id);
+    const existing = attendanceRecords.find(r => r.event_id === event.event_id || r.eventId === event.event_id);
     if (existing) {
       setAttFeedback(existing.eventFeedback || '');
       const resolved = (existing.attendees || []).map((att: any) => ({
@@ -1043,7 +1058,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
       const eventDate = attendanceModalEvent.date || '';
       const timeslot = attendanceModalEvent.time || '';
 
-      const existing = attendanceRecords.find(r => r.eventId === eventId);
+      const existing = attendanceRecords.find(r => r.event_id === eventId || r.eventId === eventId);
       const reporterPoppoId = auth.poppo_id || auth.id || 'SystemAdmin';
       const reporterRoleStr = auth.role || 'Admin';
       const reporterNameStr = auth.nickname || auth.name || 'Admin';
@@ -1461,537 +1476,6 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
           </button>
         </div>
 
-<<<<<<< HEAD
-      <div className="space-y-6">
-        {/* Main Calendar Section */}
-<<<<<<< HEAD
-        <div className="lg:col-span-3 space-y-6">
-          {/* Week Selector / Navigation controls */}
-          <div className="flex items-center justify-between bg-[#111111] border border-slate-800 p-4 rounded-2xl">
-            <button 
-              onClick={goToPreviousWeek} 
-              className="p-2 hover:bg-white/5 rounded-xl transition-all cursor-pointer"
-              title="Previous Week"
-              aria-label="Previous Week"
-            >
-              <ChevronLeft size={20} className="text-white/60 hover:text-white" />
-            </button>
-            <div className="text-center">
-              <h2 className="text-base font-black text-white tracking-widest uppercase">
-                {format(weekDays[0], 'MMMM d')} - {format(weekDays[6], 'MMMM d, yyyy')}
-              </h2>
-              <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest mt-1">Week View</p>
-=======
-        <div className="space-y-6">
-          {/* View Toggles & Navigation controls */}
-          <div className="flex flex-col sm:flex-row items-center justify-between bg-[#0F1117] border border-[#D4AF37]/40 p-4 rounded-2xl gap-4 shadow-[0_0_15px_rgba(212,175,55,0.15)]">
-            <div className="flex items-center gap-2 bg-[#0A0B0E] p-1.5 rounded-xl border border-[#D4AF37]/20 w-full sm:w-auto">
-              <button 
-                onClick={() => setViewMode('week')}
-                className={cn(
-                  "flex-1 sm:flex-none px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all cursor-pointer",
-                  viewMode === 'week' ? "bg-[#D4AF37] text-black shadow-lg shadow-[#D4AF37]/20" : "text-white/40 hover:text-white hover:bg-white/5"
-                )}
-              >
-                Week
-              </button>
-              <button 
-                onClick={() => setViewMode('month')}
-                className={cn(
-                  "flex-1 sm:flex-none px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all cursor-pointer",
-                  viewMode === 'month' ? "bg-[#D4AF37] text-black shadow-lg shadow-[#D4AF37]/20" : "text-white/40 hover:text-white hover:bg-white/5"
-                )}
-              >
-                Month
-              </button>
->>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
-            </div>
-
-<<<<<<< HEAD
-          {/* 7-Day Calendar Grid */}
-          <div className="grid grid-cols-7 gap-2 md:gap-4 bg-[#0A0A0A] p-4 rounded-3xl border border-white/5 shadow-xl">
-            {weekDays.map((day, idx) => {
-              const dayName = format(day, 'EEEE');
-              const dayAbbr = format(day, 'EEE').toUpperCase();
-              const dayNum = format(day, 'd');
-              const isSelected = isSameDay(day, selectedDate);
-              const dayEventsCount = getEventsForDay(day).length;
-
-              return (
-                <div key={idx} className="flex flex-col items-center gap-2">
-                  <span className="text-[9px] font-black uppercase tracking-[0.1em] text-white/30 text-center truncate w-full">
-                    {dayName}
-                  </span>
-
-                  <button
-                    onClick={() => handleDateClick(day)}
-                    className={cn(
-                      "w-full py-4 rounded-2xl flex flex-col items-center justify-center gap-1.5 transition-all border cursor-pointer select-none relative",
-                      isSelected 
-                        ? "bg-[#181B24] border-[#FFB800] shadow-[0_0_15px_rgba(212,175,55,0.15)] text-[#FFB800]" 
-                        : "bg-[#111111] border-white/5 hover:border-white/10 hover:bg-[#0A0A0A] text-white"
-                    )}
-                    title={`Select ${dayName}`}
-                    aria-label={`Select ${dayName}`}
-                  >
-                    <span className={cn(
-                      "text-[9px] font-black tracking-widest uppercase",
-                      isSelected ? "text-[#FFB800]" : "text-white/40"
-                    )}>
-                      {dayAbbr}
-                    </span>
-                    <span className="text-lg font-black tracking-tight">
-                      {dayNum}
-                    </span>
-                    {dayEventsCount > 0 && !isSelected && (
-                      <span className="absolute bottom-1.5 w-1.5 h-1.5 rounded-full bg-[#FFB800]" />
-                    )}
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Events Section Heading */}
-          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-            <h3 className="text-xs font-black uppercase tracking-[0.2em] text-white">
-              Scheduled Events ({format(selectedDate, 'EEEE, MMMM d')})
-            </h3>
-            <span className="text-[10px] font-bold text-white/40 uppercase font-mono">
-              {selectedDayEvents.length} {selectedDayEvents.length === 1 ? 'Event' : 'Events'}
-            </span>
-          </div>
-
-          {/* Events List */}
-          <div className="space-y-4">
-            {selectedDayEvents.length > 0 ? (
-              selectedDayEvents.map(e => {
-                const isEventSelected = selectedEventId === e.event_id;
-                
-                const colorConfig = EVENT_COLORS[e.type || ''] || {
-                  bg: 'bg-white/5 border-white/5',
-                  text: 'text-white/40',
-                  gradient: 'from-slate-600 to-slate-400'
-                };
-                
-                return (
-                  <button
-                    key={e.event_id}
-                    onClick={() => setSelectedEventId(e.event_id)}
-                    className={cn(
-                      "w-full text-left bg-[#111111]/80 p-5 rounded-2xl relative overflow-hidden transition-all flex items-stretch gap-4 border cursor-pointer group shadow-lg",
-                      isEventSelected 
-                        ? "border-[#FFB800] bg-[#1A1A1A] shadow-[0_0_15px_rgba(212,175,55,0.15)]" 
-                        : "border-white/5 hover:border-white/10 hover:bg-[#222222]"
-                    )}
-                  >
-                    <div className={cn("w-1.5 rounded-full shrink-0 bg-gradient-to-b", colorConfig.gradient)} />
-                    
-                    <div className="flex-1 space-y-2">
-                      <div className="flex items-center justify-between gap-4">
-                        <span className={cn(
-                          "px-2.5 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider",
-                          colorConfig.bg,
-                          colorConfig.text
-                        )}>
-                          {e.type || 'Event'}
-                        </span>
-                        <span className="font-mono text-xs font-bold text-[#67e8f9]">
-                          {e.time || '14:00 - 16:00'}
-                        </span>
-                      </div>
-                      
-                      <div>
-                        <h4 className="font-black text-white text-base tracking-tight uppercase group-hover:text-[#FFB800] transition-colors">
-                          {e.title}
-                        </h4>
-                        <p className="text-xs text-white/55 font-medium leading-relaxed mt-1">
-                          {e.description}
-                        </p>
-                      </div>
-                      
-                      <div className="flex items-center gap-1.5 text-[10px] font-black text-white/40 tracking-wider uppercase pt-1">
-                        <svg className="w-3.5 h-3.5 text-white/30 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                          <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
-                          <circle cx="12" cy="10" r="3" />
-                        </svg>
-                        <span>{e.location || 'ONLINE'}</span>
-                      </div>
-                    </div>
-                  </button>
-                );
-              })
-            ) : (
-              <div className="bg-[#111111]/30 border border-dashed border-white/5 rounded-2xl py-12 text-center">
-                <CalendarIcon className="mx-auto text-white/10 mb-2" size={28} />
-                <p className="text-xs text-white/20 italic">No events scheduled for this date.</p>
-=======
-            <div className="flex items-center gap-4">
-              <button 
-                title="Previous"
-                onClick={viewMode === 'week' ? goToPreviousWeek : goToPreviousMonth} 
-                className="p-2 bg-[#0A0B0E] border border-[#D4AF37]/10 hover:border-[#D4AF37]/30 hover:bg-[#D4AF37]/5 rounded-xl transition-all cursor-pointer"
-              >
-                <ChevronLeft size={16} className="text-[#D4AF37]" />
-              </button>
-              <div className="text-center min-w-[150px]">
-                <h2 className="text-sm font-black text-white tracking-widest uppercase">
-                  {viewMode === 'week' 
-                    ? `${format(weekDays[0], 'MMM d')} - ${format(weekDays[6], 'MMM d, yyyy')}`
-                    : format(currentDate, 'MMMM yyyy')}
-                </h2>
->>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
-              </div>
-              <button 
-                title="Next"
-                onClick={viewMode === 'week' ? goToNextWeek : goToNextMonth} 
-                className="p-2 bg-[#0A0B0E] border border-[#D4AF37]/10 hover:border-[#D4AF37]/30 hover:bg-[#D4AF37]/5 rounded-xl transition-all cursor-pointer"
-              >
-                <ChevronRight size={16} className="text-[#D4AF37]" />
-              </button>
-            </div>
-          </div>
-
-<<<<<<< HEAD
-          {/* Detailed Interactive Card */}
-          <div className="bg-[#111111] border border-white/5 rounded-3xl p-6 shadow-xl relative overflow-hidden bg-gradient-to-br from-[#111111] to-[#12141A]">
-            <div className="absolute inset-0 bg-gradient-to-tr from-indigo-500/2 via-transparent to-[#FFB800]/2 pointer-events-none" />
-            
-            {selectedEvent ? (
-              <div className="space-y-5 relative z-10">
-                <div className="flex items-center justify-between border-b border-white/5 pb-3">
-                  <div className="flex items-center gap-2">
-                    <Info size={14} className="text-[#FFB800]" />
-                    <span className="text-[10px] font-black uppercase text-[#FFB800] tracking-widest">
-                      Complete Event Metadata
-                    </span>
-                  </div>
-                  <span className="text-[9px] font-mono text-white/30 uppercase tracking-widest bg-white/5 px-2 py-0.5 rounded border border-white/5">
-                    ID: {selectedEvent.event_id}
-                  </span>
-                </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs">
-                  <div className="space-y-4">
-                    <div>
-                      <span className="block text-[9px] font-black uppercase tracking-wider text-white/30 mb-1">Event Title</span>
-                      <p className="font-extrabold text-white text-base uppercase tracking-tight">{selectedEvent.title}</p>
-                    </div>
-                    <div>
-                      <span className="block text-[9px] font-black uppercase tracking-wider text-white/30 mb-1">Description / Notes</span>
-                      <p className="font-medium text-white/60 leading-relaxed bg-[#0A0B0E]/60 border border-white/5 rounded-xl p-3.5">
-                        {selectedEvent.description || 'No description provided.'}
-                      </p>
-                    </div>
-                    {selectedEvent.location && (
-                      <div>
-                        <span className="block text-[9px] font-black uppercase tracking-wider text-white/30 mb-1">Location Details</span>
-                        <div className="flex items-center gap-1.5 font-bold text-white uppercase bg-[#0A0B0E]/30 px-3 py-2 rounded-xl border border-white/5 w-fit">
-                          <MapPin size={13} className="text-red-400" />
-                          <span>{selectedEvent.location}</span>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                  
-                  <div className="space-y-4 md:border-l md:border-white/5 md:pl-6">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <span className="block text-[9px] font-black uppercase tracking-wider text-white/30 mb-1">Target Date</span>
-                        <p className="font-mono font-bold text-white bg-[#0A0B0E]/40 px-2.5 py-1.5 rounded-lg border border-white/5 w-fit">{selectedEvent.date}</p>
-                      </div>
-                      <div>
-                        <span className="block text-[9px] font-black uppercase tracking-wider text-white/30 mb-1">Scheduled Time</span>
-                        <p className="font-mono font-bold text-white bg-[#0A0B0E]/40 px-2.5 py-1.5 rounded-lg border border-white/5 w-fit">{selectedEvent.time || 'N/A'}</p>
-                      </div>
-                    </div>
-                    
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <span className="block text-[9px] font-black uppercase tracking-wider text-white/30 mb-1">Host ID</span>
-                        <span className="inline-flex px-2.5 py-1.5 bg-[#0A0B0E]/40 border border-white/5 rounded-lg font-mono font-bold text-white/80">
-                          {selectedEvent.poppo_id}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="block text-[9px] font-black uppercase tracking-wider text-white/30 mb-1">System Visibility</span>
-                        <span className="inline-flex px-2.5 py-1.5 bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 rounded-lg font-bold">
-                          {selectedEvent.visibility}
-                        </span>
-                      </div>
-                    </div>
-                    
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <span className="block text-[9px] font-black uppercase tracking-wider text-white/30 mb-1">Event Category</span>
-                        <span className="inline-flex px-2.5 py-1.5 bg-[#FFB800]/10 border border-[#FFB800]/20 text-[#FFB800] rounded-lg font-bold">
-                          {selectedEvent.type || 'Standard Event'}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="block text-[9px] font-black uppercase tracking-wider text-white/30 mb-1">Authorized By</span>
-                        <div className="flex items-center gap-1.5 text-white/80 font-bold">
-                          <User size={13} className="text-white/45" />
-                          <span>
-                            {selectedEvent.created_by_name}{' '}
-                            <span className="text-[9px] text-[#FFB800] font-black uppercase">[{selectedEvent.created_by_role}]</span>
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {selectedEvent.event_host_id && (
-                      <div>
-                        <span className="block text-[9px] font-black uppercase tracking-wider text-white/30 mb-1">Event Host ID</span>
-                        <p className="font-mono font-bold text-white bg-[#0A0B0E]/40 px-2.5 py-1.5 rounded-lg border border-white/5 w-fit">
-                          {selectedEvent.event_host_id}
-                        </p>
-                      </div>
-                    )}
-                    
-                    <div>
-                      <span className="block text-[9px] font-black uppercase tracking-wider text-white/30 mb-1">Created Timestamp</span>
-                      <p className="font-mono text-white/40 text-[10px] bg-[#0A0B0E]/30 px-2.5 py-1 rounded-lg border border-white/5 w-fit">
-                        {new Date(selectedEvent.timestamp || new Date()).toLocaleString()}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Niners Participants display */}
-                  {selectedEvent.participants && selectedEvent.participants.length > 0 && (
-                    <div className="md:col-span-2 pt-2 border-t border-white/5">
-                      <span className="block text-[9px] font-black uppercase tracking-wider text-white/30 mb-2">Niners Participants ({selectedEvent.participants.length})</span>
-                      <div className="flex flex-wrap gap-2">
-                        {selectedEvent.participants.map(poppoId => {
-                          const pHost = (hosts || []).find(h => h.id === poppoId);
-                          const dispName = pHost ? `${pHost.nickname || pHost.name} (#${poppoId})` : `#${poppoId}`;
-                          return (
-                            <span key={poppoId} className="bg-slate-800/60 border border-slate-700 rounded-lg px-2.5 py-1 text-[10px] font-semibold text-white/90">
-                              {dispName}
-                            </span>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            ) : (
-              <div className="py-10 text-center space-y-2 relative z-10">
-                <CalendarIcon className="mx-auto text-white/10 animate-pulse" size={32} />
-                <p className="text-xs text-white/30 italic">Tap any scheduled event card above to reveal full interactive metadata details.</p>
-              </div>
-            )}
-          </div>
-
-          {/* Livehouse Reservation Requests Queue Panel */}
-          {!isReadOnly && auth.level > 0 && (
-            <div className="bg-[#111111] border border-white/5 rounded-3xl p-6 shadow-xl bg-gradient-to-br from-[#111111] to-[#12141A] mt-6 relative overflow-hidden">
-              <div className="absolute inset-0 bg-gradient-to-tr from-pink-500/2 via-transparent to-[#FFB800]/2 pointer-events-none" />
-              
-              <div className="flex items-center justify-between border-b border-white/5 pb-3 mb-5">
-                <div className="flex items-center gap-2">
-                  <Clock size={16} className="text-[#ec4899]" />
-                  <span className="text-[10px] font-black uppercase text-white tracking-widest">
-                    Livehouse Reservation Requests Queue
-                  </span>
-                </div>
-                <span className="text-[9px] font-mono text-white/30 uppercase tracking-widest bg-white/5 px-2 py-0.5 rounded border border-white/5 font-bold">
-                  Requests: {visibleRequests.length}
-                </span>
-              </div>
-
-              {visibleRequests.length > 0 ? (
-                <div className="space-y-4 max-h-[450px] overflow-y-auto pr-2 custom-scrollbar">
-                  {visibleRequests.map(req => {
-                    const isOwnRequest = req.poppoId === auth.poppo_id;
-                    const canManage = auth.role === 'Director' || auth.role === 'Founder' || auth.role === 'Head Admin' || auth.role === 'Admin' || auth.role === 'Manager' || auth.level >= 2;
-                    
-                    let statusColor = 'bg-slate-500/10 border-slate-500/20 text-slate-400';
-                    if (req.status === 'Approved') statusColor = 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400';
-                    if (req.status === 'Pending Approval' || req.status === 'Host Accepted Proposal') statusColor = 'bg-amber-500/10 border-amber-500/20 text-amber-400';
-                    if (req.status === 'New Timeslot Proposed') statusColor = 'bg-pink-500/10 border-pink-500/20 text-pink-400';
-                    if (req.status === 'Closed') statusColor = 'bg-red-500/10 border-red-500/20 text-red-400';
-
-                    return (
-                      <div key={req.id} className="bg-[#0A0B0E]/60 border border-white/5 rounded-2xl p-4 space-y-3 shadow-lg relative group hover:border-[#ec4899]/30 transition-all">
-                        <div className="flex items-center justify-between gap-4">
-                          <div className="flex items-center gap-2">
-                            <span className={cn("px-2.5 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider", statusColor)}>
-                              {req.status}
-                            </span>
-                            <span className="text-[9px] font-bold text-white/40 uppercase tracking-wider font-mono">
-                              ID: {req.id.slice(0, 8)}
-                            </span>
-                          </div>
-                          <span className="text-[10px] font-mono text-white/30">
-                            {new Date(req.timestamp).toLocaleDateString()}
-                          </span>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-                          <div className="space-y-1">
-                            <p className="font-extrabold text-white uppercase text-sm tracking-tight">{req.name} <span className="text-[10px] text-white/40 font-mono font-bold font-sans tracking-normal">(#{req.poppoId})</span></p>
-                            <p className="text-white/60 text-xs">
-                              Requested Set: <span className="font-extrabold text-[#ec4899] uppercase">{req.timeslot}</span> on <span className="font-bold text-white font-mono">{req.date}</span>
-                            </p>
-                            {req.notes && (
-                              <p className="text-white/45 italic leading-relaxed text-[11px] bg-black/20 p-2 rounded-lg mt-1.5">
-                                "{req.notes}"
-                              </p>
-                            )}
-                          </div>
-
-                          {/* Proposed status detail */}
-                          {req.status === 'New Timeslot Proposed' && (
-                            <div className="bg-pink-500/5 border border-pink-500/10 rounded-xl p-3 space-y-1.5 self-center">
-                              <span className="block text-[8px] font-black uppercase text-pink-400 tracking-wider">Alternative Proposal</span>
-                              <p className="text-xs text-white/80 font-semibold">
-                                Manager Proposed: <span className="font-mono text-white font-bold">{req.proposedDate}</span> at <span className="text-pink-400 font-extrabold">{req.proposedTimeslot}</span>
-                              </p>
-                              <span className="text-[9px] text-white/40 font-medium block">Proposed by: {req.proposedBy || 'Management'}</span>
-                            </div>
-                          )}
-
-                          {/* Host actions on proposals */}
-                          {req.status === 'New Timeslot Proposed' && isOwnRequest && (
-                            <div className="flex items-center gap-2 pt-1 self-center justify-end">
-                              <button 
-                                onClick={() => handleHostAcceptProposal(req.id)}
-                                className="bg-slate-900 border border-[#FFB800] hover:bg-[#FFB800]/10 text-[#FFB800] text-[9px] font-black uppercase tracking-widest px-4 py-2 rounded-lg cursor-pointer transition-all active:scale-95 shadow-lg shadow-[#FFB800]/5"
-                              >
-                                Accept proposal
-                              </button>
-                              <button 
-                                onClick={() => handleHostDenyProposal(req.id)}
-                                className="bg-slate-900 border border-red-500/50 hover:bg-red-500/10 text-red-400 text-[9px] font-black uppercase tracking-widest px-4 py-2 rounded-lg cursor-pointer transition-all active:scale-95"
-                              >
-                                Deny
-                              </button>
-                            </div>
-                          )}
-
-                          {/* Manager Actions on request */}
-                          {(req.status === 'Pending Approval' || req.status === 'Host Accepted Proposal') && canManage && (
-                            <div className="flex flex-wrap items-center gap-2 pt-1 self-center justify-end">
-                              <button 
-                                onClick={() => handleApproveRequest(req.id)}
-                                className="bg-slate-900 border border-emerald-500/70 hover:bg-emerald-500/10 text-emerald-400 text-[9px] font-black uppercase tracking-widest px-4 py-2 rounded-lg cursor-pointer transition-all active:scale-95 shadow-lg shadow-emerald-500/5"
-                              >
-                                Approve slot
-                              </button>
-                              <button 
-                                onClick={() => setProposingRequestId(req.id)}
-                                className="bg-slate-900 border border-pink-500/50 hover:bg-pink-500/10 text-pink-400 text-[9px] font-black uppercase tracking-widest px-4 py-2 rounded-lg cursor-pointer transition-all active:scale-95"
-                              >
-                                Propose Alt
-                              </button>
-                              <button 
-                                onClick={() => handleDenyRequest(req.id)}
-                                className="bg-slate-900 border border-red-500/50 hover:bg-red-500/10 text-red-400 text-[9px] font-black uppercase tracking-widest px-4 py-2 rounded-lg cursor-pointer transition-all active:scale-95"
-                              >
-                                Deny
-                              </button>
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Propose different slot inline mini-form */}
-                        {proposingRequestId === req.id && (
-                          <div className="bg-[#12141C] border border-slate-800 rounded-xl p-4 mt-3 space-y-3">
-                            <h5 className="text-[10px] font-black text-white/50 uppercase tracking-widest">Propose Alternative Timeslot</h5>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                              <div className="space-y-1">
-                                <label htmlFor={`prop-date-${req.id}`} className="text-[8px] font-black text-white/40 uppercase tracking-wider block">Proposal Date</label>
-                                <input 
-                                  id={`prop-date-${req.id}`}
-                                  type="date" 
-                                  value={proposalDate} 
-                                  onChange={(e) => setProposalDate(e.target.value)} 
-                                  required 
-                                  title="Proposal Date" 
-                                  className="w-full bg-[#0A0B0E] border border-slate-800 rounded-lg px-3 py-2 text-xs focus:border-[#FFB800] outline-none text-white font-mono" 
-                                />
-                              </div>
-                              <div className="space-y-1">
-                                <label htmlFor={`prop-timeslot-${req.id}`} className="text-[8px] font-black text-white/40 uppercase tracking-wider block">Timeslot Option</label>
-                                <select 
-                                  id={`prop-timeslot-${req.id}`}
-                                  value={proposalTimeslot} 
-                                  onChange={(e) => setProposalTimeslot(e.target.value)} 
-                                  required 
-                                  title="Proposal Timeslot Option" 
-                                  className="w-full bg-[#0A0B0E] border border-slate-800 rounded-lg px-3 py-2 text-xs focus:border-[#FFB800] outline-none text-white font-bold cursor-pointer"
-                                >
-                                  <option value="">-- Choose timeslot --</option>
-                                  {getTimeslotAvailability(proposalDate).map(t => (
-                                    <option 
-                                      key={t.slot} 
-                                      value={t.slot} 
-                                      disabled={t.isTaken} 
-                                      className={cn("bg-[#111111]", t.isTaken ? "text-red-500/50" : "text-white")}
-                                    >
-                                      {t.label}
-                                    </option>
-                                  ))}
-                                </select>
-                              </div>
-                            </div>
-                            <div className="flex gap-2 justify-end">
-                              <button 
-                                type="button" 
-                                onClick={() => setProposingRequestId(null)} 
-                                className="px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-white/45 text-[9px] font-black uppercase tracking-wider hover:bg-slate-800 transition-colors"
-                              >
-                                Cancel
-                              </button>
-                              <button 
-                                type="button" 
-                                onClick={handleProposeTimeslot}
-                                disabled={!proposalTimeslot}
-                                className="px-3 py-1.5 rounded-lg bg-slate-900 border border-[#ec4899] text-[#ec4899] hover:text-white text-[9px] font-black uppercase tracking-wider hover:bg-[#ec4899]/10 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                              >
-                                Submit Proposal
-                              </button>
-                            </div>
-                          </div>
-=======
-          {/* Calendar Grids */}
-          {viewMode === 'week' ? (
-            /* 7-Day Calendar Grid */
-            <div className="overflow-x-auto pb-4 -mx-4 px-4 sm:mx-0 sm:px-0 custom-scrollbar">
-              <div className="grid grid-cols-7 gap-2 md:gap-4 bg-[#0B0D12] p-4 rounded-3xl border border-[#D4AF37]/40 shadow-[0_0_15px_rgba(212,175,55,0.15)] min-w-[700px]">
-                {weekDays.map((day, idx) => {
-                  const dayName = format(day, 'EEEE');
-                  const dayAbbr = format(day, 'EEE').toUpperCase();
-                  const dayNum = format(day, 'd');
-                  const isSelected = isSameDay(day, selectedDate);
-                  const dayEventsCount = getEventsForDay(day).length;
-
-                  return (
-                    <div key={idx} className="flex flex-col items-center gap-2">
-                      <span className="text-[9px] font-black uppercase tracking-[0.1em] text-[#D4AF37]/60 text-center truncate w-full">
-                        {dayName}
-                      </span>
-                      <button
-                        onClick={() => handleDateClick(day)}
-                        className={cn(
-                          "w-full py-4 rounded-2xl flex flex-col items-center justify-center gap-1.5 transition-all border cursor-pointer select-none relative bg-gradient-to-br",
-                          isSelected 
-                            ? "from-indigo-950 to-slate-900 ring-1 ring-purple-500 shadow-[0_0_15px_rgba(168,85,247,0.4)] border-transparent" 
-                            : "from-[#0F1117] to-[#13161F] border-[#D4AF37]/10 hover:border-purple-500/50 hover:from-slate-900 hover:to-indigo-950/40 text-white"
->>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
-                        )}
-                      >
-                        <span className={cn("text-[9px] font-black tracking-widest uppercase", isSelected ? "text-purple-400" : "text-white/40")}>{dayAbbr}</span>
-                        <span className={cn("text-lg font-black tracking-tight", isSelected ? "text-white" : "")}>{dayNum}</span>
-                        {dayEventsCount > 0 && !isSelected && <span className="absolute bottom-1.5 w-1.5 h-1.5 rounded-full bg-purple-500 shadow-[0_0_8px_rgba(168,85,247,0.8)]" />}
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-=======
       {activeTab === 'LIVEHOUSE' ? (
         <LivehouseCalendar 
           allUsers={allUsers}
@@ -2139,45 +1623,10 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                     }
                   })()}
                </div>
->>>>>>> 2b42d3ae84c3e300e1faeb35e7009a759158d1e9
             </div>
           </div>
 
-<<<<<<< HEAD
-        {/* Sidebar: Event Options & Create */}
-        <div className="space-y-6">
-          {/* Filter options */}
-          <div className="bg-[#111111] border border-slate-800 p-4 rounded-2xl space-y-3 shadow-lg">
-            <h4 className="font-black text-white/40 text-[9px] uppercase tracking-widest">Filter by Type</h4>
-            <div className="flex flex-col gap-1.5">
-              {Object.keys(EVENT_COLORS).map(type => {
-                const isActive = activeFilters.includes(type as EventType);
-                const colorConfig = EVENT_COLORS[type];
-                return (
-                  <button
-                    key={type}
-                    onClick={() => toggleFilter(type as EventType)}
-                    className={cn(
-                      "w-full text-left px-3 py-2 rounded-xl text-[10px] font-bold uppercase transition-all border border-transparent cursor-pointer",
-                      isActive
-                        ? "bg-slate-800 border-slate-700 text-white"
-                        : "bg-[#0A0B0E] border-slate-900 text-slate-500 hover:text-white/60"
-                    )}
-                  >
-                    <span className="flex items-center gap-2">
-                      <span className={cn("w-1.5 h-1.5 rounded-full bg-gradient-to-b", colorConfig.gradient)} />
-                      {type}
-                    </span>
-                  </button>
-                );
-              })}
-              {activeFilters.length > 0 && (
-                <button 
-                  onClick={() => { setActiveFilters([]); setSelectedEventId(null); }}
-                  className="mt-2 text-center text-[9px] font-black uppercase text-[#FFB800] hover:underline cursor-pointer"
-=======
           {/* Scheduled Events Panel */}
-<<<<<<< HEAD
           <div className="bg-gradient-to-br from-[#0F1117] to-[#12141A] rounded-3xl border border-[#D4AF37]/40 p-5 space-y-4 shadow-[0_0_15px_rgba(212,175,55,0.15)] relative overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-tr from-purple-500/5 via-transparent to-indigo-500/5 pointer-events-none" />
             
@@ -2197,7 +1646,6 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                   value={selectedTimezone}
                   onChange={(e) => setSelectedTimezone(e.target.value)}
                   className="bg-[#0A0B0E] border border-purple-500/30 rounded-lg px-2 py-1 text-[10px] font-bold text-white/80 focus:border-purple-400 focus:ring-1 focus:ring-purple-400 outline-none cursor-pointer tracking-widest uppercase appearance-none"
->>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
                 >
                   {TIMEZONES.map(tz => (
                     <option key={tz.value} value={tz.value}>{tz.label}</option>
@@ -2205,10 +1653,8 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                 </select>
               </div>
             </div>
-=======
           <div className="bg-black/20 backdrop-blur-xl rounded-3xl border border-[#D4AF37]/25 p-5 space-y-4 shadow-[0_0_30px_rgba(212,175,55,0.05)] relative overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-tr from-[#D4AF37]/5 via-transparent to-orange-500/5 pointer-events-none" />
->>>>>>> 2b42d3ae84c3e300e1faeb35e7009a759158d1e9
 
             <div className="space-y-3 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
               {selectedDayEvents.length > 0 ? (
@@ -2237,7 +1683,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                     const hostPhoto = hostUser ? (hostUser.photoUrl || hostUser.profilePhotoUrl || hostUser.photoURL) : null;
                     const avatarUrl = hostPhoto || `https://ui-avatars.com/api/?name=${encodeURIComponent(hostName)}&background=0a0806&color=D4AF37`;
                     
-                    const eventAttendance = attendanceRecords.find(r => r.eventId === e.event_id);
+                    const eventAttendance = attendanceRecords.find(r => r.event_id === e.event_id || r.eventId === e.event_id);
                     const displayAttendees = eventAttendance ? (eventAttendance.attendees || eventAttendance.attendeeIds || eventAttendance.actualParticipants || []) : [];
 
                     return (
@@ -2328,15 +1774,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                 {auth.level > 0 && (
                   <button 
                     onClick={() => setIsAdding(true)} 
-<<<<<<< HEAD
-<<<<<<< HEAD
-                    className="w-full bg-[#FFB800] hover:bg-[#FFB800]/80 text-black font-black uppercase tracking-wider text-xs py-3.5 rounded-xl cursor-pointer flex items-center justify-center gap-2 shadow-lg shadow-[#FFB800]/5 transition-all transform active:scale-95"
-=======
-                    className="flex-1 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-black uppercase tracking-wider text-xs py-3.5 rounded-xl cursor-pointer flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(168,85,247,0.4)] transition-all transform active:scale-95 border border-purple-400/50"
->>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
-=======
                     className="px-4 py-2 border border-[#D4AF37]/30 bg-[#D4AF37]/10 hover:bg-[#D4AF37]/20 text-[#D4AF37] font-black text-[10px] uppercase tracking-widest hover:border-[#D4AF37]/50 rounded-xl transition-all active:scale-[0.99] cursor-pointer flex items-center gap-2 shadow-md shadow-[#D4AF37]/5"
->>>>>>> 2b42d3ae84c3e300e1faeb35e7009a759158d1e9
                   >
                     <Plus size={14} />
                     Add Event
@@ -2345,17 +1783,8 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
 
                 {['talent', 'host'].includes(auth.role?.toLowerCase() || '') && (
                   <button 
-<<<<<<< HEAD
-                    onClick={() => setIsRequestingTimeslot(true)} 
-                    className="w-full border border-[#FFB800]/50 hover:border-[#FFB800] text-[#FFB800] hover:bg-[#FFB800]/5 font-black uppercase tracking-wider text-xs py-3.5 rounded-xl cursor-pointer flex items-center justify-center gap-2 transition-all transform active:scale-95"
-=======
                     onClick={() => setIsReservingLivehouse(true)} 
-<<<<<<< HEAD
                     className="flex-1 bg-slate-900 border border-purple-500/50 hover:bg-purple-500/10 text-purple-400 hover:text-white font-black uppercase tracking-[0.2em] text-xs py-3.5 rounded-xl cursor-pointer flex items-center justify-center gap-2 shadow-xl transition-all transform active:scale-95"
->>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
-=======
-                    className="px-4 py-2 bg-black/20 border border-white/10 hover:bg-[#1a120e] hover:border-white/20 text-[#A09E9A] hover:text-[#F0EFE8] font-black text-[10px] uppercase tracking-widest rounded-xl transition-all active:scale-[0.99] cursor-pointer flex items-center gap-2 shadow-md"
->>>>>>> 2b42d3ae84c3e300e1faeb35e7009a759158d1e9
                   >
                     <Clock size={14} />
                     Schedule Livehouse
@@ -2363,7 +1792,8 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                 )}
               </div>
             )}
-          </div>
+           </div>
+        </div>
         </div>
       )}
       </div>
@@ -2616,15 +2046,16 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                                 <div className={`grid gap-3 ${isLarge ? 'grid-cols-4' : 'grid-cols-4 sm:grid-cols-6'}`}>
                                   {displayAttendees.map((att: any, idx: number) => {
                                     const pid = typeof att === 'string' ? att : (att.poppoId || att.poppo_id || att.id || att.participantId);
+                                    const attendeeNickname = typeof att === 'string' ? pid : (att.nickname || att.name || pid);
+                                    const attendeeRole = typeof att === 'string' ? '' : (att.role || '');
                                     const pUser = allUsers.find(u => String(u.poppo_id || u.poppoId || u.id) === String(pid));
-                                    const pName = pUser ? (pUser.nickname || pUser.name) : pid;
                                     const pPhoto = pUser ? (pUser.photoUrl || pUser.profilePhotoUrl || pUser.photoURL) : null;
-                                    const avatar = pPhoto || `https://ui-avatars.com/api/?name=${encodeURIComponent(pName)}&background=0a0806&color=D4AF37`;
+                                    const avatar = pPhoto || `https://ui-avatars.com/api/?name=${encodeURIComponent(attendeeNickname)}&background=0a0806&color=D4AF37`;
                                     
                                     return (
                                       <div key={idx} className="flex flex-col items-center justify-start gap-1.5 p-1 transition-transform hover:scale-105">
-                                        <img src={avatar} alt={pName} className={`${isLarge ? 'w-14 h-14 sm:w-16 sm:h-16' : 'w-10 h-10'} rounded-full border border-[#D4AF37]/30 object-cover shadow-[0_0_10px_rgba(212,175,55,0.1)]`} />
-                                        <span className={`${isLarge ? 'text-[10px] sm:text-xs' : 'text-[9px]'} font-bold text-white/80 text-center leading-tight line-clamp-1 w-full`} title={pName}>{pName}</span>
+                                        <img src={avatar} alt={attendeeNickname} className={`${isLarge ? 'w-14 h-14 sm:w-16 sm:h-16' : 'w-10 h-10'} rounded-full border border-[#D4AF37]/30 object-cover shadow-[0_0_10px_rgba(212,175,55,0.1)]`} />
+                                        <span className={`${isLarge ? 'text-[10px] sm:text-xs' : 'text-[9px]'} font-bold text-white/80 text-center leading-tight line-clamp-1 w-full`} title={attendeeNickname}>{attendeeNickname}</span>
                                       </div>
                                     )
                                   })}
@@ -2656,275 +2087,8 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
       <AnimatePresence>
         {isAdding && (
           <div className="fixed inset-0 z-[1000] flex items-center justify-center p-6">
-<<<<<<< HEAD
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsAdding(false)} className="absolute inset-0 bg-[#0A0B0E]/80 backdrop-blur-sm" />
-<<<<<<< HEAD
-            <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="relative bg-[#111111] border border-slate-800 w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl z-10 max-h-[90vh] overflow-y-auto custom-scrollbar">
-              <div className="p-6 border-b border-slate-800 font-black text-white uppercase tracking-widest text-[10px]">Create New Event Entry</div>
-              <form onSubmit={handleCreate} className="p-6 space-y-5">
-                
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <label htmlFor="event-title" className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">Event Title</label>
-                    <input id="event-title" name="title" required className="w-full bg-[#0A0B0E] border border-slate-800 rounded-xl px-4 py-3 text-sm focus:border-[#FFB800] outline-none text-white placeholder-white/20" placeholder="e.g. PK Battle" title="Event Title" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label htmlFor="event-type" className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">Event Type</label>
-                    <select id="event-type" name="type" title="Event Type" className="w-full bg-[#0A0B0E] border border-slate-800 rounded-xl px-4 py-3 text-sm focus:border-[#FFB800] outline-none text-white font-bold cursor-pointer">
-                      {Object.keys(EVENT_COLORS).map(type => (
-                        <option key={type} value={type} className="bg-[#111111] text-white">{type}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-                
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <label htmlFor="event-host-id" className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">Host ID (Poppo ID)</label>
-                    <input 
-                      id="event-host-id"
-                      name="hostId" 
-                      required={auth.role !== 'Talent'} 
-                      disabled={auth.role === 'Talent'}
-                      defaultValue={auth.role === 'Talent' ? auth.poppo_id : ''}
-                      className="w-full bg-[#0A0B0E] border border-slate-800 rounded-xl px-4 py-3 text-sm focus:border-[#FFB800] outline-none text-white" 
-                      placeholder="e.g. 19157913" 
-                      title="Host ID"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label htmlFor="event-ev-host-id" className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">Event Host ID (Info Only)</label>
-                    <input 
-                      id="event-ev-host-id"
-                      name="eventHostId" 
-                      className="w-full bg-[#0A0B0E] border border-slate-800 rounded-xl px-4 py-3 text-sm focus:border-[#FFB800] outline-none text-white placeholder-white/20" 
-                      placeholder="e.g. 1234567" 
-                      title="Event Host ID"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <label htmlFor="event-date" className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">Event Date</label>
-                    <input id="event-date" name="date" type="date" required className="w-full bg-[#0A0B0E] border border-slate-800 rounded-xl px-4 py-3 text-sm focus:border-[#FFB800] outline-none text-white" title="Event Date" placeholder="Event Date" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label htmlFor="event-time" className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">Time Block</label>
-                    <input id="event-time" name="time" placeholder="14:00 - 16:00" required className="w-full bg-[#0A0B0E] border border-slate-800 rounded-xl px-4 py-3 text-sm focus:border-[#FFB800] outline-none text-white font-bold" title="Event Time" />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <label htmlFor="event-location" className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">Location Details</label>
-                    <input id="event-location" name="location" placeholder="e.g. CHANNEL ROOM 109" required className="w-full bg-[#0A0B0E] border border-slate-800 rounded-xl px-4 py-3 text-sm focus:border-[#FFB800] outline-none text-white font-bold" title="Location Details" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label htmlFor="event-visibility" className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">Visibility</label>
-                    <select id="event-visibility" name="visibility" title="Event visibility level" className="w-full bg-[#0A0B0E] border border-slate-800 rounded-xl px-4 py-3 text-sm focus:border-[#FFB800] outline-none text-white font-bold cursor-pointer">
-                       <option value="All">Everyone (Public)</option>
-                       <option value="Leadership">Leadership Only</option>
-                       <option value="Director">Director Only</option>
-                     </select>
-                  </div>
-                </div>
-
-                {/* Niners Participants selector */}
-                <div className="space-y-1.5">
-                  <label htmlFor="event-participants-add" className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">
-                    Niners Participants ({selectedParticipants.length} / 9)
-                  </label>
-                  <select
-                    id="event-participants-add"
-                    value=""
-                    title="Add Niners Participants"
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      if (val && selectedParticipants.length < 9 && !selectedParticipants.includes(val)) {
-                        setSelectedParticipants([...selectedParticipants, val]);
-                      }
-                    }}
-                    disabled={selectedParticipants.length >= 9}
-                    className="w-full bg-[#0A0B0E] border border-slate-800 rounded-xl px-4 py-3 text-sm focus:border-[#FFB800] outline-none text-white font-bold cursor-pointer disabled:opacity-40"
-                  >
-                    <option value="">-- Add Participant Host --</option>
-                    {(hosts || []).map(h => (
-                      <option key={h.id} value={h.id} className="bg-[#111111] text-white">
-                        {h.nickname || h.name} (#{h.id})
-                      </option>
-                    ))}
-                  </select>
-                  
-                  {/* Stacking visual blocks display below */}
-                  {selectedParticipants.length > 0 && (
-                    <div className="flex flex-wrap gap-2 pt-1">
-                      {selectedParticipants.map(poppoId => {
-                        const pHost = (hosts || []).find(h => h.id === poppoId);
-                        const dispName = pHost ? `${pHost.nickname || pHost.name} (#${poppoId})` : `#${poppoId}`;
-                        return (
-                          <span key={poppoId} className="bg-slate-800 border border-slate-700 rounded-xl px-2.5 py-1 text-[10px] font-black text-white flex items-center gap-1.5 shadow-sm">
-                            <span>{dispName}</span>
-                            <button
-                              type="button"
-                              onClick={() => setSelectedParticipants(selectedParticipants.filter(id => id !== poppoId))}
-                              className="text-slate-400 hover:text-red-400 font-extrabold text-[10px] transition-colors shrink-0"
-                            >
-                              ✕
-                            </button>
-                          </span>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-
-                <div className="space-y-1.5">
-                  <label htmlFor="event-description" className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">Description / Notes</label>
-                  <textarea id="event-description" name="description" title="Description and notes" className="w-full bg-[#0A0B0E] border border-slate-800 rounded-xl p-4 text-sm focus:border-[#FFB800] outline-none text-white h-24 resize-none placeholder-white/20" placeholder="Details about the event requirements..." />
-                </div>
-
-                <div className="pt-2 flex gap-4">
-                   <button type="button" onClick={() => setIsAdding(false)} className="flex-1 px-6 py-4 rounded-xl bg-slate-900 border border-slate-800 text-white/40 font-black uppercase text-[10px] tracking-widest hover:bg-slate-800 hover:text-white transition-colors cursor-pointer">Cancel</button>
-                   <button type="submit" className="flex-[2] bg-slate-900 border border-[#FFB800] hover:bg-[#FFB800]/5 text-[#FFB800] hover:text-white py-4 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] shadow-xl transition-all cursor-pointer">Authorize & Create</button>
-                </div>
-              </form>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* Request Livehouse Timeslot Modal */}
-      <AnimatePresence>
-        {isRequestingTimeslot && (
-          <div className="fixed inset-0 z-[1000] flex items-center justify-center p-6">
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsRequestingTimeslot(false)} className="absolute inset-0 bg-[#0A0B0E]/80 backdrop-blur-sm" />
-            <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="relative bg-[#111111] border border-slate-800 w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl z-10 max-h-[90vh] overflow-y-auto custom-scrollbar">
-              <div className="p-6 border-b border-slate-800 font-black text-white uppercase tracking-widest text-[10px]">Request Livehouse Timeslot</div>
-              <form onSubmit={handleRequestTimeslot} className="p-6 space-y-5">
-                
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <label htmlFor="req-theme" className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">Performance Theme / Title</label>
-                    <input id="req-theme" name="title" required className="w-full bg-[#0A0B0E] border border-slate-800 rounded-xl px-4 py-3 text-sm focus:border-[#FFB800] outline-none text-white placeholder-white/20" placeholder="e.g. Summer Acoustic Vibes" title="Performance Theme" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label htmlFor="req-livehouse-type" className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">Livehouse Type</label>
-                    <select id="req-livehouse-type" name="livehouseType" title="Livehouse Type" className="w-full bg-[#0A0B0E] border border-slate-800 rounded-xl px-4 py-3 text-sm focus:border-[#FFB800] outline-none text-white font-bold cursor-pointer">
-                      <option value="Solo Livehouse" className="bg-[#111111] text-white">Solo Livehouse</option>
-                      <option value="Party Livehouse" className="bg-[#111111] text-white">Party Livehouse</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <label htmlFor="req-host-id" className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">Host ID (Poppo ID)</label>
-                    <input 
-                      id="req-host-id"
-                      name="hostId" 
-                      required={auth.role !== 'Talent'} 
-                      disabled={auth.role === 'Talent'}
-                      defaultValue={auth.role === 'Talent' ? auth.poppo_id : ''}
-                      className="w-full bg-[#0A0B0E] border border-slate-800 rounded-xl px-4 py-3 text-sm focus:border-[#FFB800] outline-none text-white" 
-                      placeholder="Enter Poppo ID..." 
-                      title="Target Poppo ID"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label htmlFor="req-ev-host-id" className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">Event Host ID (Info Only)</label>
-                    <input 
-                      id="req-ev-host-id"
-                      name="eventHostId" 
-                      className="w-full bg-[#0A0B0E] border border-slate-800 rounded-xl px-4 py-3 text-sm focus:border-[#FFB800] outline-none text-white placeholder-white/20" 
-                      placeholder="e.g. 1234567" 
-                      title="Event Host ID"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <label htmlFor="req-date" className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">Requested Date</label>
-                    <input id="req-date" name="date" type="date" required className="w-full bg-[#0A0B0E] border border-slate-800 rounded-xl px-4 py-3 text-sm focus:border-[#FFB800] outline-none text-white" title="Requested Date" placeholder="Requested Date" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label htmlFor="req-time" className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">Requested Timeslot Block</label>
-                    <select id="req-time" name="time" title="Requested Timeslot Block" className="w-full bg-[#0A0B0E] border border-slate-800 rounded-xl px-4 py-3 text-sm focus:border-[#FFB800] outline-none text-white font-bold cursor-pointer">
-                      <option value="14:00 - 16:00" className="bg-[#111111] text-white">14:00 - 16:00</option>
-                      <option value="16:00 - 18:00" className="bg-[#111111] text-white">16:00 - 18:00</option>
-                      <option value="18:00 - 20:00" className="bg-[#111111] text-white">18:00 - 20:00</option>
-                      <option value="20:00 - 22:00" className="bg-[#111111] text-white">20:00 - 22:00</option>
-                      <option value="22:00 - 00:00" className="bg-[#111111] text-white">22:00 - 00:00</option>
-                    </select>
-                  </div>
-                </div>
-
-                {/* Niners Participants selector */}
-                <div className="space-y-1.5">
-                  <label htmlFor="req-participants-add" className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">
-                    Niners Participants ({selectedParticipants.length} / 9)
-                  </label>
-                  <select
-                    id="req-participants-add"
-                    value=""
-                    title="Add Niners Participants"
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      if (val && selectedParticipants.length < 9 && !selectedParticipants.includes(val)) {
-                        setSelectedParticipants([...selectedParticipants, val]);
-                      }
-                    }}
-                    disabled={selectedParticipants.length >= 9}
-                    className="w-full bg-[#0A0B0E] border border-slate-800 rounded-xl px-4 py-3 text-sm focus:border-[#FFB800] outline-none text-white font-bold cursor-pointer disabled:opacity-40"
-                  >
-                    <option value="">-- Add Participant Host --</option>
-                    {(hosts || []).map(h => (
-                      <option key={h.id} value={h.id} className="bg-[#111111] text-white">
-                        {h.nickname || h.name} (#{h.id})
-                      </option>
-                    ))}
-                  </select>
-                  
-                  {/* Stacking visual blocks display below */}
-                  {selectedParticipants.length > 0 && (
-                    <div className="flex flex-wrap gap-2 pt-1">
-                      {selectedParticipants.map(poppoId => {
-                        const pHost = (hosts || []).find(h => h.id === poppoId);
-                        const dispName = pHost ? `${pHost.nickname || pHost.name} (#${poppoId})` : `#${poppoId}`;
-                        return (
-                          <span key={poppoId} className="bg-slate-800 border border-slate-700 rounded-xl px-2.5 py-1 text-[10px] font-black text-white flex items-center gap-1.5 shadow-sm">
-                            <span>{dispName}</span>
-                            <button
-                              type="button"
-                              onClick={() => setSelectedParticipants(selectedParticipants.filter(id => id !== poppoId))}
-                              className="text-slate-400 hover:text-red-400 font-extrabold text-[10px] transition-colors shrink-0"
-                            >
-                              ✕
-                            </button>
-                          </span>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-
-                <div className="space-y-1.5">
-                  <label htmlFor="req-notes" className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">Special Notes / Equipment Requests</label>
-                  <textarea id="req-notes" name="notes" title="Special Notes / Equipment Requests" className="w-full bg-[#0A0B0E] border border-slate-800 rounded-xl p-4 text-sm focus:border-[#FFB800] outline-none text-white h-24 resize-none placeholder-white/20" placeholder="e.g. Need high fidelity mic presets..." />
-                </div>
-
-                <div className="pt-2 flex gap-4">
-                   <button type="button" onClick={() => setIsRequestingTimeslot(false)} className="flex-1 px-6 py-4 rounded-xl bg-slate-900 border border-slate-800 text-white/40 font-black uppercase text-[10px] tracking-widest hover:bg-slate-800 hover:text-white transition-colors cursor-pointer">Cancel</button>
-                   <button type="submit" className="flex-[2] bg-slate-900 border border-[#FFB800] hover:bg-[#FFB800]/5 text-[#FFB800] hover:text-white py-4 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] shadow-xl transition-all cursor-pointer">Submit Timeslot Request</button>
-                </div>
-              </form>
-=======
-            <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="relative bg-[#0F1117] border border-[#D4AF37]/20 w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl z-10 max-h-[90vh] overflow-y-auto custom-scrollbar">
-=======
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsAdding(false)} className="absolute inset-0 bg-black/20 backdrop-blur-sm" />
             <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="relative glass-card w-full max-w-lg rounded-3xl overflow-hidden z-10 max-h-[90vh] overflow-y-auto custom-scrollbar p-0">
->>>>>>> 2b42d3ae84c3e300e1faeb35e7009a759158d1e9
               <div className="p-6 border-b border-[#D4AF37]/20 font-black text-white uppercase tracking-widest text-[10px]">Schedule New Calendar Event</div>
               <div className="p-6">
                 <AddEventForm 
@@ -2936,219 +2100,12 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                   onCancel={() => setIsAdding(false)}
                 />
               </div>
->>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
             </motion.div>
           </div>
         )}
       </AnimatePresence>
 
       {/* Reserve Livehouse Timeslot Modal */}
-<<<<<<< HEAD
-      <AnimatePresence>
-        {isReservingLivehouse && (
-          <div className="fixed inset-0 z-[1000] flex items-center justify-center p-6">
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsReservingLivehouse(false)} className="absolute inset-0 bg-[#0A0B0E]/80 backdrop-blur-sm" />
-<<<<<<< HEAD
-            <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="relative bg-[#111111] border border-slate-800 w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl z-10 max-h-[90vh] overflow-y-auto custom-scrollbar">
-              <div className="p-6 border-b border-slate-800 font-black text-white uppercase tracking-widest text-[10px]">Reserve Livehouse Timeslot</div>
-=======
-            <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="relative bg-[#0F1117] border border-[#D4AF37]/20 w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl z-10 max-h-[90vh] overflow-y-auto custom-scrollbar">
-              <div className="p-6 border-b border-[#D4AF37]/20 font-black text-white uppercase tracking-widest text-[10px]">SCHEDULE LIVEHOUSE</div>
->>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
-              <form onSubmit={handleReserveLivehouse} className="p-6 space-y-5">
-                
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <label htmlFor="res-poppo-id" className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">Poppo ID</label>
-                    <input 
-                      id="res-poppo-id"
-                      disabled 
-                      value={auth.poppo_id} 
-                      className="w-full bg-[#0A0B0E] border border-[#D4AF37]/15 rounded-xl px-4 py-3 text-sm text-white/50 cursor-not-allowed outline-none" 
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label htmlFor="res-host-name" className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">Host Name</label>
-                    <input 
-                      id="res-host-name"
-                      disabled 
-                      value={auth.nickname || auth.name} 
-                      className="w-full bg-[#0A0B0E] border border-[#D4AF37]/15 rounded-xl px-4 py-3 text-sm text-white/50 cursor-not-allowed outline-none" 
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <label htmlFor="reserve-livehouse-type" className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">Livehouse Type</label>
-                    <select 
-                      id="reserve-livehouse-type"
-                      value={selectedLivehouseType}
-                      onChange={(e) => setSelectedLivehouseType(e.target.value as any)}
-                      title="Livehouse Type" 
-<<<<<<< HEAD
-                      className="w-full bg-[#0A0B0E] border border-slate-800 rounded-xl px-4 py-3 text-sm focus:border-[#FFB800] outline-none text-white font-bold cursor-pointer"
-                    >
-                      <option value="Solo Livehouse" className="bg-[#111111]">Solo Livehouse</option>
-                      <option value="Party Livehouse" className="bg-[#111111]">Party Livehouse</option>
-=======
-                      className="w-full bg-[#0A0B0E] border border-[#D4AF37]/15 rounded-xl px-4 py-3 text-sm focus:border-[#D4AF37] outline-none text-white font-bold cursor-pointer"
-                    >
-                      <option value="SOLO LIVEHOUSE" className="bg-[#0f1117]">SOLO LIVEHOUSE</option>
-                      <option value="PARTY LIVEHOUSE" className="bg-[#0f1117]">PARTY LIVEHOUSE</option>
->>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
-                    </select>
-                  </div>
-                  <div className="space-y-1.5">
-                    <label htmlFor="reserve-date" className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">Date Selector</label>
-                    <SingleDatePicker 
-                      id="reserve-date" 
-                      name="reserveDate"
-                      value={reserveDate} 
-                      onChange={(val) => setReserveDate(val)} 
-                      required 
-<<<<<<< HEAD
-                      className="w-full bg-[#0A0B0E] border border-slate-800 rounded-xl px-4 py-3 text-sm focus:border-[#FFB800] outline-none text-white font-mono" 
-                      title="Reserve Date" 
-=======
->>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
-                    />
-                  </div>
-                </div>
-
-<<<<<<< HEAD
-                <div className="space-y-1.5">
-                  <label htmlFor="reserve-timeslot" className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">Timeslot (Select Available)</label>
-                  <select 
-                    id="reserve-timeslot" 
-                    value={reserveTimeslot} 
-                    onChange={(e) => setReserveTimeslot(e.target.value)} 
-                    required 
-                    title="Reserve Timeslot" 
-                    className="w-full bg-[#0A0B0E] border border-slate-800 rounded-xl px-4 py-3 text-sm focus:border-[#FFB800] outline-none text-white font-bold cursor-pointer font-mono"
-                  >
-                    <option value="" className="text-white/40 font-sans">-- Choose a timeslot --</option>
-                    {getTimeslotAvailability(reserveDate).map(t => (
-                      <option 
-                        key={t.slot} 
-                        value={t.slot} 
-                        disabled={t.isTaken} 
-                        className={cn("bg-[#111111]", t.isTaken ? "text-red-500/50" : "text-white")}
-                      >
-                        {t.label}
-                      </option>
-                    ))}
-                  </select>
-=======
-                <div className="space-y-3">
-                  <span className="text-[10px] font-black text-white/40 uppercase tracking-widest block">Select Timeslot</span>
-                  
-                  {/* Timezone Notice */}
-                  <div className="text-[11px] font-bold text-[#D4AF37]/90 bg-[#D4AF37]/5 border border-[#D4AF37]/20 rounded-xl px-4 py-2.5 flex items-center gap-2 mb-2">
-                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#D4AF37] animate-pulse" />
-                    All times are in Manila Time (PHT)
-                  </div>
-
-                  <div className="space-y-4 max-h-[300px] overflow-y-auto pr-1 custom-scrollbar">
-                    {TIMESLOT_BLOCKS.map(block => {
-                      const blockSlots = getTimeslotAvailability(reserveDate).filter(t => block.slots.includes(t.slot));
-                      
-                      return (
-                        <div key={block.name} className="space-y-2">
-                          <h4 className="text-[9px] font-black text-[#D4AF37]/75 uppercase tracking-widest border-b border-[#D4AF37]/10 pb-1 flex items-center gap-1.5">
-                            <span className="w-1.5 h-1.5 rounded-full bg-[#D4AF37]/40" />
-                            {block.name}
-                          </h4>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                            {blockSlots.map(t => {
-                              const displaySlot = t.slot.replace(' (Manila Time)', '');
-                              const isSelected = reserveTimeslot === t.slot;
-                              
-                              let statusText = '2 Available';
-                              let statusClass = 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20';
-                              if (t.count >= 2) {
-                                statusText = 'Full';
-                                statusClass = 'text-red-400 bg-red-500/10 border-red-500/20';
-                              } else if (t.count === 1) {
-                                statusText = '1 slot left';
-                                statusClass = 'text-amber-400 bg-amber-500/10 border-amber-500/20';
-                              }
-
-                              return (
-                                <button
-                                  key={t.slot}
-                                  type="button"
-                                  disabled={t.count >= 2}
-                                  onClick={() => setReserveTimeslot(t.slot)}
-                                  className={cn(
-                                    "p-3.5 rounded-xl border text-left transition-all flex flex-col justify-between gap-2.5 relative overflow-hidden",
-                                    t.count >= 2
-                                      ? "bg-[#0A0B0E]/40 border-red-500/10 cursor-not-allowed opacity-50"
-                                      : isSelected
-                                        ? "bg-[#181B24] border-[#D4AF37] shadow-[0_0_12px_rgba(212,175,55,0.15)] text-white"
-                                        : "bg-[#0A0B0E] border-[#D4AF37]/10 hover:border-[#D4AF37]/20 hover:bg-[#12151D] text-white/70"
-                                  )}
-                                >
-                                  <div className="flex justify-between items-start gap-2.5 w-full">
-                                    <span className="font-mono text-xs font-black tracking-tight">{displaySlot}</span>
-                                    <span className={cn("px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider border shrink-0", statusClass)}>
-                                      {statusText}
-                                    </span>
-                                  </div>
-
-                                  {t.pendingCount > 0 && (
-                                    <div className="text-[9px] font-bold text-amber-500 bg-amber-500/5 px-2 py-1 rounded border border-amber-500/10 w-fit">
-                                      {t.pendingCount} pending request{t.pendingCount > 1 ? 's' : ''}
-                                    </div>
-                                  )}
-
-                                  {t.eventTitles.length > 0 && (
-                                    <div className="space-y-1 mt-1 border-t border-white/5 pt-1.5 w-full">
-                                      <span className="block text-[8px] font-black text-white/30 uppercase tracking-wider">Booked Events:</span>
-                                      {t.eventTitles.map((title, i) => (
-                                        <p key={i} className="text-[9px] font-bold text-white/60 truncate" title={title}>
-                                          • {title}
-                                        </p>
-                                      ))}
-                                    </div>
-                                  )}
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
->>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
-                </div>
-
-                <div className="space-y-1.5">
-                  <label htmlFor="reserve-notes" className="text-[10px] font-black text-white/40 uppercase tracking-widest block mb-1">Description / Special Request Notes</label>
-                  <textarea 
-                    id="reserve-notes" 
-                    value={reserveNotes} 
-                    onChange={(e) => setReserveNotes(e.target.value)} 
-                    title="Reservation Notes" 
-<<<<<<< HEAD
-                    className="w-full bg-[#0A0B0E] border border-slate-800 rounded-xl p-4 text-sm focus:border-[#FFB800] outline-none text-white h-24 resize-none placeholder-white/20" 
-=======
-                    className="w-full bg-[#0A0B0E] border border-[#D4AF37]/15 rounded-xl p-4 text-sm focus:border-[#D4AF37] outline-none text-white h-24 resize-none placeholder-white/20" 
->>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
-                    placeholder="Provide details for your livehouse set..." 
-                  />
-                </div>
-
-                <div className="pt-2 flex gap-4">
-                  <button type="button" onClick={() => setIsReservingLivehouse(false)} className="flex-1 px-6 py-4 rounded-xl bg-slate-900 border border-[#D4AF37]/15 text-white/40 font-black uppercase text-[10px] tracking-widest hover:bg-slate-800 hover:text-white transition-colors cursor-pointer">Cancel</button>
-                  <button type="submit" className="flex-[2] bg-slate-900 border border-[#D4AF37] hover:bg-[#D4AF37]/5 text-[#D4AF37] hover:text-white py-4 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] shadow-xl transition-all cursor-pointer">Submit Schedule Request</button>
-                </div>
-              </form>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-=======
       <LivehouseBookingModal
         isOpen={isReservingLivehouse}
         onClose={() => setIsReservingLivehouse(false)}
@@ -3159,7 +2116,6 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
         livehouseRequests={livehouseRequests}
         setLivehouseRequests={setLivehouseRequests}
       />
->>>>>>> 2b42d3ae84c3e300e1faeb35e7009a759158d1e9
 
       {/* Event Spotlight Modal */}
       <AnimatePresence>

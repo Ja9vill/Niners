@@ -1,11 +1,6 @@
-<<<<<<< HEAD
-import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { subscribeToHosts, patchHost, HostRosterUser, UserRole } from '../lib/firebaseService';
-=======
 /* eslint-disable */
 import React, { useState, useEffect, useRef } from 'react';
 import { subscribeToHosts, patchHost, deleteUser, FirebaseService, HostRosterUser, UserRole } from '../lib/firebaseService';
->>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
 import { Storage } from '../lib/storage';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -269,17 +264,10 @@ export const AppUsersTab: React.FC<AppUsersTabProps> = ({ currentUserRole }) => 
       </div>
 
       {/* ── Table ────────────────────────────────────────────────────────── */}
-<<<<<<< HEAD
-      <div className="overflow-x-auto rounded-2xl border border-white/5 shadow-lg bg-[#0A0A0A]">
-        <table className="w-full text-left border-collapse">
-          <thead>
-            <tr className="bg-[#1A1A1A] border-b border-white/5 text-[9px] font-black text-[#B0B0B0] uppercase tracking-[0.2em]">
-=======
       <div className="overflow-x-auto rounded-2xl border border-[#D4AF37]/10 shadow-lg bg-[#13131E]">
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-[#1A1A28] border-b border-[#D4AF37]/10 text-[9px] font-black text-[#A09E9A] uppercase tracking-[0.2em]">
->>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
               <th className="px-4 py-3 w-32">Poppo ID</th>
               <th className="px-4 py-3">Nickname</th>
               <th className="px-4 py-3 w-44">System App Role</th>
@@ -288,13 +276,8 @@ export const AppUsersTab: React.FC<AppUsersTabProps> = ({ currentUserRole }) => 
               <th className="px-4 py-3 w-28 text-center">Actions</th>
             </tr>
           </thead>
-<<<<<<< HEAD
-          <tbody className="divide-y divide-white/5">
-            {!isConnected && !connectionError && (
-=======
           <tbody className="divide-y divide-[#D4AF37]/10 font-sans">
             {!isConnected && (
->>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
               <tr>
                 <td colSpan={6} className="px-4 py-12 text-center text-slate-400 text-sm">
                   Connecting to Firebase…
@@ -303,13 +286,8 @@ export const AppUsersTab: React.FC<AppUsersTabProps> = ({ currentUserRole }) => 
             )}
             {connectionError && (
               <tr>
-<<<<<<< HEAD
-                <td colSpan={5} className="px-4 py-12 text-center text-red-400 text-sm">
-                  ⚠️ Error connecting to database: {connectionError}
-=======
                 <td colSpan={6} className="px-4 py-12 text-center text-slate-400 text-sm">
                   No users found in the hosts collection.
->>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
                 </td>
               </tr>
             )}
@@ -348,11 +326,7 @@ export const AppUsersTab: React.FC<AppUsersTabProps> = ({ currentUserRole }) => 
                       defaultValue={user.nickname}
                       key={user.nickname} // re-mount when live data changes to reset field
                       onBlur={e => handleNicknameBlur(user, e.target.value.trim())}
-<<<<<<< HEAD
-                      className="w-full bg-transparent border border-transparent rounded-lg px-2 py-1 text-sm font-medium text-[#F5F5F5] placeholder-[#5A5865] focus:bg-[#2A2A40] focus:border-white/10 outline-none transition-all"
-=======
                       className="w-full bg-transparent border border-transparent rounded-lg px-2 py-1 text-sm font-medium text-[#F0EFE8] placeholder-[#5A5865] focus:bg-[#2A2A40] focus:border-[#D4AF37]/35 outline-none transition-all"
->>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
                       placeholder="—"
                     />
                   </td>
@@ -361,18 +335,6 @@ export const AppUsersTab: React.FC<AppUsersTabProps> = ({ currentUserRole }) => 
                   <td className="px-4 py-2.5">
                     <div className="relative">
                       <select
-<<<<<<< HEAD
-                        title="System App Role"
-                        value={user.role}
-                        onChange={e => handleRoleChange(user.poppo_id, e.target.value as UserRole)}
-                        className="w-full appearance-none bg-[#1A1A1A] border border-white/10 text-[#F5F5F5] rounded-lg pl-2.5 pr-7 py-1.5 text-xs font-bold cursor-pointer outline-none focus:ring-1 focus:ring-[#FFB800]/40 focus:border-[#FFB800] transition-all"
-                      >
-                        {ALLOWED_ROLES.map(r => (
-                          <option key={r} value={r} className="bg-[#1A1A1A] text-[#F5F5F5]">
-                            {r.charAt(0).toUpperCase() + r.slice(1)}
-                          </option>
-                        ))}
-=======
                         title="User Role"
                         value={user.role}
                         onChange={e => handleRoleChange(user.poppo_id, e.target.value as UserRole)}
@@ -386,7 +348,6 @@ export const AppUsersTab: React.FC<AppUsersTabProps> = ({ currentUserRole }) => 
                             </option>
                           ))
                         }
->>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
                       </select>
                       {/* Role badge preview */}
                       <div className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2">
@@ -416,11 +377,7 @@ export const AppUsersTab: React.FC<AppUsersTabProps> = ({ currentUserRole }) => 
                         }))}
                         placeholder="••••••••"
                         autoComplete="new-password"
-<<<<<<< HEAD
-                        className="flex-1 min-w-0 bg-[#111111] border border-white/10 rounded-lg px-2.5 py-1.5 text-xs font-medium text-[#F5F5F5] placeholder-[#5A5865] focus:border-[#FFB800] focus:ring-1 focus:ring-[#FFB800]/30 outline-none transition-all"
-=======
                         className="flex-1 min-w-0 bg-[#0D0D14] border border-[#D4AF37]/15 rounded-lg px-2.5 py-1.5 text-xs font-medium text-[#F0EFE8] placeholder-[#5A5865] focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37]/30 outline-none transition-all"
->>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
                         onKeyDown={e => e.key === 'Enter' && handlePasswordSet(user.poppo_id)}
                       />
                       <button
@@ -458,14 +415,9 @@ export const AppUsersTab: React.FC<AppUsersTabProps> = ({ currentUserRole }) => 
                           'relative inline-flex h-6 w-11 rounded-full border-2 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-offset-1',
                           user.isActive
                             ? 'bg-emerald-500 border-emerald-500 focus:ring-emerald-300'
-<<<<<<< HEAD
-                            : 'bg-[#1A1A1A] border-white/10 focus:ring-[#5a5865]',
-                        ].join(' ')}
-=======
                             : 'bg-[#1A1A28] border-[#D4AF37]/15 focus:ring-[#5a5865]',
                         ].join(' ')}
                         {...({ 'aria-pressed': user.isActive })}
->>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
                         aria-label={`Toggle login access for ${user.poppo_id}`}
                       >
                         <span

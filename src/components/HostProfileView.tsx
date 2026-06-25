@@ -7,21 +7,12 @@ import { FirebaseService, generateSubmissionId } from '../lib/firebaseService';
 import { Storage } from '../lib/storage';
 import { cn, formatNumber } from '../lib/utils';
 import { MANAGERS, BASE_SALARY_POLICIES } from '../lib/constants';
-<<<<<<< HEAD
-import { collection, query, where, getDocs, Timestamp, documentId } from 'firebase/firestore';
-import { db } from '../lib/firebase';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
-=======
 import { collection, query, where, getDocs, Timestamp, documentId, doc, setDoc, addDoc, onSnapshot, deleteDoc } from 'firebase/firestore';
 import { db, auth } from '../lib/firebase';
 import { ComposedChart, Area, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, BarChart, Bar, Cell } from 'recharts';
 import { SingleDatePicker, DateRangePicker } from './InteractiveDatePicker';
-<<<<<<< HEAD
->>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
 
-=======
 import { BadgeAndTaskControlPanel } from './BadgeAndTaskControlPanel';
->>>>>>> 2b42d3ae84c3e300e1faeb35e7009a759158d1e9
 interface HostProfileViewProps {
   host: Host;
   isReadOnly?: boolean;
@@ -3537,14 +3528,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
 
   const [editLevel, setEditLevel] = useState<number>(host.level || 1);
   const [isProcessingPhoto, setIsProcessingPhoto] = useState(false);
-<<<<<<< HEAD
-<<<<<<< HEAD
-  const [managersList, setManagersList] = useState<{ id: string; name: string }[]>([]);
-=======
-  const [managersList, setManagersList] = useState<{ id: string; name: string; photoUrl?: string }[]>([]);
-=======
   const [managersList, setManagersList] = useState<any[]>([]);
->>>>>>> 2b42d3ae84c3e300e1faeb35e7009a759158d1e9
 
   const assignedManager = useMemo(() => {
     const managerId = host.assignedManagerId || host.assigned_manager_poppo_id;
@@ -3644,7 +3628,6 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
   const [myRecentAiReport, setMyRecentAiReport] = useState<any>(null);
   const [isPostingAiReport, setIsPostingAiReport] = useState(false);
   const [aiReportReloadTrigger, setAiReportReloadTrigger] = useState(0);
->>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
 
   useEffect(() => {
     // Reset edit values when host changes
@@ -3685,10 +3668,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
         };
         perfSnap.forEach(doc => {
           const data = doc.data();
-<<<<<<< HEAD
-=======
           // Parse month/year from doc ID if not in data fields
->>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
           const parts = doc.id.split('_');
           const monthNameFromId = parts[1] || '';
           const yearFromId = parts[2] ? parseInt(parts[2]) : 0;
@@ -3993,22 +3973,6 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
   }, [host.id]);
 
   useEffect(() => {
-<<<<<<< HEAD
-    const fetchManagers = async () => {
-      try {
-        const allHosts = await FirebaseService.getAllHosts();
-        const mgrs = allHosts
-          .filter(h => (h.role || '').toLowerCase() === 'manager' || (h.role || '').toLowerCase() === 'agent')
-          .map(h => ({ id: h.id || (h as any).poppoId || (h as any).poppo_id, name: h.nickname || h.name || h.id }));
-        setManagersList(mgrs);
-      } catch (err) {
-        console.error("Failed to load managers list:", err);
-      }
-    };
-    fetchManagers();
-  }, []);
-
-=======
     const reloadAiReports = async () => {
       try {
         const aiSnap = await getDocs(query(collection(db, 'ai_reports'), where('hostId', '==', host.id)));
@@ -4055,7 +4019,6 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
       reloadAiReports();
     }
   }, [aiReportReloadTrigger, host.id]);
->>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
 
   useEffect(() => {
     const fetchManagers = async () => {
@@ -4146,25 +4109,6 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
     }
     setIsSubmittingRpk(true);
     try {
-<<<<<<< HEAD
-      const selectedMgr = managersList.find(m => m.name === editManager);
-      const assignedManagerId = selectedMgr ? selectedMgr.id : null;
-
-      const updatedHost: Host = {
-        ...host,
-        nickname: editNickname.trim(),
-        name: editNickname.trim() || host.name,
-        photoUrl: editPhotoUrl,
-        description: editDescription,
-        role: editRole as any,
-        team: editTeam,
-        manager: editManager,
-        assignedManagerId: assignedManagerId,
-        base_salary_category: editBaseSalaryCategory as any,
-        status: editStatus as any,
-        tier: editTier as any,
-        level: Number(editLevel) || 1,
-=======
       const currentAuth = Storage.getAuthState();
       const reportData = {
         reporter_id: currentAuth?.poppo_id || "Unknown",
@@ -4420,7 +4364,6 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
         status: updatedFields.status !== undefined ? updatedFields.status as any : host.status,
         social_links: updatedFields.social_links !== undefined ? updatedFields.social_links : host.social_links,
         streaming_hours: updatedFields.streaming_hours !== undefined ? updatedFields.streaming_hours : host.streaming_hours,
->>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
         updated_at: new Date().toISOString()
       };
 
@@ -4821,18 +4764,6 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
 
   const isSpotlight = !!onClose;
 
-<<<<<<< HEAD
-  const renderIdentityCard = () => (
-    <div className="bg-[#1A1A1A] border border-white/5 rounded-2xl p-4 flex gap-4 items-start shadow-md relative group/card">
-      {/* Edit / Save Options */}
-      {!isReadOnly && (
-        <div className="absolute top-4 right-4 z-10">
-          {!isEditing ? (
-            <button 
-              onClick={() => setIsEditing(true)}
-              className="p-1.5 bg-[#222222] hover:bg-[#2A2A3F] text-[#B0B0B0] hover:text-[#FFB800] rounded-lg transition-all border border-white/10 cursor-pointer"
-              title="Edit Profile"
-=======
   // Earnings breakdown tiles definition
   const earningTiles = [
     // Row 1
@@ -4953,7 +4884,6 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                   ? "bg-amber-500/20 text-amber-400 border border-amber-500/30 shadow-[0_0_12px_rgba(245,158,11,0.2)]"
                   : "text-white/40 hover:text-white/70 border border-transparent"
               )}
->>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
             >
               PERFORMANCE METRICS
             </button>
@@ -5043,29 +4973,6 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
               })}
             </div>
           ) : (
-<<<<<<< HEAD
-            <div className="flex gap-1.5">
-              <button 
-                onClick={handleSaveChanges}
-                disabled={isSaving || isProcessingPhoto}
-                className="px-2 py-1 bg-emerald-600/90 hover:bg-emerald-500 text-white rounded text-[8px] font-black uppercase tracking-wider transition-all disabled:opacity-50 cursor-pointer"
-                title="Save Changes"
-              >
-                {isSaving ? '...' : 'Save'}
-              </button>
-              <button 
-                onClick={() => {
-                  setIsEditing(false);
-                  setEditNickname(host.nickname || host.name || '');
-                  setEditPhotoUrl(host.photoUrl || '');
-                  setEditDescription(host.description || '');
-                }}
-                className="px-2 py-1 bg-[#222222] hover:bg-[#2A2A3F] text-[#B0B0B0] hover:text-[#F5F5F5] rounded text-[8px] font-black uppercase tracking-wider transition-all cursor-pointer"
-                title="Cancel"
-              >
-                Cancel
-              </button>
-=======
             <div className="overflow-x-auto pt-1 custom-scrollbar">
               <table className="w-full text-left border-collapse text-xs">
                 <thead>
@@ -5101,7 +5008,6 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                   )}
                 </tbody>
               </table>
->>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
             </div>
           )}
         </div>
@@ -5109,15 +5015,6 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
     );
   };
 
-<<<<<<< HEAD
-      {/* Host Photo Section */}
-      <div className="flex flex-col items-center gap-1.5 shrink-0">
-        <span className="text-[8px] font-black text-[#B0B0B0]/60 uppercase tracking-widest leading-none">HOST PHOTO</span>
-        <div className="w-16 h-16 rounded-full bg-[#111111] border-2 border-[#FFB800]/30 flex items-center justify-center font-bold text-[#F5F5F5] overflow-hidden shadow-lg shadow-[#FFB800]/5 relative">
-          {isProcessingPhoto && (
-            <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
-              <Loader2 size={16} className="animate-spin text-[#FFB800]" />
-=======
   const renderMonthlyTrend = () => {
     if (trendChartData.length === 0) return null;
 
@@ -5626,317 +5523,12 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
           {isProcessingPhoto && (
             <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-20">
               <Loader2 size={24} className="animate-spin text-[#D4AF37]" />
->>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
             </div>
           )}
           {editPhotoUrl ? (
             <img src={editPhotoUrl} alt={host.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
           ) : (
-<<<<<<< HEAD
-<<<<<<< HEAD
-            <div className="text-lg text-[#B0B0B0] font-bold">{editNickname?.[0]?.toUpperCase() || host.name?.[0] || 'JD'}</div>
-          )}
-        </div>
-        
-        {isEditing && (
-          <div className="flex flex-col items-center gap-1 mt-1">
-            <label className="px-2 py-0.5 bg-[#222222] border border-white/10 hover:bg-[#2A2A3F] rounded text-[7px] font-black uppercase tracking-wider cursor-pointer text-[#F5F5F5]">
-              Upload
-              <input type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
-            </label>
-            <input 
-              type="text" 
-              placeholder="URL..." 
-              value={editPhotoUrl}
-              onChange={(e) => setEditPhotoUrl(e.target.value)}
-              className="w-14 bg-[#111111] border border-white/10 rounded px-1 py-0.5 text-[6.5px] text-[#F5F5F5] outline-none focus:border-[#FFB800]"
-              title="Profile Photo URL"
-            />
-          </div>
-        )}
-      </div>
-
-      {/* Identity Details */}
-      <div className="flex-1 min-w-0 space-y-2.5 pr-8">
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <span className="text-[8px] font-black text-[#B0B0B0] uppercase tracking-widest block mb-0.5">NICKNAME</span>
-            {isEditing ? (
-              <input 
-                type="text"
-                value={editNickname}
-                onChange={(e) => setEditNickname(e.target.value)}
-                className="w-full bg-[#111111] border border-white/10 rounded px-2 py-1 text-xs font-bold text-[#F5F5F5] outline-none focus:border-[#FFB800]"
-                required
-                title="Nickname"
-                placeholder="Nickname"
-              />
-            ) : (
-              <span className="text-sm font-black text-[#F5F5F5] truncate block leading-tight">{host.nickname || host.name}</span>
-            )}
-          </div>
-          <div>
-            <span className="text-[8px] font-black text-[#B0B0B0] uppercase tracking-widest block mb-0.5">POPPO ID</span>
-            <span className="text-sm font-black text-[#F5F5F5] truncate block leading-tight">{host.id}</span>
-          </div>
-        </div>
-
-        {isEditing ? (
-          <div className="grid grid-cols-2 gap-3 pt-2 border-t border-white/5 text-[10px] text-[#B0B0B0]">
-
-            <div className="space-y-1">
-              <label htmlFor="edit-role" className="text-[#B0B0B0] font-bold uppercase tracking-wider block">Role:</label>
-              <select
-                id="edit-role"
-                value={editRole}
-                onChange={(e) => setEditRole(e.target.value)}
-                className="w-full bg-[#111111] border border-white/10 rounded px-1.5 py-1 text-[11px] text-[#F5F5F5] outline-none focus:border-[#FFB800]"
-              >
-                {['Talent', 'Manager', 'Admin', 'Director', 'Agent'].map(r => (
-                  <option key={r} value={r} className="bg-[#1A1A1A] text-[#F5F5F5]">{r}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="space-y-1">
-              <label htmlFor="edit-sal" className="text-[#B0B0B0] font-bold uppercase tracking-wider block">Base Salary Category:</label>
-              <select
-                id="edit-sal"
-                value={editBaseSalaryCategory}
-                onChange={(e) => setEditBaseSalaryCategory(e.target.value)}
-                className="w-full bg-[#111111] border border-white/10 rounded px-1.5 py-1 text-[11px] text-[#F5F5F5] outline-none focus:border-[#FFB800]"
-              >
-                {BASE_SALARY_POLICIES.map(policy => (
-                  <option key={policy} value={policy} className="bg-[#1A1A1A] text-[#F5F5F5]">{policy}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="space-y-1">
-              <label htmlFor="edit-mgr" className="text-[#B0B0B0] font-bold uppercase tracking-wider block">Assigned Manager:</label>
-              <select
-                id="edit-mgr"
-                value={editManager}
-                onChange={(e) => setEditManager(e.target.value)}
-                className="w-full bg-[#111111] border border-white/10 rounded px-1.5 py-1 text-[11px] text-[#F5F5F5] outline-none focus:border-[#FFB800]"
-              >
-                {!managersList.some(m => m.name === editManager) && editManager && (
-                  <option value={editManager} className="bg-[#1A1A1A] text-[#F5F5F5]">{editManager}</option>
-                )}
-                {managersList.map(mgr => (
-                  <option key={mgr.id} value={mgr.name} className="bg-[#1A1A1A] text-[#F5F5F5]">{mgr.name}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="space-y-1">
-              <label htmlFor="edit-team" className="text-[#B0B0B0] font-bold uppercase tracking-wider block">Team / Anchor Group:</label>
-              <input
-                id="edit-team"
-                type="text"
-                value={editTeam}
-                onChange={(e) => setEditTeam(e.target.value)}
-                className="w-full bg-[#111111] border border-white/10 rounded px-1.5 py-1 text-[11px] text-[#F5F5F5] outline-none focus:border-[#FFB800]"
-              />
-            </div>
-
-            <div className="space-y-1">
-              <label htmlFor="edit-status" className="text-[#B0B0B0] font-bold uppercase tracking-wider block">Status:</label>
-              <select
-                id="edit-status"
-                value={editStatus}
-                onChange={(e) => setEditStatus(e.target.value)}
-                className="w-full bg-[#111111] border border-white/10 rounded px-1.5 py-1 text-[11px] text-[#F5F5F5] outline-none focus:border-[#FFB800]"
-              >
-                {['Active', 'Inconsistent', 'Released', 'Inactive'].map(s => (
-                  <option key={s} value={s} className="bg-[#1A1A1A] text-[#F5F5F5]">{s}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="space-y-1">
-              <label htmlFor="edit-tier" className="text-[#B0B0B0] font-bold uppercase tracking-wider block">Tier:</label>
-              <select
-                id="edit-tier"
-                value={editTier}
-                onChange={(e) => setEditTier(e.target.value)}
-                className="w-full bg-[#111111] border border-white/10 rounded px-1.5 py-1 text-[11px] text-[#F5F5F5] outline-none focus:border-[#FFB800]"
-              >
-                {['S', 'A', 'B', 'C', 'X'].map(t => (
-                  <option key={t} value={t} className="bg-[#1A1A1A] text-[#F5F5F5]">{t}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="space-y-1">
-              <label htmlFor="edit-lvl" className="text-[#B0B0B0] font-bold uppercase tracking-wider block">Level Snap:</label>
-              <input
-                id="edit-lvl"
-                type="number"
-                value={editLevel}
-                onChange={(e) => setEditLevel(parseInt(e.target.value) || 1)}
-                className="w-full bg-[#111111] border border-white/10 rounded px-1.5 py-1 text-[11px] text-[#F5F5F5] outline-none focus:border-[#FFB800]"
-              />
-            </div>
-          </div>
-        ) : (
-          <div className="space-y-1.5 pt-2 border-t border-white/5 text-[10px] text-[#B0B0B0]">
-            <div className="flex items-center gap-1.5">
-              <span className="text-[#B0B0B0] font-bold uppercase tracking-wider">Role:</span>
-              <span className="text-[#FFB800] font-semibold">{host.role === 'Talent' ? 'Star Host' : host.role}</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="text-[#B0B0B0] font-bold uppercase tracking-wider">Base Salary Category:</span>
-              <span className="text-[#F5F5F5] font-semibold">{host.base_salary_category || 'Regular Host'}</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="text-[#B0B0B0] font-bold uppercase tracking-wider">Assigned Manager:</span>
-              <span className="text-[#F5F5F5] font-semibold">{host.manager}</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="text-[#B0B0B0] font-bold uppercase tracking-wider">Team / Anchor Group:</span>
-              <span className="text-indigo-400 font-semibold">{host.team}</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="text-[#B0B0B0] font-bold uppercase tracking-wider">Status:</span>
-              <span className={cn("font-semibold", host.status === 'Active' ? "text-emerald-400" : "text-amber-400")}>{host.status}</span>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-
-  const renderBiographyCard = () => {
-    if (!host.description && !isEditing) return null;
-    return (
-      <div className="bg-[#1A1A1A] border border-white/5 rounded-2xl p-4 space-y-2 shadow-md">
-        <h4 className="text-[8px] font-black text-[#B0B0B0] uppercase tracking-widest leading-none">BIOGRAPHY</h4>
-        {isEditing ? (
-          <textarea
-            value={editDescription}
-            onChange={(e) => setEditDescription(e.target.value)}
-            placeholder="Introduce yourself to the agency..."
-            rows={3}
-            className="w-full bg-[#111111] border border-white/10 rounded-xl p-2 text-xs text-[#F5F5F5] resize-none focus:border-[#FFB800] focus:ring-1 focus:ring-[#FFB800] outline-none"
-          />
-        ) : (
-          <p className="text-xs text-[#B0B0B0] leading-relaxed italic">
-            "{host.description || 'No biography or talent assessment provided.'}"
-          </p>
-        )}
-      </div>
-    );
-  };
-
-  const renderPerformanceHistory = () => (
-    <div className="space-y-3 bg-[#1A1A1A]/50 border border-white/5 p-4 rounded-2xl">
-      <div className="flex items-center justify-between px-1">
-        <h4 className="text-[10px] font-black uppercase tracking-[0.15em] text-[#B0B0B0] font-outfit">Performance History (Section 1)</h4>
-        <span className="text-[8px] font-bold text-[#FFB800] border border-[#FFB800]/20 bg-[#FFB800]/5 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
-          Firestore Query: poppoId
-        </span>
-      </div>
-      <div className="overflow-x-auto">
-        <table className="w-full text-left border-collapse text-xs mt-2">
-          <thead>
-            <tr className="border-b border-white/5 text-[#B0B0B0] font-bold uppercase tracking-wider">
-              <th className="py-2 px-1">Period</th>
-              <th className="py-2 px-1">Level</th>
-              <th className="py-2 px-1">Live Duration</th>
-              <th className="py-2 px-1">Party Duration</th>
-              <th className="py-2 px-1 text-right">Points</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-white/5 text-slate-300">
-            {performanceReports.length > 0 ? (
-              performanceReports.map((r, i) => (
-                <tr key={i} className="hover:bg-white/2 transition-colors">
-                  <td className="py-2.5 px-1 capitalize">{r.periodType} ({r.month}/{r.year})</td>
-                  <td className="py-2.5 px-1">Lvl {r.level}</td>
-                  <td className="py-2.5 px-1">{(Number(r.liveDurationMinutes || 0) / 60).toFixed(1)} Hrs</td>
-                  <td className="py-2.5 px-1">{(Number(r.partyHostDurationMinutes || 0) / 60).toFixed(1)} Hrs</td>
-                  <td className="py-2.5 px-1 text-right font-mono text-emerald-400">
-                    {Number(r.earningsBreakdown?.totalEarningsOfPoints || 0).toLocaleString()}
-                  </td>
-                </tr>
-              ))
-            ) : (
-              <tr>
-                <td colSpan={5} className="py-8 text-center text-[#B0B0B0]/40 italic">No historical performance records found in database.</td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-
-  const renderEarningsTrend = () => {
-    if (!performanceReports || performanceReports.length === 0) return null;
-
-    // Filter to last 6 months and sort chronologically
-    const last6Months = [...performanceReports]
-      .filter((_, idx) => idx < 6)
-      .reverse();
-
-    const chartData = last6Months.map(report => ({
-      month: `${report.year}-${String(report.month).padStart(2, '0')}`,
-      earnings: Number(report.earningsBreakdown?.totalEarningsOfPoints || 0)
-    }));
-
-    if (chartData.length === 0) return null;
-
-    // Calculate 3-month average
-    const last3Data = chartData.slice(-3);
-    const threeMonthAvg = last3Data.length > 0
-      ? last3Data.reduce((sum, item) => sum + item.earnings, 0) / last3Data.length
-      : 0;
-
-    return (
-      <div className="space-y-4 bg-[#1A1A1A]/50 border border-white/5 p-5 rounded-2xl">
-        <div className="flex items-center justify-between px-1">
-          <h4 className="text-[10px] font-black uppercase tracking-[0.15em] text-[#B0B0B0] font-outfit">Earnings Trend (Last 6 Months)</h4>
-          <span className="text-[8px] font-bold text-emerald-400 border border-emerald-500/20 bg-emerald-500/5 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
-            3-Mo Avg: {formatNumber(Math.round(threeMonthAvg))}
-          </span>
-        </div>
-        
-        <div className="h-48 w-full mt-4">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={chartData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" vertical={false} />
-              <XAxis 
-                dataKey="month" 
-                tick={{ fontSize: 9, fill: '#B0B0B0', fontWeight: 'bold' }}
-                axisLine={{ stroke: '#ffffff20' }}
-                tickLine={false}
-              />
-              <YAxis 
-                tick={{ fontSize: 9, fill: '#B0B0B0', fontWeight: 'bold' }}
-                axisLine={false}
-                tickLine={false}
-                tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`}
-              />
-              <Tooltip 
-                contentStyle={{ backgroundColor: '#0A0A0A', borderColor: '#ffffff20', borderRadius: '12px', fontSize: '10px', fontWeight: 'bold' }}
-                itemStyle={{ color: '#F5F5F5' }}
-                labelStyle={{ color: '#FFB800', marginBottom: '4px' }}
-                formatter={(value: number) => [formatNumber(value), 'Points']}
-              />
-              {threeMonthAvg > 0 && (
-                <ReferenceLine 
-                  y={threeMonthAvg} 
-                  stroke="#D4AF37" 
-                  strokeDasharray="3 3" 
-                  opacity={0.5} 
-                  label={{ position: 'top', value: '3-Mo Avg', fill: '#D4AF37', fontSize: 8, fontWeight: 'bold', offset: 5 }}
-                />
-=======
-            <div className="w-full h-full flex items-center justify-center text-7xl text-[#A09E9A] font-black bg-gradient-to-br from-[#1A1A28] to-[#0D0D14]">
-=======
             <div className="w-full h-full flex items-center justify-center text-7xl text-[#A09E9A] font-black bg-gradient-to-br from-black/80 to-black">
->>>>>>> 2b42d3ae84c3e300e1faeb35e7009a759158d1e9
               {editNickname?.[0]?.toUpperCase() || host.name?.[0] || 'JD'}
             </div>
           )}
@@ -6233,7 +5825,6 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
               className={cn(
                 "border border-white/5 p-2.5 sm:p-4 rounded-2xl flex flex-col justify-between min-h-[85px] sm:min-h-[90px] transition-all duration-300 transform group-hover:translate-y-[-2px] shadow-lg",
                 cell.hoverBorder
->>>>>>> 1caeedfed0e8d150b835bb818f205219a88c9b93
               )}
             >
               <span className="text-[8px] sm:text-[9px] font-black text-[#A09E9A] uppercase tracking-widest leading-none">
