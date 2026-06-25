@@ -1,6 +1,6 @@
 import React from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
-import { Home, Trophy, Calendar, PlayCircle, ArrowLeft } from 'lucide-react';
+import { Home, Trophy, Calendar, PlayCircle, ArrowLeft, FileText } from 'lucide-react';
 import { cn } from '../lib/utils';
 import appLogo from '../logo.jpg';
 import { Storage } from '../lib/storage';
