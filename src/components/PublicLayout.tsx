@@ -9,7 +9,7 @@ export const PublicLayout = ({ children }: { children?: React.ReactNode }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const authState = Storage.getAuthState();
-  const isFooterPage = ['/', '/roster', '/calendar', '/poppo-live'].includes(location.pathname);
+  const isFooterPage = ['/', '/roster', '/calendar', '/poppo-live', '/blog'].includes(location.pathname);
   const isLoggedIn = authState && authState.level > 0;
 
   return (
@@ -73,6 +73,7 @@ export const PublicLayout = ({ children }: { children?: React.ReactNode }) => {
               { to: '/roster', label: 'Roster' },
               { to: '/calendar', label: 'Calendar' },
               { to: '/poppo-live', label: 'Poppo' },
+              { to: '/blog', label: 'Blog' },
             ].map(({ to, label }) => {
               const isActive = to === '/' ? location.pathname === '/' : location.pathname.startsWith(to);
               return (
@@ -142,6 +143,7 @@ export const PublicLayout = ({ children }: { children?: React.ReactNode }) => {
             { to: '/roster', icon: Trophy, label: 'Roster' },
             { to: '/calendar', icon: Calendar, label: 'Calendar' },
             { to: '/poppo-live', icon: PlayCircle, label: 'Poppo' },
+            { to: '/blog', icon: FileText, label: 'Blog' },
           ].map(({ to, icon: Icon, label }) => {
             const isActive = to === '/' ? location.pathname === '/' : location.pathname.startsWith(to);
             return (
