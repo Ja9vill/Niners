@@ -36,7 +36,7 @@ export const parseTimeStringToHourMin = (timeStr: string) => {
 
   // If no AM/PM specified, assume 24-hour format and validate bounds
   if (!isAM && !isPM) {
-    if (h > 23 || m > 59) return null; // Invalid 24-hour time
+    if (h < 0 || h > 23 || m < 0 || m > 59) return null; // Invalid 24-hour time
   } else {
     if (isPM && h < 12) h += 12;
     if (isAM && h === 12) h = 0;
