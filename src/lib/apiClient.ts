@@ -36,7 +36,7 @@ export async function apiFetch<T = unknown>(
     headers: mergedHeaders,
   });
 
-  const data = await response.json().catch(() => ({} as T));
+  const data: T = await response.json();
 
   return {
     ok: response.ok,
