@@ -1,0 +1,8 @@
+{
+  "name": "NINE Talent Management Dashboard",
+  "description": "A high-performance talent agency dashboard for POPPO Live management, featuring financial tracking, host analytics, roster management, and automated data processing.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

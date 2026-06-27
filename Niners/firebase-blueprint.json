@@ -1,0 +1,340 @@
+{
+  "entities": {
+    "Host": {
+      "title": "Host",
+      "description": "Talent/Host profile information",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "poppo_id": { "type": "string" },
+        "assigned_manager": { "type": "string" },
+        "tier_pay": { "type": "string" },
+        "team_anchor": { "type": "string" },
+        "name": { "type": "string" },
+        "nickname": { "type": "string" },
+        "role": { "type": "string" },
+        "team": { "type": "string" },
+        "manager": { "type": "string" },
+        "anchor_type": { "type": "string" },
+        "base_salary_category": { "type": "string" },
+        "status": { "type": "string" },
+        "level": { "type": "number" },
+        "tier": { "type": "string" },
+        "password": { "type": "string" },
+        "is_temp_password": { "type": "boolean" },
+        "photoUrl": { "type": "string" },
+        "description": { "type": "string" },
+        "bio": { "type": "string" },
+        "followers_count": { "type": "number" },
+        "reset_requested": { "type": "boolean" },
+        "isActive": { "type": "boolean" },
+        "social_links": {
+          "type": "object",
+          "properties": {
+            "fb": { "type": "string" },
+            "ig": { "type": "string" },
+            "tiktok": { "type": "string" },
+            "whatsapp": { "type": "string" }
+          }
+        },
+        "streaming_hours": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "from": { "type": "string" },
+              "to": { "type": "string" }
+            }
+          }
+        },
+        "googleUid": { "type": "string" },
+        "googleEmail": { "type": "string" },
+        "assignedManagerId": { "type": ["string", "null"] },
+        "assignedHosts": {
+          "type": ["array", "null"],
+          "items": { "type": "string" }
+        },
+        "created_at": { "type": "string" },
+        "updated_at": { "type": "string" }
+      },
+      "required": ["id", "name", "role"]
+    },
+    "Commission": {
+      "title": "Commission",
+      "description": "Monthly commission data from MasterSheet",
+      "type": "object",
+      "properties": {
+        "poppo_id": { "type": "string" },
+        "poppo_name": { "type": "string" },
+        "month": { "type": "string" },
+        "live_duration": { "type": "number" },
+        "live_earnings": { "type": "number" },
+        "video_duration": { "type": "number" },
+        "video_earnings": { "type": "number" },
+        "agentweb_commission_rate": { "type": "number" },
+        "agentweb_commission_earning": { "type": "number" },
+        "total_points": { "type": "number" },
+        "total_earnings": { "type": "number" },
+        "my_commission": { "type": "number" },
+        "private_chat": { "type": "number" },
+        "tips": { "type": "number" },
+        "platform_reward": { "type": "number" },
+        "other_earn": { "type": "number" },
+        "platform_hourly_salary": { "type": "number" },
+        "super_salary": { "type": "number" },
+        "super_rank": { "type": "number" },
+        "level": { "type": "number" }
+      },
+      "required": ["poppo_id", "month", "total_points"]
+    },
+    "PKRecord": {
+      "title": "PK Record",
+      "description": "Individual PK tournament performance",
+      "type": "object",
+      "properties": {
+        "poppo_id": { "type": "string" },
+        "start_date": { "type": "string" },
+        "end_date": { "type": "string" },
+        "win_percentage": { "type": "number" },
+        "pk_score": { "type": "number" },
+        "sessions": { "type": "number" },
+        "submitted_by": { "type": "string" },
+        "timestamp": { "type": "string" }
+      }
+    },
+    "Exposure": {
+      "title": "Exposure",
+      "description": "Visibility and event participation log",
+      "type": "object",
+      "properties": {
+        "poppo_id": { "type": "string" },
+        "event_type": { "type": "string" },
+        "event_date": { "type": "string" },
+        "description": { "type": "string" },
+        "submitted_by": { "type": "string" },
+        "timestamp": { "type": "string" }
+      }
+    },
+    "FanbaseHealth": {
+      "title": "Fanbase Health",
+      "description": "Engagement KPIs and group chat metrics",
+      "type": "object",
+      "properties": {
+        "hostId": { "type": "string" },
+        "subscribers": { "type": "number" },
+        "gcMembers": { "type": "number" },
+        "preStreamUpdate": { "type": "string" },
+        "postStreamUpdate": { "type": "string" },
+        "submittedBy": { "type": "string" },
+        "submittedAt": { "type": "string" }
+      }
+    },
+    "HostTask": {
+      "title": "Host Task",
+      "description": "Tasks assigned to hosts",
+      "type": "object",
+      "properties": {
+        "hostId": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "status": { "enum": ["To Do", "In Progress", "Completed"] },
+        "assignedBy": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "dueDate": { "type": "string" }
+      }
+    },
+    "PerformanceGoal": {
+      "title": "Performance Goal",
+      "description": "KPI targets for hosts",
+      "type": "object",
+      "properties": {
+        "hostId": { "type": "string" },
+        "type": { "enum": ["fanbase", "fanclub_gc", "hours", "pk", "song_requests"] },
+        "target": { "type": "number" },
+        "current": { "type": "number" },
+        "period": { "enum": ["Daily", "Weekly", "Monthly"] },
+        "deadline": { "type": "string" }
+      }
+    },
+    "CalendarEvent": {
+      "title": "Calendar Event",
+      "description": "Agency scheduled events",
+      "type": "object",
+      "properties": {
+        "poppo_id": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "date": { "type": "string" },
+        "time": { "type": "string" },
+        "created_by_name": { "type": "string" },
+        "created_by_role": { "type": "string" },
+        "visibility": { "enum": ["All", "Leadership", "Director Only"] },
+        "timestamp": { "type": "string" }
+      }
+    },
+    "PasswordResetRequest": {
+      "title": "Password Reset Request",
+      "description": "Requests from users who forgot their passwords",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "poppoId": { "type": "string" },
+        "hostName": { "type": "string" },
+        "status": { "enum": ["Pending", "Resolved"] },
+        "requestedAt": { "type": "string" },
+        "resolvedAt": { "type": "string" }
+      }
+    },
+    "DirectorNote": {
+      "title": "Director Note",
+      "description": "Manager and Director notes for talent management",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "hostId": { "type": "string" },
+        "type": { "enum": ["Note", "Task", "Feedback"] },
+        "content": { "type": "string" },
+        "createdAt": { "type": "string" }
+      }
+    },
+    "TopNinersEarningsSummary": {
+      "title": "Top Niners Earnings Summary",
+      "description": "Earnings performance summaries for top users",
+      "type": "object",
+      "properties": {
+        "summaryId": { "type": "string" },
+        "periodKey": { "type": "string" },
+        "month": { "type": "integer", "nullable": true },
+        "year": { "type": "integer", "nullable": true },
+        "poppoId": { "type": "string" },
+        "nickname": { "type": "string" },
+        "position": { "type": "string" },
+        "totalEarningsPoints": { "type": "integer" },
+        "rank": { "type": "integer" },
+        "isPublished": { "type": "boolean" },
+        "profilePhotoUrl": { "type": "string" }
+      },
+      "required": ["summaryId", "periodKey", "poppoId", "totalEarningsPoints", "rank"]
+    },
+    "EventsCalendarPublic": {
+      "title": "Public Events Calendar",
+      "description": "Public agency calendar events",
+      "type": "object",
+      "properties": {
+        "eventId": { "type": "string" },
+        "eventTitle": { "type": "string" },
+        "eventDate": { "type": "string" },
+        "eventDay": { "type": "integer" },
+        "eventMonth": { "type": "integer" },
+        "eventYear": { "type": "integer" },
+        "eventStartTime": { "type": "string" },
+        "eventEndTime": { "type": "string" },
+        "locationOrPlatform": { "type": "string" },
+        "isPublished": { "type": "boolean" }
+      },
+      "required": ["eventId", "eventTitle", "eventDate", "isPublished"]
+    },
+    "ReportingSubmission": {
+      "title": "Reporting Submission",
+      "description": "Performance report submissions and payloads",
+      "type": "object",
+      "properties": {
+        "submissionId": { "type": "string" },
+        "reportType": { "enum": ["random_pk", "fanbase", "live_data_last_week", "live_data_last_month"] },
+        "submittedByUserId": { "type": "string" },
+        "status": { "enum": ["draft", "submitted"] },
+        "dataPayload": {
+          "type": "object",
+          "properties": {
+            "weekStartDate": { "type": "string" },
+            "weekEndDate": { "type": "string" },
+            "poppoId": { "type": "string" },
+            "nickname": { "type": "string" },
+            "pkScore": { "type": "integer" },
+            "pkWinPercentage": { "type": "number" },
+            "fanclubSubscribers": { "type": "integer" },
+            "fanclubGcMembers": { "type": "integer" },
+            "totalDuration": { "type": "number" },
+            "totalEarnings": { "type": "number" },
+            "totalPoints": { "type": "integer" },
+            "3mosEarnings": { "type": "number" }
+          },
+          "required": ["poppoId", "nickname"]
+        }
+      },
+      "required": ["submissionId", "reportType", "submittedByUserId", "status", "dataPayload"]
+    },
+    "Task": {
+      "title": "Task",
+      "description": "Tasks assigned to users or related to a Poppo host",
+      "type": "object",
+      "properties": {
+        "taskId": { "type": "string" },
+        "assignedToUserId": { "type": "string" },
+        "relatedPoppoId": { "type": "string" },
+        "taskType": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "status": { "enum": ["Assigned", "In Progress", "Completed"] },
+        "dueDate": { "type": "string" }
+      },
+      "required": ["taskId", "assignedToUserId", "relatedPoppoId", "status", "title"]
+    },
+    "User": {
+      "title": "User",
+      "description": "Core User Profile in Niners agency",
+      "type": "object",
+      "properties": {
+        "poppoId": { "type": "string" },
+        "nickname": { "type": "string" },
+        "role": { "type": "string" },
+        "level": { "type": "integer" },
+        "status": { "type": "string" },
+        "password_hash": { "type": "string" },
+        "is_first_login": { "type": "boolean" },
+        "is_temp_password": { "type": "boolean" },
+        "assignedManagerId": { "type": ["string", "null"] },
+        "assignedHosts": {
+          "type": ["array", "null"],
+          "items": { "type": "string" }
+        },
+        "createdAt": { "type": "string" },
+        "passwordSetAt": { "type": ["string", "null"] },
+        "lastLoginAt": { "type": ["string", "null"] },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["poppoId", "nickname", "role"]
+    },
+    "ActivityAuditLog": {
+      "title": "Activity Audit Log",
+      "description": "System audit logs for user and profile actions",
+      "type": "object",
+      "properties": {
+        "logId": { "type": "string" },
+        "timestamp": { "type": "string" },
+        "actorUserId": { "type": "string" },
+        "actionType": { "type": "string" },
+        "beforeValue": { "type": "string" },
+        "afterValue": { "type": "string" }
+      },
+      "required": ["logId", "timestamp", "actorUserId", "actionType"]
+    }
+  },
+  "firestore": {
+    "users": { "schema": "User", "description": "Master user collection" },
+    "host": { "schema": "Host", "description": "Global talent roster" },
+    "commissions": { "schema": "Commission", "description": "Monthly financials" },
+    "pk_records": { "schema": "PKRecord", "description": "PK performance history" },
+    "exposures": { "schema": "Exposure", "description": "Visibility logs" },
+    "fanbase_health": { "schema": "FanbaseHealth", "description": "Engagement history" },
+    "goals": { "schema": "PerformanceGoal", "description": "Set performance targets" },
+    "calendar": { "schema": "CalendarEvent", "description": "Scheduled activities" },
+    "reset_requests": { "schema": "PasswordResetRequest", "description": "Password reset queue" },
+    "notes": { "schema": "DirectorNote", "description": "Talent management logs" },
+    "top_niners_earnings_summary": { "schema": "TopNinersEarningsSummary", "description": "Top users earnings summary" },
+    "events_calendar_public": { "schema": "EventsCalendarPublic", "description": "Public events calendar" },
+    "reporting_submissions": { "schema": "ReportingSubmission", "description": "Report submissions" },
+    "tasks": { "schema": "Task", "description": "Assigned tasks" },
+    "activity_audit_logs": { "schema": "ActivityAuditLog", "description": "Activity audit logs" }
+  }
+}

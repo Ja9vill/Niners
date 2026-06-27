@@ -1,0 +1,205 @@
+@import "tailwindcss";
+
+/* =========================================
+   NINE TALENT MANAGEMENT — DESIGN SYSTEM
+   Premium Dark Theme with Gold Accents
+   ========================================= */
+
+/* noinspection CssUnknownAtRule */
+@theme {
+  /* Brand gold palette */
+  --color-gold-50:  #FFF8E1;
+  --color-gold-100: #FFECB3;
+  --color-gold-200: #F5D87E;
+  --color-gold-300: #E8C44A;
+  --color-gold-400: #D4AF37;   /* primary brand gold */
+  --color-gold-500: #B8960C;
+  --color-gold-600: #9A7B0A;
+
+  /* Surface palette */
+  --color-surface-0:  #08080F;  /* deepest */
+  --color-surface-1:  #0D0D14;  /* body bg */
+  --color-surface-2:  #13131E;  /* sidebar / header */
+  --color-surface-3:  #1A1A28;  /* cards */
+  --color-surface-4:  #222235;  /* elevated cards */
+  --color-surface-5:  #2A2A40;  /* hover states */
+
+  /* Text palette */
+  --color-text-primary:   #F0EFE8;  /* warm off-white */
+  --color-text-secondary: #A09E9A;  /* muted */
+  --color-text-muted:     #5A5865;  /* very muted */
+
+  /* Semantic */
+  --color-success: #22C55E;
+  --color-error:   #EF4444;
+  --color-warning: #F59E0B;
+  --color-info:    #60A5FA;
+
+  /* Override tailwind defaults for brand consistency */
+  --color-indigo-500: #D4AF37;
+  --color-indigo-400: #E8C44A;
+  --color-indigo-600: #B8960C;
+}
+
+/* ---- Base ---- */
+:root {
+  color-scheme: dark;
+}
+
+html, body, #root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  background-color: #0D0D14;
+  background-image:
+    radial-gradient(ellipse at 10% 0%,   rgba(212, 175, 55, 0.07) 0%, transparent 50%),
+    radial-gradient(ellipse at 90% 100%, rgba(212, 175, 55, 0.04) 0%, transparent 50%);
+  background-attachment: fixed;
+  color: #F0EFE8;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ---- Component Classes ---- */
+@layer components {
+
+  /* Cards */
+  .glass-card {
+    background: #1A1A28;
+    border: 1px solid rgba(212, 175, 55, 0.10);
+    border-radius: 1rem;
+    padding: 1.5rem;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.35);
+  }
+
+  .glass {
+    background: rgba(26, 26, 40, 0.85);
+    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(212, 175, 55, 0.10);
+  }
+
+  /* Inputs */
+  .glass-input {
+    background: #222235;
+    border: 1px solid rgba(212, 175, 55, 0.15);
+    border-radius: 0.75rem;
+    padding: 0.75rem 1rem;
+    color: #F0EFE8;
+    transition: all 0.2s;
+  }
+  .glass-input::placeholder { color: #5A5865; }
+  .glass-input:focus {
+    outline: none;
+    border-color: rgba(212, 175, 55, 0.5);
+    box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.08);
+  }
+
+  /* Gold accent button */
+  .btn-gold {
+    background: linear-gradient(135deg, #D4AF37, #B8960C);
+    color: #0D0D14;
+    font-weight: 700;
+    border-radius: 0.625rem;
+    padding: 0.5rem 1.25rem;
+    font-size: 0.75rem;
+    transition: all 0.2s;
+    box-shadow: 0 2px 12px rgba(212,175,55,0.25);
+  }
+  .btn-gold:hover {
+    background: linear-gradient(135deg, #E8C44A, #D4AF37);
+    box-shadow: 0 4px 20px rgba(212,175,55,0.35);
+    transform: translateY(-1px);
+  }
+
+  /* Nav item */
+  .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.625rem 0.75rem;
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    width: 100%;
+    text-align: left;
+    cursor: pointer;
+    transition: all 0.15s;
+    color: #A09E9A;
+  }
+  .nav-item:hover {
+    background: rgba(212, 175, 55, 0.08);
+    color: #F0EFE8;
+  }
+  .nav-item.active {
+    background: rgba(212, 175, 55, 0.12);
+    color: #D4AF37;
+  }
+
+  /* Section label */
+  .nav-section-label {
+    font-size: 0.625rem;
+    font-weight: 800;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: #5A5865;
+    padding: 0.5rem 0.75rem 0.25rem;
+  }
+
+  /* App shell utilities (replaces inline styles in App.tsx) */
+  .app-bg {
+    background: #0D0D14;
+  }
+  .app-header {
+    background: #13131E;
+    border-color: rgba(212, 175, 55, 0.12);
+  }
+  .app-sidebar {
+    background: #13131E;
+    border-color: rgba(212, 175, 55, 0.10);
+  }
+  .app-dropdown {
+    background: #1A1A28;
+    border-color: rgba(212, 175, 55, 0.15);
+  }
+  .app-divider-border {
+    border-color: rgba(212, 175, 55, 0.10);
+  }
+  .app-logo-border {
+    border-color: rgba(212, 175, 55, 0.15);
+  }
+  .app-notif-header-border {
+    border-color: rgba(212, 175, 55, 0.10);
+  }
+  .app-notif-border {
+    border-color: rgba(255, 255, 255, 0.04);
+  }
+  .app-avatar {
+    background: rgba(212, 175, 55, 0.10);
+    border-color: rgba(212, 175, 55, 0.25);
+  }
+  .app-loader-spinner {
+    border-color: rgba(212, 175, 55, 0.2);
+    border-top-color: #D4AF37;
+  }
+}
+
+/* ---- Scrollbar ---- */
+.custom-scrollbar::-webkit-scrollbar { width: 4px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(212, 175, 55, 0.2);
+  border-radius: 999px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(212, 175, 55, 0.4);
+}
+
+/* ---- Mobile safe-area padding ---- */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  .mobile-safe-bottom {
+    padding-bottom: calc(env(safe-area-inset-bottom) + 4rem);
+  }
+}
