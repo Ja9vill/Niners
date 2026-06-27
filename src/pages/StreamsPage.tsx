@@ -300,9 +300,9 @@ export const StreamsPage = () => {
   const [submitError, setSubmitError] = useState('');
 
   const reporterBase = {
-    reporterID: authState.poppo_id,
-    reporterName: authState.nickname || authState.name || '',
-    reporterRole: authState.role || 'Host',
+    reporter_id: authState.poppo_id,
+    reporter_name: authState.nickname || authState.name || '',
+    reporter_role: authState.role || 'Host',
     hostID: selectedHostId,
     hostNickname: selectedHostName,
     timestamp: new Date().toISOString()
@@ -651,7 +651,12 @@ export const StreamsPage = () => {
         gc_activity_count_host: isElevatedStaff ? (parseFloat(fanbaseFormData.gc_activity_count_host) || 0) : 0,
         gc_activity_count_fans: isElevatedStaff ? (parseFloat(fanbaseFormData.gc_activity_count_fans) || 0) : 0,
         notes: fanbaseFormData.notes,
-        submittedAt: new Date().toISOString()
+        submittedAt: new Date().toISOString(),
+        // Legacy camelCase fields kept for backward compatibility (useAnalytics.ts, HostProfileView.tsx)
+        reporterId: authState.poppo_id || "Unknown",
+        poppoId: selectedHostId,
+        currentFollowers: parseFloat(fanbaseFormData.total_followers) || 0,
+        fanclubGcMembers: parseFloat(fanbaseFormData.fanclub_gc_members) || 0,
       };
       await FirebaseService.submitFanbaseReport(selectedHostId, fanbaseFormData.from_date, fanbaseFormData.to_date, reportData);
       await FirebaseService.logSystemActivity(`Submitted fanbase report for Host: ${selectedHostName}`, 'Info');
