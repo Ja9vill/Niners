@@ -303,6 +303,9 @@ export const StreamsPage = () => {
     reporter_id: authState.poppo_id,
     reporter_name: authState.nickname || authState.name || '',
     reporter_role: authState.role || 'Host',
+    reporterID: authState.poppo_id,
+    reporterName: authState.nickname || authState.name || '',
+    reporterRole: authState.role || 'Host',
     hostID: selectedHostId,
     hostNickname: selectedHostName,
     timestamp: new Date().toISOString()
@@ -508,7 +511,7 @@ export const StreamsPage = () => {
     try {
       const q = query(
         collection(db, 'stream_reports'),
-        where('reporter_id', '==', authState.poppo_id),
+        where('reporterID', '==', authState.poppo_id),
         where('type', '==', type),
         orderBy('timestamp', 'desc')
       );
@@ -559,21 +562,21 @@ export const StreamsPage = () => {
 
       const streamSnap = await getDocs(query(
         collection(db, 'stream_reports'),
-        where('reporter_id', '==', authState.poppo_id),
+        where('reporterID', '==', authState.poppo_id),
         orderBy('timestamp', 'desc')
       ));
       streamSnap.docs.forEach(d => results.push({ id: d.id, ...d.data(), _collection: 'stream_reports' }));
 
       const pkSnap = await getDocs(query(
         collection(db, 'pk_reports'),
-        where('reporter_id', '==', authState.poppo_id),
+        where('reporterID', '==', authState.poppo_id),
         orderBy('timestamp', 'desc')
       ));
       pkSnap.docs.forEach(d => results.push({ id: d.id, ...d.data(), _collection: 'pk_reports', type: 'rpk' }));
 
       const fbSnap = await getDocs(query(
         collection(db, 'fanbase_reports'),
-        where('reporter_id', '==', authState.poppo_id),
+        where('reporterID', '==', authState.poppo_id),
         orderBy('timestamp', 'desc')
       ));
       fbSnap.docs.forEach(d => results.push({ id: d.id, ...d.data(), _collection: 'fanbase_reports', type: 'fanbase' }));
@@ -652,11 +655,18 @@ export const StreamsPage = () => {
         gc_activity_count_fans: isElevatedStaff ? (parseFloat(fanbaseFormData.gc_activity_count_fans) || 0) : 0,
         notes: fanbaseFormData.notes,
         submittedAt: new Date().toISOString(),
-        // Legacy camelCase fields kept for backward compatibility (useAnalytics.ts, HostProfileView.tsx)
+        // Legacy camelCase fields for backward compatibility (useAnalytics.ts, HostProfileView.tsx)
         reporterId: authState.poppo_id || "Unknown",
+        reporterName: authState.name || authState.nickname || "Unknown",
+        reporterRole: authState.role || "Unknown",
         poppoId: selectedHostId,
         currentFollowers: parseFloat(fanbaseFormData.total_followers) || 0,
+        fanclubSubscribers: parseFloat(fanbaseFormData.fanclub_subscribers) || 0,
         fanclubGcMembers: parseFloat(fanbaseFormData.fanclub_gc_members) || 0,
+        gcUpdatesHost: isElevatedStaff ? (parseFloat(fanbaseFormData.gc_activity_count_host) || 0) : 0,
+        gcUpdatesFans: isElevatedStaff ? (parseFloat(fanbaseFormData.gc_activity_count_fans) || 0) : 0,
+        fromDate: fanbaseFormData.from_date,
+        toDate: fanbaseFormData.to_date,
       };
       await FirebaseService.submitFanbaseReport(selectedHostId, fanbaseFormData.from_date, fanbaseFormData.to_date, reportData);
       await FirebaseService.logSystemActivity(`Submitted fanbase report for Host: ${selectedHostName}`, 'Info');
@@ -1430,7 +1440,7 @@ const HistoryCard = ({ report, canModify, onEdit, onDelete, editingId, editForm,
       {isEditing ? (
         <div className="space-y-2">
           <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-            {Object.entries(editForm || {}).filter(([k]) => !['id', 'reporterID', 'reporterName', 'reporterRole', 'hostID', 'hostNickname', 'timestamp', 'type'].includes(k)).map(([key, val]) => (
+            {Object.entries(editForm || {}).filter(([k]) => !['id', 'reporterID', 'reporterName', 'reporterRole', 'reporter_id', 'reporter_name', 'reporter_role', 'hostID', 'hostNickname', 'timestamp', 'type'].includes(k)).map(([key, val]) => (
               <div key={key} className="space-y-0.5">
                 <label className="text-[7px] text-white/40 font-black uppercase tracking-widest">{key.replace(/_/g, ' ')}</label>
                 <input type="text" value={String(val || '')} onChange={(e) => setEditForm({ ...editForm, [key]: e.target.value })}
