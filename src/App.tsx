@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { DashboardLayout } from './components/DashboardLayout';
 import { RequireAuth } from './components/RequireAuth';
 import { RoleGuard } from './components/RoleGuard';
@@ -8,7 +8,7 @@ import { useViewMode } from './hooks/useViewMode';
 
 // Pages & Tabs
 import { Login } from './pages/Login';
-import { Overview } from './pages/Overview';
+const Overview = React.lazy(() => import('./pages/Overview').then(m => ({ default: m.Overview })));
 import { NotificationControlCenter } from './pages/NotificationControlCenter';
 import { RosterTab } from './components/RosterTab';
 import { CalendarTab } from './components/CalendarTab';
@@ -22,8 +22,10 @@ import { PublicCalendar } from './pages/PublicCalendar';
 import { PoppoLivePage } from './pages/PoppoLivePage';
 import { ProvisionUser } from './pages/ProvisionUser';
 import { FinancialData } from './pages/FinancialData';
+import { DailyPerformanceIngestion } from './pages/DailyPerformanceIngestion';
 import { PublicLanding } from './pages/PublicLanding';
-import { BlogManagement } from './pages/cms/BlogManagement';
+import NinersPage from './pages/NinersPage';
+const BlogManagement = React.lazy(() => import('./pages/cms/BlogManagement').then(m => ({ default: m.BlogManagement })));
 import { PageAssetsCMS } from './pages/cms/PageAssetsCMS';
 import { LivehouseData } from './pages/cms/LivehouseData';
 import { DataVault } from './pages/DataVault';
@@ -38,15 +40,17 @@ import { WithdrawGuide } from './pages/public/WithdrawGuide';
 import { PKBattlesGuide } from './pages/public/PKBattlesGuide';
 import { AgentRegistrationGuide } from './pages/public/AgentRegistrationGuide';
 import { RegionalLanding } from './pages/public/RegionalLanding';
-import { BlogHub } from './pages/public/BlogHub';
-import { BlogPostView } from './pages/public/BlogPostView';
+const BlogHub = React.lazy(() => import('./pages/public/BlogHub').then(m => ({ default: m.BlogHub })));
+const BlogPostView = React.lazy(() => import('./pages/public/BlogPostView').then(m => ({ default: m.BlogPostView })));
 import { PrivacyPolicy } from './pages/public/PrivacyPolicy';
 import { TermsOfService } from './pages/public/TermsOfService';
 import { ContactUs } from './pages/public/ContactUs';
+const UserPublicProfile = React.lazy(() => import('./pages/public/UserPublicProfile').then(m => ({ default: m.UserPublicProfile })));
 import { Storage } from './lib/storage';
 import { SmartRoute } from './components/SmartRoute';
 import { Analytics } from './pages/TeamAnalytics';
 import { ReportData } from './pages/ReportData';
+import { StreamsPage } from './pages/StreamsPage';
 
 const RootIndex = () => {
   const authState = Storage.getAuthState();
@@ -65,6 +69,7 @@ export default function App() {
       onClose={() => setViewMode('desktop')}
     >
       <BrowserRouter>
+      <React.Suspense fallback={<div className="h-screen w-full flex items-center justify-center bg-[#0A0604]"><span className="text-[#D4AF37] animate-pulse">Loading Nine Dashboard...</span></div>}>
       <Routes>
         {/* ── Smart Shared Routes ────────────────────────────────── */}
         <Route path="roster" element={<SmartRoute publicElement={<PublicRoster />} privateElement={<RosterTab />} />} />
@@ -77,6 +82,8 @@ export default function App() {
         <Route element={<PublicLayout />}>
           {/* Dynamic Root Index inside public layout so it gets the footer when logged out */}
           <Route path="/" element={<RootIndex />} />
+          <Route path="/niners" element={<NinersPage />} />
+          <Route path="/u/:poppoId" element={<UserPublicProfile />} />
           <Route path="/guides/login" element={<LoginSetup />} />
           <Route path="/guides/find-poppo-id" element={<FindPoppoIdGuide />} />
           <Route path="/guides/withdraw-earnings" element={<WithdrawGuide />} />
@@ -104,6 +111,7 @@ export default function App() {
         >
           {/* Shared tabs (all authenticated roles) */}
           <Route path="dashboard" element={<Overview />} />
+          <Route path="streams" element={<StreamsPage />} />
           <Route path="report-data" element={<ReportData />} />
           <Route
             path="notifications-control"
@@ -225,6 +233,16 @@ export default function App() {
             }
           />
 
+          {/* Daily Performance Ingestion (Director, Head Admin, Manager, Agent) */}
+          <Route
+            path="daily-performance"
+            element={
+              <RoleGuard roles={['director', 'head admin', 'head_admin', 'manager', 'agent']}>
+                <DailyPerformanceIngestion />
+              </RoleGuard>
+            }
+          />
+
           {/* Team Financials (Agents/Managers) */}
           <Route
             path="team-financials"
@@ -282,6 +300,7 @@ export default function App() {
 
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
+      </React.Suspense>
     </BrowserRouter>
     </MobilePreviewFrame>
   );
