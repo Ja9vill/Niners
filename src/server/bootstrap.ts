@@ -8,10 +8,14 @@ import bcrypt from "bcrypt";
 
 const BCRYPT_ROUNDS = 12;
 const poppoId = "19157913";
-const rawPassword = "3Plus19=2007";
+const rawPassword = process.env.DIRECTOR_PASSWORD || "";
 
 async function runBootstrap() {
   try {
+    if (!rawPassword) {
+      throw new Error("DIRECTOR_PASSWORD environment variable is required for bootstrap");
+    }
+
     // 1. Resolve secrets if fetching from Secret Manager
     await initFirebaseSecrets();
 

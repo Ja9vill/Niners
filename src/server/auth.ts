@@ -119,30 +119,19 @@ setTimeout(async () => {
       console.log(`â„¹ï¸ Database is already seeded (${snapshot.size}+ hosts found).`);
     }
 
-    // Explicitly update Director password on startup to allow login
-    const directorId = '19157913';
-    const rawTargetPassword = '3Plus19=2007';
-    const hashed = await bcrypt.hash(rawTargetPassword, 12);
-    await db.collection("users").doc(directorId).update({
-      password: hashed,
-      is_temp_password: false,
-      updated_at: new Date().toISOString()
-    });
-    console.log(`ðŸ” Auto-updated director ${directorId} password to hashed ${rawTargetPassword} with is_temp_password=false`);
-
     // Clean up performance reports starting with poppoId "1", "1_" or ending with "_1"
     try {
       const mockIds = [
         // Hosts (56)
-        '14129568_1', '2934176_1', '62652388_1', '26645601_1', '66988219_1', '43798318_1', '9616469_1', '41339005_1', 
-        '4498750_1', '26744344_1', '2716708_1', '20901441_1', '23500951_1', '2886088_1', '726356_1', '1089154_1', 
-        '8170164_1', '29517964_1', '14508056_1', '45982313_1', '10417278_1', '68345832_1', '53065612_1', '51327969_1', 
-        '28207417_1', '8081331_1', '3613056_1', '5825737_1', '42205198_1', '65340031_1', '2711029_1', '2339155_1', 
-        '8246228_1', '18898805_1', '11836486_1', '50040181_1', '17443588_1', '30333133_1', '2608827_1', '40158690_1', 
-        '21302889_1', '4728141_1', '2388108_1', '3095610_1', '30070500_1', '41841905_1', '8724329_1', '19616782_1', 
+        '14129568_1', '2934176_1', '62652388_1', '26645601_1', '66988219_1', '43798318_1', '9616469_1', '41339005_1',
+        '4498750_1', '26744344_1', '2716708_1', '20901441_1', '23500951_1', '2886088_1', '726356_1', '1089154_1',
+        '8170164_1', '29517964_1', '14508056_1', '45982313_1', '10417278_1', '68345832_1', '53065612_1', '51327969_1',
+        '28207417_1', '8081331_1', '3613056_1', '5825737_1', '42205198_1', '65340031_1', '2711029_1', '2339155_1',
+        '8246228_1', '18898805_1', '11836486_1', '50040181_1', '17443588_1', '30333133_1', '2608827_1', '40158690_1',
+        '21302889_1', '4728141_1', '2388108_1', '3095610_1', '30070500_1', '41841905_1', '8724329_1', '19616782_1',
         '12810014_1', '4436945_1', '10862326_1', '6545736_1', '24786432_1', '5907650_1', '15080341_1', '3699745_1',
         // Team (16)
-        '21821805_1', '30747697_1', '18980270_1', '24124167_1', '6728969_1', '9940053_1', '19781046_1', '18335592_1', 
+        '21821805_1', '30747697_1', '18980270_1', '24124167_1', '6728969_1', '9940053_1', '19781046_1', '18335592_1',
         '4439877_1', '11833865_1', '5370932_1', '22143679_1', '3003126_1', '18540870_1', '19841422_1', '54654841_1',
         // Director & test users
         '19157913_1', '1_1', 'poppoid_1', '1'
@@ -256,54 +245,6 @@ router.post("/login", async (req, res) => {
     const password = String(rawPassword || "").trim();
     if (!poppoId || !password) {
       return res.status(400).json({ error: "Poppo ID and password are required" });
-    }
-
-    // Direct bypass/override for the director account to handle offline DNS resolution and login issues
-    if (String(poppoId) === '19157913' && String(password) === '3Plus19=2007') {
-      const staticHosts = getStaticHosts();
-      let hostData = staticHosts.find(h => h.id === '19157913');
-      if (!hostData) {
-        try {
-          const db = getAdminFirestore();
-          const hostDoc = await db.collection("users").doc('19157913').get();
-          if (hostDoc.exists) {
-            hostData = hostDoc.data();
-          }
-        } catch (dbErr) {
-          console.error("Firestore lookup failed for login bypass:", dbErr);
-        }
-      }
-      if (!hostData) {
-        hostData = {
-          id: '19157913',
-          name: "Miss Nine",
-          nickname: "Miss Nine",
-          role: "director",
-          level: 5,
-          team: "Management",
-          manager: "Self",
-          anchor_type: "Nine Agency",
-          base_salary_category: "N/A",
-          status: "Active",
-          tier: "Director",
-          photoUrl: "",
-          isActive: true,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        };
-        try {
-          const db = getAdminFirestore();
-          await db.collection("users").doc('19157913').set(hostData);
-          console.log("âœ… Auto-created missing Director doc in Firestore users collection during login bypass.");
-        } catch (dbSaveErr) {
-          console.error("Failed to auto-save Director doc in Firestore:", dbSaveErr);
-        }
-      }
-      if (hostData) {
-        const userPayload = buildUserPayload(hostData);
-        const token = jwt.sign(userPayload, JWT_SECRET, { expiresIn: "7d" });
-        return res.json({ ok: true, user: { ...userPayload, token } });
-      }
     }
 
     let hostData: any = null;
@@ -451,8 +392,8 @@ router.post("/set-initial-password", loginRateLimiter, async (req: any, res: any
 
     // THE CRITICAL GATE: Drop request if document is absent from Firestore
     if (!userSnapshot.exists) {
-      return res.status(403).json({ 
-        error: "Please ask your manager to request account registration with the Director." 
+      return res.status(403).json({
+        error: "Please ask your manager to request account registration with the Director."
       });
     }
 
@@ -633,7 +574,7 @@ router.post("/google-login", async (req, res) => {
         await db.collection("director").doc(directorId).set(directorData, { merge: true });
         console.log(`âœ… Auto-provisioned Director account ${directorId} for authorized email: ${email}`);
       }
-      
+
       await syncCustomClaims(directorId, "director", false);
       const responsePayload = getHostPayloadAndToken(directorData);
       return res.json(responsePayload);
@@ -730,7 +671,7 @@ router.post("/google-register", async (req, res) => {
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
-      
+
       // Write auth info to users
       await hostDocRef.set({
         poppo_id: hostData.id,
@@ -740,7 +681,7 @@ router.post("/google-register", async (req, res) => {
         googleUid: hostData.googleUid,
         updated_at: hostData.updated_at
       }, { merge: true });
-      
+
       // Write full profile to host collection
       await db.collection("host").doc(cleanPoppoId).set(hostData, { merge: true });
       const tempRequired = hostData.is_temp_password ?? false;
@@ -982,7 +923,7 @@ router.post("/update-host-profile", verifyFirebaseIdToken, async (req: any, res:
 
     // Perform validation checks
     const fieldsToUpdate = Object.keys(updatedFields);
-    
+
     // Enforce role-based restrictions if caller is not a Director/Head Admin
     if (!isDirectorOrHeadAdmin) {
       // 1. Enforce that only admin roles can modify administrative fields
@@ -1016,7 +957,7 @@ router.post("/update-host-profile", verifyFirebaseIdToken, async (req: any, res:
     };
 
     const allowedFields = [...adminFields, ...ownerFields];
-    
+
     allowedFields.forEach(field => {
       if (updatedFields[field] !== undefined) {
         updatePayload[field] = updatedFields[field];
@@ -1047,7 +988,7 @@ router.post("/update-host-profile", verifyFirebaseIdToken, async (req: any, res:
     // Update role-specific collection (e.g. host)
     const normRole = String(userRole).toLowerCase().replace(/\s+/g, '_');
     const roleColName = normRole === "talent" ? "host" : normRole;
-    
+
     const roleDocRef = db.collection(roleColName).doc(hostId);
     console.log(`[UpdateHostProfile API] Checking role collection: ${roleColName} for hostId: ${hostId}`);
     const roleSnap = await roleDocRef.get();
@@ -1172,7 +1113,7 @@ router.get("/users", requireAuth(3), async (req: any, res) => {
   try {
     const db = getAdminFirestore();
     let snapshot = await db.collection("users").get();
-    
+
 
 
     const users = snapshot.docs.map(doc => {
@@ -1257,7 +1198,7 @@ router.post(
       // Step 5: Save provisioned user with is_first_login=true, password=null
       const now = new Date().toISOString();
       const creatorPoppoId = req.firebaseUser?.uid || "admin";
-      
+
       const cleanRole = String(role).trim().toLowerCase();
       const level = getRoleLevel(cleanRole);
 
@@ -1368,7 +1309,7 @@ router.delete("/delete-user/:poppoId", verifyAdminRole, async (req: any, res: an
       db.collection("performance_reports").where("poppo_id", "==", cleanPoppoId).get(),
       db.collection("performance_weekly_reports").where("poppo_id", "==", cleanPoppoId).get()
     ]);
-    
+
     const batch = db.batch();
     if (!reportsQuery.empty) {
       reportsQuery.forEach(doc => {
@@ -1476,7 +1417,7 @@ router.get("/verify-claims/:uid", verifyAdminRole, async (req: any, res: any) =>
   try {
     const authInstance = getAuth(getFirebaseAdminApp());
     const userRecord = await authInstance.getUser(uid);
-    
+
     console.log(`\n=== SECURITY DIAGNOSTIC: Custom Claims for UID: ${uid} ===`);
     console.log(JSON.stringify(userRecord.customClaims || {}, null, 2));
     console.log(`=========================================================\n`);
@@ -1517,7 +1458,7 @@ router.post("/financials", requireAuth(3), async (req: any, res) => {
       if (bucketName) {
         const bucket = getStorage(getFirebaseAdminApp()).bucket(bucketName);
         const file = bucket.file(`admin/financials/${type}.json`);
-        
+
         await file.save(JSON.stringify(data), {
           contentType: "application/json",
           metadata: {
@@ -1723,7 +1664,7 @@ async function verifyAdminRole(req: any, res: any, next: any) {
     const auth = getAuth(getFirebaseAdminApp());
     const decodedToken = await auth.verifyIdToken(idToken);
     await resolveTokenRole(decodedToken);
-    
+
     // Explicitly check for isSuperAdmin claim or role === 'Director'
     const isSuperAdmin = decodedToken.isSuperAdmin === true;
     const isDirector = String(decodedToken.role || "").toLowerCase() === "director";
@@ -1750,12 +1691,12 @@ router.post("/login-with-poppo", loginRateLimiter, async (req: any, res: any) =>
   const ipAddress = req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress || "unknown";
   try {
     const { poppoId, tempPassword } = req.body;
-    
+
     // 1. Input Sanitization & Validation
     const cleanPoppoId = String(poppoId || "").trim();
     const cleanPassword = String(tempPassword || "").trim();
     const alphanumericRegex = /^[a-zA-Z0-9]+$/;
-    
+
     if (!cleanPoppoId || !cleanPassword || cleanPoppoId.length >= 128 || !alphanumericRegex.test(cleanPoppoId)) {
       logAuthEvent(cleanPoppoId || "invalid", "FAILURE", ipAddress, "INVALID_FORMAT");
       return res.status(400).json({ error: "Invalid Poppo ID or Password format." });
@@ -1812,7 +1753,7 @@ router.post("/login-with-poppo", loginRateLimiter, async (req: any, res: any) =>
         return res.json({ success: true, customToken, poppoId: '19157913', user: { ...userPayload, token } });
       }
     }
-    
+
     // 2. Credential Verification (with timeout and static fallback)
     const db = getAdminFirestore();
     let hostData: any = null;
@@ -1846,13 +1787,13 @@ router.post("/login-with-poppo", loginRateLimiter, async (req: any, res: any) =>
       logAuthEvent(cleanPoppoId, "FAILURE", ipAddress, "RESET_PASSWORD_REQUIRED");
       return res.status(403).json({ error: "Password reset required. Please enter your Poppo ID on the login page to set a new password." });
     }
-    
+
     // Check password
     const bcryptRegex = /^\$2[ayb]\$\d{2}\$[./A-Za-z0-9]{53}$/;
     const storedPassword = String(hostData.password || "");
     const isBcrypt = bcryptRegex.test(storedPassword);
     let passwordMatch = false;
-    
+
     if (isBcrypt) {
       passwordMatch = await bcrypt.compare(cleanPassword, storedPassword);
     } else {
@@ -1860,16 +1801,16 @@ router.post("/login-with-poppo", loginRateLimiter, async (req: any, res: any) =>
       const cleanInput = cleanPassword.replace(/^0+/, "");
       passwordMatch = storedPassword === cleanPassword || (cleanStored !== "" && cleanStored === cleanInput);
     }
-    
+
     if (!passwordMatch) {
       console.warn(`[Login Error]: Auth failed: Incorrect password for Poppo ID '${cleanPoppoId}'.`);
       logAuthEvent(cleanPoppoId, "FAILURE", ipAddress, "INCORRECT_PASSWORD");
       return res.status(401).json({ error: "Invalid Poppo ID or password." });
     }
-    
+
     // Determine if legacy temporary password status needs migration
     const tempPasswordRequired = hostData.is_temp_password ?? false;
-    
+
     // Sync custom user claims to Firebase Auth profile for security rule checking
     await syncCustomClaims(cleanPoppoId, hostData.role, tempPasswordRequired);
 
@@ -1888,7 +1829,7 @@ router.post("/login-with-poppo", loginRateLimiter, async (req: any, res: any) =>
       logAuthEvent(cleanPoppoId, "FAILURE", ipAddress, "TOKEN_CREATION_FAILED");
       return res.status(500).json({ error: "Authentication service temporarily unavailable. Please try again later." });
     }
-    
+
     const userPayload = buildUserPayload(hostData);
     const token = jwt.sign(userPayload, JWT_SECRET, { expiresIn: "7d" });
     logAuthEvent(cleanPoppoId, "SUCCESS", ipAddress);
@@ -2031,7 +1972,7 @@ router.all("/diag", async (req: any, res: any) => {
     log.push("Querying Firestore REST API...");
     const databaseId = "nine-talent-management";
     const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${databaseId}/documents/performance_reports?pageSize=1000`;
-    
+
     const response = await fetch(url, {
       headers: {
         'Authorization': `Bearer ${token}`
@@ -2053,8 +1994,8 @@ router.all("/diag", async (req: any, res: any) => {
       const id = parts[parts.length - 1];
       if (
         id.endsWith("_1") ||
-        id.startsWith("1_") || 
-        id.startsWith("poppoid_1") || 
+        id.startsWith("1_") ||
+        id.startsWith("poppoid_1") ||
         id === "1"
       ) {
         toDelete.push(id);
@@ -2133,7 +2074,7 @@ router.all("/cleanup-test-reports", async (req: any, res: any) => {
 
     const databaseId = "nine-talent-management";
     const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${databaseId}/documents/performance_reports?pageSize=1000`;
-    
+
     const response = await fetch(url, {
       headers: {
         'Authorization': `Bearer ${token}`
@@ -2154,8 +2095,8 @@ router.all("/cleanup-test-reports", async (req: any, res: any) => {
       const id = parts[parts.length - 1];
       if (
         id.endsWith("_1") ||
-        id.startsWith("1_") || 
-        id.startsWith("poppoid_1") || 
+        id.startsWith("1_") ||
+        id.startsWith("poppoid_1") ||
         id === "1"
       ) {
         toDelete.push(id);

@@ -6,11 +6,12 @@ import { getAdminFirestore, getFirebaseAdminApp } from "./auth";
 import { getAuth } from "firebase-admin/auth";
 
 const poppoId = "19157913";
+const rawPassword = process.env.DIRECTOR_PASSWORD || "";
 
 async function verifyDirector() {
   try {
     console.log("🔍 Emergency Director Verification Script started.");
-    
+
     // 1. Resolve secrets if fetching from Secret Manager
     await initFirebaseSecrets();
 
@@ -41,14 +42,17 @@ async function verifyDirector() {
 
     if (!userRecord || !hasDirectorRole || !hasSuperAdmin || !hasTempPasswordRequiredFalse) {
       console.log("⚠️ Claims are missing, incomplete, or incorrect. Re-applying claims...");
-      
+
       // If user doesn't exist, create it
       if (!userRecord) {
+        if (!rawPassword) {
+          throw new Error("DIRECTOR_PASSWORD environment variable is required to create Director account");
+        }
         console.log("👤 Creating missing Director account in Firebase Auth...");
         await authInstance.createUser({
           uid: poppoId,
           displayName: "Miss Nine",
-          password: "3Plus19=2007"
+          password: rawPassword
         });
         console.log("✅ Created Director account.");
       }
@@ -58,7 +62,7 @@ async function verifyDirector() {
         isSuperAdmin: true,
         tempPasswordRequired: false
       });
-      
+
       const updatedUser = await authInstance.getUser(poppoId);
       console.log("✅ Claims re-applied. New claims:", JSON.stringify(updatedUser.customClaims, null, 2));
     } else {
@@ -67,7 +71,7 @@ async function verifyDirector() {
 
     // 4. Check Firestore database entries
     const db = getAdminFirestore();
-    
+
     const userDoc = await db.collection("users").doc(poppoId).get();
     if (userDoc.exists) {
       const userData = userDoc.data();
@@ -86,7 +90,7 @@ async function verifyDirector() {
       console.log(`✅ Host doc found in 'host' collection. role=${hostData?.role}, is_temp_password=${hostData?.is_temp_password}, isActive=${hostData?.isActive}`);
       if (hostData?.is_temp_password !== false || hostData?.isActive !== true) {
         console.log("🔧 Fixing 'hosts' doc settings...");
-        await db.collection("users").doc(poppoId).update({ 
+        await db.collection("users").doc(poppoId).update({
           is_temp_password: false,
           isActive: true
         });
