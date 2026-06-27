@@ -52,14 +52,16 @@ async function runInitialization() {
   const db = getFirestore(app, databaseId);
 
   // 1. Initial Users Seeding Data
+  // IMPORTANT: Passwords must be set via environment variables or a secure vault.
+  // These are placeholder values — replace before running in production.
   const seedUsers = [
-    { poppoId: "19157913", nickname: "Miss Nine", role: "Director", password: "3Plus19=2007" },
-    { poppoId: "21821805", nickname: "Miles", role: "Head Admin", password: "123456789M" },
-    { poppoId: "18335592", nickname: "Yoshi", role: "Manager", password: "123456789Y" },
-    { poppoId: "18540870", nickname: "Aimee", role: "Admin", password: "123456789hAi" },
-    { poppoId: "19841422", nickname: "Armae", role: "Admin", password: "123456789Ar" },
-    { poppoId: "11155826", nickname: "Nhia", role: "Agent", password: "123456789N" },
-    { poppoId: "29517964", nickname: "Jake", role: "Host", password: "123456789J" }
+    { poppoId: "19157913", nickname: "Miss Nine", role: "Director", password: process.env.DIRECTOR_PASSWORD || "CHANGE_ME_DIRECTOR" },
+    { poppoId: "21821805", nickname: "Miles", role: "Head Admin", password: process.env.HEADADMIN_PASSWORD || "CHANGE_ME_HEADADMIN" },
+    { poppoId: "18335592", nickname: "Yoshi", role: "Manager", password: process.env.MANAGER_PASSWORD || "CHANGE_ME_MANAGER" },
+    { poppoId: "18540870", nickname: "Aimee", role: "Admin", password: process.env.ADMIN1_PASSWORD || "CHANGE_ME_ADMIN1" },
+    { poppoId: "19841422", nickname: "Armae", role: "Admin", password: process.env.ADMIN2_PASSWORD || "CHANGE_ME_ADMIN2" },
+    { poppoId: "11155826", nickname: "Nhia", role: "Agent", password: process.env.AGENT_PASSWORD || "CHANGE_ME_AGENT" },
+    { poppoId: "29517964", nickname: "Jake", role: "Host", password: process.env.HOST_PASSWORD || "CHANGE_ME_HOST" }
   ];
 
   console.log("Seeding users collection...");

@@ -12,7 +12,10 @@ import { initFirebaseSecrets } from "./secrets";
 import { runAutoSyncLivehouseData } from "./cron";
 
 const router = Router();
-const JWT_SECRET = process.env.JWT_SECRET || "nine-dashboard-secret-key-12345";
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  throw new Error("FATAL: JWT_SECRET environment variable is not set.");
+}
 const BCRYPT_ROUNDS = 12;
 
 /**
@@ -239,7 +242,7 @@ function requireAuth(requiredLevel: number = 3) {
 router.post("/login", async (req, res) => {
   const rawPoppoId = req.body?.poppoId;
   const rawPassword = req.body?.password;
-  console.log(`âž¡ï¸ LOGIN ATTEMPT: poppoId="${rawPoppoId}", password="${rawPassword}"`);
+  console.log(`LOGIN ATTEMPT: poppoId="${rawPoppoId}"`);
   try {
     const poppoId = String(rawPoppoId || "").trim();
     const password = String(rawPassword || "").trim();
@@ -1944,7 +1947,7 @@ router.post("/change-password", verifyFirebaseIdToken, async (req: any, res: any
   }
 });
 
-router.all("/diag", async (req: any, res: any) => {
+router.all("/diag", requireAuth(5), async (req: any, res: any) => {
   const log: string[] = [];
   try {
     log.push("Using REST API for Firestore connection...");
@@ -2051,7 +2054,7 @@ router.all("/diag", async (req: any, res: any) => {
  * GET/POST /api/auth/cleanup-test-reports
  * Publicly accessible route to clean up test performance reports from Firestore database.
  */
-router.all("/cleanup-test-reports", async (req: any, res: any) => {
+router.all("/cleanup-test-reports", requireAuth(5), async (req: any, res: any) => {
   try {
     const projectId = process.env.FIREBASE_PROJECT_ID || "gen-lang-client-0222945352";
     const clientEmail = process.env.FIREBASE_CLIENT_EMAIL || process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;

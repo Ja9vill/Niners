@@ -31,7 +31,10 @@ const resolvedDirname = getDirname();
 
 dotenv.config();
 
-const JWT_SECRET = process.env.JWT_SECRET || "nine-dashboard-secret-key-12345";
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  throw new Error("FATAL: JWT_SECRET environment variable is not set. Server cannot start without a secure secret.");
+}
 
 /** Returns the first available TCP port starting from `start`. */
 function findFreePort(start: number): Promise<number> {
@@ -619,15 +622,13 @@ async function startServer() {
   app.get("/api/health", (req, res) => {
     res.json({
       status: "ok",
-      domain: req.headers.host,
-      forwardedHost: req.headers['x-forwarded-host'] || req.headers['x-original-host'] || null,
-      headers: req.headers
+      timestamp: new Date().toISOString()
     });
   });
 
   // Proxy image upload to Google Cloud Storage using service account credentials
   // This completely bypasses Firebase CORS & Storage Rules limitations
-  app.post("/api/upload-profile-photo", async (req, res) => {
+  app.post("/api/upload-profile-photo", verifyHeadAdminOrDirector, async (req, res) => {
     try {
       const { fileData, fileName, contentType } = req.body;
       if (!fileData || !fileName) {
@@ -1164,7 +1165,7 @@ Return ONLY the raw JSON object, no markdown blocks.`;
     }
   });
 
-  app.post("/api/notify", async (req, res) => {
+  app.post("/api/notify", verifyHeadAdminOrDirector, async (req, res) => {
     try {
       const { targetPoppoId, title, body } = req.body;
       if (!targetPoppoId || !title || !body) {
@@ -1350,7 +1351,7 @@ Return ONLY the raw JSON object, no markdown blocks.`;
   });
 
   // 3) POST /api/push/send
-  app.post("/api/push/send", async (req, res) => {
+  app.post("/api/push/send", verifyHeadAdminOrDirector, async (req, res) => {
     const { title, body, url, type } = req.body;
     
     if (!title || !body || !type) {
