@@ -31,7 +31,10 @@ const resolvedDirname = getDirname();
 
 dotenv.config();
 
-const JWT_SECRET = process.env.JWT_SECRET || "nine-dashboard-secret-key-12345";
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  throw new Error("FATAL: JWT_SECRET environment variable is not set. Server cannot start without a secure secret.");
+}
 
 /** Returns the first available TCP port starting from `start`. */
 function findFreePort(start: number): Promise<number> {
@@ -183,6 +186,22 @@ async function startServer() {
     }
     if (oldManagerId && oldManagerId !== newManagerId) {
       await updateManagerHostFieldsBackend(oldManagerId, null, hostId);
+    }
+  }
+
+  // Middleware to verify any authenticated user
+  function verifyAuthenticated(req: any, res: any, next: any) {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return res.status(401).json({ error: "Access Denied: Authorization required." });
+    }
+    const token = authHeader.split("Bearer ")[1];
+    try {
+      const decodedToken = jwt.verify(token, JWT_SECRET) as any;
+      req.user = decodedToken;
+      next();
+    } catch (error: any) {
+      return res.status(401).json({ error: "Access Denied: Invalid or expired token." });
     }
   }
 
@@ -619,15 +638,13 @@ async function startServer() {
   app.get("/api/health", (req, res) => {
     res.json({
       status: "ok",
-      domain: req.headers.host,
-      forwardedHost: req.headers['x-forwarded-host'] || req.headers['x-original-host'] || null,
-      headers: req.headers
+      timestamp: new Date().toISOString()
     });
   });
 
   // Proxy image upload to Google Cloud Storage using service account credentials
   // This completely bypasses Firebase CORS & Storage Rules limitations
-  app.post("/api/upload-profile-photo", async (req, res) => {
+  app.post("/api/upload-profile-photo", verifyHeadAdminOrDirector, async (req, res) => {
     try {
       const { fileData, fileName, contentType } = req.body;
       if (!fileData || !fileName) {
@@ -689,7 +706,7 @@ async function startServer() {
   // Register audit router AFTER specific routes so it doesn't intercept them
   app.use("/api", auditRouter);
 
-  app.post("/api/chat", async (req, res) => {
+  app.post("/api/chat", verifyAuthenticated, async (req, res) => {
     try {
       const { message } = req.body;
       const apiKey = process.env.GEMINI_API_KEY;
@@ -1164,7 +1181,7 @@ Return ONLY the raw JSON object, no markdown blocks.`;
     }
   });
 
-  app.post("/api/notify", async (req, res) => {
+  app.post("/api/notify", verifyHeadAdminOrDirector, async (req, res) => {
     try {
       const { targetPoppoId, title, body } = req.body;
       if (!targetPoppoId || !title || !body) {
@@ -1313,7 +1330,7 @@ Return ONLY the raw JSON object, no markdown blocks.`;
   });
 
   // 2) POST /api/push/subscribe
-  app.post("/api/push/subscribe", async (req, res) => {
+  app.post("/api/push/subscribe", verifyAuthenticated, async (req, res) => {
     const { subscription, poppo_id } = req.body;
     const subObj = subscription || req.body;
     const poppoId = poppo_id || null;
@@ -1350,7 +1367,7 @@ Return ONLY the raw JSON object, no markdown blocks.`;
   });
 
   // 3) POST /api/push/send
-  app.post("/api/push/send", async (req, res) => {
+  app.post("/api/push/send", verifyHeadAdminOrDirector, async (req, res) => {
     const { title, body, url, type } = req.body;
     
     if (!title || !body || !type) {

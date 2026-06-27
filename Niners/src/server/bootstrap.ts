@@ -8,7 +8,11 @@ import bcrypt from "bcrypt";
 
 const BCRYPT_ROUNDS = 12;
 const poppoId = "19157913";
-const rawPassword = "3Plus19=2007";
+const rawPassword = process.env.DIRECTOR_PASSWORD;
+if (!rawPassword) {
+  console.error("FATAL: DIRECTOR_PASSWORD environment variable is not set.");
+  process.exit(1);
+}
 
 async function runBootstrap() {
   try {
