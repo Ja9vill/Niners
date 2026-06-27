@@ -1879,7 +1879,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
                   <label className="text-[9px] font-black uppercase tracking-widest text-[#A09E9A]">Optional Action URL</label>
                   <input
                     type="text"
-                    placeholder="e.g. /dashboard or https://..."
+                    placeholder="e.g. /overview or https://..."
                     className="glass-input text-xs border-[#D4AF37]/20 focus:border-[#D4AF37]/50"
                     value={rosterPushUrl}
                     onChange={(e) => setRosterPushUrl(e.target.value)}
@@ -2258,7 +2258,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
       nickname: selectedImpersonationUser.nickname || selectedImpersonationUser.name,
       name: selectedImpersonationUser.name || selectedImpersonationUser.nickname,
     });
-    window.location.href = '/dashboard';
+    window.location.href = '/overview';
   };
 
   const renderImpersonationBlock = () => {

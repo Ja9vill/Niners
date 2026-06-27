@@ -9,7 +9,7 @@ export const PublicLayout = ({ children }: { children?: React.ReactNode }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const authState = Storage.getAuthState();
-  const isFooterPage = ['/', '/roster', '/calendar', '/poppo-live', '/blog'].includes(location.pathname);
+  const isFooterPage = ['/', '/roster', '/calendar', '/events', '/poppo-live', '/blog'].includes(location.pathname);
   const isLoggedIn = authState && authState.level > 0;
 
   return (
@@ -41,10 +41,10 @@ export const PublicLayout = ({ children }: { children?: React.ReactNode }) => {
             </Link>
           ) : (
             <Link 
-              to="/dashboard"
+              to="/overview"
               className="global-block-1 px-4 py-1.5 rounded-xl text-[#D4AF37] hover:text-[#D4AF37] hover:scale-105 text-[10px] font-bold uppercase tracking-widest transition-all"
             >
-              Dashboard
+              Overview
             </Link>
           )}
         </div>
@@ -71,7 +71,8 @@ export const PublicLayout = ({ children }: { children?: React.ReactNode }) => {
             {[
               { to: '/', label: 'Home' },
               { to: '/roster', label: 'Roster' },
-              { to: '/calendar', label: 'Calendar' },
+              { to: '/events', label: 'Events' },
+              { to: '/calendar', label: 'Events' },
               { to: '/poppo-live', label: 'Poppo' },
               { to: '/blog', label: 'Blog' },
             ].map(({ to, label }) => {
@@ -104,10 +105,10 @@ export const PublicLayout = ({ children }: { children?: React.ReactNode }) => {
             </Link>
           ) : (
             <Link 
-              to="/dashboard"
+              to="/overview"
               className="global-block-1 px-4 py-1.5 rounded-xl text-[#D4AF37] hover:text-[#D4AF37] hover:scale-105 text-[10px] font-bold uppercase tracking-widest transition-all"
             >
-              Dashboard
+              Overview
             </Link>
           )}
         </div>
@@ -141,7 +142,7 @@ export const PublicLayout = ({ children }: { children?: React.ReactNode }) => {
           {[
             { to: '/', icon: Home, label: 'Home' },
             { to: '/roster', icon: Trophy, label: 'Roster' },
-            { to: '/calendar', icon: Calendar, label: 'Calendar' },
+            { to: '/calendar', icon: Calendar, label: 'Events' },
             { to: '/poppo-live', icon: PlayCircle, label: 'Poppo' },
             { to: '/blog', icon: FileText, label: 'Blog' },
           ].map(({ to, icon: Icon, label }) => {

@@ -83,7 +83,7 @@ export default function ChangePassword() {
       
       // Delay navigation slightly so user sees success state
       setTimeout(() => {
-        navigate('/dashboard');
+        navigate('/overview');
       }, 2000);
     } catch (err: any) {
       console.error('[ChangePassword Page Error]:', err);

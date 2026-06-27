@@ -349,7 +349,7 @@ export default function App() {
   useEffect(() => {
     const handleNavigate = (e: Event) => {
       const path = (e as CustomEvent).detail?.path;
-      if (path === '/dashboard' || path === '/home') {
+      if (path === '/overview' || path === '/dashboard' || path === '/home') {
         handleMigrationSuccess();
       } else if (path === '/change-password') {
         setActiveTab('update-password');

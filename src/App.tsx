@@ -74,6 +74,7 @@ export default function App() {
         {/* ── Smart Shared Routes ────────────────────────────────── */}
         <Route path="roster" element={<SmartRoute publicElement={<PublicRoster />} privateElement={<RosterTab />} />} />
         <Route path="calendar" element={<SmartRoute publicElement={<PublicCalendar />} privateElement={<CalendarTab />} />} />
+        <Route path="events" element={<SmartRoute publicElement={<PublicCalendar />} privateElement={<CalendarTab />} />} />
         <Route path="poppo-live" element={<SmartRoute publicElement={<PoppoLivePage />} privateElement={<PoppoLivePage />} />} />
         <Route path="become-an-agent" element={<Navigate to="/poppo-live" replace />} />
         <Route path="leaderboards" element={<Navigate to="/roster" replace />} />
@@ -110,9 +111,11 @@ export default function App() {
           }
         >
           {/* Shared tabs (all authenticated roles) */}
-          <Route path="dashboard" element={<Overview />} />
+          <Route path="overview" element={<Overview />} />
           <Route path="streams" element={<StreamsPage />} />
           <Route path="report-data" element={<ReportData />} />
+          <Route path="dashboard" element={<Navigate to="/overview" replace />} />
+          <Route path="my-profile" element={<Navigate to="/profile" replace />} />
           <Route
             path="notifications-control"
             element={
@@ -124,7 +127,7 @@ export default function App() {
 
           {/* My Profile — accessible to hosts and admin/manager/agent/head admin roles */}
           <Route
-            path="my-profile"
+            path="profile"
             element={
               <RoleGuard roles={['host', 'admin', 'manager', 'agent', 'head admin', 'head_admin', 'director']}>
                 <HostProfileEditor />
@@ -298,7 +301,7 @@ export default function App() {
           />
         </Route>
 
-        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+        <Route path="*" element={<Navigate to="/overview" replace />} />
       </Routes>
       </React.Suspense>
     </BrowserRouter>

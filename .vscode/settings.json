@@ -30,5 +30,7 @@
   "github-actions.workflows.pinned.refresh.enabled": true,
   "vscode-edge-devtools.browserFlavor": "Default",
   "vscode-edge-devtools.showWorkers": true,
-  "vscode-edge-devtools.webhintInstallNotification": true
+  "vscode-edge-devtools.webhintInstallNotification": true,
+  "editor.formatOnPaste": true,
+  "githubIssues.alwaysPromptForNewIssueRepo": true
 }
