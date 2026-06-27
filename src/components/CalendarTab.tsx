@@ -16,7 +16,7 @@ import { LivehouseCalendar } from './LivehouseCalendar';
 import { LivehouseBookingModal } from './LivehouseBookingModal';
 import { CalendarHeaderGroup } from './CalendarHeaderGroup';
 import { DailyScheduleGroup } from './DailyScheduleGroup';
-import { formatDualTimestamps, getLocalTimezoneAbbreviation, formatLocalTime, formatLocalDate } from '../lib/timezoneUtils';
+import { formatLocalTime, getLocalTimezoneAbbreviation, parseTimeStringToHourMin } from '../lib/timezoneUtils';
 
 
 const TIMESLOT_BLOCKS = [
@@ -47,18 +47,6 @@ const TIMESLOT_BLOCKS = [
     ]
   }
 ];
-
-export const parseTimeStringToHourMin = (timeStr: string) => {
-  const match = timeStr.match(/(\d+)(?::(\d+))?\s*(AM|PM)?/i);
-  if (!match) return null;
-  let h = parseInt(match[1], 10);
-  let m = match[2] ? parseInt(match[2], 10) : 0;
-  const isPM = match[3] && match[3].toUpperCase() === 'PM';
-  const isAM = match[3] && match[3].toUpperCase() === 'AM';
-  if (isPM && h < 12) h += 12;
-  if ((isAM || (!isAM && !isPM && h === 12)) && h === 12) h = 0;
-  return { h, m };
-};
 
 export const getTargetDisplayDate = (event: CalendarEvent, mode: 'Manila' | 'Local'): string => {
   const rawDate = event.date || event.event_date || '';
@@ -1536,6 +1524,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
               allUsers={allUsers}
               attendanceRecords={attendanceRecords}
               onEventClick={handleSpotlightClick}
+              auth={auth}
             />
           </div>
         )}
@@ -1698,7 +1687,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                                 {(() => {
                                   const displayTime = selectedEvent.time;
                                   if (displayTime === 'TBD' || !displayTime) return displayTime;
-                                  return formatDualTimestamps(displayTime, selectedEvent.date);
+                                  return formatLocalTime(displayTime, selectedEvent.date);
                                 })()}
                               </span>
                             </div>

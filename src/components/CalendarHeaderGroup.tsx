@@ -1,8 +1,9 @@
-import React, { useState, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import { ChevronLeft, ChevronRight, Plus, Calendar as CalendarIcon } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { format, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay, startOfMonth, endOfMonth, addMonths, subMonths, isSameMonth } from 'date-fns';
 import { EVENT_COLORS } from '../lib/constants';
+import { isValidDateString } from '../lib/timezoneUtils';
 
 interface CalendarHeaderGroupProps {
   activeTab: 'AGENCY' | 'LIVEHOUSE';
@@ -40,6 +41,10 @@ export const CalendarHeaderGroup: React.FC<CalendarHeaderGroupProps> = ({
     const dayStr = format(day, 'yyyy-MM-dd');
     return events.filter(event => {
       const eventDate = event.date || event.event_date;
+      // Skip events with missing or invalid dates
+      if (!eventDate) return false;
+      // Validate date format and validity
+      if (!isValidDateString(eventDate)) return false;
       return eventDate === dayStr;
     });
   };
@@ -79,19 +84,19 @@ export const CalendarHeaderGroup: React.FC<CalendarHeaderGroupProps> = ({
       {/* Month Navigation with Add Event Button */}
       <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
         <div className="flex items-center gap-2 bg-[#14100c]/60 p-2 rounded-2xl border border-[#D4AF37]/10 backdrop-blur-md">
-          <button 
+          <button
             onClick={() => onDateChange(subMonths(currentDate, 1))}
             className="p-2 hover:bg-[#D4AF37]/20 rounded-xl transition-all text-[#D4AF37]"
             title="Previous Month"
           >
             <ChevronLeft size={20} />
           </button>
-          
+
           <h2 className="text-sm sm:text-base font-black text-transparent bg-clip-text bg-gradient-to-r from-[#FFF0B3] to-[#D4AF37] tracking-widest uppercase min-w-[140px] text-center">
             {format(currentDate, 'MMMM yyyy')}
           </h2>
-          
-          <button 
+
+          <button
             onClick={() => onDateChange(addMonths(currentDate, 1))}
             className="p-2 hover:bg-[#D4AF37]/20 rounded-xl transition-all text-[#D4AF37]"
             title="Next Month"
@@ -121,7 +126,7 @@ export const CalendarHeaderGroup: React.FC<CalendarHeaderGroupProps> = ({
 
       {/* Calendar Grid */}
       <div className="grid grid-cols-7 gap-1 sm:gap-2 mb-2">
-        {monthDays.map((day, idx) => {
+        {monthDays.map((day) => {
           const dayStr = format(day, 'yyyy-MM-dd');
           const dayNum = parseInt(dayStr.split('-')[2], 10);
           const isToday = isSameDay(day, new Date());
@@ -146,7 +151,7 @@ export const CalendarHeaderGroup: React.FC<CalendarHeaderGroupProps> = ({
 
           return (
             <button
-              key={idx}
+              key={dayStr}
               onClick={() => handleDateClick(day)}
               className={cn(
                 "aspect-square rounded-xl sm:rounded-2xl flex flex-col items-center justify-center border transition-all cursor-pointer relative group hover:border-[#D4AF37]/30",
@@ -162,11 +167,12 @@ export const CalendarHeaderGroup: React.FC<CalendarHeaderGroupProps> = ({
               {dayEvents.length > 0 && (
                 <div className="absolute bottom-1.5 flex gap-0.5">
                   {dayEvents.slice(0, 3).map((e, i) => {
-                    const isLivehouse = (e.type || e.type_of_event || '').toLowerCase().includes('livehouse');
-                    const config = isLivehouse 
+                    const eventType = e.type ?? e.type_of_event ?? '';
+                    const isLivehouse = eventType.toLowerCase().includes('livehouse');
+                    const config = isLivehouse
                       ? { gradient: 'from-[#A855F7] to-[#6366F1]' } // Purple for LIVEHOUSE
-                      : (EVENT_COLORS[e.type || ''] || { gradient: 'from-[#D4AF37] to-[#b8960c]' });
-                    return <div key={i} className={cn("w-1 h-1 sm:w-1.5 sm:h-1.5 rounded-full bg-gradient-to-br", config.gradient)} />
+                      : (EVENT_COLORS[eventType] || { gradient: 'from-[#D4AF37] to-[#b8960c]' });
+                    return <div key={`${dayStr}-${i}`} className={cn("w-1 h-1 sm:w-1.5 sm:h-1.5 rounded-full bg-gradient-to-br", config.gradient)} />
                   })}
                 </div>
               )}

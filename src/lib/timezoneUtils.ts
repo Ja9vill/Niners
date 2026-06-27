@@ -1,17 +1,44 @@
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 
 /**
- * Parse a time string (e.g., "9AM", "9:30AM", "9:30 AM") to hour and minute
+ * Validate if a date string in YYYY-MM-DD format is a valid date
+ */
+export const isValidDateString = (dateStr: string): boolean => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return false;
+  const date = parseISO(dateStr);
+  return !isNaN(date.getTime());
+};
+
+/**
+ * Parse a time string (e.g., "9AM", "9:30AM", "9:30 AM", "14:00", "14:30") to hour and minute
+ * Supports both 12-hour (AM/PM) and 24-hour formats
  */
 export const parseTimeStringToHourMin = (timeStr: string) => {
-  const match = timeStr.match(/(\d+)(?::(\d+))?\s*(AM|PM)?/i);
-  if (!match) return null;
-  let h = parseInt(match[1], 10);
-  let m = match[2] ? parseInt(match[2], 10) : 0;
-  const isPM = match[3] && match[3].toUpperCase() === 'PM';
-  const isAM = match[3] && match[3].toUpperCase() === 'AM';
-  if (isPM && h < 12) h += 12;
-  if ((isAM || (!isAM && !isPM && h === 12)) && h === 12) h = 0;
+  // Try 24-hour format first (e.g., "14:00", "14:30")
+  const match24h = timeStr.match(/^(\d{1,2}):(\d{2})$/);
+  if (match24h) {
+    const h = parseInt(match24h[1], 10);
+    const m = parseInt(match24h[2], 10);
+    if (h >= 0 && h <= 23 && m >= 0 && m <= 59) {
+      return { h, m };
+    }
+  }
+
+  // Try 12-hour format (e.g., "9AM", "9:30AM", "9:30 AM")
+  const match12h = timeStr.match(/(\d+)(?::(\d+))?\s*(AM|PM)?/i);
+  if (!match12h) return null;
+  let h = parseInt(match12h[1], 10);
+  let m = match12h[2] ? parseInt(match12h[2], 10) : 0;
+  const isPM = match12h[3] && match12h[3].toUpperCase() === 'PM';
+  const isAM = match12h[3] && match12h[3].toUpperCase() === 'AM';
+
+  // If no AM/PM specified, assume 24-hour format
+  if (!isAM && !isPM) {
+    // Keep as-is (already 24-hour format)
+  } else {
+    if (isPM && h < 12) h += 12;
+    if (isAM && h === 12) h = 0;
+  }
   return { h, m };
 };
 
@@ -34,40 +61,43 @@ export const getLocalTimezoneAbbreviation = (): string => {
 };
 
 /**
+ * Shared helper to format a single timestamp from UTC+8 to local time
+ */
+const formatSingleTimestamp = (ts: string, dateStr: string): string => {
+  const parsed = parseTimeStringToHourMin(ts);
+  if (!parsed) return ts;
+
+  const isoString = `${dateStr}T${parsed.h.toString().padStart(2, '0')}:${parsed.m.toString().padStart(2, '0')}:00+08:00`;
+  const dateObj = new Date(isoString);
+
+  let localH = dateObj.getHours();
+  const localM = dateObj.getMinutes();
+  const mStr = localM > 0 ? `:${localM.toString().padStart(2, '0')}` : '';
+
+  let result = '';
+  if (localH === 0) result = `12${mStr}AM`;
+  else if (localH === 12) result = `12${mStr}PM`;
+  else result = localH < 12 ? `${localH}${mStr}AM` : `${localH - 12}${mStr}PM`;
+
+  const localDateStr = format(dateObj, 'yyyy-MM-dd');
+  if (localDateStr !== dateStr) {
+    result += ` (${format(dateObj, 'MMM d')})`;
+  }
+  return result;
+};
+
+/**
  * Format a time in UTC+8 to local time
  */
 export const formatLocalTime = (timeStr: string, dateStr: string): string => {
   if (timeStr === 'TBD' || !timeStr) return timeStr;
-  
+
   try {
-    const formatLocal = (ts: string) => {
-      const parsed = parseTimeStringToHourMin(ts);
-      if (!parsed) return ts;
-      
-      const isoString = `${dateStr}T${parsed.h.toString().padStart(2, '0')}:${parsed.m.toString().padStart(2, '0')}:00+08:00`;
-      const dateObj = new Date(isoString);
-      
-      let localH = dateObj.getHours();
-      const localM = dateObj.getMinutes();
-      const mStr = localM > 0 ? `:${localM.toString().padStart(2, '0')}` : '';
-      
-      let result = '';
-      if (localH === 0) result = `12${mStr}AM`;
-      else if (localH === 12) result = `12${mStr}PM`;
-      else result = localH < 12 ? `${localH}${mStr}AM` : `${localH - 12}${mStr}PM`;
-
-      const localDateStr = format(dateObj, 'yyyy-MM-dd');
-      if (localDateStr !== dateStr) {
-        result += ` (${format(dateObj, 'MMM d')})`;
-      }
-      return result;
-    };
-
     const parts = timeStr.split('-').map(s => s.trim());
     if (parts.length === 1) {
-      return formatLocal(parts[0]);
+      return formatSingleTimestamp(parts[0], dateStr);
     } else if (parts.length === 2) {
-      return `${formatLocal(parts[0])} - ${formatLocal(parts[1])}`;
+      return `${formatSingleTimestamp(parts[0], dateStr)} - ${formatSingleTimestamp(parts[1], dateStr)}`;
     }
     return timeStr;
   } catch {
@@ -80,62 +110,20 @@ export const formatLocalTime = (timeStr: string, dateStr: string): string => {
  */
 export const formatLocalDate = (dateStr: string, timeStr: string): string => {
   if (!timeStr || timeStr === 'TBD') return dateStr;
-  
+
   try {
     const firstTimePart = timeStr === '00:00' ? '00:00' : timeStr.split('-')[0].trim();
     const parsedTime = parseTimeStringToHourMin(firstTimePart);
-    
+
     if (!parsedTime) return dateStr;
-    
+
     const isoString = `${dateStr}T${parsedTime.h.toString().padStart(2, '0')}:${parsedTime.m.toString().padStart(2, '0')}:00+08:00`;
     const dateObj = new Date(isoString);
-    
+
     if (isNaN(dateObj.getTime())) return dateStr;
-    
+
     return format(dateObj, 'yyyy-MM-dd');
   } catch {
     return dateStr;
-  }
-};
-
-/**
- * Format dual timestamps (e.g., "9AM - 10AM") with local timezone conversion
- */
-export const formatDualTimestamps = (timeStr: string, dateStr: string): string => {
-  if (timeStr === 'TBD' || !timeStr) return timeStr;
-  
-  try {
-    const formatLocal = (ts: string) => {
-      const parsed = parseTimeStringToHourMin(ts);
-      if (!parsed) return ts;
-      
-      const isoString = `${dateStr}T${parsed.h.toString().padStart(2, '0')}:${parsed.m.toString().padStart(2, '0')}:00+08:00`;
-      const dateObj = new Date(isoString);
-      
-      let localH = dateObj.getHours();
-      const localM = dateObj.getMinutes();
-      const mStr = localM > 0 ? `:${localM.toString().padStart(2, '0')}` : '';
-      
-      let result = '';
-      if (localH === 0) result = `12${mStr}AM`;
-      else if (localH === 12) result = `12${mStr}PM`;
-      else result = localH < 12 ? `${localH}${mStr}AM` : `${localH - 12}${mStr}PM`;
-
-      const localDateStr = format(dateObj, 'yyyy-MM-dd');
-      if (localDateStr !== dateStr) {
-        result += ` (${format(dateObj, 'MMM d')})`;
-      }
-      return result;
-    };
-
-    const parts = timeStr.split('-').map(s => s.trim());
-    if (parts.length === 1) {
-      return formatLocal(parts[0]);
-    } else if (parts.length === 2) {
-      return `${formatLocal(parts[0])} - ${formatLocal(parts[1])}`;
-    }
-    return timeStr;
-  } catch {
-    return timeStr;
   }
 };

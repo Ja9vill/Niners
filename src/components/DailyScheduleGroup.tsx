@@ -3,7 +3,7 @@ import { Calendar as CalendarIcon, Clock, Plus, Globe } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { format, parseISO } from 'date-fns';
 import { EVENT_COLORS, TIMEZONES } from '../lib/constants';
-import { formatLocalTime, getLocalTimezoneAbbreviation, formatLocalDate } from '../lib/timezoneUtils';
+import { formatLocalTime, getLocalTimezoneAbbreviation, parseTimeStringToHourMin, isValidDateString } from '../lib/timezoneUtils';
 
 interface DailyScheduleGroupProps {
   selectedDate: Date;
@@ -14,6 +14,7 @@ interface DailyScheduleGroupProps {
   allUsers?: any[];
   attendanceRecords?: any[];
   onEventClick?: (event: any) => void;
+  auth?: { level: number; role: string };
 }
 
 export const DailyScheduleGroup: React.FC<DailyScheduleGroupProps> = ({
@@ -24,7 +25,8 @@ export const DailyScheduleGroup: React.FC<DailyScheduleGroupProps> = ({
   localTimezoneMode = false,
   allUsers = [],
   attendanceRecords = [],
-  onEventClick
+  onEventClick,
+  auth = { level: 0, role: '' }
 }) => {
   const localTzAbbr = getLocalTimezoneAbbreviation();
 
@@ -32,25 +34,13 @@ export const DailyScheduleGroup: React.FC<DailyScheduleGroupProps> = ({
     const dayStr = format(selectedDate, 'yyyy-MM-dd');
     return events.filter(event => {
       const eventDate = event.date || event.event_date;
+      // Skip events with missing or invalid dates
+      if (!eventDate) return false;
+      // Validate date format and validity
+      if (!isValidDateString(eventDate)) return false;
       return eventDate === dayStr;
     });
   }, [selectedDate, events]);
-
-  const parseTimeStringToHourMin = (timeStr: string) => {
-    const match = timeStr.match(/(\d+)(?::(\d+))?\s*(AM|PM)?/i);
-    if (!match) return null;
-    let h = parseInt(match[1], 10);
-    let m = match[2] ? parseInt(match[2], 10) : 0;
-    const isPM = match[3] && match[3].toUpperCase() === 'PM';
-    const isAM = match[3] && match[3].toUpperCase() === 'AM';
-    if (isPM && h < 12) h += 12;
-    if ((isAM || (!isAM && !isPM && h === 12)) && h === 12) h = 0;
-    return { h, m };
-  };
-
-  const [selectedTimezone, setSelectedTimezone] = React.useState('UTC+8');
-
-  const auth = { level: 1, role: 'admin' }; // This should come from props or context
 
   return (
     <div className="space-y-6">
@@ -85,17 +75,9 @@ export const DailyScheduleGroup: React.FC<DailyScheduleGroupProps> = ({
 
           <div className="flex items-center gap-2">
             <Globe size={14} className="text-purple-400" />
-            <select
-              title="Select timezone"
-              aria-label="Select timezone"
-              value={selectedTimezone}
-              onChange={(e) => setSelectedTimezone(e.target.value)}
-              className="bg-[#0A0B0E] border border-purple-500/30 rounded-lg px-2 py-1 text-[10px] font-bold text-white/80 focus:border-purple-400 focus:ring-1 focus:ring-purple-400 outline-none cursor-pointer tracking-widest uppercase appearance-none"
-            >
-              {TIMEZONES.map(tz => (
-                <option key={tz.value} value={tz.value}>{tz.label}</option>
-              ))}
-            </select>
+            <span className="text-[10px] font-bold text-white/50 tracking-widest uppercase">
+              {localTimezoneMode ? localTzAbbr : 'UTC+8'}
+            </span>
           </div>
         </div>
 
@@ -105,18 +87,40 @@ export const DailyScheduleGroup: React.FC<DailyScheduleGroupProps> = ({
           <div className="space-y-3 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
             {selectedDayEvents.length > 0 ? (
               selectedDayEvents
-                .sort((a, b) => a.time.localeCompare(b.time))
+                .sort((a, b) => {
+                  const timeA = a.time || '';
+                  const timeB = b.time || '';
+                  // Parse times to minutes for chronological sorting
+                  const parseToMinutes = (timeStr: string) => {
+                    if (timeStr === 'TBD' || !timeStr) return 9999;
+                    const firstPart = timeStr.split('-')[0].trim();
+                    const parsed = parseTimeStringToHourMin(firstPart);
+                    if (!parsed) return 9999;
+                    return parsed.h * 60 + parsed.m;
+                  };
+                  return parseToMinutes(timeA) - parseToMinutes(timeB);
+                })
                 .map(e => {
                   const colorConfig = EVENT_COLORS[e.type || ''] || { gradient: 'from-[#D4AF37] to-[#b8960c]', text: 'text-[#D4AF37]' };
-                  const displayTime = e.time === '00:00' ? 'TBD' : e.time;
+                  const displayTime = (!e.time || e.time === '00:00') ? 'TBD' : e.time;
+
+                  // Skip events with missing or invalid dates
+                  if (!e.date) {
+                    return null;
+                  }
 
                   let eventDateObj = new Date();
-                  const firstTimePart = e.time === '00:00' ? '00:00' : e.time.split('-')[0].trim();
+                  const firstTimePart = e.time === '00:00' ? '00:00' : (e.time?.split('-')?.[0]?.trim() || '00:00');
                   const parsedStart = parseTimeStringToHourMin(firstTimePart);
                   if (parsedStart) {
                     eventDateObj = new Date(`${e.date}T${parsedStart.h.toString().padStart(2, '0')}:${parsedStart.m.toString().padStart(2, '0')}:00+08:00`);
                   } else {
                     eventDateObj = new Date(`${e.date}T00:00:00+08:00`);
+                  }
+
+                  // Validate the created date object
+                  if (isNaN(eventDateObj.getTime())) {
+                    return null;
                   }
 
                   // Determine if the event is "upcoming" or "past/ongoing"
@@ -169,8 +173,8 @@ export const DailyScheduleGroup: React.FC<DailyScheduleGroupProps> = ({
                         </div>
                       </div>
                     </div>
-                  )
-                })
+                  );
+                }).filter(Boolean)
             ) : (
               <div className="flex flex-col items-center justify-center py-12 gap-3">
                 <div className="w-12 h-12 rounded-full bg-[#0e0a08]/90 border border-white/5 flex items-center justify-center">
