@@ -47,3 +47,16 @@ export const TIMESLOTS = [
   '09:00 PM - 10:00 PM (Manila Time)',
   '10:00 PM - 11:00 PM (Manila Time)'
 ];
+
+export const TIMEZONES = [
+  { value: 'UTC+8', label: 'UTC+8 (Manila)' },
+  { value: 'UTC-5', label: 'UTC-5 (EST)' },
+  { value: 'UTC-6', label: 'UTC-6 (CST)' },
+  { value: 'UTC-7', label: 'UTC-7 (MST)' },
+  { value: 'UTC-8', label: 'UTC-8 (PST)' },
+  { value: 'UTC+1', label: 'UTC+1 (CET)' },
+  { value: 'UTC+2', label: 'UTC+2 (EET)' },
+  { value: 'UTC+5:30', label: 'UTC+5:30 (IST)' },
+  { value: 'UTC+7', label: 'UTC+7 (ICT)' },
+  { value: 'UTC+9', label: 'UTC+9 (JST/KST)' },
+];
