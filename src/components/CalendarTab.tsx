@@ -2086,26 +2086,24 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                           <h5 className="text-[9px] font-black text-[#D4AF37] uppercase tracking-widest mb-3 border-b border-white/5 pb-2">Attendance</h5>
                           <div className="flex flex-col gap-2">
                             {(() => {
-                              const displayAttendees = attendanceRecord ? (
-                                attendanceRecord.attendees ||
-                                attendanceRecord.attendeeIds ||
-                                attendanceRecord.actualParticipants ||
-                                attendanceRecord.participants ||
-                                attendanceRecord.participantIds ||
-                                []
-                              ) : [];
+                              const displayAttendees = attAttendees.length > 0 ? attAttendees : [];
+                              const noRawData = !attendanceRecord || (
+                                !attendanceRecord.attendees &&
+                                !attendanceRecord.attendeeIds &&
+                                !attendanceRecord.actualParticipants &&
+                                !attendanceRecord.participants &&
+                                !attendanceRecord.participantIds
+                              );
 
-                              if (displayAttendees && displayAttendees.length > 0) {
+                              if (displayAttendees.length > 0) {
                                 const isLarge = displayAttendees.length <= 4;
                                 return (
                                   <div className={`grid gap-3 ${isLarge ? 'grid-cols-4' : 'grid-cols-4 sm:grid-cols-6'}`}>
                                     {displayAttendees.map((att: any, idx: number) => {
-                                      const pid = typeof att === 'string' ? att : (att.poppoId || att.poppo_id || att.id || att.participantId);
-                                      const attendeeNickname = typeof att === 'string' ? pid : (att.nickname || att.name || pid);
-                                      const attendeeRole = typeof att === 'string' ? '' : (att.role || '');
-                                      const pUser = allUsers.find(u => String(u.poppo_id || u.poppoId || u.id) === String(pid));
-                                      const pPhoto = pUser ? (pUser.photoUrl || pUser.profilePhotoUrl || pUser.photoURL) : null;
-                                      const avatar = pPhoto || `https://ui-avatars.com/api/?name=${encodeURIComponent(attendeeNickname)}&background=0a0806&color=D4AF37`;
+                                      const pid = att.poppo_id || att.poppoId || att.id || '';
+                                      const attendeeNickname = att.nickname || att.name || pid;
+                                      const photoUrl = att.photoUrl || att.profilePhotoUrl || att.photoURL;
+                                      const avatar = photoUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(attendeeNickname)}&background=0a0806&color=D4AF37`;
 
                                       return (
                                         <div key={idx} className="flex flex-col items-center justify-start gap-1.5 p-1 transition-transform hover:scale-105">
@@ -2116,6 +2114,8 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                                     })}
                                   </div>
                                 );
+                              } else if (!noRawData) {
+                                return <div className="text-[10px] text-yellow-400/60 italic p-3 bg-white/5 rounded-xl border border-white/5 text-center">Attendance records exist but user profiles not yet loaded. Please wait...</div>;
                               } else {
                                 return <div className="text-center text-[10px] text-white/30 italic p-4 bg-white/5 rounded-xl border border-white/5">No attendance records yet.</div>;
                               }

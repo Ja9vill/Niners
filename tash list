@@ -1,0 +1,18 @@
+[33mcommit 7b15c709bf75c9d69ea2e3802f7e3ead121eb036[m
+Author: Janine WP <jwavpr@gmail.com>
+Date:   Sat Jun 27 07:04:03 2026 -0400
+
+    VSCode OpenCode edits
+
+.vscode/mcp.json
+.vscode/settings.json
+Niners
+dist/index.html
+push_subscriptions.json
+src/App.tsx
+src/components/CalendarTab.tsx
+src/pages/DailyPerformanceIngestion.tsx
+src/pages/NinersPage.tsx
+src/pages/StreamsPage.tsx
+src/pages/public/UserPublicProfile.tsx
+src/server/auth.ts
