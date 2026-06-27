@@ -11,6 +11,9 @@ import { TeamLeaderboard } from '../components/TeamLeaderboard';
 import { SingleDatePicker } from '../components/InteractiveDatePicker';
 import { cn } from '../lib/utils';
 import { Host } from '../types';
+import { useToast } from '../lib/toast';
+import { apiPost } from '../lib/apiClient';
+import { normalizeRole, isManagerOrAgent } from '../lib/roleUtils';
 
 export const Analytics = () => {
   const rootAuth = Storage.getAuthState();
@@ -41,29 +44,17 @@ export const Analytics = () => {
   const [taskError, setTaskError] = useState('');
   const [isNotifying, setIsNotifying] = useState(false);
 
-  // Toast States
-  const [toasts, setToasts] = useState<any[]>([]);
-  const [toastIdCounter, setToastIdCounter] = useState(0);
-
-  const showToast = (type: 'success' | 'error', message: string) => {
-    const id = toastIdCounter;
-    setToastIdCounter(prev => prev + 1);
-    setToasts(prev => [...prev, { id, type, message }]);
-    setTimeout(() => {
-      setToasts(prev => prev.filter(t => t.id !== id));
-    }, 4000);
-  };
+  const { toasts, showToast } = useToast();
 
   // Fetch assigned hosts
   useEffect(() => {
-    const userRoleLower = String(rootAuth?.role || '').toLowerCase();
-    if ((userRoleLower === 'agent' || userRoleLower === 'manager') && managerPoppoId) {
+    if (isManagerOrAgent(rootAuth?.role) && managerPoppoId) {
       const fetchAssignedHosts = async () => {
         setIsLoadingAssignedHosts(true);
         try {
           const list = await FirebaseService.getAllRoleMetadata();
           const filtered = list.filter(u => {
-            const uRole = String(u.role || '').toLowerCase();
+            const uRole = normalizeRole(u.role);
             const mgrId = String(u.assigned_manager_poppo_id || u.assignedManagerId || '');
             return (uRole === 'host' || uRole === 'talent') && mgrId === String(managerPoppoId);
           });
@@ -82,8 +73,7 @@ export const Analytics = () => {
 
   // Fetch team analytics data for the managed hosts
   useEffect(() => {
-    const userRoleLower = String(rootAuth?.role || '').toLowerCase();
-    if ((userRoleLower !== 'agent' && userRoleLower !== 'manager') || !managerPoppoId || assignedHostsList.length === 0) {
+    if (!isManagerOrAgent(rootAuth?.role) || !managerPoppoId || assignedHostsList.length === 0) {
       setIsLoadingAnalytics(false);
       return;
     }
@@ -311,18 +301,13 @@ export const Analytics = () => {
     setTaskSuccess('');
     
     try {
-      const res = await fetch('/api/notify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          targetPoppoId: taskAssigneeId,
-          title: 'New Task Assigned',
-          body: `New Task: ${taskTitle}. Tap to view.`
-        })
+      const res = await apiPost<{ error?: string }>('/api/notify', {
+        targetPoppoId: taskAssigneeId,
+        title: 'New Task Assigned',
+        body: `New Task: ${taskTitle}. Tap to view.`
       });
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to send notification');
+      if (!res.ok) throw new Error(res.data.error || 'Failed to send notification');
       
       setTaskSuccess(`Push notification sent to host ${taskAssigneeId}!`);
       showToast('success', `Notification sent to ${taskAssigneeId}`);

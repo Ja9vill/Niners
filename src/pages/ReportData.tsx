@@ -4,6 +4,8 @@ import { Storage } from '../lib/storage';
 import { db } from '../lib/firebase';
 import { collection, addDoc, doc, setDoc } from 'firebase/firestore';
 import { Loader2, UploadCloud, Search, Trash2, CheckCircle2, ChevronDown, Plus, FileText, Image as ImageIcon, Info, X, Pencil, CalendarDays } from 'lucide-react';
+import { isHost as checkIsHost, normalizeRole } from '../lib/roleUtils';
+import { apiGet } from '../lib/apiClient';
 
 type TabType = 'PK' | 'Stream';
 type StreamType = 'daily' | 'weekly' | 'monthly';
@@ -46,7 +48,7 @@ const calculateMergedPKRatings = (rows: any[]) => {
 
 export const ReportData = () => {
   const authState = Storage.getAuthState();
-  const isHost = String(authState.role || '').toLowerCase() === 'host' || String(authState.role || '').toLowerCase() === 'talent';
+  const isHost = checkIsHost(authState.role);
 
   // Portal into the static #modal-portal div in index.html (outside #root, immune to overflow:hidden)
   const portalRoot = React.useMemo(() => document.getElementById('modal-portal'), []);
@@ -221,15 +223,9 @@ export const ReportData = () => {
       }
       setIsSearching(true);
       try {
-        const token = authState.token || '';
-        const res = await fetch(`/api/roster-management/search?query=${encodeURIComponent(hostSearchTerm)}`, {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
+        const res = await apiGet<any[]>(`/api/roster-management/search?query=${encodeURIComponent(hostSearchTerm)}`);
         if (!res.ok) throw new Error('Search failed');
-        const data = await res.json();
-        setSearchResults(data);
+        setSearchResults(res.data);
       } catch (err) {
         console.error(err);
       } finally {
@@ -334,7 +330,7 @@ export const ReportData = () => {
     setPkSuccess('');
 
     try {
-      const reporterRole = String(authState.role || 'host').toLowerCase();
+      const reporterRole = normalizeRole(authState.role) || 'host';
       const baseData = {
         reporterID: authState.poppo_id,
         reporterName: authState.nickname || authState.name || '',

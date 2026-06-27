@@ -10,6 +10,7 @@ import { getStaticHosts } from "../lib/staticHosts";
 import { logAuthEvent } from "./auditLogger";
 import { initFirebaseSecrets } from "./secrets";
 import { runAutoSyncLivehouseData } from "./cron";
+import { extractBearerToken } from "./firebaseAdmin";
 
 const router = Router();
 const JWT_SECRET = process.env.JWT_SECRET || "nine-dashboard-secret-key-12345";
@@ -1633,11 +1634,10 @@ async function resolveTokenRole(decodedToken: any): Promise<void> {
  * Attaches decoded token data to req.firebaseUser on success.
  */
 async function verifyFirebaseIdToken(req: any, res: any, next: any) {
-  const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+  const idToken = extractBearerToken(req.headers.authorization);
+  if (!idToken) {
     return res.status(401).json({ error: "Access Denied: Missing or malformed Authorization Bearer header." });
   }
-  const idToken = authHeader.split("Bearer ")[1];
   try {
     const auth = getAuth(getFirebaseAdminApp());
     const decodedToken = await auth.verifyIdToken(idToken);
@@ -1655,11 +1655,10 @@ async function verifyFirebaseIdToken(req: any, res: any, next: any) {
  * Prevents lower-level Admins or unauthorized users from executing highly restricted admin actions.
  */
 async function verifyAdminRole(req: any, res: any, next: any) {
-  const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+  const idToken = extractBearerToken(req.headers.authorization);
+  if (!idToken) {
     return res.status(401).json({ error: "Access Denied: Missing or malformed Authorization Bearer header." });
   }
-  const idToken = authHeader.split("Bearer ")[1];
   try {
     const auth = getAuth(getFirebaseAdminApp());
     const decodedToken = await auth.verifyIdToken(idToken);

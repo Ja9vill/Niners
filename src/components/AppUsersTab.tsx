@@ -2,6 +2,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { subscribeToHosts, patchHost, deleteUser, FirebaseService, HostRosterUser, UserRole } from '../lib/firebaseService';
 import { Storage } from '../lib/storage';
+import { useToast, Toast } from '../lib/toast';
+import { getRoleBadgeStyle } from '../lib/roleBadge';
+import { apiPost } from '../lib/apiClient';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -14,22 +17,7 @@ const ALLOWED_ROLES: UserRole[] = [
   'host',
 ];
 
-const ROLE_BADGE: Record<UserRole, string> = {
-  director:    'bg-amber-500/10 text-amber-400 border-amber-500/20',
-  'head admin':'bg-purple-500/10 text-purple-400 border-purple-500/20',
-  manager:     'bg-cyan-500/10 text-cyan-400 border-cyan-500/20',
-  agent:       'bg-indigo-500/10 text-indigo-400 border-indigo-500/20',
-  admin:       'bg-blue-500/10 text-blue-400 border-blue-500/20',
-  host:        'bg-slate-500/10 text-slate-400 border-slate-500/20',
-};
 
-// ─── Toast ───────────────────────────────────────────────────────────────────
-
-interface Toast {
-  id: number;
-  type: 'success' | 'error';
-  message: string;
-}
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -66,16 +54,8 @@ export const AppUsersTab: React.FC<AppUsersTabProps> = ({ currentUserRole }) => 
   const [isConnected, setIsConnected] = useState(false);
   const [connectionError, setConnectionError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [toasts, setToasts] = useState<Toast[]>([]);
   const [pwStates, setPwStates] = useState<Record<string, PwState>>({});
-  const toastIdRef = useRef(0);
-
-  // ── Toast helpers ─────────────────────────────────────────────────────────
-  const showToast = (type: 'success' | 'error', message: string) => {
-    const id = ++toastIdRef.current;
-    setToasts(prev => [...prev, { id, type, message }]);
-    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 4000);
-  };
+  const { toasts, showToast } = useToast();
 
   // ── Live Firestore subscription ───────────────────────────────────────────
   useEffect(() => {
@@ -162,16 +142,8 @@ export const AppUsersTab: React.FC<AppUsersTabProps> = ({ currentUserRole }) => 
     setPwStates(prev => ({ ...prev, [poppoId]: { ...prev[poppoId], loading: true } }));
     try {
       const authState = Storage.getAuthState();
-      const res = await fetch('/api/admin/reset-password', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(authState.token ? { Authorization: `Bearer ${authState.token}` } : {}),
-        },
-        body: JSON.stringify({ poppo_id: poppoId, new_password: pw }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || 'Reset failed');
+      const res = await apiPost<{ error?: string }>('/api/admin/reset-password', { poppo_id: poppoId, new_password: pw });
+      if (!res.ok) throw new Error(res.data?.error || 'Reset failed');
       // Clear field on success
       setPwStates(prev => ({ ...prev, [poppoId]: { value: '', loading: false } }));
       await FirebaseService.logSystemActivity(`Admin generated new temporary password for user Poppo ID: ${poppoId}`, 'Warning');
@@ -359,7 +331,7 @@ export const AppUsersTab: React.FC<AppUsersTabProps> = ({ currentUserRole }) => 
                     {/* Small badge below */}
                     <span className={[
                       'mt-1 inline-block text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded border',
-                      ROLE_BADGE[user.role] || 'bg-slate-500/10 text-slate-400 border-slate-500/20',
+                      getRoleBadgeStyle(user.role),
                     ].join(' ')}>
                       {user.role}
                     </span>

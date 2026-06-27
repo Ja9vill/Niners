@@ -1,7 +1,7 @@
 import { Router } from "express";
 import admin from "firebase-admin";
-import { getAuth } from "firebase-admin/auth";
-import { getFirebaseAdminApp, getAdminFirestore } from "./auth";
+import { getAdminFirestore } from "./auth";
+import { getAdminAuth, extractBearerToken } from "./firebaseAdmin";
 
 const router = Router();
 
@@ -27,14 +27,12 @@ const financialFields = [
  * Attaches decoded token data to req.firebaseUser on success.
  */
 async function verifyFirebaseToken(req: any, res: any, next: any) {
-  const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+  const idToken = extractBearerToken(req.headers.authorization);
+  if (!idToken) {
     return res.status(401).json({ error: "Access Denied: Missing Authorization Header" });
   }
-  const idToken = authHeader.split("Bearer ")[1];
   try {
-    const auth = getAuth(getFirebaseAdminApp());
-    const decodedToken = await auth.verifyIdToken(idToken);
+    const decodedToken = await getAdminAuth().verifyIdToken(idToken);
     req.firebaseUser = decodedToken;
     next();
   } catch (error: any) {

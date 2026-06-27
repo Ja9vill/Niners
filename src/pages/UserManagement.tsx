@@ -1,18 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Shield, Plus, Trash2, Loader2, UserPlus, Users, AlertCircle, RefreshCw } from 'lucide-react';
 import { RoleGuard } from '../components/RoleGuard';
-import { Storage } from '../lib/storage';
+import { useToast } from '../lib/toast';
+import { getRoleBadgeStyle, ROLE_BADGE_BASE_CLASS } from '../lib/roleBadge';
+import { apiGet, apiPost, apiDelete } from '../lib/apiClient';
 
 interface User {
   poppoId: string;
   nickname: string;
   role: string;
-}
-
-interface Toast {
-  id: number;
-  type: 'success' | 'error';
-  message: string;
 }
 
 export default function UserManagement() {
@@ -24,36 +20,16 @@ export default function UserManagement() {
   const [isSubmitLoading, setIsSubmitLoading] = useState(false);
   const [isTableLoading, setIsTableLoading] = useState(false);
   
-  const [toasts, setToasts] = useState<Toast[]>([]);
-  const [toastIdCounter, setToastIdCounter] = useState(0);
-
-  const showToast = (type: 'success' | 'error', message: string) => {
-    const id = toastIdCounter;
-    setToastIdCounter(prev => prev + 1);
-    setToasts(prev => [...prev, { id, type, message }]);
-    setTimeout(() => {
-      setToasts(prev => prev.filter(t => t.id !== id));
-    }, 4000);
-  };
+  const { toasts, showToast } = useToast();
 
   const fetchUsers = async () => {
     setIsTableLoading(true);
     try {
-      const authState = Storage.getAuthState();
-      const response = await fetch('/api/admin/users', {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(authState.token ? { 'Authorization': `Bearer ${authState.token}` } : {})
-        }
-      });
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to retrieve users.');
+      const res = await apiGet<User[]>('/api/admin/users');
+      if (!res.ok) {
+        throw new Error((res.data as any).error || 'Failed to retrieve users.');
       }
-      
-      // Sort users by poppoId
-      const sortedUsers = (data || []).sort((a: User, b: User) => a.poppoId.localeCompare(b.poppoId));
+      const sortedUsers = (res.data || []).sort((a: User, b: User) => a.poppoId.localeCompare(b.poppoId));
       setUsers(sortedUsers);
     } catch (err: any) {
       console.error('[UserManagement Fetch Error]:', err);
@@ -81,24 +57,15 @@ export default function UserManagement() {
 
     setIsSubmitLoading(true);
     try {
-      const authState = Storage.getAuthState();
-      const response = await fetch('/api/admin/create-user', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(authState.token ? { 'Authorization': `Bearer ${authState.token}` } : {})
-        },
-        body: JSON.stringify({
-          poppoId: cleanPoppoId,
-          nickname: cleanNickname,
-          role
-        })
+      const res = await apiPost<{ message?: string; error?: string }>('/api/admin/create-user', {
+        poppoId: cleanPoppoId,
+        nickname: cleanNickname,
+        role
       });
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to create user.');
+      if (!res.ok) {
+        throw new Error(res.data.error || 'Failed to create user.');
       }
-      showToast('success', data.message || `User '${cleanNickname}' created successfully.`);
+      showToast('success', res.data.message || `User '${cleanNickname}' created successfully.`);
       
       // Reset form
       setPoppoId('');
@@ -121,19 +88,11 @@ export default function UserManagement() {
     }
 
     try {
-      const authState = Storage.getAuthState();
-      const response = await fetch(`/api/admin/delete-user/${poppoIdToDelete}`, {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(authState.token ? { 'Authorization': `Bearer ${authState.token}` } : {})
-        }
-      });
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to delete user.');
+      const res = await apiDelete<{ message?: string; error?: string }>(`/api/admin/delete-user/${poppoIdToDelete}`);
+      if (!res.ok) {
+        throw new Error(res.data.error || 'Failed to delete user.');
       }
-      showToast('success', data.message || `User '${poppoIdToDelete}' has been deleted.`);
+      showToast('success', res.data.message || `User '${poppoIdToDelete}' has been deleted.`);
       
       // Auto-refresh table
       fetchUsers();
@@ -316,14 +275,7 @@ export default function UserManagement() {
                           {user.nickname}
                         </td>
                         <td className="px-4 py-3">
-                          <span className={[
-                            'text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded border capitalize',
-                            user.role === 'director' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
-                            user.role === 'admin' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' :
-                            user.role === 'manager' ? 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20' :
-                            user.role === 'agent' ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20' :
-                            'bg-slate-500/10 text-slate-400 border-slate-500/20'
-                          ].join(' ')}>
+                          <span className={`${ROLE_BADGE_BASE_CLASS} ${getRoleBadgeStyle(user.role)}`}>
                             {user.role}
                           </span>
                         </td>
