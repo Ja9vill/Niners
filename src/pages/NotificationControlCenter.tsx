@@ -171,7 +171,9 @@ export const NotificationControlCenter = () => {
     try {
       const cached = localStorage.getItem('last_received_push');
       if (cached) setLastNotification(JSON.parse(cached));
-    } catch (e) {}
+    } catch (e) {
+      console.warn('[NotificationControlCenter] Failed to parse cached push notification from localStorage:', e);
+    }
 
     return () => {
       navigator.serviceWorker.removeEventListener('message', handleMessage);

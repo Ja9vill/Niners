@@ -33,7 +33,7 @@ export const BlogHub = () => {
         setBlogs(published);
         setFilteredBlogs(published.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
       } catch (error) {
-        console.error(error);
+        console.error('[BlogHub] Failed to load blogs:', error);
       } finally {
         setIsLoading(false);
       }

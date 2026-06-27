@@ -20,6 +20,8 @@ export const PageAssetsCMS = () => {
   const [assets, setAssets] = useState<Record<string, PublicPageAsset>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const authState = Storage.getAuthState();
 
@@ -31,7 +33,8 @@ export const PageAssetsCMS = () => {
       data.forEach(a => { assetMap[a.slotId] = a; });
       setAssets(assetMap);
     } catch (error) {
-      console.error(error);
+      console.error('[PageAssetsCMS] Failed to load assets:', error);
+      setLoadError(error instanceof Error ? error.message : 'Failed to load page assets.');
     } finally {
       setIsLoading(false);
     }
@@ -54,7 +57,9 @@ export const PageAssetsCMS = () => {
       setAssets(prev => ({ ...prev, [slotId]: { ...prev[slotId], ...assetData } as PublicPageAsset }));
       await FirebaseService.logSystemActivity(`Admin updated public page asset: "${slotId}"`, 'Info');
     } catch (error) {
-      console.error(error);
+      console.error('[PageAssetsCMS] Failed to save asset:', error);
+      setSaveError(error instanceof Error ? error.message : 'Failed to save asset.');
+      setTimeout(() => setSaveError(null), 5000);
     } finally {
       setIsProcessing(null);
     }
@@ -76,6 +81,18 @@ export const PageAssetsCMS = () => {
           <p className="text-[#A09E9A] text-sm mt-1">Manage screenshots and banner images for public guides and regional pages.</p>
         </div>
       </div>
+
+      {loadError && (
+        <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 text-red-400 text-sm">
+          Failed to load page assets: {loadError}
+        </div>
+      )}
+
+      {saveError && (
+        <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 text-red-400 text-sm">
+          {saveError}
+        </div>
+      )}
 
       <div className="bg-[#1A140A]/80 backdrop-blur-xl border border-[#D4AF37]/20 rounded-2xl p-6 shadow-[0_0_20px_rgba(212,175,55,0.15)]">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

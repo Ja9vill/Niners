@@ -141,6 +141,7 @@ export async function runAutoSyncLivehouseData(ignoreLock = false) {
     console.log(`Successfully completed automated Livehouse sync! Extracted ${scheduleRows.length} timeslots.`);
   } catch (err) {
     console.error("Failed to execute autoSyncLivehouseData:", err);
+    throw err;
   }
 }
 
@@ -234,6 +235,7 @@ async function runCheckUpcomingEvents() {
     }
   } catch (err) {
     console.error("Failed to check upcoming events:", err);
+    throw err;
   }
 }
 
@@ -268,6 +270,7 @@ async function runCleanupOldSystemLogs() {
     }
   } catch (err) {
     console.error("Failed to clean up old system_logs:", err);
+    throw err;
   }
 }
 
@@ -276,12 +279,12 @@ export function startCronJobs() {
   console.log("Starting backend cron jobs...");
   
   // Run once immediately on startup
-  runAutoSyncLivehouseData().catch(console.error);
-  runCheckUpcomingEvents();
-  runCleanupOldSystemLogs();
+  runAutoSyncLivehouseData().catch(err => console.error("[Cron] Initial Livehouse sync failed:", err));
+  runCheckUpcomingEvents().catch(err => console.error("[Cron] Initial upcoming events check failed:", err));
+  runCleanupOldSystemLogs().catch(err => console.error("[Cron] Initial system_logs cleanup failed:", err));
   
-  // Schedule intervals
-  setInterval(runAutoSyncLivehouseData, 15 * 60 * 1000); // 15 mins
-  setInterval(runCheckUpcomingEvents, 5 * 60 * 1000); // 5 mins
-  setInterval(runCleanupOldSystemLogs, 24 * 60 * 60 * 1000); // 24 hours
+  // Schedule intervals (wrap async calls to prevent unhandled rejections)
+  setInterval(() => { runAutoSyncLivehouseData().catch(err => console.error("[Cron] Livehouse sync failed:", err)); }, 15 * 60 * 1000);
+  setInterval(() => { runCheckUpcomingEvents().catch(err => console.error("[Cron] Upcoming events check failed:", err)); }, 5 * 60 * 1000);
+  setInterval(() => { runCleanupOldSystemLogs().catch(err => console.error("[Cron] system_logs cleanup failed:", err)); }, 24 * 60 * 60 * 1000);
 }

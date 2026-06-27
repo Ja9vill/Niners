@@ -184,7 +184,8 @@ export const LivehouseData = () => {
         checkAndAutoApproveRequests(livehouseRequests, data);
       }
     } catch (err) {
-      console.error(err);
+      console.error('[LivehouseData] Failed to load Firestore data:', err);
+      setErrorMessage(err instanceof Error ? err.message : 'Failed to load livehouse schedule data.');
     } finally {
       setIsLoading(false);
     }

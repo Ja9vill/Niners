@@ -121,7 +121,7 @@ export const Storage = {
             name: mockUser.name || mockUser.nickname,
           };
         } catch (e) {
-          // ignore
+          console.warn('[Storage] Failed to parse mock_user from sessionStorage:', e);
         }
       }
 
@@ -136,7 +136,8 @@ export const Storage = {
       }
 
       return state;
-    } catch {
+    } catch (e) {
+      console.warn('[Storage] Failed to parse auth state from sessionStorage:', e);
       return { ...emptyAuthState };
     }
   },

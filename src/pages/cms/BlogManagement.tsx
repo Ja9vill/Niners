@@ -11,6 +11,7 @@ export const BlogManagement = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [editingBlog, setEditingBlog] = useState<BlogPost | undefined>(undefined);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const authState = Storage.getAuthState();
 
@@ -20,7 +21,8 @@ export const BlogManagement = () => {
       const data = await FirebaseService.getBlogs();
       setBlogs(data.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
     } catch (error) {
-      console.error(error);
+      console.error('[BlogManagement] Failed to load blogs:', error);
+      setErrorMessage(error instanceof Error ? error.message : 'Failed to load blog posts.');
     } finally {
       setIsLoading(false);
     }
@@ -52,7 +54,8 @@ export const BlogManagement = () => {
       await loadBlogs();
       await FirebaseService.logSystemActivity(`Admin deleted blog post: "${blogTitle}"`, 'Warning');
     } catch (error) {
-      console.error(error);
+      console.error('[BlogManagement] Failed to delete blog:', error);
+      alert(error instanceof Error ? error.message : 'Failed to delete blog post.');
     } finally {
       setIsProcessing(false);
     }
@@ -81,6 +84,12 @@ export const BlogManagement = () => {
           <span>New Post</span>
         </button>
       </div>
+
+      {errorMessage && (
+        <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 text-red-400 text-sm">
+          {errorMessage}
+        </div>
+      )}
 
       {isFormOpen ? (
         <BlogEditor

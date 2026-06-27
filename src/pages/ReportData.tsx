@@ -231,7 +231,8 @@ export const ReportData = () => {
         const data = await res.json();
         setSearchResults(data);
       } catch (err) {
-        console.error(err);
+        console.error('[ReportData] Host search failed:', err);
+        setSearchResults([]);
       } finally {
         setIsSearching(false);
       }

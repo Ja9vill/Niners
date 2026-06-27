@@ -1242,7 +1242,7 @@ Return ONLY the raw JSON object, no markdown blocks.`;
         console.log("Public Key:", vapidPublicKey);
         console.log("=========================================================");
       } catch (err) {
-        console.error("Failed to dynamically generate VAPID keys. Ensure web-push is installed.");
+        console.error("Failed to dynamically generate VAPID keys. Ensure web-push is installed.", err);
       }
     }
   }
@@ -1255,8 +1255,10 @@ Return ONLY the raw JSON object, no markdown blocks.`;
         vapidPrivateKey
       );
     } catch (err: any) {
-      console.error("Failed to set VAPID details:", err.message);
+      console.error("Failed to set VAPID details — push notifications will not work:", err.message);
     }
+  } else {
+    console.warn("VAPID keys not available — push notifications are disabled.");
   }
 
   const SUBSCRIPTIONS_FILE = path.join(resolvedDirname, "push_subscriptions.json");

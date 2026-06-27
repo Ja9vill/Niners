@@ -468,7 +468,9 @@ const formatToLocalTimezone = (date: Date): string => {
       .formatToParts(date)
       .find(p => p.type === 'timeZoneName')?.value;
     if (tzName) tzAbbr = tzName;
-  } catch (e) { }
+  } catch (e) {
+    console.warn('[formatLocalTime] Intl.DateTimeFormat failed, using UTC offset fallback:', e);
+  }
 
   if (!tzAbbr) {
     const offset = date.getTimezoneOffset();
@@ -4337,7 +4339,9 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
           try {
             const text = await res.clone().text();
             if (text) errMsg = text;
-          } catch (e) { }
+          } catch (e) {
+            console.warn('[UpdateProfile] Could not read error response body:', e);
+          }
         }
         showToast('error', errMsg);
         console.error(`[UpdateProfile Error] HTTP ${res.status}: ${errMsg}`);
@@ -4346,7 +4350,9 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
       try {
         const resData = await res.clone().json();
         console.log("[UpdateProfile Success] Response data:", resData);
-      } catch (e) { }
+      } catch (e) {
+        console.warn('[UpdateProfile] Could not parse success response as JSON:', e);
+      }
 
       updatedHost = {
         ...host,

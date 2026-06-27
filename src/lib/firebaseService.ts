@@ -2319,6 +2319,8 @@ export const deleteUser = async (
   if (safeRole === 'host') {
     try {
       await deleteDoc(doc(db, 'hosts', poppoId));
-    } catch (e) {}
+    } catch (e) {
+      console.warn(`[deleteUser] Failed to delete legacy hosts doc for ${poppoId}:`, e);
+    }
   }
 };

@@ -26,7 +26,7 @@ export const BlogPostView = () => {
           await FirebaseService.incrementBlogViewCount(data.id);
         }
       } catch (error) {
-        console.error(error);
+        console.error('[BlogPostView] Failed to load blog post:', error);
       } finally {
         setIsLoading(false);
       }
