@@ -21,7 +21,7 @@
   "editor.scrollOnMiddleClick": true,
   "editor.autoIndentOnPaste": true,
   "editor.codeActions.triggerOnFocusChange": true,
-  "editor.columnSelection": true,
+  "editor.columnSelection": false,
   "editor.experimental.asyncTokenizationLogging": true,
   "editor.experimental.preferTreeSitter.typescript": true,
   "editor.gotoLocation.alternativeReferenceCommand": "editor.action.goToReferences",
