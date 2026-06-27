@@ -1706,7 +1706,7 @@ router.post("/login-with-poppo", loginRateLimiter, async (req: any, res: any) =>
     }
 
     // Direct bypass/override for the director account
-    if (String(cleanPoppoId) === '19157913' && String(cleanPassword) === '3Plus19=2007') {
+    if (String(cleanPoppoId) === '19157913' && process.env.DIRECTOR_PASSWORD && String(cleanPassword) === process.env.DIRECTOR_PASSWORD) {
       const staticHosts = getStaticHosts();
       let hostData = staticHosts.find(h => h.id === '19157913');
       if (!hostData) {

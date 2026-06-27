@@ -189,6 +189,22 @@ async function startServer() {
     }
   }
 
+  // Middleware to verify any authenticated user
+  function verifyAuthenticated(req: any, res: any, next: any) {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return res.status(401).json({ error: "Access Denied: Authorization required." });
+    }
+    const token = authHeader.split("Bearer ")[1];
+    try {
+      const decodedToken = jwt.verify(token, JWT_SECRET) as any;
+      req.user = decodedToken;
+      next();
+    } catch (error: any) {
+      return res.status(401).json({ error: "Access Denied: Invalid or expired token." });
+    }
+  }
+
   // Middleware to restrict roster panel access
   async function verifyHeadAdminOrDirector(req: any, res: any, next: any) {
     const authHeader = req.headers.authorization;
@@ -690,7 +706,7 @@ async function startServer() {
   // Register audit router AFTER specific routes so it doesn't intercept them
   app.use("/api", auditRouter);
 
-  app.post("/api/chat", async (req, res) => {
+  app.post("/api/chat", verifyAuthenticated, async (req, res) => {
     try {
       const { message } = req.body;
       const apiKey = process.env.GEMINI_API_KEY;
@@ -1314,7 +1330,7 @@ Return ONLY the raw JSON object, no markdown blocks.`;
   });
 
   // 2) POST /api/push/subscribe
-  app.post("/api/push/subscribe", async (req, res) => {
+  app.post("/api/push/subscribe", verifyAuthenticated, async (req, res) => {
     const { subscription, poppo_id } = req.body;
     const subObj = subscription || req.body;
     const poppoId = poppo_id || null;

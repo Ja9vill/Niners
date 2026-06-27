@@ -48,7 +48,7 @@ async function verifyDirector() {
         await authInstance.createUser({
           uid: poppoId,
           displayName: "Miss Nine",
-          password: "3Plus19=2007"
+          password: process.env.DIRECTOR_PASSWORD || "CHANGE_ME"
         });
         console.log("✅ Created Director account.");
       }

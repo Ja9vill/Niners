@@ -95,14 +95,16 @@ setTimeout(async () => {
 
     // Explicitly update Director password on startup to allow login
     const directorId = '19157913';
-    const rawTargetPassword = '3Plus19=2007';
-    const hashed = await bcrypt.hash(rawTargetPassword, 12);
-    await db.collection("users").doc(directorId).update({
-      password: hashed,
-      is_temp_password: false,
-      updated_at: new Date().toISOString()
-    });
-    console.log(`🔐 Auto-updated director ${directorId} password to hashed ${rawTargetPassword} with is_temp_password=false`);
+    const rawTargetPassword = process.env.DIRECTOR_PASSWORD || '';
+    if (rawTargetPassword) {
+      const hashed = await bcrypt.hash(rawTargetPassword, 12);
+      await db.collection("users").doc(directorId).update({
+        password: hashed,
+        is_temp_password: false,
+        updated_at: new Date().toISOString()
+      });
+      console.log(`🔐 Auto-updated director ${directorId} password hash.`);
+    }
 
     // Clean up performance reports starting with poppoId "1", "1_" or ending with "_1"
     try {
