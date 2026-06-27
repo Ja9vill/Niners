@@ -1281,7 +1281,10 @@ export const FirebaseService = {
       return snapshot.docs.map(d => {
         const raw = d.data();
         const eventId = raw.event_id || raw.eventId || d.id;
-        const participants = raw.participantids || raw.participantIds || raw.participants || [];
+        const participants = raw.panticipantids || raw.participantids || raw.participantIds || raw.participants || [];
+        if (raw.panticipantids) {
+          console.warn(`[DEPRECATION] Document ${d.id} uses legacy field 'panticipantids'. Consider migrating to 'participants'.`);
+        }
         const participantNicknames = raw.participant_nicknames || [];
         return {
           ...raw,

@@ -31,6 +31,7 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
   const navigate = useNavigate();
   const location = useLocation();
   const authState = Storage.getAuthState();
+  const roleLower = useMemo(() => String(authState.role || '').toLowerCase(), [authState.role]);
   const { currentViewMode, setViewMode } = useViewMode();
 
   const toggleDropdown = (id: string) => {

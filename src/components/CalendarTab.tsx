@@ -113,7 +113,6 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
   const [isAdding, setIsAdding] = useState(false);
   const [matrixLoading, setMatrixLoading] = useState(false);
   const [livehouseMatrix, setLivehouseMatrix] = useState<any[]>([]);
-  const [selectedTimezone, setSelectedTimezone] = useState('UTC+8');
 
   // Multi-select Participants State
   const [selectedParticipants, setSelectedParticipants] = useState<string[]>([]);
