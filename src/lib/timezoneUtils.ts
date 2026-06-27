@@ -6,7 +6,9 @@ import { format, parseISO } from 'date-fns';
 export const isValidDateString = (dateStr: string): boolean => {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return false;
   const date = parseISO(dateStr);
-  return !isNaN(date.getTime());
+  if (isNaN(date.getTime())) return false;
+  // Check for date rollover (e.g., "2024-02-30" becomes "2024-03-01")
+  return format(date, 'yyyy-MM-dd') === dateStr;
 };
 
 /**
@@ -32,9 +34,9 @@ export const parseTimeStringToHourMin = (timeStr: string) => {
   const isPM = match12h[3] && match12h[3].toUpperCase() === 'PM';
   const isAM = match12h[3] && match12h[3].toUpperCase() === 'AM';
 
-  // If no AM/PM specified, assume 24-hour format
+  // If no AM/PM specified, assume 24-hour format and validate bounds
   if (!isAM && !isPM) {
-    // Keep as-is (already 24-hour format)
+    if (h > 23 || m > 59) return null; // Invalid 24-hour time
   } else {
     if (isPM && h < 12) h += 12;
     if (isAM && h === 12) h = 0;
@@ -66,9 +68,11 @@ export const getLocalTimezoneAbbreviation = (): string => {
 const formatSingleTimestamp = (ts: string, dateStr: string): string => {
   const parsed = parseTimeStringToHourMin(ts);
   if (!parsed) return ts;
+  if (!isValidDateString(dateStr)) return ts;
 
   const isoString = `${dateStr}T${parsed.h.toString().padStart(2, '0')}:${parsed.m.toString().padStart(2, '0')}:00+08:00`;
   const dateObj = new Date(isoString);
+  if (isNaN(dateObj.getTime())) return ts;
 
   let localH = dateObj.getHours();
   const localM = dateObj.getMinutes();
