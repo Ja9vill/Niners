@@ -473,9 +473,17 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
     const loadData = async () => {
       try {
         const firestoreEvents = await FirebaseService.getCalendarEvents();
-        if (firestoreEvents && firestoreEvents.length > 0) {
-          Storage.setEvents(firestoreEvents);
-          setEvents(firestoreEvents);
+        // Deduplicate by event_id or (title+date+from_time) composite key
+        const seen = new Set<string>();
+        const deduped = (firestoreEvents || []).filter(e => {
+          const key = e.event_id || `${e.title || ''}_${e.date || e.event_date || ''}_${e.from_time || e.time || ''}`;
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
+        if (deduped.length > 0) {
+          Storage.setEvents(deduped);
+          setEvents(deduped);
         } else {
           // If Firestore is empty, check if we have events in local storage
           const stored = Storage.getEvents();
@@ -1633,7 +1641,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                             className="px-3 py-1.5 bg-gradient-to-r from-[#FF8C00]/20 to-[#D4AF37]/20 hover:from-[#FF8C00]/30 hover:to-[#D4AF37]/30 border border-[#D4AF37]/50 text-[#FFD700] font-black text-[10px] uppercase tracking-wider rounded-lg transition-all shadow-[0_0_15px_rgba(255,140,0,0.2)] flex items-center gap-1.5 mt-1"
                           >
                             <CheckCircle2 size={12} />
-                            Attendance
+                            {attendanceRecord ? 'Update Attendance' : 'Submit Attendance'}
                           </button>
                         )}
                       </div>
@@ -1665,16 +1673,29 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
 
                       {/* Event Details */}
                       <div className="w-full bg-[#0a0806]/60 rounded-2xl border border-[#D4AF37]/10 p-5 flex flex-col gap-4 shadow-[inset_0_0_20px_rgba(0,0,0,0.5)]">
+                        {/* Event Title */}
+                        <div className="flex items-center gap-4">
+                          <div className="p-2.5 bg-[#D4AF37]/10 rounded-xl text-[#D4AF37] border border-[#D4AF37]/20">
+                            <CalendarIcon size={18} />
+                          </div>
+                          <div className="flex flex-col">
+                            <span className="text-[10px] uppercase tracking-[0.2em] text-[#D4AF37]/60 font-black mb-1">Event Title</span>
+                            <span className="text-sm font-black text-white/90 uppercase tracking-widest">{selectedEvent.event_title || selectedEvent.title || 'Untitled'}</span>
+                          </div>
+                        </div>
+
+                        {/* Event Type */}
                         <div className="flex items-center gap-4">
                           <div className="p-2.5 bg-[#D4AF37]/10 rounded-xl text-[#D4AF37] border border-[#D4AF37]/20">
                             <CalendarIcon size={18} />
                           </div>
                           <div className="flex flex-col">
                             <span className="text-[10px] uppercase tracking-[0.2em] text-[#D4AF37]/60 font-black mb-1">Event Type</span>
-                            <span className="text-sm font-black text-white/90 uppercase tracking-widest">{selectedEvent.type || 'Event'}</span>
+                            <span className="text-sm font-black text-white/90 uppercase tracking-widest">{selectedEvent.event_type || selectedEvent.type || 'Event'}</span>
                           </div>
                         </div>
 
+                        {/* Date & Time */}
                         <div className="flex items-center gap-4">
                           <div className="p-2.5 bg-gradient-to-br from-[#FF8C00]/10 to-[#FF4500]/10 rounded-xl text-[#FF8C00] border border-[#FF8C00]/20">
                             <Clock size={18} />
@@ -1685,7 +1706,9 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                               <span className="text-xs font-black text-[#FF8C00] uppercase tracking-widest">{format(new Date(selectedEvent.date), 'MMMM dd, yyyy')}</span>
                               <span className="text-sm font-black text-transparent bg-clip-text bg-gradient-to-r from-[#FFD700] to-[#FF8C00]">
                                 {(() => {
-                                  const displayTime = selectedEvent.time;
+                                  const displayTime = selectedEvent.from_time && selectedEvent.to_time
+                                    ? `${selectedEvent.from_time} - ${selectedEvent.to_time}`
+                                    : (selectedEvent.time || 'TBD');
                                   if (displayTime === 'TBD' || !displayTime) return displayTime;
                                   return formatLocalTime(displayTime, selectedEvent.date);
                                 })()}
@@ -1693,34 +1716,64 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                             </div>
                           </div>
                         </div>
+
+                        {/* Description */}
+                        {selectedEvent.event_description || selectedEvent.description ? (
+                          <div className="flex items-start gap-4">
+                            <div className="p-2.5 bg-white/5 rounded-xl text-white/40 border border-white/10 mt-0.5">
+                              <Info size={18} />
+                            </div>
+                            <div className="flex flex-col">
+                              <span className="text-[10px] uppercase tracking-[0.2em] text-white/40 font-black mb-1">Description</span>
+                              <span className="text-xs font-medium text-white/70 leading-relaxed">{selectedEvent.event_description || selectedEvent.description}</span>
+                            </div>
+                          </div>
+                        ) : null}
+
+                        {/* Host */}
+                        <div className="flex items-center gap-4">
+                          <div className="p-2.5 bg-[#D4AF37]/10 rounded-xl text-[#D4AF37] border border-[#D4AF37]/20">
+                            <User size={18} />
+                          </div>
+                          <div className="flex flex-col">
+                            <span className="text-[10px] uppercase tracking-[0.2em] text-[#D4AF37]/60 font-black mb-1">Host</span>
+                            <span className="text-sm font-black text-white/90">{selectedEvent.event_host_name || hostName}</span>
+                            <span className="text-[10px] text-[#A09E9A] font-mono">ID: {selectedEvent.event_host_id || selectedEvent.poppo_id || ''}</span>
+                          </div>
+                        </div>
                       </div>
 
                       {/* Participants Section */}
-                      {selectedEvent.participants && selectedEvent.participants.length > 0 && (
-                        <div className="mt-2">
-                          <h5 className="text-[9px] font-black text-[#D4AF37] uppercase tracking-widest mb-3 border-b border-white/5 pb-2">
-                            Performers / Hosts ({selectedEvent.participants.length})
-                          </h5>
-                          <div className="grid gap-3 grid-cols-4 sm:grid-cols-6">
-                            {selectedEvent.participants.map((pid, idx) => {
-                              const pUser = allUsers.find(u => String(u.poppo_id || u.poppoId || u.id) === String(pid));
-                              const pName = pUser ? (pUser.nickname || pUser.name) : pid;
-                              const pPhoto = pUser ? (pUser.photoUrl || pUser.profilePhotoUrl || pUser.photoURL) : null;
-                              const avatar = pPhoto || `https://ui-avatars.com/api/?name=${encodeURIComponent(pName)}&background=0a0806&color=D4AF37`;
-                              return (
-                                <div key={idx} className="flex flex-col items-center justify-start gap-1.5 p-1 transition-transform hover:scale-105">
-                                  <img src={avatar} alt={pName} className="w-10 h-10 sm:w-14 sm:h-14 rounded-full border border-[#D4AF37]/30 object-cover shadow-[0_0_10px_rgba(212,175,55,0.1)]" />
-                                  <span className="text-[9px] sm:text-[10px] font-bold text-white/80 text-center leading-tight line-clamp-1 w-full" title={pName}>{pName}</span>
-                                </div>
-                              )
-                            })}
-                          </div>
+                      {(() => {
+                        const pIds = selectedEvent.participantIds || selectedEvent.participants || [];
+                        const pNicknames = selectedEvent.participant_nicknames || [];
+                        if (pIds.length === 0) return null;
+                        return (
+                          <div className="mt-2">
+                            <h5 className="text-[9px] font-black text-[#D4AF37] uppercase tracking-widest mb-3 border-b border-white/5 pb-2">
+                              Participants ({pIds.length})
+                            </h5>
+                            <div className="grid gap-3 grid-cols-4 sm:grid-cols-6">
+                              {pIds.map((pid: string, idx: number) => {
+                                const nickFromArray = pNicknames[idx];
+                                const pUser = allUsers.find(u => String(u.poppo_id || u.poppoId || u.id) === String(pid));
+                                const pName = nickFromArray || (pUser ? (pUser.nickname || pUser.name) : pid);
+                                const pPhoto = pUser ? (pUser.photoUrl || pUser.profilePhotoUrl || pUser.photoURL) : null;
+                                const avatar = pPhoto || `https://ui-avatars.com/api/?name=${encodeURIComponent(pName)}&background=0a0806&color=D4AF37`;
+                                return (
+                                  <div key={idx} className="flex flex-col items-center justify-start gap-1.5 p-1 transition-transform hover:scale-105">
+                                    <img src={avatar} alt={pName} className="w-10 h-10 sm:w-14 sm:h-14 rounded-full border border-[#D4AF37]/30 object-cover shadow-[0_0_10px_rgba(212,175,55,0.1)]" />
+                                    <span className="text-[9px] sm:text-[10px] font-bold text-white/80 text-center leading-tight line-clamp-1 w-full" title={pName}>{pName}</span>
+                                  </div>
+                                )
+                              })}
+                            </div>
                         </div>
-                      )}
+                      );
+                    })()}
 
                       {/* Attendance Section */}
-                      {
-                        (attendanceRecord || isUpcoming === false) && (
+                      {(attendanceRecord || isUpcoming === false) && (
                           <div className="mt-4">
                             <h5 className="text-[9px] font-black text-[#D4AF37] uppercase tracking-widest mb-3 border-b border-white/5 pb-2">Attendance</h5>
                             <div className="flex flex-col gap-2">

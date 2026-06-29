@@ -791,35 +791,19 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
         ]
       });
 
-      links.push({
-        id: 'dropdown-reporting',
-        isDropdown: true,
-        label: 'Reporting',
-        icon: BarChart,
-        subLinks: [
-          { path: '/reporting/events', label: 'Events Log', icon: Calendar },
-          { path: '/reporting/attendance', label: 'Attendance Log', icon: ClipboardList },
-          { path: '/reporting/pk-performance', label: 'PK Performance', icon: Activity },
-          { path: '/reporting/fanbase-health', label: 'Fanbase Health', icon: Users }
-        ]
-      });
+      links.push({ path: '/reporting-logs', label: 'Reporting Logs', icon: BarChart });
 
       if (role === 'director') {
         links.push({ isDivider: true, id: 'div-2' });
         links.push({ isTitle: true, label: "Directors Access", id: 'title-access' });
-        links.push({ path: '/notifications-control', label: 'Notification Center', icon: Bell });
-
         links.push({
           id: 'dropdown-database',
           isDropdown: true,
           label: 'Database',
           icon: Database,
           subLinks: [
-            { path: '/profiles', label: 'Roster Management', icon: Users },
             { path: '/financial-data', label: 'Financial Data', icon: DollarSign },
             { path: '/cms/livehouse', label: 'Livehouse Data', icon: Calendar },
-            { path: '/collections-log', label: 'Collections Log', icon: Database },
-            { path: '/data-vault', label: 'Data Vault', icon: Shield },
             { path: '/provision-user', label: 'Provision User', icon: Plus }
           ]
         });

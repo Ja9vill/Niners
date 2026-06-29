@@ -9,13 +9,11 @@ import { useViewMode } from './hooks/useViewMode';
 // Pages & Tabs
 import { Login } from './pages/Login';
 const Overview = React.lazy(() => import('./pages/Overview').then(m => ({ default: m.Overview })));
-import { NotificationControlCenter } from './pages/NotificationControlCenter';
 import { RosterTab } from './components/RosterTab';
 import { CalendarTab } from './components/CalendarTab';
 import { DirectorOperations } from './pages/DirectorOperations';
 import { SystemLogsPage } from './pages/SystemLogsPage';
 import { HostProfileEditor } from './components/HostProfileEditor';
-import { ProfilesTab } from './components/ProfilesTab';
 import { PublicLayout } from './components/PublicLayout';
 import { PublicRoster } from './pages/PublicRoster';
 import { PublicCalendar } from './pages/PublicCalendar';
@@ -29,10 +27,7 @@ import NinersPage from './pages/NinersPage';
 const BlogManagement = React.lazy(() => import('./pages/cms/BlogManagement').then(m => ({ default: m.BlogManagement })));
 import { PageAssetsCMS } from './pages/cms/PageAssetsCMS';
 import { LivehouseData } from './pages/cms/LivehouseData';
-import { DataVault } from './pages/DataVault';
-
-import { ReportingPages } from './pages/ReportingPages';
-import { CollectionsLog } from './pages/CollectionsLog';
+import { ReportingLogs } from './pages/ReportingLogs';
 import { AgencyPolicy } from './pages/AgencyPolicy';
 import { OnboardingProcess } from './pages/OnboardingProcess';
 import { LoginSetup } from './pages/public/LoginSetup';
@@ -117,15 +112,6 @@ export default function App() {
           <Route path="report-data" element={<ReportData />} />
           <Route path="dashboard" element={<Navigate to="/overview" replace />} />
           <Route path="my-profile" element={<Navigate to="/profile" replace />} />
-          <Route
-            path="notifications-control"
-            element={
-              <RoleGuard roles={['director']}>
-                <NotificationControlCenter />
-              </RoleGuard>
-            }
-          />
-
           {/* My Profile — accessible to hosts and admin/manager/agent/head admin roles */}
           <Route
             path="profile"
@@ -135,17 +121,6 @@ export default function App() {
               </RoleGuard>
             }
           />
-
-          {/* All-member profile browser — restricted to director */}
-          <Route
-            path="profiles"
-            element={
-              <RoleGuard roles={['director']}>
-                <ProfilesTab />
-              </RoleGuard>
-            }
-          />
-
 
           {/* Team Analytics */}
           <Route
@@ -163,16 +138,6 @@ export default function App() {
             element={
               <RoleGuard roles={['director']}>
                 <DirectorOperations />
-              </RoleGuard>
-            }
-          />
-
-          {/* Data Vault */}
-          <Route
-            path="data-vault"
-            element={
-              <RoleGuard roles={['director', 'head admin', 'head_admin']}>
-                <DataVault />
               </RoleGuard>
             }
           />
@@ -267,37 +232,10 @@ export default function App() {
             }
           />
 
-          {/* Reporting Pages (Director & Head Admin Access) */}
-          <Route path="reporting/events" element={
+          {/* Reporting Logs (Director & Head Admin Access) */}
+          <Route path="reporting-logs" element={
             <RoleGuard roles={['director', 'head admin', 'head_admin']}>
-              <ReportingPages collectionName="calendar" reportType="Events Log" />
-            </RoleGuard>
-          } />
-          <Route path="reporting/attendance" element={
-            <RoleGuard roles={['director', 'head admin', 'head_admin']}>
-              <ReportingPages collectionName="attendance" reportType="Attendance Log" />
-            </RoleGuard>
-          } />
-          <Route path="reporting/pk-performance" element={
-            <RoleGuard roles={['director', 'head admin', 'head_admin']}>
-              <ReportingPages collectionName="pk_reports" reportType="PK Performance" />
-            </RoleGuard>
-          } />
-          <Route path="reporting/fanbase-health" element={
-            <RoleGuard roles={['director', 'head admin', 'head_admin']}>
-              <ReportingPages collectionName="fanbase_reports" reportType="Fanbase Health" />
-            </RoleGuard>
-          } />
-          <Route path="reporting/assigned-badges" element={
-            <RoleGuard roles={['director', 'head admin', 'head_admin']}>
-              <ReportingPages collectionName="users" filterField="badges" reportType="Assigned Badges" />
-            </RoleGuard>
-          } />
-
-          {/* Collections Log (Director Only) */}
-          <Route path="collections-log" element={
-            <RoleGuard roles={['director']}>
-              <CollectionsLog />
+              <ReportingLogs />
             </RoleGuard>
           } />
 

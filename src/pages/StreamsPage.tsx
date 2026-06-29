@@ -697,9 +697,7 @@ export const StreamsPage = () => {
   const st = streamSubTab;
 
   return (
-    <div className="p-4 md:p-8 space-y-6 mx-auto h-full overflow-y-auto custom-scrollbar">
-      <div className="max-w-7xl mx-auto w-full">
-        <div className="w-[92%] max-w-[360px] md:w-full md:max-w-none mx-auto">
+    <div className="p-3 sm:p-4 md:p-8 space-y-6 mx-auto h-full overflow-y-auto custom-scrollbar max-w-7xl">
         {/* ── Header / Host Selector ──────────────────────────────────────────── */}
         <div className="glass-card relative z-10 overflow-visible space-y-3 mb-4 p-3 md:p-4">
           <div className="flex items-center gap-2 mb-2">
@@ -813,7 +811,7 @@ export const StreamsPage = () => {
               </div>
 
               {/* ── Random PK — Live Metric Blocks ──────────────────────────── */}
-              <div className="grid grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3">
                 {[
                    { label: 'PK Rating', value: rpkRatingResult && (rpkFormData.pk_wins_percent || rpkFormData.pk_points || rpkFormData.pk_sessions) ? rpkRatingResult.rating.toFixed(1) : '—', suffix: '', color: '#c084fc', borderColor: 'rgba(192,132,252,0.4)', bg: 'rgba(192,132,252,0.2)', shadow: 'rgba(192,132,252,0.4)' },
                    { label: 'Win Rate', value: rpkFormData.pk_wins_percent || '—', suffix: '', color: '#fb7185', borderColor: 'rgba(251,113,133,0.4)', bg: 'rgba(251,113,133,0.2)', shadow: 'rgba(251,113,133,0.4)' },
@@ -1034,9 +1032,9 @@ export const StreamsPage = () => {
                         </div>
                       </div>
 
-                      <div className="mx-auto" style={{ width: '92%', maxWidth: '360px' }}>
+                      <div className="w-full">
                         <div className="relative rounded-2xl p-[1px] overflow-hidden" style={{ background: `linear-gradient(135deg, rgba(245,158,11,0.5), rgba(217,119,6,0.15), rgba(245,158,11,0.5))`, boxShadow: `0 0 40px rgba(245,158,11,0.12), 0 0 15px rgba(245,158,11,0.08)` }}>
-                          <div className="relative rounded-2xl p-4 space-y-3" style={{ background: 'rgba(8,4,2,0.88)', backdropFilter: 'blur(22px)', boxShadow: 'inset 0 1px 1px rgba(255,255,255,0.05), inset 0 0 30px rgba(245,158,11,0.04), 0 4px 16px rgba(0,0,0,0.4)' }}>
+                          <div className="relative rounded-2xl p-3 sm:p-4 space-y-3" style={{ background: 'rgba(8,4,2,0.88)', backdropFilter: 'blur(22px)', boxShadow: 'inset 0 1px 1px rgba(255,255,255,0.05), inset 0 0 30px rgba(245,158,11,0.04), 0 4px 16px rgba(0,0,0,0.4)' }}>
                             <h4 className="text-[10px] font-black uppercase tracking-widest" style={{ color: 'rgba(251,191,36,0.7)', textShadow: '0 0 12px rgba(251,191,36,0.3)' }}>Preview</h4>
                             <div className="overflow-x-auto">
                               <table className="w-full text-[10px] border-collapse">
@@ -1067,7 +1065,7 @@ export const StreamsPage = () => {
                     </div>
                   </div>
 
-                  <div className="mx-auto" style={{ width: '92%', maxWidth: '360px' }}>
+                  <div className="w-full">
                     <div className="space-y-4">
                       <StatusMessages error={submitError} success={submitSuccess} />
                       <SubmitBtn onClick={submitWeeklyReport} disabled={isSubmitting || !selectedHostId} loading={isSubmitting} label="Add Report" color="#fbbf24" />
@@ -1126,9 +1124,9 @@ export const StreamsPage = () => {
                         </div>
                       </div>
 
-                      <div className="mx-auto" style={{ width: '92%', maxWidth: '360px' }}>
+                      <div className="w-full">
                         <div className="relative rounded-2xl p-[1px] overflow-hidden" style={{ background: `linear-gradient(135deg, rgba(16,185,129,0.5), rgba(5,150,105,0.15), rgba(16,185,129,0.5))`, boxShadow: `0 0 40px rgba(16,185,129,0.12), 0 0 15px rgba(16,185,129,0.08)` }}>
-                          <div className="relative rounded-2xl p-4 space-y-3" style={{ background: 'rgba(8,4,2,0.88)', backdropFilter: 'blur(22px)', boxShadow: 'inset 0 1px 1px rgba(255,255,255,0.05), inset 0 0 30px rgba(16,185,129,0.04), 0 4px 16px rgba(0,0,0,0.4)' }}>
+                          <div className="relative rounded-2xl p-3 sm:p-4 space-y-3" style={{ background: 'rgba(8,4,2,0.88)', backdropFilter: 'blur(22px)', boxShadow: 'inset 0 1px 1px rgba(255,255,255,0.05), inset 0 0 30px rgba(16,185,129,0.04), 0 4px 16px rgba(0,0,0,0.4)' }}>
                             <h4 className="text-[10px] font-black uppercase tracking-widest" style={{ color: 'rgba(52,211,153,0.7)', textShadow: '0 0 12px rgba(52,211,153,0.3)' }}>Preview</h4>
                           <div className="overflow-x-auto max-h-60 overflow-y-auto custom-scrollbar">
                             <table className="w-full text-[10px] border-collapse">
@@ -1159,7 +1157,7 @@ export const StreamsPage = () => {
                     </div>
                   </div>
 
-                  <div className="mx-auto" style={{ width: '92%', maxWidth: '360px' }}>
+                  <div className="w-full">
                     <div className="space-y-4">
                       <StatusMessages error={submitError} success={submitSuccess} />
                       <SubmitBtn onClick={submitMonthlyReport} disabled={isSubmitting || !selectedHostId} loading={isSubmitting} label="Add Report" color="#34d399" />
@@ -1372,8 +1370,6 @@ export const StreamsPage = () => {
         </div>
         );
       })()}
-        </div>
-      </div>
     </div>
   </div>
   );
