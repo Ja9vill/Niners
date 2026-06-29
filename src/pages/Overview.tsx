@@ -207,6 +207,11 @@ export const Overview = () => {
 
         // Combine old reports + new agent_financial_reports
         const oldReports = fetchedReports.filter(r => r.docId !== '_schema_template' && r.poppoId);
+        const parseNum = (v: any): number => Number(String(v ?? '0').replace(/,/g, '')) || 0;
+        const durToMin = (d: string): number => {
+          const p = d.split(':').map(Number);
+          return p[0] * 60 + (p[1] || 0) + Math.round((p[2] || 0) / 60);
+        };
         const transformedNew = newReports.map((r: any) => ({
           ...r,
           poppoId: r.poppo_id,
@@ -214,11 +219,11 @@ export const Overview = () => {
           monthName: new Date(r.from_date).toLocaleString('default', { month: 'long' }),
           year: new Date(r.from_date).getFullYear().toString(),
           earningsBreakdown: {
-            totalEarningsOfPoints: r.total_point,
-            liveDurationMinutes: r.total_duration,
-            agentCommission: r.agent_commission,
-            superSalary: r.super_salary,
-            superRank: r.super_rank,
+            totalEarningsOfPoints: parseNum(r.total_points || r.total_point),
+            liveDurationMinutes: durToMin(r.total_duration || '0'),
+            agentCommission: parseNum(r.agent_commission),
+            superSalary: parseNum(r.super_salary),
+            superRank: parseNum(r.super_rank),
           },
           owner_role: r.agent_id === '19381364' ? 'Agency' : 'Agent',
         }));

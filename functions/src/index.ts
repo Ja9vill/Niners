@@ -1,14 +1,7 @@
-import { onCall, HttpsError, type CallableRequest } from "firebase-functions/v2/https";
-import { onSchedule } from "firebase-functions/v2/scheduler";
+import * as functions from "firebase-functions/v1";
 import { getAuth } from "firebase-admin/auth";
 import { initializeApp } from "firebase-admin/app";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
-import { setGlobalOptions } from "firebase-functions/v2";
-
-// Use the explicit service account instead of the missing default compute service account
-setGlobalOptions({ 
-  serviceAccount: "nine-dashboard-sa@gen-lang-client-0222945352.iam.gserviceaccount.com" 
-});
 
 // Initialize Firebase Admin SDK
 initializeApp();
@@ -38,18 +31,15 @@ async function verifyPoppoCredentials(poppoId: string, password: string): Promis
 }
 
 /**
- * 2nd-Gen HTTPS Callable Cloud Function for custom Poppo ID authentication.
+ * 1st-Gen HTTPS Callable Cloud Function for custom Poppo ID authentication.
  */
-export const authenticatePoppoUser = onCall(
-  {
-    serviceAccount: "nine-dashboard-sa@gen-lang-client-0222945352.iam.gserviceaccount.com"
-  },
-  async (request: CallableRequest<AuthenticatePoppoRequest>): Promise<AuthenticatePoppoResponse> => {
-    const { data } = request;
+const fnOpts = { serviceAccount: "nine-dashboard-sa@gen-lang-client-0222945352.iam.gserviceaccount.com" };
 
+export const authenticatePoppoUser = functions.runWith(fnOpts).https.onCall(
+  async (data: AuthenticatePoppoRequest, context: functions.https.CallableContext): Promise<AuthenticatePoppoResponse> => {
     // 1. Input validation & type checks
     if (!data || typeof data.poppoId !== "string" || typeof data.password !== "string") {
-      throw new HttpsError(
+      throw new functions.https.HttpsError(
         "invalid-argument",
         "The function must be called with valid 'poppoId' and 'password' strings."
       );
@@ -59,7 +49,7 @@ export const authenticatePoppoUser = onCall(
     const password = data.password.trim();
 
     if (poppoId.length === 0 || password.length === 0) {
-      throw new HttpsError(
+      throw new functions.https.HttpsError(
         "invalid-argument",
         "Poppo ID and password cannot be empty values."
       );
@@ -71,14 +61,14 @@ export const authenticatePoppoUser = onCall(
       isCredentialValid = await verifyPoppoCredentials(poppoId, password);
     } catch (dbError: any) {
       console.error("Database lookup error during credential validation:", dbError.message || dbError);
-      throw new HttpsError(
+      throw new functions.https.HttpsError(
         "internal",
         "An internal database lookup error occurred. Please try again later."
       );
     }
 
     if (!isCredentialValid) {
-      throw new HttpsError(
+      throw new functions.https.HttpsError(
         "unauthenticated",
         "Authentication failed. Invalid Poppo ID or password."
       );
@@ -93,7 +83,7 @@ export const authenticatePoppoUser = onCall(
     } catch (tokenError: any) {
       // Log full stack trace internally, hide internal SDK details from client
       console.error(`Failed to generate custom token for UID ${poppoId}:`, tokenError.message || tokenError);
-      throw new HttpsError(
+      throw new functions.https.HttpsError(
         "internal",
         "Failed to generate session token. Please contact site administrators."
       );
@@ -105,12 +95,8 @@ export const authenticatePoppoUser = onCall(
  * Scheduled function to automatically delete system_logs older than 30 days.
  * Runs every day at midnight (UTC).
  */
-export const cleanupOldSystemLogs = onSchedule(
-  {
-    schedule: "every day 00:00",
-    serviceAccount: "nine-dashboard-sa@gen-lang-client-0222945352.iam.gserviceaccount.com"
-  }, 
-  async (event) => {
+export const cleanupOldSystemLogs = functions.runWith(fnOpts).pubsub.schedule("every day 00:00").onRun(
+  async (_event) => {
     const db = getFirestore();
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
@@ -173,12 +159,8 @@ function parseManilaTimeToUTC(dateStr: string, timeStr: string): number {
  * Scheduled function to check upcoming events and post announcements.
  * Runs every 5 minutes.
  */
-export const checkUpcomingEvents = onSchedule(
-  {
-    schedule: "every 5 minutes",
-    serviceAccount: "nine-dashboard-sa@gen-lang-client-0222945352.iam.gserviceaccount.com"
-  }, 
-  async (event) => {
+export const checkUpcomingEvents = functions.runWith(fnOpts).pubsub.schedule("every 5 minutes").onRun(
+  async (_event) => {
     const db = getFirestore();
   const now = Date.now();
   
@@ -253,12 +235,8 @@ export const checkUpcomingEvents = onSchedule(
  * Scheduled function to automatically sync Livehouse Spreadsheet data.
  * Runs every 15 minutes.
  */
-export const autoSyncLivehouseData = onSchedule(
-  {
-    schedule: "every 15 minutes",
-    serviceAccount: "nine-dashboard-sa@gen-lang-client-0222945352.iam.gserviceaccount.com"
-  }, 
-  async (event) => {
+export const autoSyncLivehouseData = functions.runWith(fnOpts).pubsub.schedule("every 15 minutes").onRun(
+  async (_event) => {
     const API_URL = "https://script.google.com/macros/s/AKfycbxM3XxkT30dpaNbVSsUFVlLhSCejbcZcIizqEE1StZpj4nKGGMmMSzN0xn0tmYHQuuwaQ/exec";
   const db = getFirestore();
   

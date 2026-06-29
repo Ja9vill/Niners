@@ -426,28 +426,32 @@ export interface AgentFinancialReport {
   agent_id: string;
   poppo_id: string;
   nickname: string;
-  type: 'Monthly' | 'Weekly' | 'Daily';
+  type: 'monthly' | 'weekly' | 'daily';
   solo_live_duration: string;
   party_live_duration: string;
-  total_point: number;
-  agent_commission: number;
-  solo_live_earnings: number;
-  party_live_earnings: number;
-  private_chat: number;
-  tips: number;
-  platform_reward: number;
-  other_earnings: number;
-  platform_salary: number;
-  super_salary: number;
-  super_rank: number;
+  total_points: string;
+  agent_commission: string;
+  solo_live_earnings: string;
+  party_live_earnings: string;
+  private_chat: string;
+  tips: string;
+  platform_reward: string;
+  other_earnings: string;
+  platform_salary: string;
+  super_salary: string;
+  super_rank: string;
   stream_level: number;
-  total_incentives: number;
-  total_duration: number;
-  total_earnings: number;
+  total_incentives: string;
+  total_duration: string;
+  total_earnings: string;
+  total_income: string;
   from_date: string;
   to_date: string;
   created_at: string;
   updated_at: string;
+  submitted_by_id?: string;
+  submitted_by_name?: string;
+  submitted_by_role: string;
 }
 
 export interface UserRegistration {

@@ -1,16 +1,43 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.autoSyncLivehouseData = exports.checkUpcomingEvents = exports.cleanupOldSystemLogs = exports.authenticatePoppoUser = void 0;
-const https_1 = require("firebase-functions/v2/https");
-const scheduler_1 = require("firebase-functions/v2/scheduler");
+const functions = __importStar(require("firebase-functions/v1"));
 const auth_1 = require("firebase-admin/auth");
 const app_1 = require("firebase-admin/app");
 const firestore_1 = require("firebase-admin/firestore");
-const v2_1 = require("firebase-functions/v2");
-// Use the explicit service account instead of the missing default compute service account
-(0, v2_1.setGlobalOptions)({
-    serviceAccount: "nine-dashboard-sa@gen-lang-client-0222945352.iam.gserviceaccount.com"
-});
 // Initialize Firebase Admin SDK
 (0, app_1.initializeApp)();
 /**
@@ -26,20 +53,18 @@ async function verifyPoppoCredentials(poppoId, password) {
     return false;
 }
 /**
- * 2nd-Gen HTTPS Callable Cloud Function for custom Poppo ID authentication.
+ * 1st-Gen HTTPS Callable Cloud Function for custom Poppo ID authentication.
  */
-exports.authenticatePoppoUser = (0, https_1.onCall)({
-    serviceAccount: "nine-dashboard-sa@gen-lang-client-0222945352.iam.gserviceaccount.com"
-}, async (request) => {
-    const { data } = request;
+const fnOpts = { serviceAccount: "nine-dashboard-sa@gen-lang-client-0222945352.iam.gserviceaccount.com" };
+exports.authenticatePoppoUser = functions.runWith(fnOpts).https.onCall(async (data, context) => {
     // 1. Input validation & type checks
     if (!data || typeof data.poppoId !== "string" || typeof data.password !== "string") {
-        throw new https_1.HttpsError("invalid-argument", "The function must be called with valid 'poppoId' and 'password' strings.");
+        throw new functions.https.HttpsError("invalid-argument", "The function must be called with valid 'poppoId' and 'password' strings.");
     }
     const poppoId = data.poppoId.trim();
     const password = data.password.trim();
     if (poppoId.length === 0 || password.length === 0) {
-        throw new https_1.HttpsError("invalid-argument", "Poppo ID and password cannot be empty values.");
+        throw new functions.https.HttpsError("invalid-argument", "Poppo ID and password cannot be empty values.");
     }
     // 2. Validate credentials against target authentication store
     let isCredentialValid = false;
@@ -48,10 +73,10 @@ exports.authenticatePoppoUser = (0, https_1.onCall)({
     }
     catch (dbError) {
         console.error("Database lookup error during credential validation:", dbError.message || dbError);
-        throw new https_1.HttpsError("internal", "An internal database lookup error occurred. Please try again later.");
+        throw new functions.https.HttpsError("internal", "An internal database lookup error occurred. Please try again later.");
     }
     if (!isCredentialValid) {
-        throw new https_1.HttpsError("unauthenticated", "Authentication failed. Invalid Poppo ID or password.");
+        throw new functions.https.HttpsError("unauthenticated", "Authentication failed. Invalid Poppo ID or password.");
     }
     // 3. Mint custom Firebase Auth Token
     try {
@@ -62,17 +87,14 @@ exports.authenticatePoppoUser = (0, https_1.onCall)({
     catch (tokenError) {
         // Log full stack trace internally, hide internal SDK details from client
         console.error(`Failed to generate custom token for UID ${poppoId}:`, tokenError.message || tokenError);
-        throw new https_1.HttpsError("internal", "Failed to generate session token. Please contact site administrators.");
+        throw new functions.https.HttpsError("internal", "Failed to generate session token. Please contact site administrators.");
     }
 });
 /**
  * Scheduled function to automatically delete system_logs older than 30 days.
  * Runs every day at midnight (UTC).
  */
-exports.cleanupOldSystemLogs = (0, scheduler_1.onSchedule)({
-    schedule: "every day 00:00",
-    serviceAccount: "nine-dashboard-sa@gen-lang-client-0222945352.iam.gserviceaccount.com"
-}, async (event) => {
+exports.cleanupOldSystemLogs = functions.runWith(fnOpts).pubsub.schedule("every day 00:00").onRun(async (_event) => {
     const db = (0, firestore_1.getFirestore)();
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
@@ -130,10 +152,7 @@ function parseManilaTimeToUTC(dateStr, timeStr) {
  * Scheduled function to check upcoming events and post announcements.
  * Runs every 5 minutes.
  */
-exports.checkUpcomingEvents = (0, scheduler_1.onSchedule)({
-    schedule: "every 5 minutes",
-    serviceAccount: "nine-dashboard-sa@gen-lang-client-0222945352.iam.gserviceaccount.com"
-}, async (event) => {
+exports.checkUpcomingEvents = functions.runWith(fnOpts).pubsub.schedule("every 5 minutes").onRun(async (_event) => {
     const db = (0, firestore_1.getFirestore)();
     const now = Date.now();
     try {
@@ -199,10 +218,7 @@ exports.checkUpcomingEvents = (0, scheduler_1.onSchedule)({
  * Scheduled function to automatically sync Livehouse Spreadsheet data.
  * Runs every 15 minutes.
  */
-exports.autoSyncLivehouseData = (0, scheduler_1.onSchedule)({
-    schedule: "every 15 minutes",
-    serviceAccount: "nine-dashboard-sa@gen-lang-client-0222945352.iam.gserviceaccount.com"
-}, async (event) => {
+exports.autoSyncLivehouseData = functions.runWith(fnOpts).pubsub.schedule("every 15 minutes").onRun(async (_event) => {
     const API_URL = "https://script.google.com/macros/s/AKfycbxM3XxkT30dpaNbVSsUFVlLhSCejbcZcIizqEE1StZpj4nKGGMmMSzN0xn0tmYHQuuwaQ/exec";
     const db = (0, firestore_1.getFirestore)();
     try {

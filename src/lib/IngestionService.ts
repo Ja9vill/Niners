@@ -12,9 +12,55 @@ function now(): string {
   return new Date().toISOString();
 }
 
-function generateDocId(agentId: string, type: string, fromDate: string): string {
-  const clean = fromDate.replace(/[/,\s]/g, '-');
-  return `${agentId}_${type}_${clean}`;
+function pad2(n: number): string {
+  return String(n).padStart(2, '0');
+}
+
+function formatDateStr(d: Date): string {
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+}
+
+function lastDayOfMonth(y: number, m: number): number {
+  return new Date(y, m, 0).getDate();
+}
+
+function addDuration(a: string, b: string): string {
+  const toSec = (s: string) => { const p = s.split(':').map(Number); return p[0] * 3600 + p[1] * 60 + (p[2] || 0); };
+  const total = toSec(a) + toSec(b);
+  return `${pad2(Math.floor(total / 3600))}:${pad2(Math.floor((total % 3600) / 60))}:${pad2(total % 60)}`;
+}
+
+function fixDuration(val: string): string {
+  if (!val) return '00:00:00';
+  const parts = val.split(':');
+  if (parts.length === 3) return val;
+  if (parts.length === 2) return `${parts[0]}:${parts[1]}:00`;
+  return '00:00:00';
+}
+
+function fmtNum(n: number): string {
+  return Math.round(n).toLocaleString('en-US');
+}
+
+function parseNum(v: string): number {
+  return Number(String(v).replace(/[^0-9.\-]/g, '')) || 0;
+}
+
+function generateDocId(poppoId: string, type: string, fromDate: string, toDate: string): string {
+  if (type === 'daily') return `${poppoId}_${type}_${fromDate}`;
+  return `${poppoId}_${type}_${fromDate}_to_${toDate}`;
+}
+
+function parseReportType(fromDate: string, toDate: string): 'monthly' | 'weekly' | 'daily' {
+  if (fromDate === toDate) return 'daily';
+  const from = new Date(fromDate);
+  const to = new Date(toDate);
+  const diffDays = Math.round((to.getTime() - from.getTime()) / (1000 * 60 * 60 * 24));
+  if (diffDays <= 7 && from.getDay() === 1 && to.getDay() === 0) return 'weekly';
+  const ld = lastDayOfMonth(from.getFullYear(), from.getMonth() + 1);
+  if (from.getDate() === 1 && to.getDate() === ld) return 'monthly';
+  if (diffDays <= 7) return 'weekly';
+  return 'monthly';
 }
 
 export interface ParsedCSVRow {
@@ -22,7 +68,7 @@ export interface ParsedCSVRow {
   nickname: string;
   solo_live_duration: string;
   party_live_duration: string;
-  total_point: number;
+  total_points: number;
   agent_commission: number;
   solo_live_earnings: number;
   party_live_earnings: number;
@@ -58,26 +104,6 @@ export interface UploadHistoryNode {
 
 export const IngestionService = {
 
-  /** 0. Migrate legacy collection */
-  async migrateLegacyData(): Promise<number> {
-    let migratedCount = 0;
-    try {
-      const legacySnap = await getDocs(collection(db, 'director_performance_reports'));
-      const batch = writeBatch(db);
-      legacySnap.docs.forEach(docSnap => {
-        const data = docSnap.data();
-        const newRef = doc(collection(db, AGENT_REPORTS_COL), docSnap.id);
-        batch.set(newRef, { ...data, agent_id: '19381364' });
-        batch.delete(docSnap.ref);
-        migratedCount++;
-      });
-      if (migratedCount > 0) await batch.commit();
-    } catch (e) {
-      console.warn('[IngestionService] Migration skipped or already done:', e);
-    }
-    return migratedCount;
-  },
-
   /** 1. Parse CSV text into rows */
   parseCSV(csvText: string): ParsedCSVRow[] {
     const lines = csvText.trim().split('\n');
@@ -88,16 +114,12 @@ export const IngestionService = {
       if (!line) continue;
       const cols = line.split(',').map(c => c.trim().replace(/^"|"$/g, ''));
       if (cols.length < 15) continue;
-      const parseNum = (v: string): number => {
-        const cleaned = v.replace(/[^0-9.\-]/g, '');
-        return parseFloat(cleaned) || 0;
-      };
       rows.push({
         poppo_id: cols[0],
         nickname: cols[1],
-        solo_live_duration: cols[2] || '00:00:00',
-        party_live_duration: cols[3] || '00:00:00',
-        total_point: parseNum(cols[4]),
+        solo_live_duration: fixDuration(cols[2] || ''),
+        party_live_duration: fixDuration(cols[3] || ''),
+        total_points: parseNum(cols[4]),
         agent_commission: parseNum(cols[5]),
         solo_live_earnings: parseNum(cols[6]),
         party_live_earnings: parseNum(cols[7]),
@@ -133,56 +155,74 @@ export const IngestionService = {
     });
   },
 
-  /** 3. Save financial report to agent_financial_reports */
+  /** 3. Check for duplicate before saving */
+  async checkDuplicate(
+    poppoId: string,
+    type: string,
+    fromDate: string,
+    toDate: string,
+  ): Promise<boolean> {
+    const q = query(
+      collection(db, AGENT_REPORTS_COL),
+      where('poppo_id', '==', poppoId),
+      where('type', '==', type),
+      where('from_date', '==', fromDate),
+      where('to_date', '==', toDate),
+    );
+    const snap = await getDocs(q);
+    return snap.size > 0;
+  },
+
+  /** 4. Save financial report to agent_financial_reports */
   async saveReport(
     row: ParsedCSVRow,
     agentId: string,
-    reportType: 'Monthly' | 'Weekly' | 'Daily',
+    reportType: 'monthly' | 'weekly' | 'daily',
     fromDate: string,
     toDate: string,
     loggedInName: string,
   ): Promise<string> {
-    const docId = generateDocId(agentId, reportType, fromDate);
-    const durationToMinutes = (d: string): number => {
-      const parts = d.split(':');
-      if (parts.length === 3) return parseInt(parts[0]) * 60 + parseInt(parts[1]) + Math.round(parseInt(parts[2]) / 60);
-      if (parts.length === 2) return parseInt(parts[0]) * 60 + parseInt(parts[1]);
-      return parseInt(parts[0]) || 0;
-    };
-    const soloMin = durationToMinutes(row.solo_live_duration);
-    const partyMin = durationToMinutes(row.party_live_duration);
+    const docId = generateDocId(row.poppo_id, reportType, fromDate, toDate);
+    const soloDur = fixDuration(row.solo_live_duration);
+    const partyDur = fixDuration(row.party_live_duration);
+    const totalDur = addDuration(soloDur, partyDur);
+    const totalIncentives = row.super_salary + row.super_rank;
+    const totalEarnings = row.total_points + totalIncentives;
+
     const report: AgentFinancialReport = {
       agent_id: agentId,
       poppo_id: row.poppo_id,
       nickname: row.nickname,
       type: reportType,
-      solo_live_duration: row.solo_live_duration,
-      party_live_duration: row.party_live_duration,
-      total_point: row.total_point,
-      agent_commission: row.agent_commission,
-      solo_live_earnings: row.solo_live_earnings,
-      party_live_earnings: row.party_live_earnings,
-      private_chat: row.private_chat,
-      tips: row.tips,
-      platform_reward: row.platform_reward,
-      other_earnings: row.other_earnings,
-      platform_salary: row.platform_salary,
-      super_salary: row.super_salary,
-      super_rank: row.super_rank,
+      solo_live_duration: soloDur,
+      party_live_duration: partyDur,
+      total_points: fmtNum(row.total_points),
+      agent_commission: fmtNum(row.agent_commission),
+      solo_live_earnings: fmtNum(row.solo_live_earnings),
+      party_live_earnings: fmtNum(row.party_live_earnings),
+      private_chat: fmtNum(row.private_chat),
+      tips: fmtNum(row.tips),
+      platform_reward: fmtNum(row.platform_reward),
+      other_earnings: fmtNum(row.other_earnings),
+      platform_salary: fmtNum(row.platform_salary),
+      super_salary: fmtNum(row.super_salary),
+      super_rank: fmtNum(row.super_rank),
       stream_level: row.stream_level,
-      total_incentives: row.super_salary + row.super_rank,
-      total_duration: soloMin + partyMin,
-      total_earnings: row.total_point + row.super_salary + row.super_rank,
+      total_incentives: fmtNum(totalIncentives),
+      total_duration: totalDur,
+      total_earnings: fmtNum(totalEarnings),
+      total_income: fmtNum(totalEarnings),
       from_date: fromDate,
       to_date: toDate,
       created_at: now(),
       updated_at: now(),
+      submitted_by_role: 'agent',
     };
     await setDoc(doc(db, AGENT_REPORTS_COL, docId), report, { merge: false });
     return docId;
   },
 
-  /** 4. Get all agents for Director dropdown */
+  /** 5. Get all agents for Director dropdown */
   async getAgentList(): Promise<{ poppo_id: string; nickname: string }[]> {
     const q = query(collection(db, USERS_COL), where('role', '==', 'Agent'));
     const snap = await getDocs(q);
@@ -194,7 +234,7 @@ export const IngestionService = {
     return agents.sort((a, b) => a.nickname.localeCompare(b.nickname));
   },
 
-  /** 5. Provision — create user_registration or users directly */
+  /** 6. Provision — create user_registration or users directly */
   async provisionUser(
     row: ProvisionRow,
     loggedInRole: string,
@@ -238,7 +278,7 @@ export const IngestionService = {
     }
   },
 
-  /** 6. Get upload history tree */
+  /** 7. Get upload history tree */
   async getUploadHistory(agentId: string, loggedInRole: string, loggedInAgentId: string): Promise<UploadHistoryNode[]> {
     let reportsQuery;
     if (loggedInRole === 'Agent') {
@@ -264,7 +304,6 @@ export const IngestionService = {
         agentMap.get(r.agent_id)!.push(r);
         if (!agentNames.has(r.agent_id) && r.nickname) agentNames.set(r.agent_id, r.nickname);
       }
-      // Fetch agent nicknames from users collection for agents
       const agentList = await this.getAgentList();
       for (const a of agentList) {
         if (!agentNames.has(a.poppo_id)) agentNames.set(a.poppo_id, a.nickname);
@@ -292,7 +331,7 @@ export const IngestionService = {
       if (!typeMap.has(r.type)) typeMap.set(r.type, []);
       typeMap.get(r.type)!.push(r);
     }
-    const types = ['Daily', 'Weekly', 'Monthly'];
+    const types = ['daily', 'weekly', 'monthly'];
     const tree: UploadHistoryNode[] = [];
     for (const t of types) {
       const treports = typeMap.get(t);
@@ -300,7 +339,7 @@ export const IngestionService = {
       const typeNode: UploadHistoryNode = { id: `type_${t}`, label: t, children: [] };
       const yearMap = new Map<string, AgentFinancialReport[]>();
       for (const r of treports) {
-        const year = r.from_date ? new Date(r.from_date).getFullYear().toString() : 'Unknown';
+        const year = r.from_date ? r.from_date.substring(0, 4) : 'Unknown';
         if (!yearMap.has(year)) yearMap.set(year, []);
         yearMap.get(year)!.push(r);
       }
@@ -308,18 +347,21 @@ export const IngestionService = {
         const yearNode: UploadHistoryNode = { id: `year_${t}_${year}`, label: year, children: [] };
         const monthMap = new Map<string, AgentFinancialReport[]>();
         for (const r of yreports) {
-          const month = r.from_date ? new Date(r.from_date).toLocaleString('default', { month: 'long' }) : 'Unknown';
-          if (!monthMap.has(month)) monthMap.set(month, []);
-          monthMap.get(month)!.push(r);
+          const parts = r.from_date ? r.from_date.split('-') : [];
+          const monthNum = parts[1] || '01';
+          const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+          const monthLabel = months[parseInt(monthNum) - 1] || 'Unknown';
+          if (!monthMap.has(monthLabel)) monthMap.set(monthLabel, []);
+          monthMap.get(monthLabel)!.push(r);
         }
         for (const [month, mreports] of monthMap) {
           const monthNode: UploadHistoryNode = { id: `month_${t}_${year}_${month}`, label: month, children: [] };
           for (const r of mreports) {
-            const leafLabel = t === 'Daily'
+            const leafLabel = t === 'daily'
               ? r.from_date
-              : t === 'Weekly'
+              : t === 'weekly'
                 ? `${r.from_date} - ${r.to_date}`
-                : r.from_date ? new Date(r.from_date).toLocaleString('default', { month: 'long', year: 'numeric' }) : r.from_date;
+                : r.from_date ? new Date(r.from_date + 'T12:00:00').toLocaleString('default', { month: 'long', year: 'numeric' }) : r.from_date;
             monthNode.children!.push({
               id: r.poppo_id + '_' + r.from_date,
               label: leafLabel || r.from_date,
@@ -335,17 +377,17 @@ export const IngestionService = {
     return tree;
   },
 
-  /** 7. Delete a report */
+  /** 8. Delete a report */
   async deleteReport(docId: string): Promise<void> {
     await deleteDoc(doc(db, AGENT_REPORTS_COL, docId));
   },
 
-  /** 8. Update a report */
+  /** 9. Update a report */
   async updateReport(docId: string, data: Partial<AgentFinancialReport>): Promise<void> {
     await setDoc(doc(db, AGENT_REPORTS_COL, docId), { ...data, updated_at: now() }, { merge: true });
   },
 
-  /** 9. Get exposure count from attendance */
+  /** 10. Get exposure count from attendance */
   async getExposureCount(poppoId: string): Promise<number> {
     try {
       const q = query(collection(db, ATTENDANCE_COL), where('attendees', 'array-contains', poppoId));
@@ -356,7 +398,7 @@ export const IngestionService = {
     }
   },
 
-  /** 10. Get reports for overview page */
+  /** 11. Get reports for overview page */
   async getReportsForOverview(agentId: string): Promise<AgentFinancialReport[]> {
     const q = query(
       collection(db, AGENT_REPORTS_COL),
@@ -367,7 +409,7 @@ export const IngestionService = {
     return snap.docs.map(d => ({ id: d.id, ...d.data() as AgentFinancialReport }));
   },
 
-  /** 11. Request agent assignment */
+  /** 12. Request agent assignment */
   async requestAgentAssignment(userId: string, nickname: string, agentId: string): Promise<void> {
     const timestamp = now();
     const docId = `assign_req_${userId}_${timestamp}`;
@@ -380,7 +422,7 @@ export const IngestionService = {
     });
   },
 
-  /** 12. Get matched nickname from users */
+  /** 13. Get matched nickname from users */
   async getMatchedNickname(poppoId: string): Promise<string | null> {
     try {
       const snap = await getDoc(doc(db, USERS_COL, poppoId));
@@ -394,7 +436,7 @@ export const IngestionService = {
     }
   },
 
-  /** 13. Get a single user's agent_id */
+  /** 14. Get a single user's agent_id */
   async getUserAgentId(poppoId: string): Promise<string | null> {
     try {
       const snap = await getDoc(doc(db, USERS_COL, poppoId));
@@ -407,7 +449,7 @@ export const IngestionService = {
     }
   },
 
-  /** 14. Get all users for attendance matching */
+  /** 15. Get all users for attendance matching */
   async getAllUsers(): Promise<{ poppo_id: string; nickname: string; role: string; agent_id?: string }[]> {
     const snap = await getDocs(collection(db, USERS_COL));
     return snap.docs.map(d => {
@@ -421,7 +463,7 @@ export const IngestionService = {
     });
   },
 
-  /** 15. Get attendance documents */
+  /** 16. Get attendance documents */
   async getAttendanceDocs(): Promise<{ id: string; attendees: string[] }[]> {
     const snap = await getDocs(collection(db, ATTENDANCE_COL));
     return snap.docs.map(d => ({

@@ -4,7 +4,7 @@ import { Storage } from '../lib/storage';
 import { IngestionService, ParsedCSVRow, PreviewRow, UploadHistoryNode, ProvisionRow } from '../lib/IngestionService';
 import { cn } from '../lib/utils';
 
-type ReportType = 'Monthly' | 'Weekly' | 'Daily';
+type ReportType = 'monthly' | 'weekly' | 'daily';
 
 export const FinancialIngestion = () => {
   const auth = Storage.getAuthState();
@@ -18,9 +18,12 @@ export const FinancialIngestion = () => {
   const [selectedAgentNickname, setSelectedAgentNickname] = useState('');
 
   // Report period
-  const [reportType, setReportType] = useState<ReportType>('Daily');
+  const [reportType, setReportType] = useState<ReportType>('daily');
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().slice(0, 10));
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
+  const [weekStart, setWeekStart] = useState(() => {
+    const d = new Date(); d.setDate(d.getDate() - d.getDay() + 1); return d.toISOString().slice(0, 10);
+  });
 
   // CSV
   const [csvText, setCsvText] = useState('');
@@ -38,9 +41,6 @@ export const FinancialIngestion = () => {
   const [selectedReport, setSelectedReport] = useState<{ docId: string; data: any } | null>(null);
   const [editingReport, setEditingReport] = useState<any>(null);
 
-  // Migration
-  const [migrationDone, setMigrationDone] = useState(false);
-
   // Active tab
   const [activeTab, setActiveTab] = useState<'upload' | 'history'>('upload');
 
@@ -48,13 +48,6 @@ export const FinancialIngestion = () => {
   useEffect(() => {
     if (isDirector) {
       IngestionService.getAgentList().then(setAgentList);
-    }
-    // Run migration once
-    if (!migrationDone) {
-      IngestionService.migrateLegacyData().then(count => {
-        if (count > 0) console.log(`[Ingestion] Migrated ${count} legacy records`);
-        setMigrationDone(true);
-      });
     }
   }, []);
 
@@ -105,6 +98,17 @@ export const FinancialIngestion = () => {
     try {
       const { fromDate, toDate } = getDateRange();
       const loggedInName = auth?.name || auth?.nickname || auth?.poppo_id || 'Unknown';
+
+      // Check each row for duplicates before uploading
+      for (const row of parsedRows) {
+        const exists = await IngestionService.checkDuplicate(row.poppo_id, reportType, fromDate, toDate);
+        if (exists) {
+          setUploadMsg({ type: 'error', text: `This financial report already exists and cannot be uploaded again. (${row.poppo_id})` });
+          setIsUploading(false);
+          return;
+        }
+      }
+
       let successCount = 0;
       for (const row of parsedRows) {
         await IngestionService.saveReport(row, agentId, reportType, fromDate, toDate, loggedInName);
@@ -124,8 +128,19 @@ export const FinancialIngestion = () => {
   };
 
   const getDateRange = (): { fromDate: string; toDate: string } => {
-    if (reportType === 'Daily') {
+    if (reportType === 'daily') {
       return { fromDate: selectedDate, toDate: selectedDate };
+    }
+    if (reportType === 'weekly') {
+      const from = new Date(weekStart);
+      const to = new Date(from);
+      to.setDate(to.getDate() + 6);
+      const fmt = (d: Date) => {
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const dd = String(d.getDate()).padStart(2, '0');
+        return `${d.getFullYear()}-${mm}-${dd}`;
+      };
+      return { fromDate: fmt(from), toDate: fmt(to) };
     }
     const year = parseInt(selectedMonth.slice(0, 4));
     const month = parseInt(selectedMonth.slice(5, 7));
@@ -281,7 +296,7 @@ export const FinancialIngestion = () => {
             <div className="bg-[#1A1A28]/60 border border-white/5 p-5 rounded-2xl space-y-4">
               <h3 className="text-xs font-black uppercase tracking-widest text-[#F0EFE8]">Period</h3>
               <div className="flex gap-3">
-                {(['Daily', 'Weekly', 'Monthly'] as ReportType[]).map(t => (
+                {(['daily', 'weekly', 'monthly'] as ReportType[]).map(t => (
                   <button
                     key={t}
                     onClick={() => setReportType(t)}
@@ -292,8 +307,11 @@ export const FinancialIngestion = () => {
                   >{t}</button>
                 ))}
               </div>
-              {reportType === 'Daily' ? (
+              {reportType === 'daily' ? (
                 <input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)}
+                  className="w-full bg-[#0D0D14] border border-white/10 rounded-xl px-3 py-2 text-xs text-[#F0EFE8] focus:outline-none focus:border-indigo-500" />
+              ) : reportType === 'weekly' ? (
+                <input type="date" value={weekStart} onChange={(e) => setWeekStart(e.target.value)}
                   className="w-full bg-[#0D0D14] border border-white/10 rounded-xl px-3 py-2 text-xs text-[#F0EFE8] focus:outline-none focus:border-indigo-500" />
               ) : (
                 <input type="month" value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)}

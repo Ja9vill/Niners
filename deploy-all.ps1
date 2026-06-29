@@ -5,6 +5,13 @@ param(
 $ErrorActionPreference = "Stop"
 $startTime = Get-Date
 
+# Set the service account key for Firebase CLI authentication
+$adcKey = "$env:USERPROFILE\firebase-adminsdk-key.json"
+if (Test-Path $adcKey) {
+    $env:GOOGLE_APPLICATION_CREDENTIALS = $adcKey
+    Write-Info "GOOGLE_APPLICATION_CREDENTIALS set to $adcKey"
+}
+
 $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm"
 $separator = "=" * 55
 
@@ -73,7 +80,7 @@ $branch = git rev-parse --abbrev-ref HEAD
 if ($branch -ne "main") {
     Write-Warning "Currently on branch '$branch', not 'main'."
     if (-not $Force) {
-        $confirm = Read-Host "  Deploy from '$branch' instead? (y/N)"
+        $confirm = Read-Host ('  Deploy from ' + $branch + ' instead? (y/N)')
         if ($confirm -ne "y") {
             Write-ErrorMsg "Aborted by user. Switch to main first: git checkout main"
             exit 1
@@ -94,7 +101,7 @@ $gitStatus = git status --porcelain
 if ([string]::IsNullOrEmpty($gitStatus)) {
     Write-Warning "No uncommitted changes detected."
     if (-not $Force) {
-        $confirm = Read-Host "  Nothing to commit. Continue with pull + deploy anyway? (y/N)"
+        $confirm = Read-Host ('  Nothing to commit. Continue with pull + deploy anyway? (y/N)')
         if ($confirm -ne "y") {
             Write-Host "Aborted." -ForegroundColor Yellow
             exit 0
@@ -226,23 +233,9 @@ if ($LASTEXITCODE -ne 0) {
 Write-Success "Pushed to origin/main"
 
 # ============================================================
-# PHASE 4: FIREBASE DEPLOY — FUNCTIONS
+# PHASE 4: FIREBASE DEPLOY — HOSTING
 # ============================================================
-Write-Step "PHASE 4: Deploy Firebase Functions"
-
-Write-Info "Running: firebase deploy --only functions"
-$fnOutput = & firebase deploy --only functions 2>&1
-if ($LASTEXITCODE -ne 0) {
-    Write-ErrorMsg "Firebase Functions deploy had issues (see above)"
-    Write-Host $fnOutput -ForegroundColor Red
-} else {
-    Write-Success "Firebase Functions deployed"
-}
-
-# ============================================================
-# PHASE 5: FIREBASE DEPLOY — HOSTING
-# ============================================================
-Write-Step "PHASE 5: Deploy Firebase Hosting"
+Write-Step "PHASE 4: Deploy Firebase Hosting"
 
 Write-Info "Running: firebase deploy --only hosting"
 $hostOutput = & firebase deploy --only hosting 2>&1
@@ -254,9 +247,9 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 # ============================================================
-# PHASE 6: CLOUD RUN DEPLOY
+# PHASE 5: CLOUD RUN DEPLOY
 # ============================================================
-Write-Step "PHASE 6: Deploy Cloud Run"
+Write-Step "PHASE 5: Deploy Cloud Run"
 
 Write-Info "Running: gcloud run deploy nine-dashboard ..."
 $crOutput = & gcloud run deploy nine-dashboard `
