@@ -146,21 +146,18 @@ if ($LASTEXITCODE -ne 0) {
     $vendorErrors = $tscLines | Where-Object { $_ -match 'node_modules[\\/]' }
 
     if ($userErrors.Count -gt 0) {
-        Write-Host "  [FAIL] TypeScript errors found in source code (" -NoNewline -ForegroundColor Red
-        Write-Host $userErrors.Count -NoNewline -ForegroundColor Yellow
-        Write-Host " errors):" -ForegroundColor Red
+        $ec = $userErrors.Count
+        Write-Host "  [FAIL] TypeScript errors found in source code (" $ec " errors):" -ForegroundColor Red
         $userErrors | ForEach-Object { Write-Host "    $_" -ForegroundColor Red }
         if ($vendorErrors.Count -gt 0) {
-            Write-Host "  [!] Also " -NoNewline -ForegroundColor Yellow
-            Write-Host $vendorErrors.Count -NoNewline -ForegroundColor Cyan
-            Write-Host " errors in node_modules (third-party, not your code)" -ForegroundColor Yellow
+            $vc = $vendorErrors.Count
+            Write-Host "  [!] Also " $vc " errors in node_modules (third-party, not your code)" -ForegroundColor Yellow
         }
         exit 1
     }
 
-    Write-Host "  [!] " -NoNewline -ForegroundColor Yellow
-    Write-Host $vendorErrors.Count -NoNewline -ForegroundColor Cyan
-    Write-Host " TypeScript errors in node_modules only (third-party packages, not your code)" -ForegroundColor Yellow
+    $vc = $vendorErrors.Count
+    Write-Host "  [!] " $vc " TypeScript errors in node_modules only (third-party packages, not your code)" -ForegroundColor Yellow
     Write-Warning "These can safely be ignored. Suggestion: run 'npm update' to try fixing them."
 } else {
     Write-Success "No type errors"

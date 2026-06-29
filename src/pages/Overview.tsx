@@ -180,8 +180,11 @@ export const Overview = () => {
         const isAgent = roleLower === 'agent';
 
         // Determine which agent_id to use for financial reports
-        let useAgentId = '19381364';
-        if (showAgencyView) {
+        // Director / Head Admin see everything — fetch all reports
+        let useAgentId: string | undefined = '19381364';
+        if (['director', 'head admin', 'head_admin'].includes(roleLower)) {
+          useAgentId = undefined;
+        } else if (showAgencyView) {
           useAgentId = '19381364';
         } else if (isAgent && currentAuth?.poppo_id) {
           useAgentId = currentAuth.poppo_id;
@@ -194,7 +197,7 @@ export const Overview = () => {
             useAgentId = agentId;
           }
         }
-        setAgentOverviewId(useAgentId);
+        setAgentOverviewId(useAgentId || '19381364');
 
         const [fetchedHosts, fetchedCommissions, fetchedReports, newReports] = await Promise.all([
           FirebaseService.getAllHosts(),

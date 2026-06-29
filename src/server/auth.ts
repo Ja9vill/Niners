@@ -12,11 +12,13 @@ import { initFirebaseSecrets } from "./secrets";
 import { runAutoSyncLivehouseData } from "./cron";
 
 const router = Router();
-const JWT_SECRET = process.env.JWT_SECRET;
-if (!JWT_SECRET) {
-  throw new Error("FATAL: JWT_SECRET environment variable is not set.");
-}
 const BCRYPT_ROUNDS = 12;
+
+function getJWTSecret(): string {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) throw new Error("FATAL: JWT_SECRET environment variable is not set.");
+  return secret;
+}
 
 /**
  * Authorized Director email addresses.
@@ -206,7 +208,7 @@ function buildUserPayload(hostData: any) {
 
 function getHostPayloadAndToken(hostData: any) {
   const userPayload = buildUserPayload(hostData);
-  const token = jwt.sign(userPayload, JWT_SECRET, { expiresIn: "7d" });
+  const token = jwt.sign(userPayload, getJWTSecret(), { expiresIn: "7d" });
   return { ok: true, user: { ...userPayload, token } };
 }
 
@@ -223,7 +225,7 @@ function requireAuth(requiredLevel: number = 3) {
       return res.status(401).json({ error: "Authorization token required" });
     }
     try {
-      const decoded: any = jwt.verify(token, JWT_SECRET);
+      const decoded: any = jwt.verify(token, getJWTSecret());
       if ((decoded.level || 0) < requiredLevel) {
         return res.status(403).json({ error: "Insufficient permissions" });
       }
@@ -316,7 +318,7 @@ router.post("/login", async (req, res) => {
     }
 
     const userPayload = buildUserPayload(hostData);
-    const token = jwt.sign(userPayload, JWT_SECRET, { expiresIn: "7d" });
+    const token = jwt.sign(userPayload, getJWTSecret(), { expiresIn: "7d" });
 
     return res.json({ ok: true, user: { ...userPayload, token } });
   } catch (error: any) {
@@ -480,7 +482,7 @@ router.post("/set-initial-password", loginRateLimiter, async (req: any, res: any
 
     const fullData = { ...dbUser, id: cleanId, is_first_login: false };
     const userPayload = buildUserPayload(fullData);
-    const jwtToken = jwt.sign(userPayload, JWT_SECRET, { expiresIn: "7d" });
+    const jwtToken = jwt.sign(userPayload, getJWTSecret(), { expiresIn: "7d" });
 
     console.log(`ðŸ” Initial password set and claims synced for Poppo ID: ${cleanId}`);
     return res.json({
@@ -1750,7 +1752,7 @@ router.post("/login-with-poppo", loginRateLimiter, async (req: any, res: any) =>
         const authInstance = getAuth(getFirebaseAdminApp());
         const customToken = await authInstance.createCustomToken('19157913', { tempPasswordRequired: false, role: 'director', isSuperAdmin: true });
         const userPayload = buildUserPayload(hostData);
-        const token = jwt.sign(userPayload, JWT_SECRET, { expiresIn: "7d" });
+        const token = jwt.sign(userPayload, getJWTSecret(), { expiresIn: "7d" });
         logAuthEvent('19157913', "SUCCESS", ipAddress);
         return res.json({ success: true, customToken, poppoId: '19157913', user: { ...userPayload, token } });
       }
@@ -1833,7 +1835,7 @@ router.post("/login-with-poppo", loginRateLimiter, async (req: any, res: any) =>
     }
 
     const userPayload = buildUserPayload(hostData);
-    const token = jwt.sign(userPayload, JWT_SECRET, { expiresIn: "7d" });
+    const token = jwt.sign(userPayload, getJWTSecret(), { expiresIn: "7d" });
     logAuthEvent(cleanPoppoId, "SUCCESS", ipAddress);
     return res.json({
       success: true,

@@ -41,26 +41,18 @@ async function acquireLock(jobName: string, intervalMinutes: number): Promise<bo
 function normalizeTimeslot(timeslot: string): string {
   if (!timeslot) return timeslot;
 
-  // Replace en-dash/em-dash with regular dash
-  let normalized = timeslot.replace(/[\u2013\u2014\u2015]/g, '-');
-
-  // Remove :00 from times (e.g., "12:00AM" → "12AM")
-  normalized = normalized.replace(/:00/g, '');
-
-  // Remove spaces around dash
-  normalized = normalized.replace(/\s*-\s*/g, ' - ');
-
-  return normalized;
+  // Replace en-dash/em-dash with regular hyphen (keep :00 for LivehouseData.tsx matching)
+  return timeslot.replace(/[\u2013\u2014\u2015]/g, '-');
 }
 
-// Helper to convert full month name to short format
-function getShortMonthName(fullMonth: string): string {
+// Helper to convert full month name to zero-padded month number
+function getMonthNumber(fullMonth: string): string {
   const monthMap: Record<string, string> = {
-    "JANUARY": "Jan", "FEBRUARY": "Feb", "MARCH": "Mar", "APRIL": "Apr",
-    "MAY": "May", "JUNE": "Jun", "JULY": "Jul", "AUGUST": "Aug",
-    "SEPTEMBER": "Sep", "OCTOBER": "Oct", "NOVEMBER": "Nov", "DECEMBER": "Dec"
+    "JANUARY": "01", "FEBRUARY": "02", "MARCH": "03", "APRIL": "04",
+    "MAY": "05", "JUNE": "06", "JULY": "07", "AUGUST": "08",
+    "SEPTEMBER": "09", "OCTOBER": "10", "NOVEMBER": "11", "DECEMBER": "12"
   };
-  return monthMap[fullMonth.toUpperCase()] || fullMonth;
+  return monthMap[fullMonth.toUpperCase()] || "01";
 }
 
 // 1. Auto Sync Livehouse Data
@@ -107,7 +99,7 @@ export async function runAutoSyncLivehouseData(ignoreLock = false) {
 
     // Transform Apps Script format to frontend format
     // Apps Script returns: { tab: "JANUARY 2026", day: 1, slot: 1, timeslot: "12:00AM–1:00AM", value: "poppo_id" }
-    // Frontend expects: { date: "Jan 1", timeslot: "12AM - 1AM", slot_1: { available, poppo_id }, slot_2: { available, poppo_id } }
+    // Stored as: { date: "2026-01-01", timeslot: "12:00AM-1:00AM", slot_1: { available, poppo_id }, slot_2: { available, poppo_id } }
     const scheduleMap = new Map<string, any>();
 
     console.log(`Processing ${rawRows.length} raw rows from Apps Script`);
@@ -124,12 +116,13 @@ export async function runAutoSyncLivehouseData(ignoreLock = false) {
 
       const fullMonth = monthYearMatch[1];
       const year = monthYearMatch[2];
-      const shortMonth = getShortMonthName(fullMonth);
+      const monthNum = getMonthNumber(fullMonth);
+      const dayPadded = String(r.day).padStart(2, '0');
 
-      // Build date string (e.g., "Jul 4, 2026")
-      const date = `${shortMonth} ${r.day}, ${year}`;
+      // Build date string (e.g., "2026-07-04")
+      const date = `${year}-${monthNum}-${dayPadded}`;
 
-      // Normalize timeslot (e.g., "12:00AM–1:00AM" → "12AM - 1AM")
+      // Normalize timeslot (e.g., "12:00AM–1:00AM" → "12:00AM-1:00AM")
       const normalizedTimeslot = normalizeTimeslot(r.timeslot);
 
       // Create unique key for grouping
