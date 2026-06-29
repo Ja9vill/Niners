@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { LayoutDashboard, Loader2, TrendingUp, Users, Star, Zap, Award, Clock } from 'lucide-react';
+import { LayoutDashboard, Loader2, TrendingUp, Users, Star, Zap, Award, Clock, AlertCircle, UserPlus, Send } from 'lucide-react';
 import { FirebaseService } from '../lib/firebaseService';
 import { Host } from '../types';
-import { OverviewTab } from '../NineDashboardV1';
 import { HostProfileView } from '../components/HostProfileView';
 import { cn } from '../lib/utils';
 import { Storage } from '../lib/storage';
-import { BarChart, Bar, AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, LineChart, Line, CartesianGrid } from 'recharts';
+import { IngestionService } from '../lib/IngestionService';
+import { BarChart, Bar, AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 
 const MONTH_ORDER = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
@@ -161,6 +161,11 @@ export const Overview = () => {
   const [showRecords, setShowRecords] = useState<boolean>(false);
   const [recordsSortOption, setRecordsSortOption] = useState<'default' | 'name' | 'share'>('default');
   const [selectedTierForList, setSelectedTierForList] = useState<string | null>(null);
+  const [agentOverviewId, setAgentOverviewId] = useState<string>('19381364');
+  const [userAgentId, setUserAgentId] = useState<string | null>(null);
+  const [assignAgentId, setAssignAgentId] = useState('19381364');
+  const [assignMsg, setAssignMsg] = useState<string | null>(null);
+  const [showAgencyView, setShowAgencyView] = useState(false);
 
   const handleSpotlightClick = (poppoId: string) => {
     const host = hosts.find(h => String(h.poppo_id || h.id || h.poppoId) === String(poppoId));
@@ -170,19 +175,56 @@ export const Overview = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [fetchedHosts, fetchedCommissions, fetchedReports] = await Promise.all([
+        const currentAuth = Storage.getAuthState();
+        const roleLower = String(currentAuth?.role || '').toLowerCase();
+        const isAgent = roleLower === 'agent';
+
+        // Determine which agent_id to use for financial reports
+        let useAgentId = '19381364';
+        if (showAgencyView) {
+          useAgentId = '19381364';
+        } else if (isAgent && currentAuth?.poppo_id) {
+          useAgentId = currentAuth.poppo_id;
+          setUserAgentId(currentAuth.poppo_id);
+        } else if (currentAuth?.poppo_id) {
+          const uid = currentAuth.poppo_id;
+          const agentId = await IngestionService.getUserAgentId(uid);
+          if (agentId) {
+            setUserAgentId(agentId);
+            useAgentId = agentId;
+          }
+        }
+        setAgentOverviewId(useAgentId);
+
+        const [fetchedHosts, fetchedCommissions, fetchedReports, newReports] = await Promise.all([
           FirebaseService.getAllHosts(),
           FirebaseService.getAllCommissions(),
-          FirebaseService.getAllPerformanceReports()
+          FirebaseService.getAllPerformanceReports(),
+          IngestionService.getReportsForOverview(useAgentId),
         ]);
         setHosts(fetchedHosts);
         setCommissions(fetchedCommissions);
-        // Filter out schema template docs
-        setReports(fetchedReports.filter(r => r.docId !== '_schema_template' && r.poppoId));
+
+        // Combine old reports + new agent_financial_reports
+        const oldReports = fetchedReports.filter(r => r.docId !== '_schema_template' && r.poppoId);
+        const transformedNew = newReports.map((r: any) => ({
+          ...r,
+          poppoId: r.poppo_id,
+          hostName: r.nickname,
+          monthName: new Date(r.from_date).toLocaleString('default', { month: 'long' }),
+          year: new Date(r.from_date).getFullYear().toString(),
+          earningsBreakdown: {
+            totalEarningsOfPoints: r.total_point,
+            liveDurationMinutes: r.total_duration,
+            agentCommission: r.agent_commission,
+            superSalary: r.super_salary,
+            superRank: r.super_rank,
+          },
+          owner_role: r.agent_id === '19381364' ? 'Agency' : 'Agent',
+        }));
+        setReports([...oldReports, ...transformedNew]);
 
         // One-time automatic database relations backfill for director / head admin
-        const currentAuth = Storage.getAuthState();
-        const roleLower = String(currentAuth?.role || '').toLowerCase();
         const isDirectorOrHeadAdmin = ['director', 'head admin', 'head_admin'].includes(roleLower);
         
         if (isDirectorOrHeadAdmin && !localStorage.getItem('relation_backfill_done_v2') && fetchedHosts.length > 0) {
@@ -251,7 +293,7 @@ export const Overview = () => {
       }
     };
     fetchData();
-  }, []);
+  }, [showAgencyView]);
 
   // Available years from reports
   const availableYears = useMemo(() => {
@@ -499,11 +541,50 @@ export const Overview = () => {
     );
   }
 
-  // If no performance report data, fallback to old overview
+  // If no performance report data, show empty state
   if (reports.length === 0) {
+    const a = Storage.getAuthState();
+    const roleLower = String(a?.role || '').toLowerCase();
+    const agentRole = roleLower === 'agent';
+    const noAgent = agentRole && userAgentId !== agentOverviewId;
     return (
-      <div className="flex flex-col gap-6">
-        <OverviewTab commissions={commissions} hosts={hosts} />
+      <div className="flex flex-col items-center justify-center gap-4 py-20">
+        <AlertCircle size={40} className="text-[#A09E9A]" />
+        <p className="text-sm font-bold text-[#A09E9A] uppercase tracking-widest">No Financial Data is reported by your agent yet.</p>
+        {noAgent && (
+          <div className="flex flex-col items-center gap-3 mt-2">
+            <p className="text-xs text-[#6B7280]">You are not assigned to an agent. Request access below.</p>
+            <div className="flex items-center gap-2">
+              <input
+                value={assignAgentId}
+                onChange={e => setAssignAgentId(e.target.value)}
+                placeholder="Agent Poppo ID"
+                className="bg-[#0D0D14] border border-white/10 rounded-lg px-3 py-1.5 text-xs text-[#F0EFE8] focus:outline-none focus:border-indigo-500 w-36"
+              />
+              <button
+                onClick={async () => {
+                  if (!a?.poppo_id) return;
+                  try {
+                    await IngestionService.requestAgentAssignment(a.poppo_id, a.nickname || '', assignAgentId);
+                    setAssignMsg('Assignment request sent!');
+                  } catch { setAssignMsg('Request failed.'); }
+                }}
+                className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold transition-all flex items-center gap-1"
+              >
+                <Send size={12} /> Request
+              </button>
+            </div>
+            {assignMsg && <p className="text-xs text-emerald-400">{assignMsg}</p>}
+          </div>
+        )}
+        {!noAgent && (
+          <button
+            onClick={() => { setShowAgencyView(true); setIsLoading(true); }}
+            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition-all"
+          >
+            View Agency Overview
+          </button>
+        )}
       </div>
     );
   }

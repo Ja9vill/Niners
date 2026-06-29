@@ -38,7 +38,7 @@ export const BlogPostView = () => {
   useEffect(() => {
     if (contentRef.current && blog) {
       const headings = Array.from(contentRef.current.querySelectorAll('h2, h3'));
-      const newToc = headings.map((h, i) => {
+      const newToc = headings.map((h: Element, i) => {
         const id = `heading-${i}`;
         h.id = id;
         return {

@@ -1,5 +1,5 @@
 /* eslint-disable */
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { subscribeToHosts, patchHost, deleteUser, FirebaseService, HostRosterUser, UserRole } from '../lib/firebaseService';
 import { Storage } from '../lib/storage';
 

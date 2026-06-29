@@ -1,6 +1,6 @@
 import { AuthState } from "./lib/storage";
 
-export type Role = 'Talent' | 'Host' | 'Manager' | 'Admin' | 'Head Admin' | 'Director' | 'Agent';
+export type Role = 'Host' | 'Manager' | 'Admin' | 'Head Admin' | 'Director' | 'Agent';
 export type BaseSalaryTier = 'N/A' | 'Rocket Host' | 'Star Host' | 'S idol' | 'ESport Host' | 'Regular Host';
 export type HostStatus = 'Active' | 'Inconsistent' | 'Intermittent' | 'Released' | 'Inactive' | 'Releasing';
 export type AnchorType = 'Nine Agency' | 'Sub Agency' | 'External';
@@ -71,6 +71,7 @@ export interface Host {
   tier_pay?: string;
   photoUrl?: string;
   bio?: string;
+  description?: string;
   social_links?: {
     fb?: string;
     ig?: string;
@@ -95,6 +96,7 @@ export interface Host {
   team?: string;
   anchor_type?: AnchorType;
   anchor?: AnchorType;
+  base_salary_category?: string;
 }
 
 export interface PasswordResetRequest {
@@ -118,12 +120,14 @@ export interface PerformanceReportEntry {
   party_host_duration: number;
   total_earnings: number; // merged with total_points
   agent_commission: number;
+  my_commission?: number;
   live_earnings: number;
   party_earnings: number;
   private_chat: number;
   tips: number;
   platform_reward: number;
   other_earnings: number;
+  other_earn?: number;
   platform_hourly_salary: number;
   super_salary: number;
   super_rank: number;
@@ -138,6 +142,7 @@ export interface PerformanceReportEntry {
   agentweb_commission_earning?: number;
   video_duration?: number;
   video_earnings?: number;
+  timestamp?: string;
 }
 
 // Ensure CommissionEntry points to PerformanceReportEntry during migration to avoid breaking current code types outright
@@ -254,13 +259,16 @@ export interface LivehouseRequest {
   name: string;
   date: string;
   timeslot: string; // e.g., "14:00 - 15:00"
-  status: 'Pending Approval' | 'New Timeslot Proposed' | 'Approved' | 'Closed' | 'Host Accepted Proposal';
+  status: 'Pending Approval' | 'New Timeslot Proposed' | 'Approved' | 'Closed' | 'Host Accepted Proposal' | 'Completed';
   proposedTimeslot?: string;
   proposedDate?: string;
   proposedBy?: string;
   managerId: string; // Assigned manager's Poppo ID
   notes?: string;
   livehouseType?: string;
+  reporterId?: string;
+  reporterName?: string;
+  reporterRole?: string;
   timestamp: string;
 }
 
@@ -412,6 +420,44 @@ export interface BlogPost {
     metaTitle?: string;
     metaDescription?: string;
   };
+}
+
+export interface AgentFinancialReport {
+  agent_id: string;
+  poppo_id: string;
+  nickname: string;
+  type: 'Monthly' | 'Weekly' | 'Daily';
+  solo_live_duration: string;
+  party_live_duration: string;
+  total_point: number;
+  agent_commission: number;
+  solo_live_earnings: number;
+  party_live_earnings: number;
+  private_chat: number;
+  tips: number;
+  platform_reward: number;
+  other_earnings: number;
+  platform_salary: number;
+  super_salary: number;
+  super_rank: number;
+  stream_level: number;
+  total_incentives: number;
+  total_duration: number;
+  total_earnings: number;
+  from_date: string;
+  to_date: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UserRegistration {
+  agent_id: string;
+  poppo_id: string;
+  nickname: string;
+  role: string;
+  requestedAt: string;
+  requestedByName: string;
+  request_status: 'Pending' | 'Approved' | 'Denied' | 'Add later';
 }
 
 export const emptyAuthState: AuthState = {

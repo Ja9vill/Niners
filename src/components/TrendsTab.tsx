@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { TrendingUp, Award, BarChart2, Star, Ghost, AlertTriangle, ArrowUpRight, ArrowDownRight, Minus } from 'lucide-react';
-import { Host, Tier, CommissionEntry } from '../types';
+import { Host, CommissionEntry } from '../types';
 import { Storage } from '../lib/storage';
 import { FirebaseService } from '../lib/firebaseService';
 import { cn, formatNumber, formatDate, formatMonth } from '../lib/utils';

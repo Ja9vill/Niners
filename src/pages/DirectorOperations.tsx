@@ -21,6 +21,8 @@ export const DirectorOperations = () => {
   const [altDate, setAltDate] = useState('');
   const [altTime, setAltTime] = useState('');
   const [altReason, setAltReason] = useState('');
+  const [hosts, setHosts] = useState<Host[]>([]);
+  const [assignRoleFilter, setAssignRoleFilter] = useState<string>('All');
 
   const loadData = async () => {
     try {

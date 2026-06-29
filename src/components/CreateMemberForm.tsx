@@ -3,6 +3,7 @@ import { UserPlus, Shield, Loader2, CheckCircle2, AlertCircle, Key, RefreshCw, C
 import { getAuth } from 'firebase/auth';
 import { FirebaseService } from '../lib/firebaseService';
 import { Host } from '../types';
+import { Storage } from '../lib/storage';
 import { collection, query, where, getDocs, doc, setDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 

@@ -167,7 +167,7 @@ export const SheetsService = {
 
     const rows = commissions.map(c => [
       c.poppo_id || '',
-      c.poppo_name || '',
+      c.nickname || '',
       c.month || month,
       String(c.live_duration || 0),
       String(c.video_duration || 0),

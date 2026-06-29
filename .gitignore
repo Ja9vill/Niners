@@ -17,8 +17,7 @@ firebase-debug.log
 vapid_keys_fallback.json
 push_subscriptions.json
 
-# IDE / Agent internals — never commit
-.agents/
+# skills-lock.json — auto-generated lock file
 skills-lock.json
 
 # One-off debug / scratch scripts

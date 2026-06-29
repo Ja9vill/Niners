@@ -39,7 +39,9 @@ import {
   Task,
   ActivityAuditLog,
   TopNinersEarningsSummary,
-  EventsCalendarPublic
+  EventsCalendarPublic,
+  AwardBadge,
+  AwardAssignment
 } from '../types';
 import { cn, formatMonth, formatDate } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
@@ -1182,6 +1184,89 @@ export const DirectorTab = () => {
     );
   }
 
+  const handleCreateAward = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      setIsCreatingAward(true);
+      const newAward: AwardBadge = {
+        id: crypto.randomUUID?.() || `${Date.now()}`,
+        name: newAwardName,
+        color: newAwardColor,
+        createdAt: new Date().toISOString(),
+        startDate: newAwardStartDate,
+        endDate: newAwardEndDate,
+      };
+      const updatedAwards = [...awards, newAward];
+      await FirebaseService.saveAwards(updatedAwards);
+      setAwards(updatedAwards);
+      showSuccess(`Award "${newAwardName}" created.`);
+      setNewAwardName('');
+    } catch (err) {
+      alert('Failed to create award.');
+    } finally {
+      setIsCreatingAward(false);
+    }
+  };
+
+  const handleBulkGenerateAwards = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!bulkMonth || !bulkYear) return;
+    try {
+      setIsCreatingAward(true);
+      const yearNum = parseInt(bulkYear, 10);
+      const monthIndex = parseInt(bulkMonth, 10) - 1;
+      const lastDay = new Date(yearNum, monthIndex + 1, 0).getDate();
+      const startDateStr = `${yearNum}-${bulkMonth}-01`;
+      const endDateStr = `${yearNum}-${bulkMonth}-${String(lastDay).padStart(2, '0')}`;
+      const summary = await FirebaseService.getLatestTopNinersSummaries();
+      const badges: AwardBadge[] = summary.map((s, i) => ({
+        id: crypto.randomUUID?.() || `${Date.now()}_${i}`,
+        name: `Top 9 - ${s.nickname}`,
+        color: '#8B5CF6',
+        createdAt: new Date().toISOString(),
+        startDate: startDateStr,
+        endDate: endDateStr,
+      }));
+      const updatedAwards = [...awards, ...badges];
+      await FirebaseService.saveAwards(updatedAwards);
+      setAwards(updatedAwards);
+      showSuccess(`Generated ${badges.length} Top 9 badges.`);
+      loadData();
+    } catch (err) {
+      alert('Failed to bulk generate awards.');
+    } finally {
+      setIsCreatingAward(false);
+    }
+  };
+
+  const handleAssignAward = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      if (!assignAwardId || !awardStartDate || !awardEndDate) return;
+      const hostNickname = hosts.find(h => h.id === assignHostId)?.nickname || assignHostId;
+      await FirebaseService.assignAward(assignHostId, {
+        awardId: assignAwardId,
+        awardName: awards.find(a => a.id === assignAwardId)?.name || '',
+        startDate: awardStartDate,
+        endDate: awardEndDate,
+      });
+      showSuccess('Award assigned.');
+      loadData();
+    } catch (err) {
+      alert('Failed to assign award.');
+    }
+  };
+
+  const handleRevokeAssignment = async (id: string) => {
+    try {
+      await FirebaseService.deleteAwardAssignment(id);
+      showSuccess('Assignment revoked.');
+      loadData();
+    } catch (err) {
+      alert('Failed to revoke assignment.');
+    }
+  };
+
   return (
     <div className="flex flex-col lg:flex-row gap-8 min-h-[85vh]">
       {/* Sidebar Navigation Layout */}
@@ -1604,7 +1689,7 @@ export const DirectorTab = () => {
                           id: hostId,
                           name: String(formData.get('name')),
                           nickname: String(formData.get('name')),
-                          role: 'Talent',
+                          role: 'Host',
                           teamAnchor: String(formData.get('teamAnchor') || 'Unassigned'),
                           manager: 'Nine Management',
                           anchor_type: 'Nine Agency',
@@ -1630,7 +1715,7 @@ export const DirectorTab = () => {
                         id: hostId,
                         name: String(formData.get('name')),
                         nickname: String(formData.get('name')),
-                        role: 'Talent',
+                        role: 'Host',
                         teamAnchor: String(formData.get('teamAnchor') || 'Unassigned'),
                         manager: String(formData.get('manager') || 'Nine Management'),
                         anchor_type: 'Nine Agency',
@@ -3847,7 +3932,7 @@ export const DirectorTab = () => {
           id: poppoId,
           name: nickname,
           nickname: nickname,
-          role: 'Talent',
+          role: 'Host',
           team: 'Unassigned',
           manager: 'Nine Management',
           anchor_type: 'Nine Agency',
@@ -3942,6 +4027,7 @@ export const DirectorTab = () => {
         video_earnings: 0,
         agentweb_commission_rate: 0,
         agentweb_commission_earning: 0,
+        agent_commission: myCommission,
         total_points: totalPoints,
         total_earnings: totalPoints,
         my_commission: myCommission,
@@ -3950,6 +4036,7 @@ export const DirectorTab = () => {
         private_chat: privateChat,
         tips: tips,
         platform_reward: platformReward,
+        other_earnings: otherEarn,
         other_earn: otherEarn,
         platform_hourly_salary: platformHourlySalary,
         super_salary: superSalary,

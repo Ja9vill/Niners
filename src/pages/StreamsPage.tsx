@@ -683,7 +683,7 @@ export const StreamsPage = () => {
     return { border: 'rgba(16,185,129,0.5)', color: '#34d399', shadow: '0 0 25px rgba(16,185,129,0.35), 0 0 60px rgba(16,185,129,0.1)', ring: '#34d399', grad: 'linear-gradient(135deg, rgba(16,185,129,0.6), rgba(5,150,105,0.15))', bg: 'rgba(16,185,129,0.08)' };
   };
 
-  const SubTabBtn = ({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) => {
+  const SubTabBtn = ({ label, active, onClick }: { label: string; active: boolean; onClick: () => void; key?: string }) => {
     const a = subAccent(label as StreamSubTab);
     return (
       <button onClick={onClick} className={cn("px-4 py-1.5 rounded-md text-[9px] md:text-[10px] font-black uppercase tracking-widest transition-all",

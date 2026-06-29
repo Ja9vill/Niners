@@ -1480,6 +1480,16 @@ export const FirebaseService = {
     }
   },
 
+  async getAllExposures(): Promise<ExposureEntry[]> {
+    try {
+      const snap = await getDocs(collection(db, 'calendar'));
+      return snap.docs.map(d => d.data() as ExposureEntry);
+    } catch (error) {
+      console.warn('[FirebaseService] getAllExposures failed', error);
+      return [];
+    }
+  },
+
   async saveLivehouseSchedule(scheduleRows: LivehouseDataRow[]) {
     const path = 'livehouse_schedule';
     try {
@@ -2128,7 +2138,7 @@ export const FirebaseService = {
   },
 
   async checkFinancialStorage(period: 'monthly' | 'weekly' | 'daily', role: 'director' | 'agents' = 'director'): Promise<{ ok: boolean; dataExists: boolean; historyExists: boolean; reportCount: number; error?: string }> {
-    const result = { ok: false, dataExists: false, historyExists: false, reportCount: 0 };
+    const result: { ok: boolean; dataExists: boolean; historyExists: boolean; reportCount: number; error?: string } = { ok: false, dataExists: false, historyExists: false, reportCount: 0 };
     try {
       try {
         const data = await this.loadFinancialDataFromStorage(period, role);
@@ -2269,7 +2279,7 @@ export interface HostRosterUser {
  * poppo_id is pulled from docSnap.id (the document key).
  * Returns an unsubscribe function — call it in useEffect cleanup.
  */
-export const subscribeToHosts = (callback: (hosts: HostRosterUser[]) => void): (() => void) => {
+export const subscribeToHosts = (callback: (hosts: HostRosterUser[]) => void, onError?: (error: any) => void): (() => void) => {
   const q = query(collection(db, 'users'));
   return onSnapshot(
     q,

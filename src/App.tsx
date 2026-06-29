@@ -23,6 +23,7 @@ import { PoppoLivePage } from './pages/PoppoLivePage';
 import { ProvisionUser } from './pages/ProvisionUser';
 import { FinancialData } from './pages/FinancialData';
 import { DailyPerformanceIngestion } from './pages/DailyPerformanceIngestion';
+import { FinancialIngestion } from './pages/FinancialIngestion';
 import { PublicLanding } from './pages/PublicLanding';
 import NinersPage from './pages/NinersPage';
 const BlogManagement = React.lazy(() => import('./pages/cms/BlogManagement').then(m => ({ default: m.BlogManagement })));
@@ -242,6 +243,16 @@ export default function App() {
             element={
               <RoleGuard roles={['director', 'head admin', 'head_admin', 'manager', 'agent']}>
                 <DailyPerformanceIngestion />
+              </RoleGuard>
+            }
+          />
+
+          {/* Financial Ingestion (Agent & Director only) */}
+          <Route
+            path="financial-ingestion"
+            element={
+              <RoleGuard roles={['agent', 'director']}>
+                <FinancialIngestion />
               </RoleGuard>
             }
           />

@@ -1,4 +1,4 @@
-import { Host, Tier, BaseSalaryTier, HostStatus, AnchorType, Role } from '../types';
+import { Host, BaseSalaryTier, HostStatus, AnchorType, Role } from '../types';
 
 export const RAW_LEADERS_TEXT = `
 19381364    NINE Talent Management  -   -   -   -   -   -   31907
@@ -119,7 +119,7 @@ function parseRole(pos: string, role: string): Role {
   if (pos && pos.toLowerCase() === 'manager') return 'Manager';
   if (pos && pos.toLowerCase() === 'sub agent') return 'Agent';
   if (pos && pos.toLowerCase() === 'admin') return 'Admin';
-  return 'Talent';
+  return 'Host';
 }
 
 function getLevelForRole(role: Role): number {
@@ -133,7 +133,7 @@ function getLevelForRole(role: Role): number {
   }
 }
 
-function getTierForLevel(level: number): Tier {
+function getTierForLevel(level: number): string {
   if (level >= 85) return 'S';
   if (level >= 65) return 'A';
   if (level >= 45) return 'B';
@@ -175,7 +175,6 @@ export function getStaticHosts(): Host[] {
       base_salary_category: parseSalaryCategory(baseSalaryRaw),
       status: parseStatus(statusRaw || 'ACTIVE'),
       level: level,
-      tier: tier,
       password: String(password),
       is_temp_password: true,
       isActive: true,
@@ -200,9 +199,8 @@ export function getStaticHosts(): Host[] {
     const statusRaw = parts[8];
     const password = parts[9];
 
-    const role = 'Talent';
+    const role = 'Host';
     const level = 30;
-    const tier = 'B';
 
     parsedHosts.push({
       id: String(id),
@@ -215,7 +213,6 @@ export function getStaticHosts(): Host[] {
       base_salary_category: parseSalaryCategory(baseSalaryRaw),
       status: parseStatus(statusRaw || 'ACTIVE'),
       level: level,
-      tier: tier,
       password: String(password),
       is_temp_password: true,
       isActive: true,

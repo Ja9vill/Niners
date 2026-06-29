@@ -1714,7 +1714,7 @@ router.post("/login-with-poppo", loginRateLimiter, async (req: any, res: any) =>
           const db = getAdminFirestore();
           const hostDoc = await db.collection("users").doc('19157913').get();
           if (hostDoc.exists) {
-            hostData = hostDoc.data();
+            hostData = hostDoc.data() as any;
           }
         } catch (dbErr) {
           console.error("Firestore lookup failed for login-with-poppo bypass:", dbErr);
@@ -1725,14 +1725,13 @@ router.post("/login-with-poppo", loginRateLimiter, async (req: any, res: any) =>
           id: '19157913',
           name: "Miss Nine",
           nickname: "Miss Nine",
-          role: "director",
+          role: "Director",
           level: 5,
           team: "Management",
           manager: "Self",
           anchor_type: "Nine Agency",
           base_salary_category: "N/A",
           status: "Active",
-          tier: "Director",
           photoUrl: "",
           isActive: true,
           created_at: new Date().toISOString(),
@@ -1961,12 +1960,11 @@ router.all("/diag", requireAuth(5), async (req: any, res: any) => {
 
     log.push("Signing JWT and fetching OAuth token...");
     const { google } = await import("googleapis");
-    const jwtClient = new google.auth.JWT(
-      clientEmail,
-      undefined,
-      privateKey,
-      ['https://www.googleapis.com/auth/datastore']
-    );
+    const jwtClient = new google.auth.JWT({
+      email: clientEmail,
+      key: privateKey,
+      scopes: ['https://www.googleapis.com/auth/datastore'],
+    });
     const tokenResponse = await jwtClient.getAccessToken();
     const token = tokenResponse.token;
     if (!token) throw new Error("Failed to get access token.");
@@ -2065,12 +2063,11 @@ router.all("/cleanup-test-reports", requireAuth(5), async (req: any, res: any) =
     }
 
     const { google } = await import("googleapis");
-    const jwtClient = new google.auth.JWT(
-      clientEmail,
-      undefined,
-      privateKey,
-      ['https://www.googleapis.com/auth/datastore']
-    );
+    const jwtClient = new google.auth.JWT({
+      email: clientEmail,
+      key: privateKey,
+      scopes: ['https://www.googleapis.com/auth/datastore'],
+    });
     const tokenResponse = await jwtClient.getAccessToken();
     const token = tokenResponse.token;
     if (!token) throw new Error("Failed to get access token.");
