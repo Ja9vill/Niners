@@ -1491,6 +1491,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
         {activeTab === 'LIVEHOUSE' ? (
           <LivehouseCalendar
             allUsers={allUsers}
+            events={events}
             onOpenBookingModal={(date, timeslot) => {
               setReserveDate(date);
               setReserveTimeslot(timeslot);

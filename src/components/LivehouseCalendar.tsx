@@ -11,6 +11,7 @@ import { db } from '../lib/firebase';
 
 interface LivehouseCalendarProps {
   allUsers: any[];
+  events?: any[];
   onOpenBookingModal: (date: string, timeslot: string) => void;
 }
 
@@ -18,11 +19,11 @@ const LivehouseSlotButton = ({ slot, timeslotStr, activeDateStr, dataLength, all
   const [isFlipped, setIsFlipped] = useState(false);
 
   if (dataLength === 0 || slot.available) {
-    // GREEN GLASSMORPHISM
+    // GREEN GLASSMORPHISM — Available slot
     return (
       <div 
         onClick={() => onOpenBookingModal(activeDateStr, timeslotStr)}
-        className="w-[95%] mr-auto py-1.5 sm:py-2 flex items-center justify-center rounded-full border border-[#008F39] bg-[#031508]/80 hover:bg-[#031508] backdrop-blur-md transition-all duration-300 cursor-pointer shadow-[0_0_10px_rgba(0,255,136,0.1)] hover:shadow-[0_0_20px_rgba(0,255,136,0.3)] hover:scale-105"
+        className="w-[95%] mr-auto py-1.5 sm:py-2 flex items-center justify-center rounded-full bg-gradient-to-br from-[#031508]/80 via-[#051A0A]/90 to-[#031508]/80 border border-[#008F39]/40 hover:border-[#00C851]/60 hover:bg-gradient-to-br hover:from-[#051A0A]/90 hover:via-[#031508]/95 hover:to-[#051A0A]/90 backdrop-blur-md transition-all duration-300 cursor-pointer shadow-[0_0_10px_rgba(0,200,81,0.08)] hover:scale-105"
       >
         <span className="text-[#00FF88] font-bold text-[10px] sm:text-xs uppercase tracking-wider truncate">AVAILABLE</span>
       </div>
@@ -41,11 +42,11 @@ const LivehouseSlotButton = ({ slot, timeslotStr, activeDateStr, dataLength, all
   const matchedUser = allUsers.find(u => String(u.poppo_id || u.poppoId || u.id).trim() === rawId);
 
   if (matchedUser) {
-    // FIERY GOLD GLASSMORPHISM (NINER) - Spotlight Trigger
+    // FIERY GOLD GLASSMORPHISM — Host matched, Spotlight Trigger
     return (
       <div 
         onClick={() => onOpenSpotlight && onOpenSpotlight(matchedUser, timeslotStr, activeDateStr)}
-        className="cursor-pointer w-[95%] mr-auto py-1.5 sm:py-2 flex items-center justify-center rounded-full border border-[#FFD700]/50 bg-gradient-to-br from-[#1a1208]/95 to-[#0a0806]/95 shadow-[0_0_15px_rgba(255,140,0,0.3),inset_0_0_10px_rgba(212,175,55,0.2)] backdrop-blur-xl hover:border-[#FFD700]/80 hover:shadow-[0_0_30px_rgba(255,140,0,0.6),inset_0_0_20px_rgba(212,175,55,0.4)] transition-all duration-300 hover:scale-105"
+        className="cursor-pointer w-[95%] mr-auto py-1.5 sm:py-2 flex items-center justify-center rounded-full bg-gradient-to-br from-[#1A1208]/90 via-[#120F0A]/95 to-[#0A0806]/90 border border-[#D4AF37]/40 shadow-[0_0_15px_rgba(212,175,55,0.2),inset_0_0_10px_rgba(212,175,55,0.1)] backdrop-blur-xl hover:border-[#FFD700]/80 hover:shadow-[0_0_30px_rgba(255,140,0,0.6),inset_0_0_20px_rgba(212,175,55,0.4)] transition-all duration-300 hover:scale-105"
       >
         <span className="text-[#FFD700] font-black text-xs sm:text-sm uppercase tracking-widest truncate drop-shadow-[0_0_5px_rgba(255,215,0,0.5)] px-1">
           {matchedUser.nickname || matchedUser.name || 'VERIFIED USER'}
@@ -53,7 +54,7 @@ const LivehouseSlotButton = ({ slot, timeslotStr, activeDateStr, dataLength, all
       </div>
     );
   } else {
-    // RED GLASSMORPHISM (BOOKED) WITH FLIP
+    // FIREBRICK GLASSMORPHISM — Unmatched poppo_id, with flip
     return (
       <div 
         className="w-[95%] mr-auto relative h-[28px] sm:h-[32px] cursor-pointer group"
@@ -66,18 +67,18 @@ const LivehouseSlotButton = ({ slot, timeslotStr, activeDateStr, dataLength, all
         >
           {/* Front: BOOKED */}
           <div 
-            className="absolute inset-0 flex items-center justify-center rounded-full border border-rose-500/40 bg-rose-500/10 shadow-[0_0_10px_rgba(244,63,94,0.1)] group-hover:border-rose-400 group-hover:bg-rose-500/20 group-hover:shadow-[0_0_20px_rgba(244,63,94,0.3)] transition-all duration-300"
+            className="absolute inset-0 flex items-center justify-center rounded-full bg-gradient-to-br from-[#1A0808]/90 via-[#120A0A]/95 to-[#0A0606]/90 border border-[#B22222]/30 shadow-[0_0_15px_rgba(178,34,34,0.15),inset_0_0_10px_rgba(178,34,34,0.08)] backdrop-blur-xl group-hover:border-[#B22222]/60 group-hover:shadow-[0_0_20px_rgba(178,34,34,0.3)] transition-all duration-300"
             ref={el => { if (el) { (el.style as any).backfaceVisibility = 'hidden'; } }}
           >
-            <span className="text-rose-400 font-bold text-[10px] sm:text-xs uppercase tracking-wider truncate">BOOKED</span>
+            <span className="text-[#B22222] font-bold text-[10px] sm:text-xs uppercase tracking-wider truncate">BOOKED</span>
           </div>
           
           {/* Back: POPPO ID */}
           <div 
-            className="absolute inset-0 flex items-center justify-center rounded-full border border-rose-500 bg-rose-500/20 shadow-[0_0_20px_rgba(244,63,94,0.3)]"
+            className="absolute inset-0 flex items-center justify-center rounded-full bg-gradient-to-br from-[#1A0808]/95 via-[#120A0A]/95 to-[#0A0606]/95 border border-[#B22222]/50 shadow-[0_0_20px_rgba(178,34,34,0.2)]"
             ref={el => { if (el) { (el.style as any).backfaceVisibility = 'hidden'; el.style.transform = 'rotateX(180deg)'; } }}
           >
-            <span className="text-rose-100 font-black text-[12px] sm:text-[15px] uppercase tracking-wider drop-shadow-md truncate px-1">{rawId}</span>
+            <span className="text-[#E57373] font-black text-[12px] sm:text-[15px] uppercase tracking-wider drop-shadow-md truncate px-1">{rawId}</span>
           </div>
         </div>
       </div>
@@ -87,7 +88,7 @@ const LivehouseSlotButton = ({ slot, timeslotStr, activeDateStr, dataLength, all
 
 let sessionActiveDateStr: string | null = null;
 
-export const LivehouseCalendar: React.FC<LivehouseCalendarProps> = ({ allUsers, onOpenBookingModal }) => {
+export const LivehouseCalendar: React.FC<LivehouseCalendarProps> = ({ allUsers, events = [], onOpenBookingModal }) => {
   const [data, setData] = useState<LivehouseDataRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -187,6 +188,22 @@ export const LivehouseCalendar: React.FC<LivehouseCalendarProps> = ({ allUsers, 
     });
   }, [daysInMonthCount, baseMonthStart]);
 
+  // Per-day dot indicators
+  const dayHasLivehouse = useMemo(() => {
+    const s = new Set<string>();
+    data.forEach(r => { if (r.date) s.add(r.date); });
+    return s;
+  }, [data]);
+
+  const dayHasEvent = useMemo(() => {
+    const s = new Set<string>();
+    events.forEach((e: any) => {
+      const d = e.date || e.event_date;
+      if (d) s.add(d);
+    });
+    return s;
+  }, [events]);
+
   const activeDayRows = useMemo(() => {
     if (!activeDateStr) return [];
     const dbRows = data.filter(d => d.date === activeDateStr);
@@ -268,7 +285,7 @@ export const LivehouseCalendar: React.FC<LivehouseCalendarProps> = ({ allUsers, 
 
   if (isLoading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[400px] gap-4 bg-black/20 backdrop-blur-xl p-5 rounded-3xl border border-[#D4AF37]/20">
+      <div className="flex flex-col items-center justify-center min-h-[400px] gap-4 bg-gradient-to-b from-[#030201] via-[#050403] to-[#0A0806] backdrop-blur-xl p-5 rounded-3xl border border-[#D4AF37]/15">
         <Loader2 size={48} className="animate-spin text-[#D4AF37]" />
         <p className="text-[#A09E9A] text-sm animate-pulse tracking-widest font-bold">Synchronizing Livehouse API...</p>
       </div>
@@ -290,14 +307,14 @@ export const LivehouseCalendar: React.FC<LivehouseCalendarProps> = ({ allUsers, 
   }
 
   return (
-    <div ref={containerRef} className="animate-fade-in space-y-4 bg-gradient-to-b from-[#0a0806]/90 to-[#050403]/90 backdrop-blur-2xl border border-[#D4AF37]/20 rounded-3xl p-4 sm:p-5 shadow-[0_0_40px_rgba(212,175,55,0.08)] relative overflow-hidden">
-      {/* Subtle Fiery Glow Background accents */}
-      <div className="absolute top-0 left-1/4 w-1/2 h-32 bg-[#FF8C00]/5 blur-[80px] pointer-events-none" />
-      <div className="absolute bottom-0 right-1/4 w-1/2 h-32 bg-[#D4AF37]/5 blur-[80px] pointer-events-none" />
+    <div ref={containerRef} className="animate-fade-in space-y-4 bg-gradient-to-b from-[#030201] via-[#050403] to-[#0A0806] backdrop-blur-2xl border border-[#D4AF37]/15 rounded-3xl p-4 sm:p-5 shadow-[0_0_40px_rgba(212,175,55,0.08)] relative overflow-hidden">
+      {/* Subtle Earthy Backlight accents */}
+      <div className="absolute top-0 left-1/4 w-1/2 h-32 bg-[rgba(180,140,40,0.06)] blur-[80px] pointer-events-none" />
+      <div className="absolute bottom-0 right-1/4 w-1/2 h-32 bg-[rgba(160,120,30,0.05)] blur-[80px] pointer-events-none" />
       
       {/* Header and Add Button */}
       <div className="grid grid-cols-2 items-center justify-between border-b border-[#D4AF37]/10 pb-2 gap-2 sm:gap-4 w-full">
-        <div className="flex items-center justify-center sm:justify-start gap-1.5 sm:gap-2 bg-[#14100c]/60 p-1 rounded-2xl border border-[#D4AF37]/10 backdrop-blur-md justify-self-start max-w-full overflow-hidden">
+        <div className="flex items-center justify-center sm:justify-start gap-1.5 sm:gap-2 bg-gradient-to-r from-[#1A1510]/60 via-[#120F0A]/70 to-[#0A0806]/60 p-1 rounded-2xl border border-[#D4AF37]/10 backdrop-blur-md justify-self-start max-w-full overflow-hidden">
           <button 
             onClick={() => setActiveDateStr(format(subMonths(baseMonthStart, 1), 'yyyy-MM-dd'))} 
             className="p-1 sm:p-1.5 hover:bg-[#D4AF37]/20 rounded-xl transition-all text-[#D4AF37]"
@@ -307,7 +324,7 @@ export const LivehouseCalendar: React.FC<LivehouseCalendarProps> = ({ allUsers, 
           </button>
           
           <div className="flex items-center gap-1 sm:gap-2 px-1 overflow-hidden">
-            <h2 className="text-[11px] sm:text-sm font-black text-transparent bg-clip-text bg-gradient-to-r from-[#FFF0B3] to-[#D4AF37] tracking-widest uppercase truncate">
+            <h2 className="text-[11px] sm:text-sm font-black text-transparent bg-clip-text bg-gradient-to-r from-[#FFD700] via-[#D4AF37] to-[#9A7D0A] tracking-widest uppercase truncate">
               {format(baseDate, 'MMM yyyy')}
             </h2>
           </div>
@@ -321,31 +338,16 @@ export const LivehouseCalendar: React.FC<LivehouseCalendarProps> = ({ allUsers, 
           </button>
         </div>
 
-        {/* Timezone Toggle */}
-        <div className="flex w-full sm:w-auto bg-[#0a0806]/80 p-1.5 sm:p-2 rounded-2xl border border-white/5 backdrop-blur-xl shadow-[inset_0_0_20px_rgba(255,255,255,0.02)] justify-self-center">
-          <button 
-            onClick={() => setTimezoneMode('UTC+8')}
-            className={cn(
-              "flex-1 text-center px-4 sm:px-8 py-2 sm:py-2.5 text-[10px] sm:text-xs font-black uppercase tracking-[0.25em] rounded-xl transition-all duration-300 truncate",
-              timezoneMode === 'UTC+8'
-                ? "bg-gradient-to-br from-[#D4AF37]/25 to-[#FF8C00]/10 border border-[#D4AF37]/40 shadow-[0_0_15px_rgba(255,140,0,0.15),inset_0_0_10px_rgba(212,175,55,0.2)] text-transparent bg-clip-text bg-gradient-to-b from-[#FFF0B3] to-[#D4AF37]"
-                : "bg-transparent border border-transparent text-white/40 hover:text-[#D4AF37]/80 hover:bg-white/5"
-            )}
-          >
-            UTC+8
-          </button>
-          <button 
-            onClick={() => setTimezoneMode('Local')}
-            className={cn(
-              "flex-1 text-center px-4 sm:px-8 py-2 sm:py-2.5 text-[10px] sm:text-xs font-black uppercase tracking-[0.25em] rounded-xl transition-all duration-300 truncate",
-              timezoneMode === 'Local'
-                ? "bg-gradient-to-br from-[#D4AF37]/25 to-[#FF8C00]/10 border border-[#D4AF37]/40 shadow-[0_0_15px_rgba(255,140,0,0.15),inset_0_0_10px_rgba(212,175,55,0.2)] text-transparent bg-clip-text bg-gradient-to-b from-[#FFF0B3] to-[#D4AF37]"
-                : "bg-transparent border border-transparent text-white/40 hover:text-[#D4AF37]/80 hover:bg-white/5"
-            )}
-          >
-            {localTzAbbr}
-          </button>
-        </div>
+        {/* Timezone Toggle — unified button */}
+        <button
+          onClick={() => setTimezoneMode(prev => prev === 'UTC+8' ? 'Local' : 'UTC+8')}
+          className="relative px-3 py-1.5 rounded-xl bg-gradient-to-r from-[#1A1510] via-[#120F0A] to-[#0A0806] border border-[#D4AF37]/20 hover:border-[#D4AF37]/40 hover:bg-gradient-to-r hover:from-[#22180A] hover:via-[#1A1510] hover:to-[#120F0A] text-[#D4AF37] font-black text-[10px] uppercase tracking-wider transition-all duration-300 shadow-[0_0_15px_rgba(212,175,55,0.1)] justify-self-center"
+        >
+          {timezoneMode === 'Local' && (
+            <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-[#B22222]/10 via-transparent to-[#D4AF37]/10 pointer-events-none" />
+          )}
+          <span className="relative">{timezoneMode === 'UTC+8' ? 'Manila (UTC+8)' : localTzAbbr}</span>
+        </button>
       </div>
 
       {/* Horizontal Scrollable Days */}
@@ -359,24 +361,27 @@ export const LivehouseCalendar: React.FC<LivehouseCalendarProps> = ({ allUsers, 
             const isToday = isSameDay(new Date(dayStr), new Date());
             const isSelected = dayStr === activeDateStr;
 
-            let borderClass = "border-white/10"; // Default
-            let bgClass = "bg-gradient-to-br from-[#2a221b]/90 to-[#1a140f]/90 backdrop-blur-md shadow-[0_2px_10px_rgba(0,0,0,0.4),inset_0_0_15px_rgba(255,255,255,0.03)]";
+            let borderClass = "border-white/5"; // Default
+            let bgClass = "bg-gradient-to-br from-[#1A1510]/90 via-[#120F0A]/95 to-[#0A0806]/90 backdrop-blur-md shadow-[0_2px_10px_rgba(0,0,0,0.4),inset_0_0_15px_rgba(255,255,255,0.02)]";
             let textClass = "text-white/90"; // Non-selected dates are white
             let dayTextClass = "text-emerald-500/80";
             
             if (isToday) {
                // Today: Fiery Gold Gradient Text & Accent BG
-               borderClass = "border-[#FFD700]/50"; 
-               bgClass = "bg-gradient-to-br from-[#D4AF37]/15 via-[#1a1208]/80 to-[#FF8C00]/15 backdrop-blur-xl shadow-[0_0_20px_rgba(212,175,55,0.15),inset_0_0_15px_rgba(212,175,55,0.1)]";
-               textClass = "text-transparent bg-clip-text bg-gradient-to-b from-[#FFF0B3] to-[#D4AF37]";     
+               borderClass = "border-[#D4AF37]/40"; 
+               bgClass = "bg-gradient-to-br from-[#1A1510]/95 via-[#120F0A]/95 to-[#0A0806]/95 backdrop-blur-xl shadow-[0_0_20px_rgba(212,175,55,0.15),inset_0_0_15px_rgba(255,255,255,0.02)]";
+               textClass = "text-transparent bg-clip-text bg-gradient-to-b from-[#FFD700] via-[#D4AF37] to-[#9A7D0A]";     
                dayTextClass = "text-emerald-400 drop-shadow-[0_0_5px_rgba(52,211,153,0.5)]";
             } else if (isSelected) {
                // Selected: Gold Orange Gradient Text & Accent BG
-               borderClass = "border-[#FF8C00]/50"; 
-               bgClass = "bg-gradient-to-br from-[#FF8C00]/15 via-[#1a0f08]/80 to-[#FF4500]/15 backdrop-blur-xl shadow-[0_0_20px_rgba(255,140,0,0.15),inset_0_0_15px_rgba(255,140,0,0.1)]";
-               textClass = "text-transparent bg-clip-text bg-gradient-to-b from-[#FFD700] to-[#FF8C00]";         
+               borderClass = "border-[#D4AF37]/40"; 
+               bgClass = "bg-gradient-to-br from-[#1A1510]/95 via-[#120F0A]/95 to-[#0A0806]/95 backdrop-blur-xl shadow-[0_0_20px_rgba(212,175,55,0.15),inset_0_0_15px_rgba(255,255,255,0.02)]";
+               textClass = "text-transparent bg-clip-text bg-gradient-to-b from-[#FFD700] via-[#D4AF37] to-[#9A7D0A]";         
                dayTextClass = "text-emerald-400 drop-shadow-[0_0_5px_rgba(52,211,153,0.5)]";
             }
+
+            const hasLivehouse = dayHasLivehouse.has(dayStr);
+            const hasEvent = dayHasEvent.has(dayStr);
 
             return (
               <button
@@ -398,6 +403,11 @@ export const LivehouseCalendar: React.FC<LivehouseCalendarProps> = ({ allUsers, 
                   bgClass, borderClass
                 )}
               >
+                {/* Today Highlight — firebrick overlay when today but not selected */}
+                {isToday && !isSelected && (
+                  <div className="absolute inset-0 rounded-xl border border-[#B22222]/30 shadow-[0_0_8px_rgba(178,34,34,0.15)] pointer-events-none" />
+                )}
+
                 <span className={cn(
                   "text-[10px] sm:text-[11px] font-black uppercase tracking-widest mb-0.5",
                   dayTextClass
@@ -410,6 +420,16 @@ export const LivehouseCalendar: React.FC<LivehouseCalendarProps> = ({ allUsers, 
                 )}>
                   {dayNum}
                 </span>
+
+                {/* Dot indicators */}
+                <div className="absolute bottom-1 flex items-center gap-1">
+                  {hasEvent && (
+                    <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-gradient-to-br from-[#FFD700] via-[#D4AF37] to-[#9A7D0A] shadow-[0_0_8px_rgba(212,175,55,0.5),0_0_16px_rgba(184,150,12,0.3)] ring-1 ring-[#FFD700]/30" />
+                  )}
+                  {hasLivehouse && (
+                    <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-gradient-to-br from-[#B22222] via-[#8B0000] to-[#5C0000] shadow-[0_0_8px_rgba(178,34,34,0.5),0_0_16px_rgba(139,0,0,0.3)] ring-1 ring-[#B22222]/30" />
+                  )}
+                </div>
               </button>
             );
           })}
@@ -421,8 +441,8 @@ export const LivehouseCalendar: React.FC<LivehouseCalendarProps> = ({ allUsers, 
         <div className="w-full">
           {/* Selected Date Header & Column Labels */}
           <div className="mb-2 sticky top-0 z-10 flex flex-col gap-1">
-            <div className="flex items-center justify-center bg-gradient-to-r from-[#0a0806]/95 via-[#1a1208]/95 to-[#0a0806]/95 backdrop-blur-xl py-3 rounded-2xl border border-[#D4AF37]/30 shadow-[0_5px_15px_rgba(0,0,0,0.6),inset_0_0_15px_rgba(212,175,55,0.05)]">
-               <div className="text-xs sm:text-[13px] font-black tracking-[0.15em] uppercase text-transparent bg-clip-text bg-gradient-to-r from-[#FFF0B3] via-[#D4AF37] to-[#FF8C00] text-center px-4">
+            <div className="flex items-center justify-center bg-gradient-to-r from-[#1A1510]/95 via-[#120F0A]/95 to-[#0A0806]/95 backdrop-blur-xl py-3 rounded-2xl border border-[#D4AF37]/15 shadow-[0_5px_15px_rgba(0,0,0,0.6),inset_0_0_15px_rgba(255,255,255,0.02)]">
+               <div className="text-xs sm:text-[13px] font-black tracking-[0.15em] uppercase text-transparent bg-clip-text bg-gradient-to-r from-[#FFD700] via-[#D4AF37] to-[#9A7D0A] text-center px-4">
                   {(() => {
                     if (!activeDateStr) return "";
                     const localAgnosticDate = parse(activeDateStr, 'yyyy-MM-dd', new Date());
@@ -435,7 +455,7 @@ export const LivehouseCalendar: React.FC<LivehouseCalendarProps> = ({ allUsers, 
                </div>
             </div>
             
-            <div className="grid grid-cols-3 text-center bg-[#0a0806]/90 backdrop-blur-md py-2 rounded-xl border border-white/5 shadow-md">
+            <div className="grid grid-cols-3 text-center bg-gradient-to-r from-[#1A1510]/80 via-[#120F0A]/80 to-[#0A0806]/80 backdrop-blur-md py-2 rounded-xl border border-white/5 shadow-md">
               <div className="text-[9px] sm:text-[10px] font-black text-white/60 tracking-widest uppercase">TIMESLOT</div>
               <div className="text-[9px] sm:text-[10px] font-black text-white/60 tracking-widest uppercase">SLOT 1</div>
               <div className="text-[9px] sm:text-[10px] font-black text-white/60 tracking-widest uppercase">SLOT 2</div>
@@ -451,8 +471,8 @@ export const LivehouseCalendar: React.FC<LivehouseCalendarProps> = ({ allUsers, 
               if (startPart.includes('PM') && hour < 12) hour += 12;
               if (startPart.includes('AM') && hour === 12) hour = 0;
 
-              // Apply beautiful zebra striping and day/night fiery accents
-              const bgClass = "bg-[#0A0500]/80 backdrop-blur-xl border-[#D4AF37]/30 shadow-[0_0_15px_rgba(0,0,0,0.5)]";
+              // Card background with layered depth
+              const bgClass = "bg-gradient-to-br from-[#1A1510]/90 via-[#120F0A]/95 to-[#0A0806]/90 backdrop-blur-xl border-[#D4AF37]/15 shadow-[0_0_15px_rgba(0,0,0,0.5),inset_0_0_10px_rgba(255,255,255,0.02)]";
 
               // Compute localized time display if necessary
               let displayTimeslot = row.timeslot;
@@ -497,7 +517,7 @@ export const LivehouseCalendar: React.FC<LivehouseCalendarProps> = ({ allUsers, 
             )})}
             
             {activeDayRows.length === 0 && (
-              <div className="text-center py-8 text-white/40 text-sm font-bold tracking-widest uppercase border-t border-white/5">
+              <div className="text-center py-8 text-white/40 text-sm font-bold tracking-widest uppercase border-t border-white/5 bg-gradient-to-br from-[#1A1510]/40 via-[#120F0A]/50 to-[#0A0806]/40 rounded-2xl mt-2">
                 No slots found for this date.
               </div>
             )}
@@ -507,14 +527,14 @@ export const LivehouseCalendar: React.FC<LivehouseCalendarProps> = ({ allUsers, 
 
       {/* Spotlight Modal */}
       {spotlightHost && portalTarget && createPortal(
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-black/80 backdrop-blur-md animate-fade-in" onClick={() => setSpotlightHost(null)}>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-[#030201]/90 backdrop-blur-md animate-fade-in" onClick={() => setSpotlightHost(null)}>
           <div 
-            className="w-full max-w-md bg-[#050301] border border-[#D4AF37]/30 shadow-[0_0_50px_rgba(255,140,0,0.2),inset_0_0_20px_rgba(212,175,55,0.1)] p-6 sm:p-8 rounded-3xl flex flex-col gap-6"
+            className="w-full max-w-md bg-gradient-to-br from-[#1A1510]/95 via-[#120F0A]/95 to-[#0A0806]/95 border border-[#D4AF37]/15 shadow-[0_0_50px_rgba(212,175,55,0.15),inset_0_0_20px_rgba(255,255,255,0.02)] p-6 sm:p-8 rounded-3xl flex flex-col gap-6"
             onClick={e => e.stopPropagation()}
           >
             {/* Header/Close */}
             <div className="w-full flex justify-end">
-              <button onClick={() => setSpotlightHost(null)} className="text-white/30 hover:text-[#D4AF37] transition-colors p-1 bg-white/5 hover:bg-white/10 rounded-full" title="Close">
+              <button onClick={() => setSpotlightHost(null)} className="text-white/30 hover:text-[#D4AF37] transition-colors p-1 bg-gradient-to-br from-[#1A1510]/60 to-[#0A0806]/60 hover:from-[#1A1510]/80 hover:to-[#0A0806]/80 rounded-full border border-white/5" title="Close">
                 <X size={20} />
               </button>
             </div>
@@ -545,7 +565,7 @@ export const LivehouseCalendar: React.FC<LivehouseCalendarProps> = ({ allUsers, 
             <div className="w-full h-px bg-gradient-to-r from-transparent via-[#D4AF37]/30 to-transparent my-1" />
 
             {/* Event Details */}
-            <div className="w-full bg-[#0a0806]/60 rounded-2xl border border-[#D4AF37]/10 p-5 flex flex-col gap-5 shadow-[inset_0_0_20px_rgba(0,0,0,0.5)]">
+            <div className="w-full bg-gradient-to-br from-[#1A1510]/60 via-[#120F0A]/70 to-[#0A0806]/70 rounded-2xl border border-[#D4AF37]/10 p-5 flex flex-col gap-5 shadow-[inset_0_0_20px_rgba(0,0,0,0.5),inset_0_0_10px_rgba(255,255,255,0.01)]">
               <div className="flex items-center gap-4">
                 <div className="p-2.5 sm:p-3 bg-[#D4AF37]/10 rounded-xl text-[#D4AF37] border border-[#D4AF37]/20">
                   <CalendarIcon size={20} className="sm:w-6 sm:h-6" />
@@ -572,7 +592,7 @@ export const LivehouseCalendar: React.FC<LivehouseCalendarProps> = ({ allUsers, 
             
             <button 
               onClick={() => setSpotlightHost(null)}
-              className="w-full mt-2 py-3.5 bg-gradient-to-r from-[#D4AF37]/20 to-[#FF8C00]/20 hover:from-[#D4AF37]/30 hover:to-[#FF8C00]/30 border border-[#D4AF37]/30 rounded-xl text-white font-black tracking-widest uppercase text-xs transition-all shadow-[0_0_15px_rgba(212,175,55,0.1)] hover:shadow-[0_0_20px_rgba(212,175,55,0.2)]"
+              className="w-full mt-2 py-3.5 bg-gradient-to-r from-[#1A1510]/80 to-[#0A0806]/80 hover:from-[#1A1510]/90 hover:to-[#0A0806]/90 border border-[#D4AF37]/15 rounded-xl text-[#D4AF37] font-black tracking-widest uppercase text-xs transition-all shadow-[0_0_15px_rgba(212,175,55,0.1)] hover:shadow-[0_0_20px_rgba(212,175,55,0.2)]"
             >
               Close Spotlight
             </button>
