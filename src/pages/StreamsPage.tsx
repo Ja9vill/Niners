@@ -22,7 +22,12 @@ const formatComma = (val: string | number): string => {
 
 const parseNum = (val: string): number => {
   const cleaned = val.replace(/,/g, '');
-  return parseFloat(cleaned) || 0;
+  const parsed = parseFloat(cleaned);
+  if (isNaN(parsed)) {
+    console.warn(`[parseNum] Invalid number input: "${val}" (cleaned: "${cleaned}")`);
+    return 0;
+  }
+  return parsed;
 };
 
 const formatDuration = (val: string): string => {
@@ -100,6 +105,14 @@ export const StreamsPage = () => {
   const [selectedHostData, setSelectedHostData] = useState<any>(isHost ? authState : null);
 
   useEffect(() => {
+    if (isHost) {
+      setSelectedHostId(authState.poppo_id);
+      setSelectedHostName(authState.nickname || authState.name || '');
+      setSelectedHostData(authState);
+    }
+  }, [authState.poppo_id, authState.nickname, authState.name, isHost]);
+
+  useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (searchRef.current && !searchRef.current.contains(event.target as Node)) setShowDropdown(false);
     };
@@ -161,7 +174,22 @@ export const StreamsPage = () => {
       const q = query(collection(db, 'pk_reports'), where('poppo_id', '==', selectedHostId), orderBy('from_date', 'desc'));
       const snap = await getDocs(q);
       setRpkHistory(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    } catch (err) { console.error('Failed to fetch RPK history:', err); }
+    } catch (err: any) {
+      if (err.code === 'failed-precondition') {
+        // Composite index not yet built — fall back to client-side sort
+        try {
+          const fallbackQ = query(collection(db, 'pk_reports'), where('poppo_id', '==', selectedHostId));
+          const fallbackSnap = await getDocs(fallbackQ);
+          setRpkHistory(
+            fallbackSnap.docs
+              .map(d => ({ id: d.id, ...d.data() }))
+              .sort((a: any, b: any) => new Date(b.from_date).getTime() - new Date(a.from_date).getTime())
+          );
+        } catch (fallbackErr) { console.error('Failed to fetch RPK history (fallback):', fallbackErr); }
+      } else {
+        console.error('Failed to fetch RPK history:', err);
+      }
+    }
   }, [selectedHostId]);
 
   useEffect(() => { fetchRpkHistory(); }, [fetchRpkHistory]);
@@ -272,9 +300,9 @@ export const StreamsPage = () => {
   const [submitError, setSubmitError] = useState('');
 
   const reporterBase = {
-    reporterID: authState.poppo_id,
-    reporterName: authState.nickname || authState.name || '',
-    reporterRole: authState.role || 'Host',
+    reporter_id: authState.poppo_id,
+    reporter_name: authState.nickname || authState.name || '',
+    reporter_role: authState.role || 'Host',
     hostID: selectedHostId,
     hostNickname: selectedHostName,
     timestamp: new Date().toISOString()
@@ -480,7 +508,7 @@ export const StreamsPage = () => {
     try {
       const q = query(
         collection(db, 'stream_reports'),
-        where('reporterID', '==', authState.poppo_id),
+        where('reporter_id', '==', authState.poppo_id),
         where('type', '==', type),
         orderBy('timestamp', 'desc')
       );
@@ -531,7 +559,7 @@ export const StreamsPage = () => {
 
       const streamSnap = await getDocs(query(
         collection(db, 'stream_reports'),
-        where('reporterID', '==', authState.poppo_id),
+        where('reporter_id', '==', authState.poppo_id),
         orderBy('timestamp', 'desc')
       ));
       streamSnap.docs.forEach(d => results.push({ id: d.id, ...d.data(), _collection: 'stream_reports' }));
@@ -610,23 +638,25 @@ export const StreamsPage = () => {
       const roleLower = String(authState.role || '').toLowerCase();
       const isElevatedStaff = ['admin', 'head admin', 'head_admin', 'director'].includes(roleLower);
       const reportData = {
-        reporter_id: authState.poppo_id || "Unknown", reporter_name: authState.name || authState.nickname || "Unknown",
-        reporter_role: authState.role || "Unknown", poppo_id: selectedHostId, nickname: selectedHostName,
-        from_date: fanbaseFormData.from_date, to_date: fanbaseFormData.to_date,
+        reporter_id: authState.poppo_id || "Unknown",
+        reporter_name: authState.name || authState.nickname || "Unknown",
+        reporter_role: authState.role || "Unknown",
+        poppo_id: selectedHostId,
+        nickname: selectedHostName,
+        from_date: fanbaseFormData.from_date,
+        to_date: fanbaseFormData.to_date,
         total_followers: parseFloat(fanbaseFormData.total_followers) || 0,
         fanclub_subscribers: parseFloat(fanbaseFormData.fanclub_subscribers) || 0,
         fanclub_gc_members: parseFloat(fanbaseFormData.fanclub_gc_members) || 0,
         gc_activity_count_host: isElevatedStaff ? (parseFloat(fanbaseFormData.gc_activity_count_host) || 0) : 0,
         gc_activity_count_fans: isElevatedStaff ? (parseFloat(fanbaseFormData.gc_activity_count_fans) || 0) : 0,
         notes: fanbaseFormData.notes,
-        reporterId: authState.poppo_id || "Unknown", reporterName: authState.name || authState.nickname || "Unknown",
-        reporterRole: authState.role || "Unknown", poppoId: selectedHostId,
+        submittedAt: new Date().toISOString(),
+        // Legacy camelCase fields kept for backward compatibility (useAnalytics.ts, HostProfileView.tsx)
+        reporterId: authState.poppo_id || "Unknown",
+        poppoId: selectedHostId,
         currentFollowers: parseFloat(fanbaseFormData.total_followers) || 0,
-        fanclubSubscribers: parseFloat(fanbaseFormData.fanclub_subscribers) || 0,
         fanclubGcMembers: parseFloat(fanbaseFormData.fanclub_gc_members) || 0,
-        gcUpdatesHost: isElevatedStaff ? (parseFloat(fanbaseFormData.gc_activity_count_host) || 0) : 0,
-        gcUpdatesFans: isElevatedStaff ? (parseFloat(fanbaseFormData.gc_activity_count_fans) || 0) : 0,
-        fromDate: fanbaseFormData.from_date, toDate: fanbaseFormData.to_date, submittedAt: new Date().toISOString()
       };
       await FirebaseService.submitFanbaseReport(selectedHostId, fanbaseFormData.from_date, fanbaseFormData.to_date, reportData);
       await FirebaseService.logSystemActivity(`Submitted fanbase report for Host: ${selectedHostName}`, 'Info');

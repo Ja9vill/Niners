@@ -55,7 +55,7 @@ import { StreamsPage } from './pages/StreamsPage';
 const RootIndex = () => {
   const authState = Storage.getAuthState();
   if (authState.level > 0) {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to="/overview" replace />;
   }
   return <PublicLanding />;
 };
