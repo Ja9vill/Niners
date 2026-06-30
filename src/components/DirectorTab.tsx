@@ -649,8 +649,7 @@ export const DirectorTab = () => {
         created_by_role: localAuth.role || 'Director',
         created_by_id: localAuth.poppo_id || 'DirectorAdmin',
         visibility: 'All',
-        participants: [req.poppoId],
-        participantIds: [req.poppoId],
+        participant_ids: [req.poppoId],
         timestamp: new Date().toISOString()
       };
       await setDoc(doc(db, 'calendar', eventId), newEvent);

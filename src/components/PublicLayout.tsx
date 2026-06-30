@@ -1,201 +1,175 @@
-import React, { useState, useEffect } from 'react';
-import { Outlet, Link, useLocation } from 'react-router-dom';
-import { Menu, X, Instagram, Facebook, MessageCircle, Shield, Home, Trophy, UserPlus, Users, Calendar, PlayCircle } from 'lucide-react';
+import React from 'react';
+import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
+import { Home, Trophy, Calendar, PlayCircle, ArrowLeft, Users } from 'lucide-react';
 import { cn } from '../lib/utils';
 import appLogo from '../logo.jpg';
+import { Storage } from '../lib/storage';
 
-export const PublicLayout = () => {
-  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+export const PublicLayout = ({ children }: { children?: React.ReactNode }) => {
   const location = useLocation();
-
-  // Close drawer when route changes
-  useEffect(() => {
-    setIsDrawerOpen(false);
-  }, [location.pathname]);
-
-  const navLinks = [
-    { label: 'Home', path: '/', icon: Home },
-    { label: 'Become an Agent', path: '/become-an-agent', icon: UserPlus },
-    { label: 'Leaderboards', path: '/leaderboards', icon: Trophy },
-    { label: 'Agency Policy', path: '/policy', icon: Shield },
-  ];
+  const navigate = useNavigate();
+  const authState = Storage.getAuthState();
+  const isFooterPage = ['/', '/roster', '/events', '/calendar', '/niners', '/poppo-live'].includes(location.pathname);
+  const isLoggedIn = authState && authState.level > 0;
 
   return (
-    <div className="flex flex-col min-h-[100dvh] bg-[#0A0A0F] text-[#F0EFE8] font-sans selection:bg-[#D4AF37]/30 selection:text-white">
-      {/* Global Header */}
-      <header className="sticky top-0 z-50 w-full bg-[#0A0A0F]/80 backdrop-blur-md border-b border-white/5">
-        <div className="max-w-screen-xl mx-auto px-4 h-16 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-3 group">
+    <div className="fixed inset-0 w-full h-[100dvh] flex flex-col overflow-hidden bg-transparent text-[#F0EFE8] font-sans selection:bg-[#D4AF37]/30 selection:text-white">
+      {/* Mobile Top Bar (Matching Dashboard Mobile Header) */}
+      <header className="global-block-1 !overflow-visible md:hidden flex items-center justify-between p-4 shrink-0 z-50">
+        <div className="flex items-center gap-3">
+          <Link to="/" className="flex items-center gap-3">
             <img 
               src={appLogo} 
               alt="Nine Talent Management" 
-              className="w-9 h-9 rounded-xl border border-[#D4AF37]/30 shadow-md object-cover group-hover:scale-105 transition-transform" 
+              className="w-8 h-8 rounded-md border border-white/10 shrink-0 object-cover" 
             />
-            <span className="font-black tracking-widest text-[#D4AF37] text-base uppercase">
-              Nine Talent
-            </span>
+            <div className="flex flex-col">
+              <span className="font-black tracking-widest text-[#D4AF37] text-[11px] uppercase leading-tight">
+                NINE TALENT MANAGEMENT
+              </span>
+              <span className="text-[10px] text-[#A09E9A]">Official Portal</span>
+            </div>
           </Link>
-
-          {/* Desktop Nav */}
-          <nav className="hidden md:flex items-center gap-8">
-            {navLinks.map((link) => (
-              <Link 
-                key={link.path} 
-                to={link.path}
-                className={cn(
-                  "text-xs font-bold uppercase tracking-widest transition-colors hover:text-[#D4AF37]",
-                  location.pathname === link.path ? "text-[#D4AF37]" : "text-[#A09E9A]"
-                )}
-              >
-                {link.label}
-              </Link>
-            ))}
+        </div>
+        <div className="flex items-center gap-2">
+          {!isLoggedIn ? (
             <Link 
               to="/login"
-              className="px-5 py-2 rounded-full bg-[#D4AF37]/10 text-[#D4AF37] border border-[#D4AF37]/20 text-xs font-bold uppercase tracking-widest hover:bg-[#D4AF37]/20 transition-all"
+              className="global-block-1 px-4 py-1.5 rounded-xl text-[#D4AF37] hover:text-[#D4AF37] hover:scale-105 text-[10px] font-bold uppercase tracking-widest transition-all"
             >
-              Sign In
+              Login
             </Link>
-          </nav>
-
-          {/* Mobile Hamburger Toggle */}
-          <button 
-            className="md:hidden p-2 -mr-2 text-[#D4AF37]"
-            onClick={() => setIsDrawerOpen(true)}
-            aria-label="Open Navigation Menu"
-          >
-            <Menu size={28} />
-          </button>
+          ) : (
+            <Link 
+              to="/dashboard"
+              className="global-block-1 px-4 py-1.5 rounded-xl text-[#D4AF37] hover:text-[#D4AF37] hover:scale-105 text-[10px] font-bold uppercase tracking-widest transition-all"
+            >
+              Dashboard
+            </Link>
+          )}
         </div>
       </header>
 
-      {/* Mobile Side-Drawer Overlay */}
-      <div 
-        className={cn(
-          "fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm transition-opacity duration-300 md:hidden",
-          isDrawerOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
-        )}
-        onClick={() => setIsDrawerOpen(false)}
-      />
+      {/* Desktop Top Bar (Matching Dashboard Desktop Header) */}
+      <header className="hidden md:flex items-center justify-between px-8 py-4 bg-[#140E0A] border-b border-[#D4AF37]/10 shrink-0 z-20 h-16 animate-fadeIn">
+        <div className="flex items-center gap-6">
+          <Link to="/" className="flex items-center gap-3">
+            <img 
+              src={appLogo} 
+              alt="Nine Talent Management" 
+              className="w-8 h-8 rounded-md border border-[#D4AF37]/30 shrink-0 object-cover" 
+            />
+            <div className="flex flex-col">
+              <span className="font-black tracking-widest text-[#D4AF37] text-[11px] uppercase leading-tight">
+                NINE TALENT MANAGEMENT
+              </span>
+              <span className="text-[10px] text-[#A09E9A]">Official Portal</span>
+            </div>
+          </Link>
 
-      {/* Mobile Side-Drawer */}
-      <aside 
-        className={cn(
-          "fixed top-0 right-0 h-[100dvh] w-3/4 max-w-sm bg-[#11111A] border-l border-white/5 z-[110] transform transition-transform duration-300 ease-in-out md:hidden flex flex-col shadow-2xl",
-          isDrawerOpen ? "translate-x-0" : "translate-x-full"
-        )}
-      >
-        <div className="h-16 flex items-center justify-between px-6 border-b border-white/5 shrink-0">
-          <span className="font-black tracking-widest text-[#D4AF37] text-sm uppercase">Menu</span>
-          <button 
-            onClick={() => setIsDrawerOpen(false)}
-            className="p-2 -mr-2 text-[#A09E9A] hover:text-white transition-colors"
-            aria-label="Close Navigation Menu"
-          >
-            <X size={24} />
-          </button>
+          <nav className="flex items-center gap-1">
+            {[
+              { to: '/', label: 'Home' },
+              { to: '/roster', label: 'Roster' },
+              { to: '/events', label: 'Events' },
+              { to: '/calendar', label: 'Events' },
+              { to: '/niners', label: 'Niners' },
+              { to: '/poppo-live', label: 'Poppo' },
+            ].map(({ to, label }) => {
+              const isActive = to === '/' ? location.pathname === '/' : location.pathname.startsWith(to);
+              return (
+                <Link
+                  key={to}
+                  to={to}
+                  className={cn(
+                    "px-4 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all",
+                    isActive
+                      ? "bg-[#D4AF37]/10 text-[#D4AF37]"
+                      : "text-[#A09E9A] hover:text-[#D4AF37] hover:bg-white/[0.02]"
+                  )}
+                >
+                  {label}
+                </Link>
+              );
+            })}
+          </nav>
         </div>
 
-        <nav className="flex-1 overflow-y-auto py-6 px-4 space-y-2">
-          {navLinks.map((link) => {
-            const Icon = link.icon;
-            const isActive = location.pathname === link.path;
+        <div className="flex items-center gap-4">
+          {!isLoggedIn ? (
+            <Link 
+              to="/login"
+              className="global-block-1 px-4 py-1.5 rounded-xl text-[#D4AF37] hover:text-[#D4AF37] hover:scale-105 text-[10px] font-bold uppercase tracking-widest transition-all"
+            >
+              Login
+            </Link>
+          ) : (
+            <Link 
+              to="/dashboard"
+              className="global-block-1 px-4 py-1.5 rounded-xl text-[#D4AF37] hover:text-[#D4AF37] hover:scale-105 text-[10px] font-bold uppercase tracking-widest transition-all"
+            >
+              Dashboard
+            </Link>
+          )}
+        </div>
+      </header>
+
+      {/* Main Scrollable Content */}
+      <main
+        className="flex-1 w-full overflow-y-auto custom-scrollbar relative" 
+        ref={el => { if (el) (el.style as any).WebkitOverflowScrolling = 'touch'; }}
+      >
+        {!isFooterPage && (
+          <div className="w-full max-w-4xl mx-auto px-4 pt-4 md:pt-6 -mb-10 relative z-20">
+            <button 
+              onClick={() => navigate(-1)}
+              className="inline-flex items-center gap-2 px-3 py-1.5 text-[#D4AF37] bg-[#D4AF37]/5 hover:bg-[#D4AF37]/10 border border-[#D4AF37]/20 hover:text-white rounded-full transition-all cursor-pointer shadow-sm text-[10px] font-bold uppercase tracking-widest"
+              title="Go Back"
+              type="button"
+            >
+              <ArrowLeft size={14} strokeWidth={2.5} />
+              Back
+            </button>
+          </div>
+        )}
+        {children || <Outlet />}
+      </main>
+
+      {/* Mobile Bottom Nav (Matching Dashboard Mobile Bottom Nav layout, colors, and styling) */}
+      <div className="md:hidden fixed bottom-1 left-1.5 right-1.5 pb-safe z-50 pointer-events-none">
+        <div className="global-block-1 rounded-2xl pointer-events-auto flex w-full items-center justify-between gap-1.5 p-2 transition-all duration-500 relative overflow-hidden">
+          <div className="absolute inset-0 bg-[#0F0A06]/95 backdrop-blur-md pointer-events-none z-0"></div>
+          {[
+            { to: '/', icon: Home, label: 'Home' },
+            { to: '/roster', icon: Trophy, label: 'Roster' },
+            { to: '/events', icon: Calendar, label: 'Events' },
+            { to: '/niners', icon: Users, label: 'Niners' },
+            { to: '/poppo-live', icon: PlayCircle, label: 'Poppo' },
+          ].map(({ to, icon: Icon, label }) => {
+            const isActive = to === '/' ? location.pathname === '/' : location.pathname.startsWith(to);
             return (
               <Link
-                key={link.path}
-                to={link.path}
-                onClick={() => setIsDrawerOpen(false)}
+                key={to}
+                to={to}
                 className={cn(
-                  "flex items-center gap-4 px-4 py-4 rounded-2xl transition-all font-bold text-sm",
-                  isActive 
-                    ? "bg-[#D4AF37]/10 text-[#D4AF37]" 
-                    : "text-[#A09E9A] hover:bg-white/5 hover:text-white"
+                  "global-block-1 flex flex-col items-center justify-center flex-1 py-2 rounded-xl transition-all duration-300 relative z-10",
+                  isActive
+                    ? "active-tab border-[#D4AF37]/80 text-[#D4AF37] shadow-[0_0_15px_rgba(212,175,55,0.4)] scale-[1.03]"
+                    : "text-[#A09E9A] hover:text-[#D4AF37]"
                 )}
               >
-                <Icon size={20} />
-                <span>{link.label}</span>
+                <Icon size={16} className={isActive ? "text-[#D4AF37]" : "text-[#A09E9A]"} />
+                <span className={cn(
+                  "text-[8px] font-black uppercase tracking-wider mt-0.5",
+                  isActive ? "text-[#D4AF37]" : "text-[#A09E9A]"
+                )}>
+                  {label}
+                </span>
               </Link>
             );
           })}
-        </nav>
-
-        <div className="p-6 border-t border-white/5 shrink-0 flex flex-col gap-6">
-          <div className="flex items-center justify-center gap-8">
-            <a 
-              href="https://wa.me/message/5Y6QFQXSIEZRI1" 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="text-[#25D366] hover:scale-110 transition-transform"
-            >
-              <MessageCircle size={24} className="fill-current" />
-            </a>
-            <a 
-              href="https://instagram.com/9talentManagement" 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="text-[#E1306C] hover:scale-110 transition-transform"
-            >
-              <Instagram size={24} />
-            </a>
-            <a 
-              href="https://facebook.com/9talentManagement" 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="text-[#1877F2] hover:scale-110 transition-transform"
-            >
-              <Facebook size={24} className="fill-current" />
-            </a>
-          </div>
-          <Link 
-            to="/login"
-            onClick={() => setIsDrawerOpen(false)}
-            className="w-full flex items-center justify-center py-4 rounded-xl bg-[#D4AF37] text-black font-black uppercase tracking-widest text-sm active:scale-95 transition-transform shadow-[0_0_20px_rgba(212,175,55,0.3)]"
-          >
-            Dashboard Login
-          </Link>
         </div>
-      </aside>
-
-      {/* Main Content Render */}
-      <main className="flex-1 flex flex-col w-full">
-        <Outlet />
-      </main>
-
-      {/* Sticky Mobile Channels Footer */}
-      <footer className="sticky bottom-0 z-40 w-full bg-[#11111A] border-t border-white/5 pb-safe">
-        <div className="max-w-screen-xl mx-auto px-2 h-16 flex items-center justify-between">
-          <Link 
-            to="/leaderboards" 
-            className="flex flex-col items-center justify-center gap-1 text-[#A09E9A] hover:text-[#D4AF37] transition-colors flex-1"
-          >
-            <Trophy size={20} />
-            <span className="text-[9px] font-bold uppercase tracking-wider">Top Niners</span>
-          </Link>
-          <Link 
-            to="/roster" 
-            className="flex flex-col items-center justify-center gap-1 text-[#A09E9A] hover:text-[#D4AF37] transition-colors flex-1"
-          >
-            <Users size={20} />
-            <span className="text-[9px] font-bold uppercase tracking-wider">Roster</span>
-          </Link>
-          <Link 
-            to="/calendar" 
-            className="flex flex-col items-center justify-center gap-1 text-[#A09E9A] hover:text-[#D4AF37] transition-colors flex-1"
-          >
-            <Calendar size={20} />
-            <span className="text-[9px] font-bold uppercase tracking-wider">Calendar</span>
-          </Link>
-          <a 
-            href="https://invite-poppo.com/6CxF5E" 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className="flex flex-col items-center justify-center gap-1 text-[#A09E9A] hover:text-[#D4AF37] transition-colors flex-1"
-          >
-            <PlayCircle size={20} />
-            <span className="text-[9px] font-bold uppercase tracking-wider">Poppo Live</span>
-          </a>
-        </div>
-      </footer>
+      </div>
     </div>
   );
 };

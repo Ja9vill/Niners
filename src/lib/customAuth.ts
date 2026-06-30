@@ -231,7 +231,7 @@ export class PoppoAuthService {
       // Retrieve fresh ID token
       const idToken = await user.getIdToken(true);
 
-      // Sync state with backend
+      // Sync state with backend — send new password so it gets hashed & saved to Firestore
       try {
         const response = await fetchWithTimeout('/api/auth/mark-migration-complete', {
           method: 'POST',
@@ -239,6 +239,7 @@ export class PoppoAuthService {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${idToken}`,
           },
+          body: JSON.stringify({ newPassword }),
         });
 
         const text = await response.text();
@@ -252,7 +253,13 @@ export class PoppoAuthService {
         }
 
         if (!response.ok) {
-          throw new Error(data?.error || `Server error (${response.status}): ${text || 'Empty response'}`);
+          const errMsg = data?.error || `Server error (${response.status}): ${text || 'Empty response'}`;
+          console.warn('[PoppoAuthService] Backend sync failed (non-fatal):', errMsg);
+          // Password is already upgraded in Firebase Auth — don't block the user
+          return {
+            success: true,
+            message: 'Warning: Password upgraded, but backend sync failed. Contact admin if login issues persist.',
+          };
         }
 
         return {
@@ -260,12 +267,12 @@ export class PoppoAuthService {
           message: 'Account migration complete. Your account is now fully secured.',
         };
       } catch (syncError: any) {
-        console.error('[PoppoAuthService] Syncing migration state with backend failed:', syncError);
-        throw new Error(
-          'Warning: Your login password has been upgraded successfully, ' +
-          'but we could not synchronize this state with our server database. ' +
-          'Please contact an administrator if you cannot sign in next time.'
-        );
+        console.warn('[PoppoAuthService] Backend sync request failed (non-fatal):', syncError.message || syncError);
+        // Password is already upgraded in Firebase Auth — don't block the user
+        return {
+          success: true,
+          message: 'Warning: Password upgraded, but backend sync failed. Contact admin if login issues persist.',
+        };
       }
     } catch (error: any) {
       throw error;

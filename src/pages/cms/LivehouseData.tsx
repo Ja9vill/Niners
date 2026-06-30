@@ -152,19 +152,32 @@ export const LivehouseData = () => {
         );
 
         // Auto-create calendar event using existing saveCalendarEvents method
+        const timeParts = (req.timeslot || '').split(' - ');
         await FirebaseService.saveCalendarEvents([{
           id: req.id || (crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 15)),
-          type_of_event: (req.livehouseType || 'Solo Livehouse') as any,
+          event_id: req.id || (crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 15)),
+          event_type: req.livehouseType || 'Solo Livehouse',
+          event_title: `Livehouse: ${req.name}`,
+          event_description: `Auto-generated from approved Livehouse Request for ${req.name}. Timeslot: ${req.timeslot}`,
           event_date: req.date,
-          description: `Auto-generated from approved Livehouse Request for ${req.name}. Timeslot: ${req.timeslot}`,
-          participants_id: [req.poppoId],
-          poppo_id: req.poppoId,
+          from_time: timeParts[0] || req.timeslot || '',
+          to_time: timeParts[1] || '',
           event_host_id: req.poppoId,
-          visibility: 'all',
+          event_host_name: req.name || '',
+          is_external_host: false,
+          participant_ids: [req.poppoId],
+          participant_nicknames: [req.name || req.poppoId],
           created_by_id: adminState.poppo_id || 'system',
           created_by_name: adminState.nickname || 'System Auto-Approve',
           created_by_role: adminState.role || 'Admin',
           timestamp: new Date().toISOString(),
+          notified30min: false,
+          notifiedStart: false,
+          // Backward-compat aliases
+          type_of_event: (req.livehouseType || 'Solo Livehouse') as any,
+          description: `Auto-generated from approved Livehouse Request for ${req.name}. Timeslot: ${req.timeslot}`,
+          poppo_id: req.poppoId,
+          visibility: 'all',
           is_automated: true
         }]);
 
@@ -373,7 +386,7 @@ export const LivehouseData = () => {
           const inCalendar = calendar.some(c => {
             const hasDate = c.date === row.date || c.event_date === row.date;
             const hasTime = c.time === row.timeslot || (c.description && c.description.includes(row.timeslot));
-            const hasParticipant = (c.participants_id && c.participants_id.includes(pId)) || c.poppo_id === pId;
+            const hasParticipant = (c.participant_ids && c.participant_ids.includes(pId)) || c.poppo_id === pId;
             return hasDate && hasTime && hasParticipant;
           });
 
@@ -399,7 +412,7 @@ export const LivehouseData = () => {
           const inCalendar = calendar.some(c => {
             const hasDate = c.date === row.date || c.event_date === row.date;
             const hasTime = c.time === row.timeslot || (c.description && c.description.includes(row.timeslot));
-            const hasParticipant = (c.participants_id && c.participants_id.includes(pId)) || c.poppo_id === pId;
+            const hasParticipant = (c.participant_ids && c.participant_ids.includes(pId)) || c.poppo_id === pId;
             return hasDate && hasTime && hasParticipant;
           });
 
@@ -460,26 +473,39 @@ export const LivehouseData = () => {
       const chosenHostId = queueEventType === 'Solo Livehouse' ? currentRecommendation.poppo_id : eventHostId;
       const chosenParticipants = queueEventType === 'Solo Livehouse' ? [currentRecommendation.poppo_id] : partyParticipants;
 
+      const timeParts = (currentRecommendation.timeslot || '').split(' - ');
       const newEvent = {
         id: eventId,
         event_id: eventId,
-        poppo_id: chosenHostId,
-        event_host_id: chosenHostId,
-        title: queueEventTitle || `${currentRecommendation.nickname} - ${queueEventType}`,
-        type_of_event: queueEventType,
-        type: queueEventType,
+        event_type: queueEventType,
+        event_title: queueEventTitle || `${currentRecommendation.nickname} - ${queueEventType}`,
+        event_description: queueDescription,
         event_date: currentRecommendation.date,
-        date: currentRecommendation.date,
-        time: currentRecommendation.timeslot,
-        description: queueDescription,
-        participants_id: chosenParticipants,
-        participants: chosenParticipants,
-        visibility: 'all',
-        is_automated: false, // manually confirmed
+        from_time: timeParts[0] || currentRecommendation.timeslot || '',
+        to_time: timeParts[1] || '',
+        event_host_id: chosenHostId,
+        event_host_name: currentRecommendation.nickname || chosenHostId,
+        is_external_host: false,
+        participant_ids: chosenParticipants,
+        participant_nicknames: queueEventType === 'Solo Livehouse'
+          ? [currentRecommendation.nickname || currentRecommendation.poppo_id]
+          : partyParticipants.map((id: string) => id),
         created_by_id: authState.poppo_id || authState.id || "admin",
         created_by_name: authState.nickname || authState.name || "Admin",
         created_by_role: authState.role || "admin",
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        notified30min: false,
+        notifiedStart: false,
+        // Backward-compat aliases
+        poppo_id: chosenHostId,
+        title: queueEventTitle || `${currentRecommendation.nickname} - ${queueEventType}`,
+        type_of_event: queueEventType,
+        type: queueEventType,
+        date: currentRecommendation.date,
+        time: currentRecommendation.timeslot,
+        description: queueDescription,
+        visibility: 'all',
+        is_automated: false,
       };
 
       const batch = writeBatch(db);

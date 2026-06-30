@@ -2817,12 +2817,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
             time: editCalTime,
             type: editCalType,
             location: editCalLocation.trim(),
-            participants: editCalParticipants.map(p => ({
-              poppoId: p.poppoId || p.poppo_id || p.id,
-              nickname: p.nickname || p.name,
-              role: p.role
-            })),
-            participantIds: editCalParticipants.map(p => p.poppoId || p.poppo_id || p.id)
+            participant_ids: editCalParticipants.map(p => p.poppoId || p.poppo_id || p.id)
           }
         };
       }
@@ -2896,7 +2891,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
       setEditCalTime(item.time || '');
       setEditCalType(item.type || 'solo livehouse');
       setEditCalLocation(item.location || '');
-      setEditCalParticipants(item.participants || []);
+      setEditCalParticipants(item.participant_ids || item.participants || []);
       setEditCalSearch('');
       setEditCalRoleFilter('All Roles');
     }
@@ -3746,15 +3741,13 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
         }
 
         // Section 2: Query exposures from 'calendar' collection
-        const [eventsSnap1, eventsSnap2, eventsSnap3, eventsSnap4] = await Promise.all([
-          getDocs(query(collection(db, 'calendar'), where('participantIds', 'array-contains', host.id))),
-          getDocs(query(collection(db, 'calendar'), where('participants', 'array-contains', host.id))),
-          getDocs(query(collection(db, 'calendar'), where('participants_id', 'array-contains', host.id))),
+        const [eventsSnap1, eventsSnap4] = await Promise.all([
+          getDocs(query(collection(db, 'calendar'), where('participant_ids', 'array-contains', host.id))),
           getDocs(query(collection(db, 'calendar'), where('poppo_id', '==', host.id)))
         ]);
         const seenEventIds = new Set<string>();
         const eventsList: any[] = [];
-        [...eventsSnap1.docs, ...eventsSnap2.docs, ...eventsSnap3.docs, ...eventsSnap4.docs].forEach(doc => {
+        [...eventsSnap1.docs, ...eventsSnap4.docs].forEach(doc => {
           if (!seenEventIds.has(doc.id)) {
             seenEventIds.add(doc.id);
             eventsList.push({ id: doc.id, ...doc.data() });
@@ -4414,8 +4407,7 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
         timeslot: eventFormData.timeslot,
         eventType: eventFormData.eventType,
         description: eventFormData.description,
-        participantIds: [host.id],
-        participants: [host.id],
+        participant_ids: [host.id],
         status: 'Approved',
         actualParticipants: [host.id],
         adminFeedback: '',
@@ -4432,13 +4424,10 @@ export const HostProfileView: React.FC<HostProfileViewProps> = ({
       await FirebaseService.logSystemActivity(`Added livehouse event details for Host: ${host.nickname || host.name} (Poppo ID: ${host.id}) - Date: ${eventFormData.eventDate}, Timeslot: ${eventFormData.timeslot}, Type: ${eventFormData.eventType}, Desc: "${eventFormData.description}"`, 'Info');
 
       // Refresh participated events list
-      const [eventsSnap1, eventsSnap2] = await Promise.all([
-        getDocs(query(collection(db, 'attendance'), where('participantIds', 'array-contains', host.id))),
-        getDocs(query(collection(db, 'attendance'), where('participants', 'array-contains', host.id)))
-      ]);
+      const eventsSnap1 = await getDocs(query(collection(db, 'attendance'), where('participant_ids', 'array-contains', host.id)));
       const seenEventIds = new Set<string>();
       const eventsList: any[] = [];
-      [...eventsSnap1.docs, ...eventsSnap2.docs].forEach(doc => {
+      [...eventsSnap1.docs].forEach(doc => {
         if (!seenEventIds.has(doc.id)) {
           seenEventIds.add(doc.id);
           eventsList.push({ id: doc.id, ...doc.data() });
@@ -7078,10 +7067,8 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
       const nickname = selectedHost.nickname || selectedHost.name || 'Unnamed';
 
       const hostEvents = rosterEvents.filter(evt => {
-        const pIds = evt.participantIds || evt.participants_id || [];
-        const participants = evt.participants || [];
+        const pIds = evt.participant_ids || [];
         return (Array.isArray(pIds) && pIds.includes(hostId)) ||
-          (Array.isArray(participants) && participants.includes(hostId)) ||
           String(evt.poppo_id || evt.event_host_id || '') === hostId;
       });
 
@@ -7560,10 +7547,8 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
 
     // Filter events for assigned hosts
     const filteredEvents = rosterEvents.filter(evt => {
-      const pIds = evt.participantIds || evt.participants_id || [];
-      const participants = evt.participants || [];
+      const pIds = evt.participant_ids || [];
       const isPart = (Array.isArray(pIds) && pIds.some((id: any) => hostIds.includes(String(id)))) ||
-        (Array.isArray(participants) && participants.some((id: any) => hostIds.includes(String(id)))) ||
         hostIds.includes(String(evt.poppo_id || evt.event_host_id || ''));
       return isPart;
     });
@@ -7590,11 +7575,9 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
     const filteredAttendance = rosterAttendance.filter(att => {
       const attendeeIds = att.attendeeIds || [];
       const attendees = att.attendees || [];
-      const participantIds = att.participantIds || [];
-      const participants = att.participants || [];
+      const participantIds = att.participant_ids || [];
       const isAtt = (Array.isArray(attendeeIds) && attendeeIds.some((id: any) => hostIds.includes(String(id)))) ||
         (Array.isArray(participantIds) && participantIds.some((id: any) => hostIds.includes(String(id)))) ||
-        (Array.isArray(participants) && participants.some((id: any) => hostIds.includes(String(id)))) ||
         (Array.isArray(attendees) && attendees.some((a: any) => hostIds.includes(String(a.poppoId || a.id || '')))) ||
         hostIds.includes(String(att.poppo_id || att.poppoId || att.hostId || ''));
       return isAtt;
@@ -7627,10 +7610,8 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
     pastEvents.forEach(evt => {
       const eventHosts = assignedHostsList.filter(h => {
         const hostId = String(h.poppo_id || h.poppoId || h.id || '');
-        const pIds = evt.participantIds || evt.participants_id || [];
-        const participants = evt.participants || [];
+        const pIds = evt.participant_ids || [];
         return (Array.isArray(pIds) && pIds.includes(hostId)) ||
-          (Array.isArray(participants) && participants.includes(hostId)) ||
           String(evt.poppo_id || evt.event_host_id || '') === hostId;
       });
 
@@ -7727,10 +7708,8 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                 {upcomingEvents.map(evt => {
                   const eventHosts = assignedHostsList.filter(h => {
                     const hostId = String(h.poppo_id || h.poppoId || h.id || '');
-                    const pIds = evt.participantIds || evt.participants_id || [];
-                    const participants = evt.participants || [];
+                    const pIds = evt.participant_ids || [];
                     return (Array.isArray(pIds) && pIds.includes(hostId)) ||
-                      (Array.isArray(participants) && participants.includes(hostId)) ||
                       String(evt.poppo_id || evt.event_host_id || '') === hostId;
                   });
 
@@ -7795,11 +7774,9 @@ Monthly Performance (last 6): ${JSON.stringify(last6)}
                     const hostId = String(h.poppo_id || h.poppoId || h.id || '');
                     const attendeeIds = att.attendeeIds || [];
                     const attendees = att.attendees || [];
-                    const participantIds = att.participantIds || [];
-                    const participants = att.participants || [];
+                    const participantIds = att.participant_ids || [];
                     return (Array.isArray(attendeeIds) && attendeeIds.includes(hostId)) ||
                       (Array.isArray(participantIds) && participantIds.includes(hostId)) ||
-                      (Array.isArray(participants) && participants.includes(hostId)) ||
                       (Array.isArray(attendees) && attendees.some((a: any) => String(a.poppoId || a.id || '').trim() === hostId)) ||
                       String(att.poppo_id || att.poppoId || att.hostId || '') === hostId;
                   });

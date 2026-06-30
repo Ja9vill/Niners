@@ -1,14 +1,15 @@
 import React, { useMemo } from 'react';
 import { ChevronLeft, ChevronRight, Plus, Calendar as CalendarIcon } from 'lucide-react';
 import { cn } from '../lib/utils';
-import { format, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay, startOfMonth, endOfMonth, addMonths, subMonths } from 'date-fns';
+import { format, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay, startOfMonth, endOfMonth } from 'date-fns';
 import { CalendarDayData } from '../hooks/useCalendarEngine';
 
 interface CalendarHeaderGroupProps {
   activeTab: 'AGENCY' | 'LIVEHOUSE';
   onTabChange: (tab: 'AGENCY' | 'LIVEHOUSE') => void;
   currentDate: Date;
-  onDateChange: (date: Date) => void;
+  onPrevMonth: () => void;
+  onNextMonth: () => void;
   selectedDate: Date;
   onDateSelect: (date: Date) => void;
   events?: any[];
@@ -24,7 +25,8 @@ export const CalendarHeaderGroup: React.FC<CalendarHeaderGroupProps> = ({
   activeTab,
   onTabChange,
   currentDate,
-  onDateChange,
+  onPrevMonth,
+  onNextMonth,
   selectedDate,
   onDateSelect,
   events = [],
@@ -113,7 +115,7 @@ export const CalendarHeaderGroup: React.FC<CalendarHeaderGroupProps> = ({
       <div className="flex items-center justify-center">
         <div className="flex items-center gap-2 bg-[#14100c]/60 p-2 rounded-2xl border border-[#D4AF37]/10 backdrop-blur-md">
           <button
-            onClick={() => onDateChange(subMonths(currentDate, 1))}
+            onClick={onPrevMonth}
             className="p-2 hover:bg-[#D4AF37]/20 rounded-xl transition-all text-[#D4AF37]"
             title="Previous Month"
           >
@@ -125,7 +127,7 @@ export const CalendarHeaderGroup: React.FC<CalendarHeaderGroupProps> = ({
           </h2>
 
           <button
-            onClick={() => onDateChange(addMonths(currentDate, 1))}
+            onClick={onNextMonth}
             className="p-2 hover:bg-[#D4AF37]/20 rounded-xl transition-all text-[#D4AF37]"
             title="Next Month"
           >

@@ -124,8 +124,8 @@ export const Login = () => {
     if (!/[0-9]/.test(newPassword)) { setError('Must include at least one number.'); return; }
     setIsSubmitting(true);
     try {
-      await authService.finalizePasswordMigration(newPassword);
-      setSuccess('Account secured! Redirecting...');
+      const result = await authService.finalizePasswordMigration(newPassword);
+      setSuccess(result.message || 'Account secured! Redirecting...');
       setTimeout(() => {
         const s = Storage.getAuthState();
         Storage.addLog('Auth', `Upgraded password security for ${s.nickname} (${s.role})`, s.nickname);

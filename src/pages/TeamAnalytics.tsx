@@ -133,7 +133,7 @@ export const Analytics = () => {
         const eventsList: any[] = [];
         eventsSnap.forEach(docSnap => {
           const data = docSnap.data();
-          const participantIds = data.participantIds || [];
+          const participantIds = data.participant_ids || [];
           if (participantIds.some((id: string) => hostIds.includes(String(id)))) {
             eventsList.push({ id: docSnap.id, ...data });
           }
@@ -143,11 +143,9 @@ export const Analytics = () => {
         const calendarList: any[] = [];
         calendarSnap.forEach(docSnap => {
           const data = docSnap.data();
-          const participantIds = data.participantIds || [];
-          const participants = data.participants || [];
+          const participantIds = data.participant_ids || [];
           const hasManagedHost = 
-            (Array.isArray(participantIds) && participantIds.some((id: any) => hostIds.includes(String(id)))) ||
-            (Array.isArray(participants) && participants.some((id: any) => hostIds.includes(String(id))));
+            Array.isArray(participantIds) && participantIds.some((id: any) => hostIds.includes(String(id)));
           if (hasManagedHost) {
             calendarList.push({ id: docSnap.id, ...data });
           }

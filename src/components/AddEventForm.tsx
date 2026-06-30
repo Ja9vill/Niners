@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Plus, Send, AlertCircle, Search, UserMinus, Crown, ExternalLink } from 'lucide-react';
-import { doc, setDoc } from 'firebase/firestore';
+import { collection, doc, setDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { Storage } from '../lib/storage';
 import { FirebaseService } from '../lib/firebaseService';
@@ -75,8 +75,8 @@ export const AddEventForm: React.FC<AddEventFormProps> = ({ onSuccess, onCancel 
   const fromTimeStr = `${fromHour}:${fromMinute} ${fromAmpm}`;
   const toTimeStr = `${toHour}:${toMinute} ${toAmpm}`;
 
-  // Auto-generated event ID
-  const eventId = useMemo(() => crypto.randomUUID(), []);
+  // Auto-generated event ID (Firestore auto-ID)
+  const eventId = useMemo(() => doc(collection(db, 'calendar')).id, []);
 
   // Filter users (include all roles including Director)
   const filteredUsers = useMemo(() => {
@@ -203,13 +203,13 @@ export const AddEventForm: React.FC<AddEventFormProps> = ({ onSuccess, onCancel 
         event_host_id: eventHostId,
         event_host_name: eventHostName,
         is_external_host: isExternalHost,
-        participantIds,
+        participant_ids: participantIds,
         participant_nicknames: participantNicknames,
         created_by_id: auth.poppo_id || 'SystemAdmin',
         created_by_name: auth.nickname || auth.name || 'Admin',
         created_by_role: auth.role || 'Admin',
         timestamp: new Date().toISOString(),
-        notified30Min: false,
+        notified30min: false,
         notifiedStart: false,
       };
 

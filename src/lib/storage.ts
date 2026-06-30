@@ -90,7 +90,7 @@ export const Storage = {
 
   getAuthState(): AuthState {
     try {
-      const raw = sessionStorage.getItem(`${PREFIX}auth`);
+      const raw = localStorage.getItem(`${PREFIX}auth`);
       if (!raw) return { ...emptyAuthState };
 
       const parsed = JSON.parse(raw);
@@ -107,7 +107,7 @@ export const Storage = {
         token: String(parsed?.token || ""),
       };
 
-      const mockUserStr = sessionStorage.getItem(`${PREFIX}mock_user`);
+      const mockUserStr = localStorage.getItem(`${PREFIX}mock_user`);
       if (mockUserStr) {
         try {
           const mockUser = JSON.parse(mockUserStr);
@@ -125,7 +125,7 @@ export const Storage = {
         }
       }
 
-      const mockRole = sessionStorage.getItem(`${PREFIX}mock_role`);
+      const mockRole = localStorage.getItem(`${PREFIX}mock_role`);
       if (mockRole) {
         return {
           ...state,
@@ -157,29 +157,29 @@ export const Storage = {
       token: String(state?.token || ""),
     };
 
-    sessionStorage.setItem(`${PREFIX}auth`, JSON.stringify(nextState));
+    localStorage.setItem(`${PREFIX}auth`, JSON.stringify(nextState));
   },
 
   setMockRole(role: string | null) {
     if (role) {
-      sessionStorage.setItem(`${PREFIX}mock_role`, role);
+      localStorage.setItem(`${PREFIX}mock_role`, role);
     } else {
-      sessionStorage.removeItem(`${PREFIX}mock_role`);
+      localStorage.removeItem(`${PREFIX}mock_role`);
     }
   },
 
   setMockUser(user: any | null) {
     if (user) {
-      sessionStorage.setItem(`${PREFIX}mock_user`, JSON.stringify(user));
+      localStorage.setItem(`${PREFIX}mock_user`, JSON.stringify(user));
     } else {
-      sessionStorage.removeItem(`${PREFIX}mock_user`);
-      sessionStorage.removeItem(`${PREFIX}mock_role`);
+      localStorage.removeItem(`${PREFIX}mock_user`);
+      localStorage.removeItem(`${PREFIX}mock_role`);
     }
   },
 
   clearAuthState() {
-    sessionStorage.removeItem(`${PREFIX}auth`);
-    sessionStorage.removeItem(`${PREFIX}mock_role`);
-    sessionStorage.removeItem(`${PREFIX}mock_user`);
+    localStorage.removeItem(`${PREFIX}auth`);
+    localStorage.removeItem(`${PREFIX}mock_role`);
+    localStorage.removeItem(`${PREFIX}mock_user`);
   },
 };

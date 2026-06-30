@@ -3,9 +3,8 @@ import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Plus, Clock, MapPi
 import { CalendarEvent, EventType, Host, LivehouseRequest } from '../types';
 import { Storage } from '../lib/storage';
 import { FirebaseService, generateSubmissionId } from '../lib/firebaseService';
-import { LivehouseMatrixService } from '../lib/sheetsService';
 import { cn } from '../lib/utils';
-import { format, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay, addWeeks, subWeeks, startOfMonth, endOfMonth, addMonths, subMonths, isSameMonth, parseISO } from 'date-fns';
+import { format } from 'date-fns';
 import { motion, AnimatePresence } from 'motion/react';
 import { SingleDatePicker } from './InteractiveDatePicker';
 import { AddEventForm } from './AddEventForm';
@@ -112,9 +111,6 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
     }
   });
 
-  // Debug logging
-  console.log('[CalendarTab] Rendering, isReadOnly:', isReadOnly);
-  console.log('[CalendarTab] Events count:', events.length);
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const userTz = useMemo(() => {
     try { return Intl.DateTimeFormat().resolvedOptions().timeZone; } catch { return 'UTC'; }
@@ -128,13 +124,11 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
 
   // Modals States
   const [isAdding, setIsAdding] = useState(false);
-  const [matrixLoading, setMatrixLoading] = useState(false);
-  const [livehouseMatrix, setLivehouseMatrix] = useState<any[]>([]);
 
   // Multi-select Participants State
   const [selectedParticipants, setSelectedParticipants] = useState<string[]>([]);
 
-  const auth = Storage.getAuthState();
+  const auth = useMemo(() => Storage.getAuthState(), []);
 
   // Livehouse Reservations States
   const [livehouseRequests, setLivehouseRequests] = useState<LivehouseRequest[]>(() => {
@@ -201,6 +195,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
 
   const handleSpotlightClick = async (event: CalendarEvent) => {
     setSpotlightEvent(event);
+    setSelectedEventId(event.event_id || null);
     setIsAttendanceExpanded(false);
     setIsEditExpanded(false);
     setAttendanceRecord(null);
@@ -406,8 +401,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
         timeslot: attendanceModalEvent.time,
         eventType: attendanceModalEvent.type || 'Event',
         description: attendanceModalEvent.description || '',
-        participantIds: attendanceModalEvent.participants || [],
-        participants: attendanceModalEvent.participants || [],
+        participant_ids: attendanceModalEvent.participant_ids || [],
         status: 'Approved',
         attendeeIds: attAttendees.map(p => p.poppoId || p.poppo_id || p.id), // For backward compatibility
         attendees: attAttendees.map(a => ({
@@ -471,19 +465,6 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
   useEffect(() => {
     setIsInitializing(false);
   }, []);
-
-  // Fetch livehouse matrix from Google Apps Script on mount
-  useEffect(() => {
-    if (isReadOnly) return; // Skip for public calendar
-    setMatrixLoading(true);
-    LivehouseMatrixService.fetchSchedule()
-      .then(rows => setLivehouseMatrix(rows))
-      .catch(err => {
-        console.error('[CalendarTab] Failed to fetch livehouse matrix:', err);
-        setLivehouseMatrix([]);
-      })
-      .finally(() => setMatrixLoading(false));
-  }, [isReadOnly]);
 
   // Load events & livehouse requests from Firestore on mount
   useEffect(() => {
@@ -554,25 +535,8 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
     return new Date(engine.days[0].date + 'T00:00:00');
   }, [engine.days]);
 
-  const handleMonthChange = (date: Date) => {
-    if (date.getTime() < currentDate.getTime()) {
-      engine.goPrevMonth();
-    } else {
-      engine.goNextMonth();
-    }
-  };
-
-  const filteredEvents = useMemo(() => {
-    return events;
-  }, [events]);
-
-  const getEventsForDay = (day: Date) => {
-    const formattedStr = format(day, 'yyyy-MM-dd');
-    return filteredEvents.filter(e => {
-      const targetDate = getTargetDisplayDate(e, timeDisplayMode);
-      return targetDate === formattedStr;
-    });
-  };
+  const handlePrevMonth = () => engine.goPrevMonth();
+  const handleNextMonth = () => engine.goNextMonth();
 
   const handleDateClick = (day: Date) => {
     setSelectedDate(day);
@@ -701,24 +665,36 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
     const newEvent: CalendarEvent = {
       id: newId,
       event_id: newId,
-      poppo_id: req.poppoId,
+      event_type: req.livehouseType || 'Solo Livehouse',
+      event_title: `Livehouse: ${req.name}`,
+      event_description: req.notes || 'Livehouse timeslot approved.',
+      event_date: req.date,
+      from_time: req.timeslot?.split(' - ')?.[0] || req.timeslot || '',
+      to_time: req.timeslot?.split(' - ')?.[1] || '',
       event_host_id: req.poppoId,
+      event_host_name: req.name || '',
+      is_external_host: false,
+      participant_ids: [req.poppoId],
+      participant_nicknames: [req.name || req.poppoId],
+      created_by_id: auth.poppo_id || auth.id || 'Unknown',
+      created_by_name: auth.nickname || auth.name || 'Admin',
+      created_by_role: auth.role || 'Admin',
+      timestamp: new Date().toISOString(),
+      notified30min: false,
+      notifiedStart: false,
+      // Backward-compat aliases
+      poppo_id: req.poppoId,
       title: `Livehouse: ${req.name}`,
       description: req.notes || 'Livehouse timeslot approved.',
       date: req.date,
-      event_date: req.date,
       time: req.timeslot,
       type: (req.livehouseType || 'SOLO LIVEHOUSE') as EventType,
       type_of_event: req.livehouseType || 'SOLO LIVEHOUSE',
       location: 'VIRTUAL ROOM (LIVEHOUSE)',
-      created_by_name: auth.nickname || auth.name || 'Admin',
-      created_by_role: auth.role || 'Admin',
-      created_by_id: auth.poppo_id || auth.id || 'Unknown',
       visibility: 'All',
       participants: [req.poppoId],
       participantIds: [req.poppoId],
       participants_id: [req.poppoId],
-      timestamp: new Date().toISOString()
     };
 
     const updatedEvents = [...events, newEvent];
@@ -897,27 +873,46 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
     const isTalent = auth.role === 'Talent';
 
     const newId = crypto.randomUUID();
+    const formTitle = formData.get('title') as string || '';
+    const formDate = formData.get('date') as string || '';
+    const formTime = formData.get('time') as string || '';
+    const formType = formData.get('type') as string || 'Agency Event';
+    const formHostId = formData.get('eventHostId') as string || '';
+    const hostId = isTalent ? auth.poppo_id : (formHostId || 'Agency');
+    const timeParts = formTime.split(' - ');
     const newEvent: CalendarEvent = {
       id: newId,
       event_id: newId,
-      poppo_id: isTalent ? auth.poppo_id : (formData.get('hostId') as string || 'Agency'),
-      event_host_id: formData.get('eventHostId') as string || '',
-      title: formData.get('title') as string,
-      description: formData.get('description') as string,
-      date: formData.get('date') as string,
-      event_date: formData.get('date') as string,
-      time: formData.get('time') as string,
-      type: formData.get('type') as string || 'Agency Event',
-      type_of_event: formData.get('type') as string || 'Agency Event',
-      location: formData.get('location') as string || 'ONLINE',
+      event_type: formType,
+      event_title: formTitle,
+      event_description: formData.get('description') as string || '',
+      event_date: formDate,
+      from_time: timeParts[0] || formTime,
+      to_time: timeParts[1] || '',
+      event_host_id: hostId,
+      event_host_name: '',
+      is_external_host: false,
+      participant_ids: [...selectedParticipants],
+      participant_nicknames: [],
+      created_by_id: auth.poppo_id || auth.id || 'Unknown',
       created_by_name: auth.name,
       created_by_role: auth.role,
-      created_by_id: auth.poppo_id || auth.id || 'Unknown',
+      timestamp: new Date().toISOString(),
+      notified30min: false,
+      notifiedStart: false,
+      // Backward-compat aliases
+      poppo_id: hostId,
+      title: formTitle,
+      description: formData.get('description') as string || '',
+      date: formDate,
+      time: formTime,
+      type: formType,
+      type_of_event: formType,
+      location: formData.get('location') as string || 'ONLINE',
       visibility: formData.get('visibility') as any || 'All',
       participants: [...selectedParticipants],
-      participantIds: [...selectedParticipants], // alias for Firestore array-contains queries
+      participantIds: [...selectedParticipants],
       participants_id: [...selectedParticipants],
-      timestamp: new Date().toISOString()
     };
 
     const updated = [...events, newEvent];
@@ -925,7 +920,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
     setEvents(updated);
     Storage.addLog('Calendar', `Created event: ${newEvent.title}`, auth.name);
     FirebaseService.saveCalendarEvents(updated).then(async () => {
-      await FirebaseService.logSystemActivity(`Created calendar event entry: "${newEvent.title}" on ${newEvent.date} at ${newEvent.time} (Type: ${newEvent.type}, Location: ${newEvent.location}, Participants: ${newEvent.participants.join(', ')})`, 'Info');
+      await FirebaseService.logSystemActivity(`Created calendar event entry: "${newEvent.title}" on ${newEvent.date} at ${newEvent.time} (Type: ${newEvent.type}, Location: ${newEvent.location}, Participants: ${(newEvent.participant_ids || []).join(', ')})`, 'Info');
     }).catch(err => {
       console.error("Failed to save calendar events to Firestore:", err);
     });
@@ -934,7 +929,6 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
     setSelectedDate(new Date(newEvent.date + 'T00:00:00'));
   };
 
-  const selectedDayEvents = getEventsForDay(selectedDate);
   const selectedEvent = events.find(e => e.event_id === selectedEventId);
 
   // Load all users metadata for participant search in edit mode
@@ -1273,7 +1267,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
     setEditTime(selectedEvent.time || '');
     setEditLocation(selectedEvent.location || '');
     setEditDescription(selectedEvent.description || '');
-    setEditParticipants(selectedEvent.participants || selectedEvent.participants_id || []);
+    setEditParticipants(selectedEvent.participant_ids || []);
     setIsEditing(true);
   };
 
@@ -1358,8 +1352,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
             time: editTime,
             location: editLocation,
             description: editDescription,
-            participants: editParticipants,
-            participantIds: editParticipants
+            participant_ids: editParticipants
           }
         }),
       });
@@ -1382,9 +1375,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
             time: editTime,
             location: editLocation,
             description: editDescription,
-            participants: editParticipants,
-            participants_id: editParticipants,
-            participantIds: editParticipants
+            participant_ids: editParticipants
           };
         }
         return ev;
@@ -1615,7 +1606,8 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
         activeTab={activeTab}
         onTabChange={setActiveTab}
         currentDate={currentDate}
-        onDateChange={handleMonthChange}
+        onPrevMonth={handlePrevMonth}
+        onNextMonth={handleNextMonth}
         selectedDate={selectedDate}
         onDateSelect={handleDateClick}
         events={events}
@@ -1722,14 +1714,16 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                 </button>
               </div>
 
-              <div className="p-5 sm:p-8 overflow-y-auto custom-scrollbar flex-1 relative z-10 space-y-8">
+              <div className="overflow-y-auto custom-scrollbar flex-1 relative z-10">
                 {(() => {
                   const hostPoppoId = selectedEvent.poppo_id || selectedEvent.created_by_id;
                   const hostUser = allUsers.find(u => (u.poppo_id || u.poppoId || u.id) === hostPoppoId);
                   const hostName = hostUser ? (hostUser.nickname || hostUser.name) : (selectedEvent.created_by_name || 'Niner');
                   const hostPhoto = hostUser ? (hostUser.photoUrl || hostUser.profilePhotoUrl || hostUser.photoURL) : null;
                   const avatarUrl = hostPhoto || `https://ui-avatars.com/api/?name=${encodeURIComponent(hostName)}&background=0a0806&color=D4AF37`;
-                  const eventDateObj = new Date(`${selectedEvent.date}T${selectedEvent.time === '00:00' ? '00:00' : selectedEvent.time.split(' - ')[0]}`);
+                  const eventDateStr = selectedEvent.date || selectedEvent.event_date || '';
+                  const eventTimeStr = selectedEvent.time || '00:00';
+                  const eventDateObj = new Date(`${eventDateStr}T${eventTimeStr === '00:00' ? '00:00' : eventTimeStr.split(' - ')[0]}`);
                   const isUpcoming = eventDateObj > new Date();
 
                   const loggedInUserRole = String(auth?.role || '').toLowerCase();
@@ -1743,7 +1737,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                   }
 
                   return (
-                    <div className="p-6 sm:p-8 flex flex-col gap-6 overflow-y-auto custom-scrollbar">
+                    <div className="p-5 sm:p-8 flex flex-col gap-6">
                       {/* Header/Close */}
                       <div className="w-full flex flex-col items-end gap-2 absolute top-4 right-4 z-20">
                         <button
@@ -1820,7 +1814,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                           <div className="flex flex-col">
                             <span className="text-[10px] uppercase tracking-[0.2em] text-[#FF8C00]/60 font-black mb-1">Date & Time</span>
                             <div className="flex flex-col gap-1">
-                              <span className="text-xs font-black text-[#FF8C00] uppercase tracking-widest">{format(new Date(selectedEvent.date), 'MMMM dd, yyyy')}</span>
+                              <span className="text-xs font-black text-[#FF8C00] uppercase tracking-widest">{eventDateStr ? format(new Date(eventDateStr), 'MMMM dd, yyyy') : 'Date TBD'}</span>
                               <span className="text-sm font-black text-transparent bg-clip-text bg-gradient-to-r from-[#FFD700] to-[#FF8C00]">
                                 {(() => {
                                   const displayTime = selectedEvent.from_time && selectedEvent.to_time
@@ -1862,7 +1856,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
 
                       {/* Participants Section */}
                       {(() => {
-                        const pIds = selectedEvent.participantIds || selectedEvent.participants || [];
+                        const pIds = selectedEvent.participant_ids || [];
                         const pNicknames = selectedEvent.participant_nicknames || [];
                         if (pIds.length === 0) return null;
                         return (
@@ -1900,8 +1894,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                                   !attendanceRecord.attendees &&
                                   !attendanceRecord.attendeeIds &&
                                   !attendanceRecord.actualParticipants &&
-                                  !attendanceRecord.participants &&
-                                  !attendanceRecord.participantIds
+                                  !attendanceRecord.participant_ids
                                 );
 
                                 if (displayAttendees.length > 0) {

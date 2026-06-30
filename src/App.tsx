@@ -12,6 +12,7 @@ const Overview = React.lazy(() => import('./pages/Overview').then(m => ({ defaul
 import { RosterTab } from './components/RosterTab';
 import { CalendarTab } from './components/CalendarTab';
 import { DirectorOperations } from './pages/DirectorOperations';
+import { CommandCenter } from './pages/CommandCenter';
 import { SystemLogsPage } from './pages/SystemLogsPage';
 import { HostProfileEditor } from './components/HostProfileEditor';
 import { PublicLayout } from './components/PublicLayout';
@@ -70,9 +71,8 @@ export default function App() {
         {/* ── Smart Shared Routes ────────────────────────────────── */}
         <Route path="roster" element={<SmartRoute publicElement={<PublicRoster />} privateElement={<RosterTab />} />} />
         <Route path="calendar" element={<SmartRoute publicElement={<PublicCalendar />} privateElement={<CalendarTab />} />} />
-        <Route path="events" element={<SmartRoute publicElement={<PublicCalendar />} privateElement={<CalendarTab />} />} />
+        <Route path="events" element={<Navigate to="/calendar" replace />} />
         <Route path="poppo-live" element={<SmartRoute publicElement={<PoppoLivePage />} privateElement={<PoppoLivePage />} />} />
-        <Route path="become-an-agent" element={<Navigate to="/poppo-live" replace />} />
         <Route path="leaderboards" element={<Navigate to="/roster" replace />} />
 
         {/* ── Public Routes ───────────────────────────────────────── */}
@@ -138,6 +138,16 @@ export default function App() {
             element={
               <RoleGuard roles={['director']}>
                 <DirectorOperations />
+              </RoleGuard>
+            }
+          />
+
+          {/* Command Center */}
+          <Route
+            path="command-center"
+            element={
+              <RoleGuard roles={['director']}>
+                <CommandCenter />
               </RoleGuard>
             }
           />

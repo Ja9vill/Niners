@@ -332,7 +332,7 @@ export const StreamsPage = () => {
     setWeeklyBreakdown(initWeeklyBreakdown());
     setWeeklyForm({ total_duration: '', total_earnings: '', avg_online_users: '', gifting_count: '', unfollowers: '', new_fans: '', new_fanclub_members: '' });
     fetchUploadHistory('weekly');
-  }, [weekOffset, streamSubTab]);
+  }, [weekOffset, streamSubTab, authState.poppo_id]);
 
   const updateWeeklyBreakdown = (idx: number, field: 'points' | 'duration', value: string) => {
     setWeeklyBreakdown(prev => prev.map((d, i) => i === idx ? { ...d, [field]: field === 'duration' ? formatDuration(value) : value } : d));
@@ -448,7 +448,7 @@ export const StreamsPage = () => {
     setMonthlyBreakdown(initMonthlyBreakdown());
     setMonthlyForm({ total_duration: '', total_earnings: '', last_3mos_earnings: '' });
     if (streamSubTab === 'monthly') fetchUploadHistory('monthly');
-  }, [monthOffset, streamSubTab]);
+  }, [monthOffset, streamSubTab, authState.poppo_id]);
 
   const updateMonthlyBreakdown = (idx: number, field: 'points' | 'duration', value: string) => {
     setMonthlyBreakdown(prev => prev.map((d, i) => i === idx ? { ...d, [field]: field === 'duration' ? formatDuration(value) : value } : d));
@@ -516,7 +516,22 @@ export const StreamsPage = () => {
       const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       if (type === 'weekly') setWeeklyHistory(list);
       else if (type === 'monthly') setMonthlyHistory(list);
-    } catch (err) { console.error('Failed to fetch upload history:', err); }
+    } catch (err: any) {
+      if (err.code === 'failed-precondition') {
+        const fallbackQ = query(
+          collection(db, 'stream_reports'),
+          where('reporter_id', '==', authState.poppo_id),
+          where('type', '==', type)
+        );
+        const fallbackSnap = await getDocs(fallbackQ);
+        const list = fallbackSnap.docs.map(d => ({ id: d.id, ...d.data() }))
+          .sort((a: any, b: any) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+        if (type === 'weekly') setWeeklyHistory(list);
+        else if (type === 'monthly') setMonthlyHistory(list);
+      } else {
+        console.error('Failed to fetch upload history:', err);
+      }
+    }
   };
 
   const deleteReport = async (reportId: string, type: StreamSubTab) => {
@@ -557,26 +572,37 @@ export const StreamsPage = () => {
     try {
       const results: any[] = [];
 
-      const streamSnap = await getDocs(query(
-        collection(db, 'stream_reports'),
-        where('reporter_id', '==', authState.poppo_id),
-        orderBy('timestamp', 'desc')
-      ));
-      streamSnap.docs.forEach(d => results.push({ id: d.id, ...d.data(), _collection: 'stream_reports' }));
+      const safeGetDocs = async (collectionName: string, field: string, value: string) => {
+        try {
+          const q = query(
+            collection(db, collectionName),
+            where(field, '==', value),
+            orderBy('timestamp', 'desc')
+          );
+          return await getDocs(q);
+        } catch (err: any) {
+          if (err.code === 'failed-precondition') {
+            const fallbackQ = query(
+              collection(db, collectionName),
+              where(field, '==', value)
+            );
+            const snap = await getDocs(fallbackQ);
+            const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+            docs.sort((a: any, b: any) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+            return { docs, forEach: (fn: any) => docs.forEach(fn) } as any;
+          }
+          throw err;
+        }
+      };
 
-      const pkSnap = await getDocs(query(
-        collection(db, 'pk_reports'),
-        where('reporter_id', '==', authState.poppo_id),
-        orderBy('timestamp', 'desc')
-      ));
-      pkSnap.docs.forEach(d => results.push({ id: d.id, ...d.data(), _collection: 'pk_reports', type: 'rpk' }));
+      const streamSnap = await safeGetDocs('stream_reports', 'reporter_id', authState.poppo_id);
+      streamSnap.docs.forEach((d: any) => results.push({ id: d.id, ...d.data(), _collection: 'stream_reports' }));
 
-      const fbSnap = await getDocs(query(
-        collection(db, 'fanbase_reports'),
-        where('reporter_id', '==', authState.poppo_id),
-        orderBy('timestamp', 'desc')
-      ));
-      fbSnap.docs.forEach(d => results.push({ id: d.id, ...d.data(), _collection: 'fanbase_reports', type: 'fanbase' }));
+      const pkSnap = await safeGetDocs('pk_reports', 'submitted_by_id', authState.poppo_id);
+      pkSnap.docs.forEach((d: any) => results.push({ id: d.id, ...d.data(), _collection: 'pk_reports', type: 'rpk' }));
+
+      const fbSnap = await safeGetDocs('fanbase_reports', 'reporter_id', authState.poppo_id);
+      fbSnap.docs.forEach((d: any) => results.push({ id: d.id, ...d.data(), _collection: 'fanbase_reports', type: 'fanbase' }));
 
       results.sort((a, b) => new Date(b.timestamp || b.submittedAt || 0).getTime() - new Date(a.timestamp || a.submittedAt || 0).getTime());
       setAllHistory(results);
@@ -610,7 +636,7 @@ export const StreamsPage = () => {
 
         const calSnap = await getDocs(query(
           collection(db, 'calendar'),
-          where('participantIds', 'array-contains', selectedHostId)
+          where('participant_ids', 'array-contains', selectedHostId)
         ));
         calSnap.docs.forEach(d => {
           const dd = d.data();
@@ -645,11 +671,11 @@ export const StreamsPage = () => {
         nickname: selectedHostName,
         from_date: fanbaseFormData.from_date,
         to_date: fanbaseFormData.to_date,
-        total_followers: parseFloat(fanbaseFormData.total_followers) || 0,
-        fanclub_subscribers: parseFloat(fanbaseFormData.fanclub_subscribers) || 0,
-        fanclub_gc_members: parseFloat(fanbaseFormData.fanclub_gc_members) || 0,
-        gc_activity_count_host: isElevatedStaff ? (parseFloat(fanbaseFormData.gc_activity_count_host) || 0) : 0,
-        gc_activity_count_fans: isElevatedStaff ? (parseFloat(fanbaseFormData.gc_activity_count_fans) || 0) : 0,
+        total_followers: parseNum(fanbaseFormData.total_followers),
+        fanclub_subscribers: parseNum(fanbaseFormData.fanclub_subscribers),
+        fanclub_gc_members: parseNum(fanbaseFormData.fanclub_gc_members),
+        gc_activity_count_host: isElevatedStaff ? parseNum(fanbaseFormData.gc_activity_count_host) : 0,
+        gc_activity_count_fans: isElevatedStaff ? parseNum(fanbaseFormData.gc_activity_count_fans) : 0,
         notes: fanbaseFormData.notes,
         submittedAt: new Date().toISOString(),
         // Legacy camelCase fields kept for backward compatibility (useAnalytics.ts, HostProfileView.tsx)
@@ -1343,7 +1369,7 @@ export const StreamsPage = () => {
                             <div className="flex items-center justify-between mb-1.5">
                               <span className="text-[8px] font-mono" style={{ color: 'rgba(255,255,255,0.4)' }}>{fmtDate}</span>
                               <span className="text-[7px] font-black uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.25)' }}>{dateKey.slice(0,10)}</span>
-                              {canModify(r.reporterID || r.reporter_id) && (
+                              {canModify(r.submitted_by_id || r.reporterID || r.reporter_id) && (
                                 <button onClick={() => deleteGlobalReport(r)} className="p-1 text-red-400 hover:bg-white/10 rounded-md transition-all cursor-pointer opacity-0 md:group-hover:opacity-100">
                                   <Trash2 size={10} />
                                 </button>
@@ -1426,7 +1452,7 @@ const HistoryCard = ({ report, canModify, onEdit, onDelete, editingId, editForm,
       {isEditing ? (
         <div className="space-y-2">
           <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-            {Object.entries(editForm || {}).filter(([k]) => !['id', 'reporterID', 'reporterName', 'reporterRole', 'hostID', 'hostNickname', 'timestamp', 'type'].includes(k)).map(([key, val]) => (
+            {Object.entries(editForm || {}).filter(([k]) => !['id', 'reporter_id', 'reporterID', 'reporterName', 'reporterRole', 'hostID', 'hostNickname', 'timestamp', 'type'].includes(k)).map(([key, val]) => (
               <div key={key} className="space-y-0.5">
                 <label className="text-[7px] text-white/40 font-black uppercase tracking-widest">{key.replace(/_/g, ' ')}</label>
                 <input type="text" value={String(val || '')} onChange={(e) => setEditForm({ ...editForm, [key]: e.target.value })}

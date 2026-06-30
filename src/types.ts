@@ -217,29 +217,44 @@ export interface DirectorNote {
 
 export interface CalendarEvent {
   id: string;
-  type_of_event: string;
+  event_id: string;
+  event_type: string;
+  event_title: string;
+  event_description: string;
   event_date: string;
-  description: string;
-  participants_id: string[];
+  from_time: string;
+  to_time: string;
+  event_host_id: string;
+  event_host_name: string;
+  is_external_host: boolean;
+  participant_ids: string[];
+  participant_nicknames: string[];
   created_by_id: string;
   created_by_name: string;
   created_by_role: string;
   timestamp: string;
+  notified30min: boolean;
+  notifiedStart: boolean;
 
-  // Legacy alias fields mapped to frontend
-  event_id?: string;
-  event_host_id?: string;
-  from_time?: string;
-  to_time?: string;
-  poppo_id?: string;
+  // Backward-compat aliases for reads from legacy documents
+  /** @deprecated use participant_ids */
+  participants_id?: string[];
+  /** @deprecated use participant_ids */
+  participants?: string[];
+  /** @deprecated use participant_ids */
+  participantIds?: string[];
+  /** @deprecated legacy misspelling */
+  type_of_event?: string;
+  /** @deprecated use event_title */
   title?: string;
+  /** @deprecated use event_description */
+  description?: string;
+  poppo_id?: string;
   date?: string;
   time?: string;
   visibility?: string;
   type?: string;
   location?: string;
-  participants?: string[];
-  participantIds?: string[];
   is_automated?: boolean;
 }
 

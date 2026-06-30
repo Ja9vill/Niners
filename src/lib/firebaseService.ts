@@ -1281,29 +1281,43 @@ export const FirebaseService = {
       return snapshot.docs.map(d => {
         const raw = d.data();
         const eventId = raw.event_id || raw.eventId || d.id;
-        const participants = raw.panticipantids || raw.participantids || raw.participantIds || raw.participants || [];
+        // Prefer canonical participant_ids field, fall back to legacy fields
+        const participants = raw.participant_ids || raw.participants || raw.participantIds || raw.participantids || raw.panticipantids || [];
         if (raw.panticipantids) {
-          console.warn(`[DEPRECATION] Document ${d.id} uses legacy field 'panticipantids'. Consider migrating to 'participants'.`);
+          console.warn(`[DEPRECATION] Document ${d.id} uses legacy field 'panticipantids'. Migrate to 'participant_ids'.`);
         }
         const participantNicknames = raw.participant_nicknames || [];
         return {
           ...raw,
           id: eventId,
           event_id: eventId,
-          date: raw.event_date || raw.date || '',
-          title: raw.event_tittle || raw.title || '',
-          type: raw.event_type || raw.type || '',
-          time: raw.from_time && raw.to_time ? `${raw.from_time} - ${raw.to_time}` : (raw.time || ''),
-          poppo_id: raw.event_host_id || raw.poppo_id || '',
-          event_host_id: raw.event_host_id || '',
-          description: raw.event_description || raw.description || '',
-          participants: participants,
-          participantIds: participants,
-          participants_id: participants,
+          event_type: raw.event_type || raw.type || '',
+          event_title: raw.event_title || raw.title || '',
+          event_description: raw.event_description || raw.description || '',
+          event_date: raw.event_date || raw.date || '',
+          from_time: raw.from_time || '',
+          to_time: raw.to_time || '',
+          event_host_id: raw.event_host_id || raw.poppo_id || '',
+          event_host_name: raw.event_host_name || '',
+          is_external_host: raw.is_external_host ?? false,
+          participant_ids: participants,
+          participant_nicknames: participantNicknames,
           created_by_id: raw.created_by_id || '',
           created_by_name: raw.created_by_name || raw.event_host_name || '',
           created_by_role: raw.created_by_role || '',
           timestamp: raw.timestamp || '',
+          notified30min: raw.notified30min ?? raw.notified30Min ?? false,
+          notifiedStart: raw.notifiedStart ?? false,
+          // Backward-compat aliases for legacy consumers
+          date: raw.event_date || raw.date || '',
+          title: raw.event_title || raw.title || '',
+          type: raw.event_type || raw.type || '',
+          time: raw.from_time && raw.to_time ? `${raw.from_time} - ${raw.to_time}` : (raw.time || ''),
+          poppo_id: raw.event_host_id || raw.poppo_id || '',
+          description: raw.event_description || raw.description || '',
+          participants: participants,
+          participantIds: participants,
+          participants_id: participants,
           visibility: raw.visibility || '',
           location: raw.location || '',
           is_automated: raw.is_automated || false,
@@ -1471,7 +1485,7 @@ export const FirebaseService = {
   async getExposures(hostId: string): Promise<ExposureEntry[]> {
     try {
       const snap = await getDocs(
-        query(collection(db, 'calendar'), where('participants_id', 'array-contains', hostId))
+        query(collection(db, 'calendar'), where('participant_ids', 'array-contains', hostId))
       );
       return snap.docs.map(d => d.data() as ExposureEntry);
     } catch (error) {

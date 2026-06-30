@@ -300,8 +300,7 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
         created_by_role: authState.role || 'Admin',
         created_by_id: authState.poppo_id || 'SystemAdmin',
         visibility: 'All',
-        participants: [req.poppoId],
-        participantIds: [req.poppoId],
+        participant_ids: [req.poppoId],
         timestamp: new Date().toISOString()
       };
       await setDoc(doc(db, 'calendar', eventId), newEvent);
@@ -807,6 +806,7 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
             { path: '/provision-user', label: 'Provision User', icon: Plus }
           ]
         });
+        links.push({ path: '/command-center', label: 'Command Center', icon: Shield });
       }
     } else if (role === 'manager' || role === 'agent') {
       links.push({ isDivider: true, id: 'div-manager' });
