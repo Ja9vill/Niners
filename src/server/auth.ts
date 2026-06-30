@@ -1,7 +1,7 @@
 ﻿import { Router } from "express";
 import { initializeApp, cert, getApps, getApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
-import { getFirestore } from "firebase-admin/firestore";
+import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { getStorage } from "firebase-admin/storage";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
@@ -13,11 +13,13 @@ import { runAutoSyncLivehouseData } from "./cron";
 import { extractBearerToken } from "./firebaseAdmin";
 
 const router = Router();
-const JWT_SECRET = process.env.JWT_SECRET;
-if (!JWT_SECRET) {
-  throw new Error("FATAL: JWT_SECRET environment variable is not set.");
-}
 const BCRYPT_ROUNDS = 12;
+
+function getJWTSecret(): string {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) throw new Error("FATAL: JWT_SECRET environment variable is not set.");
+  return secret;
+}
 
 /**
  * Authorized Director email addresses.
@@ -62,11 +64,6 @@ export function getAdminStorage() {
 export function getAdminFirestore() {
   const app = getFirebaseAdminApp();
   const db = getFirestore(app, "nine-talent-management");
-  try {
-    db.settings({ preferRest: true });
-  } catch (err) {
-    // Ignore settings initialized warnings
-  }
   return db;
 }
 
@@ -207,7 +204,7 @@ export function buildUserPayload(hostData: any) {
 
 function getHostPayloadAndToken(hostData: any) {
   const userPayload = buildUserPayload(hostData);
-  const token = jwt.sign(userPayload, JWT_SECRET, { expiresIn: "7d" });
+  const token = jwt.sign(userPayload, getJWTSecret(), { expiresIn: "7d" });
   return { ok: true, user: { ...userPayload, token } };
 }
 
@@ -224,7 +221,7 @@ function requireAuth(requiredLevel: number = 3) {
       return res.status(401).json({ error: "Authorization token required" });
     }
     try {
-      const decoded: any = jwt.verify(token, JWT_SECRET);
+      const decoded: any = jwt.verify(token, getJWTSecret());
       if ((decoded.level || 0) < requiredLevel) {
         return res.status(403).json({ error: "Insufficient permissions" });
       }
@@ -317,7 +314,7 @@ router.post("/login", async (req, res) => {
     }
 
     const userPayload = buildUserPayload(hostData);
-    const token = jwt.sign(userPayload, JWT_SECRET, { expiresIn: "7d" });
+    const token = jwt.sign(userPayload, getJWTSecret(), { expiresIn: "7d" });
 
     return res.json({ ok: true, user: { ...userPayload, token } });
   } catch (error: any) {
@@ -359,12 +356,13 @@ router.post("/check-username", async (req: any, res: any) => {
       return res.json({ exists: true, is_first_login: false, blocked: true });
     }
 
-    const isFirstLogin =
-      data.is_first_login === true ||
-      data.is_temp_password === true ||
-      data.is_first_time === true ||
-      !data.password ||
-      data.password === null;
+    // If a password exists, prioritize it over stale flag fields to prevent false first-time detection
+    const hasPassword = !!data.password;
+    const isFirstLogin = hasPassword
+      ? false
+      : data.is_first_login === true ||
+        data.is_temp_password === true ||
+        data.is_first_time === true;
 
     return res.json({ exists: true, is_first_login: isFirstLogin });
   } catch (err: any) {
@@ -421,12 +419,12 @@ router.post("/set-initial-password", loginRateLimiter, async (req: any, res: any
       return res.status(400).json({ error: "Password must contain at least one number." });
     }
 
-    const isFirstLogin =
-      dbUser.is_first_login === true ||
-      dbUser.is_temp_password === true ||
-      dbUser.is_first_time === true ||
-      !dbUser.password ||
-      dbUser.password === null;
+    const hasPassword = !!dbUser.password;
+    const isFirstLogin = hasPassword
+      ? false
+      : dbUser.is_first_login === true ||
+        dbUser.is_temp_password === true ||
+        dbUser.is_first_time === true;
 
     if (!isFirstLogin) {
       // Return 403 and do NOT reveal that the account has an existing password
@@ -481,7 +479,7 @@ router.post("/set-initial-password", loginRateLimiter, async (req: any, res: any
 
     const fullData = { ...dbUser, id: cleanId, is_first_login: false };
     const userPayload = buildUserPayload(fullData);
-    const jwtToken = jwt.sign(userPayload, JWT_SECRET, { expiresIn: "7d" });
+    const jwtToken = jwt.sign(userPayload, getJWTSecret(), { expiresIn: "7d" });
 
     console.log(`ðŸ” Initial password set and claims synced for Poppo ID: ${cleanId}`);
     return res.json({
@@ -1045,20 +1043,40 @@ router.post("/update-event", verifyFirebaseIdToken, async (req: any, res: any) =
       last_updated_by: callerUid || "admin",
     };
 
-    // Allowed fields for event update
-    const allowedFields = ["title", "description", "date", "time", "type", "location", "participants", "participantIds"];
+    // Allowed fields for event update (canonical names)
+    const allowedFields = [
+      "event_title", "event_description", "event_date",
+      "from_time", "to_time", "event_type",
+      "event_host_name", "is_external_host",
+      "participant_ids", "participant_nicknames",
+      // Backward-compat aliases
+      "title", "description", "date", "time", "type",
+      "participants", "participantIds",
+    ];
     allowedFields.forEach(field => {
       if (updatedFields[field] !== undefined) {
         updatePayload[field] = updatedFields[field];
       }
     });
 
-    // Handle legacy alias mappings if present
+    // Map legacy field names to canonical names
+    if (updatePayload.title !== undefined && updatePayload.event_title === undefined) {
+      updatePayload.event_title = updatePayload.title;
+    }
+    if (updatePayload.description !== undefined && updatePayload.event_description === undefined) {
+      updatePayload.event_description = updatePayload.description;
+    }
     if (updatePayload.date !== undefined) {
       updatePayload.event_date = updatePayload.date;
     }
     if (updatePayload.type !== undefined) {
-      updatePayload.type_of_event = updatePayload.type;
+      updatePayload.event_type = updatePayload.type;
+    }
+    if (updatePayload.participants !== undefined && updatePayload.participant_ids === undefined) {
+      updatePayload.participant_ids = updatePayload.participants;
+    }
+    if (updatePayload.participantIds !== undefined && updatePayload.participant_ids === undefined) {
+      updatePayload.participant_ids = updatePayload.participantIds;
     }
 
     await eventDocRef.update(updatePayload);
@@ -1105,6 +1123,409 @@ router.post("/delete-event", verifyFirebaseIdToken, async (req: any, res: any) =
   } catch (err: any) {
     console.error("Delete calendar event API failed:", err);
     return res.status(500).json({ error: err.message || "Failed to delete calendar event." });
+  }
+});
+
+/**
+ * POST /api/admin/migrate-calendar
+ * Migrates all calendar documents to canonical field names.
+ * Deletes legacy participant fields (participants, participantIds, participants_id,
+ * participantids, panticipantids) and other redundant legacy fields.
+ * Director only.
+ */
+router.post("/migrate-calendar", verifyAdminRole, async (req: any, res: any) => {
+  const results = { processed: 0, migrated: 0, skipped: 0, errors: 0, errorDetails: [] as string[] };
+
+  try {
+    const db = getAdminFirestore();
+
+    // Load all user nicknames for participant_nicknames lookup
+    const usersSnap = await db.collection("users").get();
+    const nicknameMap: Record<string, string> = {};
+    usersSnap.forEach(doc => {
+      const data = doc.data();
+      nicknameMap[doc.id] = data.nickname || data.name || data.poppo_id || doc.id;
+    });
+
+    const calendarSnap = await db.collection("calendar").get();
+    const batch = db.batch();
+    let batchCount = 0;
+
+    const legacyParticipantFields = ['participants', 'participantIds', 'participants_id', 'participantids', 'panticipantids'];
+    const legacyFieldsToDelete = [
+      'type_of_event', 'title', 'description', 'date', 'time', 'type',
+      'location', 'visibility', 'poppo_id', 'is_automated', 'eventId',
+      'notified30Min', 'notifiedStart'
+    ];
+
+    for (const doc of calendarSnap.docs) {
+      results.processed++;
+      const data = doc.data();
+
+      // Skip if already has canonical participant_ids and no legacy fields remain
+      const hasLegacyPartField = legacyParticipantFields.some(f => data[f] !== undefined);
+      if (data.participant_ids !== undefined && !hasLegacyPartField) {
+        results.skipped++;
+        continue;
+      }
+
+      // Extract participant IDs from whichever legacy field exists
+      let participantIds: string[] = [];
+      for (const field of legacyParticipantFields) {
+        const val = data[field];
+        if (Array.isArray(val) && val.length > 0) {
+          participantIds = val;
+          break;
+        }
+      }
+
+      // Build canonical update payload
+      const updateData: Record<string, any> = {
+        participant_ids: participantIds,
+        participant_nicknames: participantIds.map(id => nicknameMap[id] || id),
+      };
+
+      // Fill in missing canonical fields with defaults
+      if (data.from_time === undefined) updateData.from_time = '';
+      if (data.to_time === undefined) updateData.to_time = '';
+      if (data.event_host_name === undefined) updateData.event_host_name = '';
+      if (data.is_external_host === undefined) updateData.is_external_host = false;
+      if (data.event_title === undefined && data.title) updateData.event_title = data.title;
+      if (data.event_description === undefined && data.description) updateData.event_description = data.description;
+      if (data.event_type === undefined && (data.type || data.type_of_event)) updateData.event_type = data.type || data.type_of_event;
+      if (data.event_date === undefined && data.date) updateData.event_date = data.date;
+      if (data.notified30min === undefined && data.notified30Min !== undefined) updateData.notified30min = data.notified30Min;
+      if (data.notifiedStart === undefined && data.notifiedStart !== undefined) updateData.notifiedStart = !!data.notifiedStart;
+
+      // Delete all legacy fields
+      const allFieldsToDelete = [...legacyParticipantFields, ...legacyFieldsToDelete];
+      allFieldsToDelete.forEach(f => {
+        if (data[f] !== undefined) {
+          updateData[f] = FieldValue.delete();
+        }
+      });
+
+      batch.update(doc.ref, updateData);
+      batchCount++;
+      results.migrated++;
+
+      // Commit in batches of 400 to avoid Firestore batch limits
+      if (batchCount >= 400) {
+        await batch.commit();
+        batchCount = 0;
+      }
+    }
+
+    // Commit remaining
+    if (batchCount > 0) {
+      await batch.commit();
+    }
+
+    console.log(`[MigrationController] Calendar migration complete: ${JSON.stringify(results)}`);
+    return res.json({ success: true, ...results });
+  } catch (error: any) {
+    console.error("[MigrationController] Calendar migration failed:", error.message || error);
+    return res.status(500).json({ error: error.message || "Calendar migration failed." });
+  }
+});
+
+/**
+ * POST /api/admin/analyze-collection
+ * Analyzes a Firestore collection for field inconsistencies, anomalies, and redundancies.
+ * Director only.
+ */
+router.post("/analyze-collection", verifyAdminRole, async (req: any, res: any) => {
+  try {
+    const { collectionName } = req.body;
+    if (!collectionName) return res.status(400).json({ error: "collectionName is required." });
+
+    const db = getAdminFirestore();
+    const snap = await db.collection(collectionName).get();
+
+    if (snap.empty) {
+      return res.json({ totalDocs: 0, fields: [], anomalies: [], suggestions: [] });
+    }
+
+    // 1. Build field map from all documents
+    const fieldMap: Record<string, {
+      name: string;
+      types: Set<string>;
+      docCount: number;
+      nullCount: number;
+      emptyCount: number;
+      samples: any[];
+      consistentType: boolean;
+    }> = {};
+
+    const docIds: string[] = [];
+
+    snap.forEach(doc => {
+      docIds.push(doc.id);
+      const data = doc.data();
+      const allKeys = new Set<string>();
+
+      // Collect own keys
+      Object.keys(data).forEach(k => allKeys.add(k));
+
+      allKeys.forEach(key => {
+        if (!fieldMap[key]) {
+          fieldMap[key] = { name: key, types: new Set(), docCount: 0, nullCount: 0, emptyCount: 0, samples: [], consistentType: true };
+        }
+        fieldMap[key].docCount++;
+        const val = data[key];
+        const valType = val === null ? 'null' : Array.isArray(val) ? 'array' : typeof val;
+        fieldMap[key].types.add(valType);
+        if (val === null || val === undefined) fieldMap[key].nullCount++;
+        if (val === '' || (Array.isArray(val) && val.length === 0)) fieldMap[key].emptyCount++;
+        if (fieldMap[key].samples.length < 3 && val !== null && val !== undefined) {
+          fieldMap[key].samples.push(typeof val === 'object' ? JSON.stringify(val).slice(0, 100) : val);
+        }
+      });
+    });
+
+    // 2. Detect consistent types
+    const fields = Object.values(fieldMap).map(f => {
+      const typeArr = Array.from(f.types);
+      f.consistentType = typeArr.length === 1 || (typeArr.length === 2 && typeArr.includes('null'));
+      return {
+        name: f.name,
+        types: Array.from(f.types),
+        docCount: f.docCount,
+        nullCount: f.nullCount,
+        emptyCount: f.emptyCount,
+        coverage: Math.round((f.docCount / snap.size) * 100),
+        samples: f.samples,
+        consistentType: f.consistentType,
+      };
+    });
+
+    fields.sort((a, b) => b.docCount - a.docCount);
+
+    // 3. Detect anomalies
+    const anomalies: any[] = [];
+
+    // Inconsistent types
+    fields.filter(f => !f.consistentType).forEach(f => {
+      anomalies.push({
+        type: 'inconsistent_type',
+        severity: 'medium',
+        fields: [f.name],
+        description: `Field "${f.name}" has mixed types: ${f.types.join(', ')}.`,
+      });
+    });
+
+    // Low-coverage fields (exist in < 50% of docs)
+    fields.filter(f => f.coverage < 50 && f.coverage > 0).forEach(f => {
+      anomalies.push({
+        type: 'low_coverage',
+        severity: 'low',
+        fields: [f.name],
+        description: `Field "${f.name}" only appears in ${f.coverage}% of documents.`,
+      });
+    });
+
+    // 4. Detect likely duplicate/redundant field groups (by name similarity)
+    const fieldNames = fields.map(f => f.name.toLowerCase());
+    const redundantGroups: string[][] = [];
+    const checked = new Set<string>();
+
+    // Normalize names for comparison
+    const normalize = (n: string) => n.replace(/[^a-z0-9]/g, '').toLowerCase();
+
+    for (let i = 0; i < fieldNames.length; i++) {
+      if (checked.has(fieldNames[i])) continue;
+      const group: string[] = [fieldNames[i]];
+      checked.add(fieldNames[i]);
+      for (let j = i + 1; j < fieldNames.length; j++) {
+        if (checked.has(fieldNames[j])) continue;
+        // Check if names are similar (Levenshtein or substring)
+        const a = normalize(fieldNames[i]);
+        const b = normalize(fieldNames[j]);
+        if (a === b || a.includes(b) || b.includes(a)) {
+          group.push(fieldNames[j]);
+          checked.add(fieldNames[j]);
+        }
+      }
+      if (group.length > 1) redundantGroups.push(group);
+    }
+
+    redundantGroups.forEach(group => {
+      anomalies.push({
+        type: 'redundant_fields',
+        severity: 'high',
+        fields: group,
+        description: `Fields [${group.join(', ')}] appear to be duplicates/redundant. Consider consolidating.`,
+      });
+    });
+
+    return res.json({
+      totalDocs: snap.size,
+      fields,
+      anomalies,
+    });
+  } catch (error: any) {
+    console.error("[AnalyzeCollection] failed:", error.message || error);
+    return res.status(500).json({ error: error.message || "Analysis failed." });
+  }
+});
+
+/**
+ * POST /api/admin/execute-collection-changes
+ * Executes field operations (delete, rename, merge) on a collection.
+ * Director only.
+ */
+router.post("/execute-collection-changes", verifyAdminRole, async (req: any, res: any) => {
+  try {
+    const { collectionName, operations, taskId } = req.body;
+    if (!collectionName || !operations || !Array.isArray(operations)) {
+      return res.status(400).json({ error: "collectionName and operations[] are required." });
+    }
+
+    const db = getAdminFirestore();
+    const snap = await db.collection(collectionName).get();
+
+    if (snap.empty) {
+      return res.json({ processed: 0, results: [] });
+    }
+
+    const results: any[] = [];
+    const batch = db.batch();
+    let batchCount = 0;
+    let totalProcessed = 0;
+
+    snap.forEach(doc => {
+      const data = doc.data();
+      let changed = false;
+      const updateData: Record<string, any> = {};
+      const deletedFields: string[] = [];
+
+      operations.forEach((op: any) => {
+        const { type, sourceField, targetField, mergeStrategy } = op;
+
+        if (type === 'delete') {
+          if (data[sourceField] !== undefined) {
+            updateData[sourceField] = FieldValue.delete();
+            deletedFields.push(sourceField);
+            changed = true;
+          }
+        }
+
+        if (type === 'rename') {
+          if (data[sourceField] !== undefined && targetField) {
+            updateData[targetField] = data[sourceField];
+            updateData[sourceField] = FieldValue.delete();
+            deletedFields.push(sourceField);
+            changed = true;
+          }
+        }
+
+        if (type === 'merge') {
+          if (data[sourceField] !== undefined && targetField && sourceField !== targetField) {
+            const existing = data[targetField];
+            const incoming = data[sourceField];
+            if (mergeStrategy === 'concat' && Array.isArray(existing) && Array.isArray(incoming)) {
+              const merged = [...new Set([...existing, ...incoming])];
+              if (JSON.stringify(merged) !== JSON.stringify(existing)) {
+                updateData[targetField] = merged;
+                changed = true;
+              }
+            } else {
+              // Default: overwrite if target is empty/missing, otherwise skip
+              if (existing === undefined || existing === null || existing === '') {
+                updateData[targetField] = incoming;
+                changed = true;
+              }
+            }
+            if (changed) {
+              updateData[sourceField] = FieldValue.delete();
+              deletedFields.push(sourceField);
+            }
+          }
+        }
+
+        if (type === 'change_type') {
+          const conversion = op.conversion || '';
+          if (data[sourceField] !== undefined) {
+            const val = data[sourceField];
+            let converted: any;
+            let convertedOk = false;
+
+            if (conversion === 'to_string') {
+              converted = val === null || val === undefined ? '' : String(val);
+              convertedOk = true;
+            } else if (conversion === 'to_number') {
+              const n = Number(val);
+              if (!isNaN(n)) { converted = n; convertedOk = true; }
+            } else if (conversion === 'string_to_array') {
+              if (typeof val === 'string') {
+                const delim = op.delimiter || ',';
+                converted = val.split(delim).map((s: string) => s.trim()).filter(Boolean);
+                convertedOk = true;
+              }
+            } else if (conversion === 'array_to_string') {
+              if (Array.isArray(val)) {
+                const delim = op.delimiter || ', ';
+                converted = val.join(delim);
+                convertedOk = true;
+              }
+            }
+
+            if (convertedOk) {
+              if (JSON.stringify(converted) !== JSON.stringify(val)) {
+                updateData[sourceField] = converted;
+                changed = true;
+              }
+            }
+          }
+        }
+      });
+
+      if (changed) {
+        batch.update(doc.ref, updateData);
+        batchCount++;
+        totalProcessed++;
+
+        results.push({
+          docId: doc.id,
+          updated: Object.keys(updateData).filter(k => updateData[k] !== FieldValue.delete()),
+          deleted: deletedFields,
+        });
+
+        if (batchCount >= 400) {
+          batchCount = 0;
+        }
+      }
+    });
+
+    if (batchCount > 0) {
+      await batch.commit();
+    }
+
+    // Store task result summary in system collection
+    try {
+      const summaryRef = db.collection("system").doc(`collection_task_${taskId || Date.now()}`);
+      await summaryRef.set({
+        type: 'collection_migration',
+        collectionName,
+        operations,
+        executedAt: new Date().toISOString(),
+        totalDocs: snap.size,
+        affectedDocs: totalProcessed,
+        completed: true,
+      });
+    } catch (storeErr) {
+      console.warn("[ExecuteChanges] Could not store task summary:", storeErr);
+    }
+
+    return res.json({
+      success: true,
+      totalDocs: snap.size,
+      affectedDocs: totalProcessed,
+      results,
+    });
+  } catch (error: any) {
+    console.error("[ExecuteCollectionChanges] failed:", error.message || error);
+    return res.status(500).json({ error: error.message || "Execution failed." });
   }
 });
 
@@ -1749,7 +2170,7 @@ router.post("/login-with-poppo", loginRateLimiter, async (req: any, res: any) =>
         const authInstance = getAuth(getFirebaseAdminApp());
         const customToken = await authInstance.createCustomToken('19157913', { tempPasswordRequired: false, role: 'director', isSuperAdmin: true });
         const userPayload = buildUserPayload(hostData);
-        const token = jwt.sign(userPayload, JWT_SECRET, { expiresIn: "7d" });
+        const token = jwt.sign(userPayload, getJWTSecret(), { expiresIn: "7d" });
         logAuthEvent('19157913', "SUCCESS", ipAddress);
         return res.json({ success: true, customToken, poppoId: '19157913', user: { ...userPayload, token } });
       }
@@ -1810,7 +2231,11 @@ router.post("/login-with-poppo", loginRateLimiter, async (req: any, res: any) =>
     }
 
     // Determine if legacy temporary password status needs migration
-    const tempPasswordRequired = hostData.is_temp_password ?? false;
+    // If the user already has a bcrypt-hashed password (i.e. they've completed
+    // migration or set a permanent password), never force migration regardless
+    // of stale is_temp_password flag. This breaks the infinite loop for users
+    // whose Firestore flags couldn't be updated.
+    const tempPasswordRequired = isBcrypt ? false : (hostData.is_temp_password ?? false);
 
     // Sync custom user claims to Firebase Auth profile for security rule checking
     await syncCustomClaims(cleanPoppoId, hostData.role, tempPasswordRequired);
@@ -1832,7 +2257,7 @@ router.post("/login-with-poppo", loginRateLimiter, async (req: any, res: any) =>
     }
 
     const userPayload = buildUserPayload(hostData);
-    const token = jwt.sign(userPayload, JWT_SECRET, { expiresIn: "7d" });
+    const token = jwt.sign(userPayload, getJWTSecret(), { expiresIn: "7d" });
     logAuthEvent(cleanPoppoId, "SUCCESS", ipAddress);
     return res.json({
       success: true,
@@ -1855,23 +2280,94 @@ router.post("/login-with-poppo", loginRateLimiter, async (req: any, res: any) =>
  * inside Firestore once the user successfully resets their permanent password.
  */
 router.post("/mark-migration-complete", verifyFirebaseIdToken, async (req: any, res: any) => {
+  const poppoId = req.firebaseUser.uid;
+  const role = req.firebaseUser.role || 'host';
+  const { newPassword } = req.body;
+
+  // Track whether each step succeeded
+  let claimSyncOk = false;
+  let firestoreOk = false;
+
+  // 0. Hash the new password and save to Firestore (critical — breaks the loop by ensuring
+  //    login-with-poppo sees a bcrypt hash next time and sets tempPasswordRequired: false)
+  let hashedPassword: string | null = null;
+  if (newPassword) {
+    try {
+      hashedPassword = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
+    } catch (hashError: any) {
+      console.error("[MigrationController] Failed to hash password:", hashError.message || hashError);
+    }
+  }
+
+  // 1. Clear the Firebase Auth custom claim directly (don't use syncCustomClaims — it swallows errors)
   try {
-    const poppoId = req.firebaseUser.uid;
+    const authInstance = getAuth(getFirebaseAdminApp());
+    const isSuperAdmin = role === 'director';
+    await authInstance.setCustomUserClaims(poppoId, {
+      role,
+      isSuperAdmin,
+      tempPasswordRequired: false
+    });
+    console.log(`[MigrationController] Custom claims cleared for Poppo ID: ${poppoId}`);
+    claimSyncOk = true;
+  } catch (claimError: any) {
+    console.error("[MigrationController] Failed to clear custom claims:", claimError.message || claimError);
+  }
+
+  // 2. Best-effort Firestore update (use set+merge so it works whether doc exists or not)
+  try {
     const db = getAdminFirestore();
-    await db.collection("users").doc(poppoId).update({
+    const updateData: Record<string, any> = {
+      is_first_login: false,
       is_temp_password: false,
       updated_at: new Date().toISOString(),
       password_migrated_at: new Date().toISOString()
-    });
-    console.log(`ðŸ’¾ Account migration finalized for Poppo ID: ${poppoId}`);
+    };
+    if (hashedPassword) {
+      updateData.password = hashedPassword;
+      updateData.password_hash = hashedPassword;
+    }
+    await db.collection("users").doc(poppoId).set(updateData, { merge: true });
+    console.log(`[MigrationController] Firestore flags cleared for Poppo ID: ${poppoId}`);
+    firestoreOk = true;
+  } catch (fsError: any) {
+    console.error("[MigrationController] Firestore set() on users collection failed:", fsError.message || fsError);
+    // Fallback: try update() in case set() doesn't work
+    try {
+      const db = getAdminFirestore();
+      const updateData: Record<string, any> = {
+        is_first_login: false,
+        is_temp_password: false,
+        updated_at: new Date().toISOString(),
+        password_migrated_at: new Date().toISOString()
+      };
+      if (hashedPassword) {
+        updateData.password = hashedPassword;
+        updateData.password_hash = hashedPassword;
+      }
+      await db.collection("users").doc(poppoId).update(updateData);
+      console.log(`[MigrationController] Firestore update() succeeded for Poppo ID: ${poppoId}`);
+      firestoreOk = true;
+    } catch (updError: any) {
+      console.error("[MigrationController] Firestore update() also failed:", updError.message || updError);
+    }
+  }
+
+  // 3. Always return success — password is already upgraded in Firebase Auth client-side
+  const messages: string[] = [];
+  messages.push("Account migration processed.");
+  if (!claimSyncOk) messages.push("Custom claim sync failed.");
+  if (!firestoreOk) messages.push("Firestore sync failed.");
+  if (claimSyncOk && firestoreOk) {
     return res.json({
       success: true,
       message: "Account migration complete. User is now fully secured."
     });
-  } catch (error: any) {
-    console.error("[MigrationController Error]: Failed to finalize migration in DB:", error);
-    return res.status(500).json({ error: "Failed to update migration status on server database." });
   }
+  return res.json({
+    success: true,
+    message: "Warning: " + messages.join(" ") + " Contact admin if login issues persist."
+  });
 });
 
 /**

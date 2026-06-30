@@ -3,9 +3,8 @@ import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Plus, Clock, MapPi
 import { CalendarEvent, EventType, Host, LivehouseRequest } from '../types';
 import { Storage } from '../lib/storage';
 import { FirebaseService, generateSubmissionId } from '../lib/firebaseService';
-import { LivehouseMatrixService } from '../lib/sheetsService';
 import { cn } from '../lib/utils';
-import { format, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay, addWeeks, subWeeks, startOfMonth, endOfMonth, addMonths, subMonths, isSameMonth, parseISO } from 'date-fns';
+import { format } from 'date-fns';
 import { motion, AnimatePresence } from 'motion/react';
 import { SingleDatePicker } from './InteractiveDatePicker';
 import { AddEventForm } from './AddEventForm';
@@ -16,6 +15,7 @@ import { LivehouseCalendar } from './LivehouseCalendar';
 import { LivehouseBookingModal } from './LivehouseBookingModal';
 import { CalendarHeaderGroup } from './CalendarHeaderGroup';
 import { DailyScheduleGroup } from './DailyScheduleGroup';
+import { useCalendarEngine } from '../hooks/useCalendarEngine';
 import { formatLocalTime, getLocalTimezoneAbbreviation, parseTimeStringToHourMin } from '../lib/timezoneUtils';
 
 
@@ -48,10 +48,30 @@ const TIMESLOT_BLOCKS = [
   }
 ];
 
-export const getTargetDisplayDate = (event: CalendarEvent, mode: 'Manila' | 'Local'): string => {
+export function formatTimezoneLabel(tz: string): string {
+  try {
+    const now = new Date();
+    const longParts = new Intl.DateTimeFormat('en-US', { timeZone: tz, timeZoneName: 'long' }).formatToParts(now);
+    const shortParts = new Intl.DateTimeFormat('en-US', { timeZone: tz, timeZoneName: 'short' }).formatToParts(now);
+    const offsetParts = new Intl.DateTimeFormat('en-US', { timeZone: tz, timeZoneName: 'longOffset' }).formatToParts(now);
+
+    const abbr = shortParts.find(p => p.type === 'timeZoneName')?.value || '';
+    const fullName = longParts.find(p => p.type === 'timeZoneName')?.value || '';
+    const offset = offsetParts.find(p => p.type === 'timeZoneName')?.value || '';
+
+    if (abbr && fullName) {
+      return `${abbr} (${fullName}): ${offset}`;
+    }
+    return tz;
+  } catch {
+    return tz;
+  }
+}
+
+export const getTargetDisplayDate = (event: CalendarEvent, mode: string): string => {
   const rawDate = event.date || event.event_date || '';
   if (!rawDate) return '';
-  if (mode === 'Manila') return rawDate;
+  if (mode === 'Asia/Manila') return rawDate;
 
   const timeStr = event.time || event.description || '';
   const firstTimePart = timeStr === '00:00' ? '00:00' : timeStr.split('-')[0].trim();
@@ -64,7 +84,11 @@ export const getTargetDisplayDate = (event: CalendarEvent, mode: 'Manila' | 'Loc
 
   if (isNaN(dateObj.getTime())) return rawDate;
 
-  return format(dateObj, 'yyyy-MM-dd');
+  try {
+    return dateObj.toLocaleDateString('en-CA', { timeZone: mode });
+  } catch {
+    return format(dateObj, 'yyyy-MM-dd');
+  }
 };
 
 
@@ -77,7 +101,6 @@ interface CalendarTabProps {
 export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, hosts = [] }) => {
   const [isInitializing, setIsInitializing] = useState(true);
   const [viewMode, setViewMode] = useState<'week' | 'month'>('month');
-  const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [events, setEvents] = useState<CalendarEvent[]>(() => {
     try {
@@ -88,36 +111,24 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
     }
   });
 
-  // Debug logging
-  console.log('[CalendarTab] Rendering, isReadOnly:', isReadOnly);
-  console.log('[CalendarTab] Events count:', events.length);
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
-  const [timeDisplayMode, setTimeDisplayMode] = useState<'Manila' | 'Local'>('Manila');
-
-  const localTzAbbr = useMemo(() => {
-    try {
-      const shortCode = new Intl.DateTimeFormat('en-US', { timeZoneName: 'short' })
-        .formatToParts(new Date())
-        .find(p => p.type === 'timeZoneName')?.value;
-
-      if (shortCode) {
-        return shortCode;
-      }
-      return 'LOCAL';
-    } catch {
-      return 'LOCAL';
-    }
+  const userTz = useMemo(() => {
+    try { return Intl.DateTimeFormat().resolvedOptions().timeZone; } catch { return 'UTC'; }
   }, []);
+  const [timeDisplayMode, setTimeDisplayMode] = useState<string>('Asia/Manila');
+
+  const otherTzLabel = useMemo(() => {
+    const other = timeDisplayMode === 'Asia/Manila' ? userTz : 'Asia/Manila';
+    return formatTimezoneLabel(other);
+  }, [timeDisplayMode, userTz]);
 
   // Modals States
   const [isAdding, setIsAdding] = useState(false);
-  const [matrixLoading, setMatrixLoading] = useState(false);
-  const [livehouseMatrix, setLivehouseMatrix] = useState<any[]>([]);
 
   // Multi-select Participants State
   const [selectedParticipants, setSelectedParticipants] = useState<string[]>([]);
 
-  const auth = Storage.getAuthState();
+  const auth = useMemo(() => Storage.getAuthState(), []);
 
   // Livehouse Reservations States
   const [livehouseRequests, setLivehouseRequests] = useState<LivehouseRequest[]>(() => {
@@ -184,6 +195,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
 
   const handleSpotlightClick = async (event: CalendarEvent) => {
     setSpotlightEvent(event);
+    setSelectedEventId(event.event_id || null);
     setIsAttendanceExpanded(false);
     setIsEditExpanded(false);
     setAttendanceRecord(null);
@@ -389,8 +401,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
         timeslot: attendanceModalEvent.time,
         eventType: attendanceModalEvent.type || 'Event',
         description: attendanceModalEvent.description || '',
-        participantIds: attendanceModalEvent.participants || [],
-        participants: attendanceModalEvent.participants || [],
+        participant_ids: attendanceModalEvent.participant_ids || [],
         status: 'Approved',
         attendeeIds: attAttendees.map(p => p.poppoId || p.poppo_id || p.id), // For backward compatibility
         attendees: attAttendees.map(a => ({
@@ -455,27 +466,22 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
     setIsInitializing(false);
   }, []);
 
-  // Fetch livehouse matrix from Google Apps Script on mount
-  useEffect(() => {
-    if (isReadOnly) return; // Skip for public calendar
-    setMatrixLoading(true);
-    LivehouseMatrixService.fetchSchedule()
-      .then(rows => setLivehouseMatrix(rows))
-      .catch(err => {
-        console.error('[CalendarTab] Failed to fetch livehouse matrix:', err);
-        setLivehouseMatrix([]);
-      })
-      .finally(() => setMatrixLoading(false));
-  }, [isReadOnly]);
-
   // Load events & livehouse requests from Firestore on mount
   useEffect(() => {
     const loadData = async () => {
       try {
         const firestoreEvents = await FirebaseService.getCalendarEvents();
-        if (firestoreEvents && firestoreEvents.length > 0) {
-          Storage.setEvents(firestoreEvents);
-          setEvents(firestoreEvents);
+        // Deduplicate by event_id or (title+date+from_time) composite key
+        const seen = new Set<string>();
+        const deduped = (firestoreEvents || []).filter(e => {
+          const key = e.event_id || `${e.title || ''}_${e.date || e.event_date || ''}_${e.from_time || e.time || ''}`;
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
+        if (deduped.length > 0) {
+          Storage.setEvents(deduped);
+          setEvents(deduped);
         } else {
           // If Firestore is empty, check if we have events in local storage
           const stored = Storage.getEvents();
@@ -518,56 +524,25 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
     loadData();
   }, []);
 
-  const filteredEvents = useMemo(() => {
-    return events;
-  }, [events]);
+  const engine = useCalendarEngine({
+    events,
+    livehouseSchedule: [],
+    loggedInPoppoId: auth?.poppo_id || ''
+  });
 
-  const weekDays = useMemo(() => {
-    return eachDayOfInterval({
-      start: startOfWeek(currentDate, { weekStartsOn: 1 }),
-      end: endOfWeek(currentDate, { weekStartsOn: 1 })
-    });
-  }, [currentDate]);
+  const currentDate = useMemo(() => {
+    if (engine.days.length === 0) return new Date();
+    return new Date(engine.days[0].date + 'T00:00:00');
+  }, [engine.days]);
 
-  const getEventsForDay = (day: Date) => {
-    const formattedStr = format(day, 'yyyy-MM-dd');
-    return filteredEvents.filter(e => {
-      const targetDate = getTargetDisplayDate(e, timeDisplayMode);
-      return targetDate === formattedStr;
-    });
-  };
+  const handlePrevMonth = () => engine.goPrevMonth();
+  const handleNextMonth = () => engine.goNextMonth();
 
   const handleDateClick = (day: Date) => {
     setSelectedDate(day);
+    engine.setSelectedDate(format(day, 'yyyy-MM-dd'));
     setSelectedEventId(null);
   };
-
-  const goToPreviousWeek = () => {
-    setCurrentDate(prev => subWeeks(prev, 1));
-    setSelectedEventId(null);
-  };
-
-  const goToNextWeek = () => {
-    setCurrentDate(prev => addWeeks(prev, 1));
-    setSelectedEventId(null);
-  };
-
-  const goToPreviousMonth = () => {
-    setCurrentDate(prev => subMonths(prev, 1));
-    setSelectedEventId(null);
-  };
-
-  const goToNextMonth = () => {
-    setCurrentDate(prev => addMonths(prev, 1));
-    setSelectedEventId(null);
-  };
-
-  const monthDays = useMemo(() => {
-    return eachDayOfInterval({
-      start: startOfWeek(startOfMonth(currentDate), { weekStartsOn: 1 }),
-      end: endOfWeek(endOfMonth(currentDate), { weekStartsOn: 1 })
-    });
-  }, [currentDate]);
   // Livehouse Reservation availability checker
   // Prefers live data from the Google Apps Script matrix; falls back to local counts.
   const getTimeslotAvailability = (targetDate: string) => {
@@ -690,24 +665,36 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
     const newEvent: CalendarEvent = {
       id: newId,
       event_id: newId,
-      poppo_id: req.poppoId,
+      event_type: req.livehouseType || 'Solo Livehouse',
+      event_title: `Livehouse: ${req.name}`,
+      event_description: req.notes || 'Livehouse timeslot approved.',
+      event_date: req.date,
+      from_time: req.timeslot?.split(' - ')?.[0] || req.timeslot || '',
+      to_time: req.timeslot?.split(' - ')?.[1] || '',
       event_host_id: req.poppoId,
+      event_host_name: req.name || '',
+      is_external_host: false,
+      participant_ids: [req.poppoId],
+      participant_nicknames: [req.name || req.poppoId],
+      created_by_id: auth.poppo_id || auth.id || 'Unknown',
+      created_by_name: auth.nickname || auth.name || 'Admin',
+      created_by_role: auth.role || 'Admin',
+      timestamp: new Date().toISOString(),
+      notified30min: false,
+      notifiedStart: false,
+      // Backward-compat aliases
+      poppo_id: req.poppoId,
       title: `Livehouse: ${req.name}`,
       description: req.notes || 'Livehouse timeslot approved.',
       date: req.date,
-      event_date: req.date,
       time: req.timeslot,
       type: (req.livehouseType || 'SOLO LIVEHOUSE') as EventType,
       type_of_event: req.livehouseType || 'SOLO LIVEHOUSE',
       location: 'VIRTUAL ROOM (LIVEHOUSE)',
-      created_by_name: auth.nickname || auth.name || 'Admin',
-      created_by_role: auth.role || 'Admin',
-      created_by_id: auth.poppo_id || auth.id || 'Unknown',
       visibility: 'All',
       participants: [req.poppoId],
       participantIds: [req.poppoId],
       participants_id: [req.poppoId],
-      timestamp: new Date().toISOString()
     };
 
     const updatedEvents = [...events, newEvent];
@@ -886,27 +873,46 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
     const isTalent = auth.role === 'Talent';
 
     const newId = crypto.randomUUID();
+    const formTitle = formData.get('title') as string || '';
+    const formDate = formData.get('date') as string || '';
+    const formTime = formData.get('time') as string || '';
+    const formType = formData.get('type') as string || 'Agency Event';
+    const formHostId = formData.get('eventHostId') as string || '';
+    const hostId = isTalent ? auth.poppo_id : (formHostId || 'Agency');
+    const timeParts = formTime.split(' - ');
     const newEvent: CalendarEvent = {
       id: newId,
       event_id: newId,
-      poppo_id: isTalent ? auth.poppo_id : (formData.get('hostId') as string || 'Agency'),
-      event_host_id: formData.get('eventHostId') as string || '',
-      title: formData.get('title') as string,
-      description: formData.get('description') as string,
-      date: formData.get('date') as string,
-      event_date: formData.get('date') as string,
-      time: formData.get('time') as string,
-      type: formData.get('type') as string || 'Agency Event',
-      type_of_event: formData.get('type') as string || 'Agency Event',
-      location: formData.get('location') as string || 'ONLINE',
+      event_type: formType,
+      event_title: formTitle,
+      event_description: formData.get('description') as string || '',
+      event_date: formDate,
+      from_time: timeParts[0] || formTime,
+      to_time: timeParts[1] || '',
+      event_host_id: hostId,
+      event_host_name: '',
+      is_external_host: false,
+      participant_ids: [...selectedParticipants],
+      participant_nicknames: [],
+      created_by_id: auth.poppo_id || auth.id || 'Unknown',
       created_by_name: auth.name,
       created_by_role: auth.role,
-      created_by_id: auth.poppo_id || auth.id || 'Unknown',
+      timestamp: new Date().toISOString(),
+      notified30min: false,
+      notifiedStart: false,
+      // Backward-compat aliases
+      poppo_id: hostId,
+      title: formTitle,
+      description: formData.get('description') as string || '',
+      date: formDate,
+      time: formTime,
+      type: formType,
+      type_of_event: formType,
+      location: formData.get('location') as string || 'ONLINE',
       visibility: formData.get('visibility') as any || 'All',
       participants: [...selectedParticipants],
-      participantIds: [...selectedParticipants], // alias for Firestore array-contains queries
+      participantIds: [...selectedParticipants],
       participants_id: [...selectedParticipants],
-      timestamp: new Date().toISOString()
     };
 
     const updated = [...events, newEvent];
@@ -914,7 +920,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
     setEvents(updated);
     Storage.addLog('Calendar', `Created event: ${newEvent.title}`, auth.name);
     FirebaseService.saveCalendarEvents(updated).then(async () => {
-      await FirebaseService.logSystemActivity(`Created calendar event entry: "${newEvent.title}" on ${newEvent.date} at ${newEvent.time} (Type: ${newEvent.type}, Location: ${newEvent.location}, Participants: ${newEvent.participants.join(', ')})`, 'Info');
+      await FirebaseService.logSystemActivity(`Created calendar event entry: "${newEvent.title}" on ${newEvent.date} at ${newEvent.time} (Type: ${newEvent.type}, Location: ${newEvent.location}, Participants: ${(newEvent.participant_ids || []).join(', ')})`, 'Info');
     }).catch(err => {
       console.error("Failed to save calendar events to Firestore:", err);
     });
@@ -923,7 +929,6 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
     setSelectedDate(new Date(newEvent.date + 'T00:00:00'));
   };
 
-  const selectedDayEvents = getEventsForDay(selectedDate);
   const selectedEvent = events.find(e => e.event_id === selectedEventId);
 
   // Load all users metadata for participant search in edit mode
@@ -1262,7 +1267,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
     setEditTime(selectedEvent.time || '');
     setEditLocation(selectedEvent.location || '');
     setEditDescription(selectedEvent.description || '');
-    setEditParticipants(selectedEvent.participants || selectedEvent.participants_id || []);
+    setEditParticipants(selectedEvent.participant_ids || []);
     setIsEditing(true);
   };
 
@@ -1347,8 +1352,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
             time: editTime,
             location: editLocation,
             description: editDescription,
-            participants: editParticipants,
-            participantIds: editParticipants
+            participant_ids: editParticipants
           }
         }),
       });
@@ -1371,9 +1375,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
             time: editTime,
             location: editLocation,
             description: editDescription,
-            participants: editParticipants,
-            participants_id: editParticipants,
-            participantIds: editParticipants
+            participant_ids: editParticipants
           };
         }
         return ev;
@@ -1408,21 +1410,32 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
   }
 
   return (
-    <div className="space-y-6 calendar-container">
+    <div data-theme={activeTab === 'LIVEHOUSE' ? 'livehouse' : 'agency'} className="space-y-6 calendar-container w-full md:max-w-3xl xl:max-w-5xl 2xl:max-w-6xl mx-auto px-2 sm:px-4">
       <style>{`
-        /* Force 60% black background for the entire calendar page elements to let global gradients show */
         body,
         .app-bg,
         main {
           background-color: rgba(0, 0, 0, 0.6) !important;
         }
-        /* Scoped style overrides for Calendar and its subcomponents (like AddEventForm) to match the global gold & charcoal brand theme */
+      `}</style>
+
+      <style>{`
         .calendar-container select,
         .calendar-container input,
         .calendar-container textarea {
           background-color: rgba(0, 0, 0, 0.6) !important;
-          border-color: rgba(212, 175, 55, 0.25) !important;
           color: #f0efe8 !important;
+        }
+        .calendar-container select option {
+          background-color: #000000 !important;
+          color: #f0efe8 !important;
+        }
+
+        /* ===== AGENCY - GOLD THEME (default) ===== */
+        .calendar-container select,
+        .calendar-container input,
+        .calendar-container textarea {
+          border-color: rgba(212, 175, 55, 0.25) !important;
         }
         .calendar-container select:focus,
         .calendar-container input:focus,
@@ -1430,11 +1443,6 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
           border-color: rgba(212, 175, 55, 0.6) !important;
           box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.08) !important;
         }
-        .calendar-container select option {
-          background-color: #000000 !important;
-          color: #f0efe8 !important;
-        }
-        /* Override bg classes to 60% black */
         .calendar-container .bg-black\\/85,
         .calendar-container .bg-\\[\\#0D0D14\\],
         .calendar-container .bg-\\[\\#0A0B0E\\],
@@ -1451,14 +1459,117 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
         .calendar-container .bg-\\[\\#12151D\\]:hover {
           background-color: #090605 !important;
         }
-        /* Override border colors */
+
+        /* ===== LIVEHOUSE - CRIMSON THEME ===== */
+        .calendar-container[data-theme="crimson"] select,
+        .calendar-container[data-theme="crimson"] input,
+        .calendar-container[data-theme="crimson"] textarea {
+          border-color: rgba(178, 34, 34, 0.3) !important;
+        }
+        .calendar-container[data-theme="crimson"] select:focus,
+        .calendar-container[data-theme="crimson"] input:focus,
+        .calendar-container[data-theme="crimson"] textarea:focus {
+          border-color: rgba(178, 34, 34, 0.6) !important;
+          box-shadow: 0 0 0 3px rgba(178, 34, 34, 0.08) !important;
+        }
+
+        /* CalendarHeaderGroup - container */
+        .calendar-container[data-theme="crimson"] [class*="border-\\[\\#D4AF37\\]"],
+        .calendar-container[data-theme="crimson"] [class*="border-\\[#D4AF37\\]"] {
+          border-color: rgba(178, 34, 34, var(--tw-border-opacity, 0.2)) !important;
+        }
+        .calendar-container[data-theme="crimson"] [class*="text-\\[\\#D4AF37\\]"],
+        .calendar-container[data-theme="crimson"] [class*="text-\\[#D4AF37\\]"] {
+          color: #B22222 !important;
+        }
+        .calendar-container[data-theme="crimson"] [class*="bg-\\[\\#D4AF37\\]"] {
+          background-color: rgba(178, 34, 34, var(--tw-bg-opacity, 0.2)) !important;
+        }
+        .calendar-container[data-theme="crimson"] [class*="hover\\:text-\\[\\#D4AF37\\]"]:hover {
+          color: #B22222 !important;
+        }
+        .calendar-container[data-theme="crimson"] [class*="hover\\:bg-\\[\\#D4AF37\\]"]:hover {
+          background-color: rgba(178, 34, 34, 0.2) !important;
+        }
+        .calendar-container[data-theme="crimson"] [class*="from-\\[\\#FFF0B3\\]"],
+        .calendar-container[data-theme="crimson"] [class*="from-\\[#FFF0B3\\]"] {
+          --tw-gradient-from: #FF6B6B !important;
+        }
+        .calendar-container[data-theme="crimson"] [class*="to-\\[\\#D4AF37\\]"],
+        .calendar-container[data-theme="crimson"] [class*="to-\\[#D4AF37\\]"],
+        .calendar-container[data-theme="crimson"] [class*="to-\\[\\#b8960c\\]"] {
+          --tw-gradient-to: #B22222 !important;
+        }
+        .calendar-container[data-theme="crimson"] [style*="background: linear-gradient(135deg, #d4af37, #b8960c)"] {
+          background: linear-gradient(135deg, #B22222, #8B0000) !important;
+          color: #fff !important;
+        }
+        .calendar-container[data-theme="crimson"] .shadow-\\[0_0_15px_rgba\\(212\\,175\\,55\\,0\\.2\\)\\] {
+          box-shadow: 0 0 15px rgba(178, 34, 34, 0.2) !important;
+        }
+        .calendar-container[data-theme="crimson"] [class*="shadow-\\[0_0_15px_rgba\\(212"] {
+          box-shadow: 0 0 15px rgba(178, 34, 34, 0.2) !important;
+        }
+        .calendar-container[data-theme="crimson"] .shadow-\\[0_0_30px_rgba\\(212\\,175\\,55\\,0\\.05\\)\\] {
+          box-shadow: 0 0 30px rgba(178, 34, 34, 0.08) !important;
+        }
+        .calendar-container[data-theme="crimson"] .border-\\[\\#FFD700\\]\\/50,
+        .calendar-container[data-theme="crimson"] [class*="border-\\[#FFD700\\]"] {
+          border-color: rgba(220, 20, 60, 0.5) !important;
+        }
+        .calendar-container[data-theme="crimson"] .border-\\[\\#FF8C00\\]\\/50,
+        .calendar-container[data-theme="crimson"] [class*="border-\\[#FF8C00\\]"] {
+          border-color: rgba(255, 68, 68, 0.5) !important;
+        }
+        .calendar-container[data-theme="crimson"] .from-\\[\\#D4AF37\\]\\/15 {
+          --tw-gradient-from: rgba(178, 34, 34, 0.15) !important;
+        }
+        .calendar-container[data-theme="crimson"] .to-\\[\\#FF8C00\\]\\/15 {
+          --tw-gradient-to: rgba(255, 68, 68, 0.15) !important;
+        }
+        .calendar-container[data-theme="crimson"] .from-\\[\\#FF8C00\\]\\/15 {
+          --tw-gradient-from: rgba(255, 68, 68, 0.15) !important;
+        }
+        .calendar-container[data-theme="crimson"] .to-\\[\\#FF4500\\]\\/15 {
+          --tw-gradient-to: rgba(139, 0, 0, 0.15) !important;
+        }
+        .calendar-container[data-theme="crimson"] .from-\\[\\#FFF0B3\\] {
+          --tw-gradient-from: #FF6B6B !important;
+        }
+        .calendar-container[data-theme="crimson"] .to-\\[\\#D4AF37\\] {
+          --tw-gradient-to: #B22222 !important;
+        }
+        .calendar-container[data-theme="crimson"] .from-\\[\\#FFD700\\] {
+          --tw-gradient-from: #DC143C !important;
+        }
+        .calendar-container[data-theme="crimson"] .to-\\[\\#FF8C00\\] {
+          --tw-gradient-to: #FF4444 !important;
+        }
+        .calendar-container[data-theme="crimson"] .text-\\[\\#D4AF37\\]\\/60 {
+          color: rgba(178, 34, 34, 0.6) !important;
+        }
+        .calendar-container[data-theme="crimson"] .text-\\[\\#D4AF37\\]\\/70 {
+          color: rgba(178, 34, 34, 0.7) !important;
+        }
+        .calendar-container[data-theme="crimson"] .shadow-\\[0_0_20px_rgba\\(212\\,175\\,55\\,0\\.15\\),inset_0_0_15px_rgba\\(212\\,175\\,55\\,0\\.1\\)\\] {
+          box-shadow: 0 0 20px rgba(178, 34, 34, 0.15), inset 0 0 15px rgba(178, 34, 34, 0.1) !important;
+        }
+        .calendar-container[data-theme="crimson"] .shadow-\\[0_0_20px_rgba\\(255\\,140\\,0\\,0\\.15\\),inset_0_0_15px_rgba\\(255\\,140\\,0\\,0\\.1\\)\\] {
+          box-shadow: 0 0 20px rgba(255, 68, 68, 0.15), inset 0 0 15px rgba(255, 68, 68, 0.1) !important;
+        }
+        .calendar-container[data-theme="crimson"] .shadow-md {
+          --tw-shadow-color: rgba(178, 34, 34, 0.2) !important;
+        }
+        .calendar-container[data-theme="crimson"] .shadow-\\[0_0_4px_rgba\\(212\\,175\\,55\\,0\\.6\\)\\] {
+          box-shadow: 0 0 4px rgba(178, 34, 34, 0.6) !important;
+        }
+        /* Remove dark blue tones */
         .calendar-container .border-purple-500\\/10,
         .calendar-container .border-purple-500\\/20,
         .calendar-container .border-purple-500\\/30,
         .calendar-container .border-purple-500\\/50 {
           border-color: rgba(212, 175, 55, 0.15) !important;
         }
-        /* Override purple/indigo text & backgrounds to brand gold */
         .calendar-container .text-purple-400,
         .calendar-container .text-purple-300 {
           color: #D4AF37 !important;
@@ -1474,60 +1585,67 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
         .calendar-container .border-purple-500\\/50 {
           border-color: rgba(212, 175, 55, 0.3) !important;
         }
+        .calendar-container[data-theme="crimson"] .text-purple-400,
+        .calendar-container[data-theme="crimson"] .text-purple-300 {
+          color: #B22222 !important;
+        }
+        .calendar-container[data-theme="crimson"] .border-purple-500\\/50,
+        .calendar-container[data-theme="crimson"] .border-purple-500\\/10,
+        .calendar-container[data-theme="crimson"] .border-purple-500\\/20,
+        .calendar-container[data-theme="crimson"] .border-purple-500\\/30 {
+          border-color: rgba(178, 34, 34, 0.2) !important;
+        }
+        .calendar-container[data-theme="crimson"] .bg-purple-500\\/20 {
+          background-color: rgba(178, 34, 34, 0.1) !important;
+          border-color: rgba(178, 34, 34, 0.2) !important;
+        }
       `}</style>
 
-      {/* Combined Calendar Block */}
-      <div className="space-y-6 calendar-container">
-        <style>{`
-          .calendar-container .bg-gradient-to-r.from-purple-600.to-indigo-600 {
-            background: linear-gradient(135deg, #d4af37, #b8960c) !important;
-            color: #0c0806 !important;
-          }
-          .calendar-container .border-purple-500\\/50 {
-            border-color: rgba(212, 175, 55, 0.3) !important;
-          }
-        `}</style>
+      {/* Shared Calendar Header (both tabs) */}
+      <CalendarHeaderGroup
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        currentDate={currentDate}
+        onPrevMonth={handlePrevMonth}
+        onNextMonth={handleNextMonth}
+        selectedDate={selectedDate}
+        onDateSelect={handleDateClick}
+        events={events}
+        engineDays={engine.days}
+        onAddEvent={() => setIsAdding(true)}
+        isReadOnly={isReadOnly}
+        showAddButton={auth.level > 0}
+        onTimezoneToggle={() => setTimeDisplayMode(prev => prev === 'Asia/Manila' ? userTz : 'Asia/Manila')}
+        timezoneLabel={otherTzLabel}
+      />
 
-        {activeTab === 'LIVEHOUSE' ? (
-          <LivehouseCalendar
-            allUsers={allUsers}
-            onOpenBookingModal={(date, timeslot) => {
-              setReserveDate(date);
-              setReserveTimeslot(timeslot);
-              setIsReservingLivehouse(true);
-            }}
-          />
-        ) : (
-          <div className="space-y-6">
-            {/* Calendar Header Group */}
-            <CalendarHeaderGroup
-              activeTab="AGENCY"
-              onTabChange={setActiveTab}
-              currentDate={currentDate}
-              onDateChange={setCurrentDate}
-              selectedDate={selectedDate}
-              onDateSelect={handleDateClick}
-              events={events}
-              onAddEvent={() => setIsAdding(true)}
-              isReadOnly={isReadOnly}
-              showAddButton={auth.level > 0}
-            />
-
-            {/* Daily Schedule Group */}
-            <DailyScheduleGroup
-              selectedDate={selectedDate}
-              events={events}
-              onAddEvent={() => setIsAdding(true)}
-              isReadOnly={isReadOnly}
-              localTimezoneMode={timeDisplayMode === 'Local'}
-              allUsers={allUsers}
-              attendanceRecords={attendanceRecords}
-              onEventClick={handleSpotlightClick}
-              auth={auth}
-            />
-          </div>
-        )}
-      </div>
+      {/* Conditional content based on tab */}
+      {activeTab === 'AGENCY' ? (
+        <DailyScheduleGroup
+          selectedDate={selectedDate}
+          events={events}
+          onAddEvent={() => setIsAdding(true)}
+          isReadOnly={isReadOnly}
+          localTimezoneMode={timeDisplayMode !== 'Asia/Manila'}
+          allUsers={allUsers}
+          attendanceRecords={attendanceRecords}
+          onEventClick={handleSpotlightClick}
+          auth={auth}
+        />
+      ) : (
+        <LivehouseCalendar
+          allUsers={allUsers}
+          events={events}
+          selectedDateStr={engine.selectedDate}
+          onOpenBookingModal={(date, timeslot) => {
+            setReserveDate(date);
+            setReserveTimeslot(timeslot);
+            setIsReservingLivehouse(true);
+          }}
+          timeDisplayMode={timeDisplayMode}
+          userTz={userTz}
+        />
+      )}
 
       {/* Create Event Modal */}
       <AnimatePresence>
@@ -1596,14 +1714,16 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                 </button>
               </div>
 
-              <div className="p-5 sm:p-8 overflow-y-auto custom-scrollbar flex-1 relative z-10 space-y-8">
+              <div className="overflow-y-auto custom-scrollbar flex-1 relative z-10">
                 {(() => {
                   const hostPoppoId = selectedEvent.poppo_id || selectedEvent.created_by_id;
                   const hostUser = allUsers.find(u => (u.poppo_id || u.poppoId || u.id) === hostPoppoId);
                   const hostName = hostUser ? (hostUser.nickname || hostUser.name) : (selectedEvent.created_by_name || 'Niner');
                   const hostPhoto = hostUser ? (hostUser.photoUrl || hostUser.profilePhotoUrl || hostUser.photoURL) : null;
                   const avatarUrl = hostPhoto || `https://ui-avatars.com/api/?name=${encodeURIComponent(hostName)}&background=0a0806&color=D4AF37`;
-                  const eventDateObj = new Date(`${selectedEvent.date}T${selectedEvent.time === '00:00' ? '00:00' : selectedEvent.time.split(' - ')[0]}`);
+                  const eventDateStr = selectedEvent.date || selectedEvent.event_date || '';
+                  const eventTimeStr = selectedEvent.time || '00:00';
+                  const eventDateObj = new Date(`${eventDateStr}T${eventTimeStr === '00:00' ? '00:00' : eventTimeStr.split(' - ')[0]}`);
                   const isUpcoming = eventDateObj > new Date();
 
                   const loggedInUserRole = String(auth?.role || '').toLowerCase();
@@ -1617,7 +1737,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                   }
 
                   return (
-                    <div className="p-6 sm:p-8 flex flex-col gap-6 overflow-y-auto custom-scrollbar">
+                    <div className="p-5 sm:p-8 flex flex-col gap-6">
                       {/* Header/Close */}
                       <div className="w-full flex flex-col items-end gap-2 absolute top-4 right-4 z-20">
                         <button
@@ -1632,7 +1752,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                             className="px-3 py-1.5 bg-gradient-to-r from-[#FF8C00]/20 to-[#D4AF37]/20 hover:from-[#FF8C00]/30 hover:to-[#D4AF37]/30 border border-[#D4AF37]/50 text-[#FFD700] font-black text-[10px] uppercase tracking-wider rounded-lg transition-all shadow-[0_0_15px_rgba(255,140,0,0.2)] flex items-center gap-1.5 mt-1"
                           >
                             <CheckCircle2 size={12} />
-                            Attendance
+                            {attendanceRecord ? 'Update Attendance' : 'Submit Attendance'}
                           </button>
                         )}
                       </div>
@@ -1664,16 +1784,29 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
 
                       {/* Event Details */}
                       <div className="w-full bg-[#0a0806]/60 rounded-2xl border border-[#D4AF37]/10 p-5 flex flex-col gap-4 shadow-[inset_0_0_20px_rgba(0,0,0,0.5)]">
+                        {/* Event Title */}
+                        <div className="flex items-center gap-4">
+                          <div className="p-2.5 bg-[#D4AF37]/10 rounded-xl text-[#D4AF37] border border-[#D4AF37]/20">
+                            <CalendarIcon size={18} />
+                          </div>
+                          <div className="flex flex-col">
+                            <span className="text-[10px] uppercase tracking-[0.2em] text-[#D4AF37]/60 font-black mb-1">Event Title</span>
+                            <span className="text-sm font-black text-white/90 uppercase tracking-widest">{selectedEvent.event_title || selectedEvent.title || 'Untitled'}</span>
+                          </div>
+                        </div>
+
+                        {/* Event Type */}
                         <div className="flex items-center gap-4">
                           <div className="p-2.5 bg-[#D4AF37]/10 rounded-xl text-[#D4AF37] border border-[#D4AF37]/20">
                             <CalendarIcon size={18} />
                           </div>
                           <div className="flex flex-col">
                             <span className="text-[10px] uppercase tracking-[0.2em] text-[#D4AF37]/60 font-black mb-1">Event Type</span>
-                            <span className="text-sm font-black text-white/90 uppercase tracking-widest">{selectedEvent.type || 'Event'}</span>
+                            <span className="text-sm font-black text-white/90 uppercase tracking-widest">{selectedEvent.event_type || selectedEvent.type || 'Event'}</span>
                           </div>
                         </div>
 
+                        {/* Date & Time */}
                         <div className="flex items-center gap-4">
                           <div className="p-2.5 bg-gradient-to-br from-[#FF8C00]/10 to-[#FF4500]/10 rounded-xl text-[#FF8C00] border border-[#FF8C00]/20">
                             <Clock size={18} />
@@ -1681,10 +1814,12 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                           <div className="flex flex-col">
                             <span className="text-[10px] uppercase tracking-[0.2em] text-[#FF8C00]/60 font-black mb-1">Date & Time</span>
                             <div className="flex flex-col gap-1">
-                              <span className="text-xs font-black text-[#FF8C00] uppercase tracking-widest">{format(new Date(selectedEvent.date), 'MMMM dd, yyyy')}</span>
+                              <span className="text-xs font-black text-[#FF8C00] uppercase tracking-widest">{eventDateStr ? format(new Date(eventDateStr), 'MMMM dd, yyyy') : 'Date TBD'}</span>
                               <span className="text-sm font-black text-transparent bg-clip-text bg-gradient-to-r from-[#FFD700] to-[#FF8C00]">
                                 {(() => {
-                                  const displayTime = selectedEvent.time;
+                                  const displayTime = selectedEvent.from_time && selectedEvent.to_time
+                                    ? `${selectedEvent.from_time} - ${selectedEvent.to_time}`
+                                    : (selectedEvent.time || 'TBD');
                                   if (displayTime === 'TBD' || !displayTime) return displayTime;
                                   return formatLocalTime(displayTime, selectedEvent.date);
                                 })()}
@@ -1692,34 +1827,64 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                             </div>
                           </div>
                         </div>
+
+                        {/* Description */}
+                        {selectedEvent.event_description || selectedEvent.description ? (
+                          <div className="flex items-start gap-4">
+                            <div className="p-2.5 bg-white/5 rounded-xl text-white/40 border border-white/10 mt-0.5">
+                              <Info size={18} />
+                            </div>
+                            <div className="flex flex-col">
+                              <span className="text-[10px] uppercase tracking-[0.2em] text-white/40 font-black mb-1">Description</span>
+                              <span className="text-xs font-medium text-white/70 leading-relaxed">{selectedEvent.event_description || selectedEvent.description}</span>
+                            </div>
+                          </div>
+                        ) : null}
+
+                        {/* Host */}
+                        <div className="flex items-center gap-4">
+                          <div className="p-2.5 bg-[#D4AF37]/10 rounded-xl text-[#D4AF37] border border-[#D4AF37]/20">
+                            <User size={18} />
+                          </div>
+                          <div className="flex flex-col">
+                            <span className="text-[10px] uppercase tracking-[0.2em] text-[#D4AF37]/60 font-black mb-1">Host</span>
+                            <span className="text-sm font-black text-white/90">{selectedEvent.event_host_name || hostName}</span>
+                            <span className="text-[10px] text-[#A09E9A] font-mono">ID: {selectedEvent.event_host_id || selectedEvent.poppo_id || ''}</span>
+                          </div>
+                        </div>
                       </div>
 
                       {/* Participants Section */}
-                      {selectedEvent.participants && selectedEvent.participants.length > 0 && (
-                        <div className="mt-2">
-                          <h5 className="text-[9px] font-black text-[#D4AF37] uppercase tracking-widest mb-3 border-b border-white/5 pb-2">
-                            Performers / Hosts ({selectedEvent.participants.length})
-                          </h5>
-                          <div className="grid gap-3 grid-cols-4 sm:grid-cols-6">
-                            {selectedEvent.participants.map((pid, idx) => {
-                              const pUser = allUsers.find(u => String(u.poppo_id || u.poppoId || u.id) === String(pid));
-                              const pName = pUser ? (pUser.nickname || pUser.name) : pid;
-                              const pPhoto = pUser ? (pUser.photoUrl || pUser.profilePhotoUrl || pUser.photoURL) : null;
-                              const avatar = pPhoto || `https://ui-avatars.com/api/?name=${encodeURIComponent(pName)}&background=0a0806&color=D4AF37`;
-                              return (
-                                <div key={idx} className="flex flex-col items-center justify-start gap-1.5 p-1 transition-transform hover:scale-105">
-                                  <img src={avatar} alt={pName} className="w-10 h-10 sm:w-14 sm:h-14 rounded-full border border-[#D4AF37]/30 object-cover shadow-[0_0_10px_rgba(212,175,55,0.1)]" />
-                                  <span className="text-[9px] sm:text-[10px] font-bold text-white/80 text-center leading-tight line-clamp-1 w-full" title={pName}>{pName}</span>
-                                </div>
-                              )
-                            })}
-                          </div>
+                      {(() => {
+                        const pIds = selectedEvent.participant_ids || [];
+                        const pNicknames = selectedEvent.participant_nicknames || [];
+                        if (pIds.length === 0) return null;
+                        return (
+                          <div className="mt-2">
+                            <h5 className="text-[9px] font-black text-[#D4AF37] uppercase tracking-widest mb-3 border-b border-white/5 pb-2">
+                              Participants ({pIds.length})
+                            </h5>
+                            <div className="grid gap-3 grid-cols-4 sm:grid-cols-6">
+                              {pIds.map((pid: string, idx: number) => {
+                                const nickFromArray = pNicknames[idx];
+                                const pUser = allUsers.find(u => String(u.poppo_id || u.poppoId || u.id) === String(pid));
+                                const pName = nickFromArray || (pUser ? (pUser.nickname || pUser.name) : pid);
+                                const pPhoto = pUser ? (pUser.photoUrl || pUser.profilePhotoUrl || pUser.photoURL) : null;
+                                const avatar = pPhoto || `https://ui-avatars.com/api/?name=${encodeURIComponent(pName)}&background=0a0806&color=D4AF37`;
+                                return (
+                                  <div key={idx} className="flex flex-col items-center justify-start gap-1.5 p-1 transition-transform hover:scale-105">
+                                    <img src={avatar} alt={pName} className="w-10 h-10 sm:w-14 sm:h-14 rounded-full border border-[#D4AF37]/30 object-cover shadow-[0_0_10px_rgba(212,175,55,0.1)]" />
+                                    <span className="text-[9px] sm:text-[10px] font-bold text-white/80 text-center leading-tight line-clamp-1 w-full" title={pName}>{pName}</span>
+                                  </div>
+                                )
+                              })}
+                            </div>
                         </div>
-                      )}
+                      );
+                    })()}
 
                       {/* Attendance Section */}
-                      {
-                        (attendanceRecord || isUpcoming === false) && (
+                      {(attendanceRecord || isUpcoming === false) && (
                           <div className="mt-4">
                             <h5 className="text-[9px] font-black text-[#D4AF37] uppercase tracking-widest mb-3 border-b border-white/5 pb-2">Attendance</h5>
                             <div className="flex flex-col gap-2">
@@ -1729,8 +1894,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                                   !attendanceRecord.attendees &&
                                   !attendanceRecord.attendeeIds &&
                                   !attendanceRecord.actualParticipants &&
-                                  !attendanceRecord.participants &&
-                                  !attendanceRecord.participantIds
+                                  !attendanceRecord.participant_ids
                                 );
 
                                 if (displayAttendees.length > 0) {

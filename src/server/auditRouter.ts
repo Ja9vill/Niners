@@ -377,7 +377,7 @@ router.post("/attendance", verifyFirebaseToken, async (req: any, res: any) => {
       timeslot,
       eventType,
       description,
-      participantIds,
+      participant_ids,
       status,
       actualParticipants,
       adminFeedback,
@@ -386,7 +386,7 @@ router.post("/attendance", verifyFirebaseToken, async (req: any, res: any) => {
 
     if (
       !eventDate || !timeslot || !eventType || !description ||
-      !participantIds || !status || !actualParticipants ||
+      !participant_ids || !status || !actualParticipants ||
       adminFeedback === undefined || !attendanceSubmittedBy
     ) {
       return res.status(403).json({ error: "Forbidden: Missing required fields" });
@@ -394,7 +394,7 @@ router.post("/attendance", verifyFirebaseToken, async (req: any, res: any) => {
 
     if (
       typeof timeslot !== "string" || typeof eventType !== "string" ||
-      typeof description !== "string" || !Array.isArray(participantIds) ||
+      typeof description !== "string" || !Array.isArray(participant_ids) ||
       typeof status !== "string" || !Array.isArray(actualParticipants) ||
       typeof adminFeedback !== "string" || typeof attendanceSubmittedBy !== "object"
     ) {
@@ -407,7 +407,7 @@ router.post("/attendance", verifyFirebaseToken, async (req: any, res: any) => {
       timeslot,
       eventType,
       description,
-      participantIds,
+      participant_ids,
       eventId: req.body.eventId || req.body.event_id || '',
       event_id: req.body.eventId || req.body.event_id || '',
       status,
@@ -457,9 +457,9 @@ router.get("/metrics/activeness", verifyFirebaseToken, async (req: any, res: any
       const data = doc.data();
       if (doc.id === "_schema_template") return;
 
-      // Exclusion logic for events: If event contains Director ID in createdBy or participantIds, exclude
+      // Exclusion logic for events: If event contains Director ID in createdBy or participant_ids, exclude
       const isCreatedByDirector = data.createdBy === directorId || data.createdBy === "Miss Nine";
-      const hasDirectorParticipant = Array.isArray(data.participantIds) && data.participantIds.includes(directorId);
+      const hasDirectorParticipant = Array.isArray(data.participant_ids) && data.participant_ids.includes(directorId);
       
       if (isCreatedByDirector || hasDirectorParticipant) {
         return;

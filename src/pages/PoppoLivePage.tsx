@@ -81,56 +81,76 @@ export const PoppoLivePage = () => {
       <PoppoSEOArticle />
 
       {/* Footer / Links Section */}
-      <div className="mt-32 border-t border-white/10 w-full max-w-5xl mx-auto pt-8 pb-32 flex flex-col items-center gap-6 z-10">
-        <div className="flex flex-wrap items-center justify-center gap-4 text-xs font-bold uppercase tracking-widest text-[#F0EFE8] mb-2">
-          <Link to="/terms-of-service" className="hover:text-[#D4AF37] transition-colors flex items-center gap-1.5">Terms</Link>
-          <span className="text-white/20">|</span>
-          <Link to="/privacy-policy" className="hover:text-[#D4AF37] transition-colors flex items-center gap-1.5">Privacy</Link>
-          <span className="text-white/20">|</span>
-          <Link to="/agency-policy" className="hover:text-[#D4AF37] transition-colors flex items-center gap-1.5">Agency Policy</Link>
-          <span className="text-white/20">|</span>
-          <Link to="/contact" className="hover:text-[#D4AF37] transition-colors flex items-center gap-1.5">Contact Us</Link>
-          <span className="text-white/20">|</span>
-          <Link to="/blog" className="hover:text-[#D4AF37] transition-colors flex items-center gap-1.5">Resource Blog</Link>
+      <div className="mt-32 border-t border-white/10 w-full max-w-5xl mx-auto pt-12 pb-32 flex flex-col items-center gap-10 z-10 px-4">
+
+        {/* Legal */}
+        <div className="flex flex-col items-center gap-4 w-full">
+          <span className="text-[9px] font-black uppercase tracking-[0.25em] text-[#D4AF37]/50">Legal</span>
+          <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2">
+            <Link to="/terms-of-service" className="text-[11px] font-bold uppercase tracking-widest text-[#F0EFE8]/80 hover:text-[#D4AF37] transition-colors">Terms of Service</Link>
+            <Link to="/privacy-policy" className="text-[11px] font-bold uppercase tracking-widest text-[#F0EFE8]/80 hover:text-[#D4AF37] transition-colors">Privacy Policy</Link>
+            <Link to="/policy" className="text-[11px] font-bold uppercase tracking-widest text-[#F0EFE8]/80 hover:text-[#D4AF37] transition-colors">Agency Policy</Link>
+          </div>
         </div>
 
-        <div className="flex flex-wrap items-center justify-center gap-4 text-[10px] font-bold uppercase tracking-wider text-white/80 mb-2">
-          <Link to="/guides/login" className="hover:text-[#D4AF37] transition-colors">Login Guide</Link>
-          <span className="text-white/20">•</span>
-          <Link to="/guides/find-poppo-id" className="hover:text-[#D4AF37] transition-colors">Find ID Guide</Link>
-          <span className="text-white/20">•</span>
-          <Link to="/guides/withdraw-earnings" className="hover:text-[#D4AF37] transition-colors">Withdrawals</Link>
-          <span className="text-white/20">•</span>
-          <Link to="/guides/how-pk-battles-work" className="hover:text-[#D4AF37] transition-colors">PK Battles</Link>
-          <span className="text-white/20">•</span>
-          <Link to="/guides/how-to-register-agent" className="hover:text-[#D4AF37] transition-colors">Agent Registration</Link>
+        {/* Guides */}
+        <div className="flex flex-col items-center gap-4 w-full">
+          <span className="text-[9px] font-black uppercase tracking-[0.25em] text-[#D4AF37]/50">Guides</span>
+          <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2">
+            <Link to="/guides/login" className="text-[11px] font-bold uppercase tracking-widest text-[#F0EFE8]/80 hover:text-[#D4AF37] transition-colors">Login Guide</Link>
+            <Link to="/guides/find-poppo-id" className="text-[11px] font-bold uppercase tracking-widest text-[#F0EFE8]/80 hover:text-[#D4AF37] transition-colors">Find Poppo ID</Link>
+            <Link to="/guides/withdraw-earnings" className="text-[11px] font-bold uppercase tracking-widest text-[#F0EFE8]/80 hover:text-[#D4AF37] transition-colors">Withdraw Earnings</Link>
+            <Link to="/guides/how-pk-battles-work" className="text-[11px] font-bold uppercase tracking-widest text-[#F0EFE8]/80 hover:text-[#D4AF37] transition-colors">PK Battles</Link>
+            <Link to="/guides/how-to-register-agent" className="text-[11px] font-bold uppercase tracking-widest text-[#F0EFE8]/80 hover:text-[#D4AF37] transition-colors">Agent Registration</Link>
+          </div>
         </div>
 
-        <div className="flex flex-wrap items-center justify-center gap-4 text-[10px] font-bold uppercase tracking-wider text-[#D4AF37] mb-4">
-          <Link to="/region/usa" className="hover:text-white transition-colors">USA</Link>
-          <Link to="/region/india" className="hover:text-white transition-colors">India</Link>
-          <Link to="/region/indonesia" className="hover:text-white transition-colors">Indonesia</Link>
-          <Link to="/region/philippines" className="hover:text-white transition-colors">Philippines</Link>
-          <Link to="/region/malaysia" className="hover:text-white transition-colors">Malaysia</Link>
+        {/* Regions */}
+        <div className="flex flex-col items-center gap-4 w-full">
+          <span className="text-[9px] font-black uppercase tracking-[0.25em] text-[#D4AF37]/50">Regions</span>
+          <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2">
+            <Link to="/region/usa" className="text-[11px] font-bold uppercase tracking-widest text-[#D4AF37]/80 hover:text-white transition-colors">USA</Link>
+            <Link to="/region/india" className="text-[11px] font-bold uppercase tracking-widest text-[#D4AF37]/80 hover:text-white transition-colors">India</Link>
+            <Link to="/region/indonesia" className="text-[11px] font-bold uppercase tracking-widest text-[#D4AF37]/80 hover:text-white transition-colors">Indonesia</Link>
+            <Link to="/region/philippines" className="text-[11px] font-bold uppercase tracking-widest text-[#D4AF37]/80 hover:text-white transition-colors">Philippines</Link>
+            <Link to="/region/malaysia" className="text-[11px] font-bold uppercase tracking-widest text-[#D4AF37]/80 hover:text-white transition-colors">Malaysia</Link>
+          </div>
         </div>
 
-        <div className="flex flex-wrap items-center justify-center gap-6">
-          <a href="https://www.facebook.com/share/1Bxc59ksHM/?mibextid=wwXIfr" target="_blank" rel="noopener noreferrer" className="text-[#F0EFE8] hover:text-[#D4AF37] transition-colors flex items-center gap-2">
-            <Facebook size={20} />
-            <span className="text-xs font-bold tracking-wider">Facebook</span>
-          </a>
-          <a href="https://instagram.com/9TalentManagement" target="_blank" rel="noopener noreferrer" className="text-[#F0EFE8] hover:text-[#D4AF37] transition-colors flex items-center gap-2">
-            <Instagram size={20} />
-            <span className="text-xs font-bold tracking-wider">@9TalentManagement</span>
-          </a>
-          <a href="https://wa.me/message/5Y6QFQXSIEZRI1" target="_blank" rel="noopener noreferrer" className="text-[#F0EFE8] hover:text-[#D4AF37] transition-colors flex items-center gap-2">
-            <MessageCircle size={20} />
-            <span className="text-xs font-bold tracking-wider">Whatsapp +639558416320</span>
-          </a>
+        {/* Resources */}
+        <div className="flex flex-col items-center gap-4 w-full">
+          <span className="text-[9px] font-black uppercase tracking-[0.25em] text-[#D4AF37]/50">Resources</span>
+          <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2">
+            <Link to="/blog" className="text-[11px] font-bold uppercase tracking-widest text-[#F0EFE8]/80 hover:text-[#D4AF37] transition-colors">Resource Blog</Link>
+            <Link to="/contact" className="text-[11px] font-bold uppercase tracking-widest text-[#F0EFE8]/80 hover:text-[#D4AF37] transition-colors">Contact Us</Link>
+          </div>
         </div>
-        
-        <p className="text-[10px] text-white/30 tracking-widest uppercase mt-4">
-          © {new Date().getFullYear()} Nine Talent Management. All rights reserved.
+
+        {/* Divider */}
+        <div className="w-full h-px bg-gradient-to-r from-transparent via-[#D4AF37]/20 to-transparent" />
+
+        {/* Social */}
+        <div className="flex flex-col items-center gap-4 w-full">
+          <span className="text-[9px] font-black uppercase tracking-[0.25em] text-[#D4AF37]/50">Connect</span>
+          <div className="flex flex-wrap items-center justify-center gap-6">
+            <a href="https://www.facebook.com/share/1Bxc59ksHM/?mibextid=wwXIfr" target="_blank" rel="noopener noreferrer" className="text-[#F0EFE8]/80 hover:text-[#D4AF37] transition-colors flex items-center gap-2">
+              <Facebook size={18} />
+              <span className="text-[11px] font-bold tracking-wider">Facebook</span>
+            </a>
+            <a href="https://instagram.com/9TalentManagement" target="_blank" rel="noopener noreferrer" className="text-[#F0EFE8]/80 hover:text-[#D4AF37] transition-colors flex items-center gap-2">
+              <Instagram size={18} />
+              <span className="text-[11px] font-bold tracking-wider">@9TalentManagement</span>
+            </a>
+            <a href="https://wa.me/message/5Y6QFQXSIEZRI1" target="_blank" rel="noopener noreferrer" className="text-[#F0EFE8]/80 hover:text-[#D4AF37] transition-colors flex items-center gap-2">
+              <MessageCircle size={18} />
+              <span className="text-[11px] font-bold tracking-wider">WhatsApp</span>
+            </a>
+          </div>
+        </div>
+
+        {/* Copyright */}
+        <p className="text-[9px] text-white/30 tracking-[0.2em] uppercase mt-2">
+          &copy; {new Date().getFullYear()} Nine Talent Management. All rights reserved.
         </p>
       </div>
 

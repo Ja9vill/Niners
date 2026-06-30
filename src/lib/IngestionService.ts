@@ -398,13 +398,13 @@ export const IngestionService = {
     }
   },
 
-  /** 11. Get reports for overview page */
-  async getReportsForOverview(agentId: string): Promise<AgentFinancialReport[]> {
-    const q = query(
-      collection(db, AGENT_REPORTS_COL),
-      where('agent_id', '==', agentId),
-      orderBy('created_at', 'desc')
-    );
+  /** 11. Get reports for overview page. Pass agentId to scope, omit for all */
+  async getReportsForOverview(agentId?: string): Promise<AgentFinancialReport[]> {
+    const constraints: any[] = [orderBy('created_at', 'desc')];
+    if (agentId) {
+      constraints.unshift(where('agent_id', '==', agentId));
+    }
+    const q = query(collection(db, AGENT_REPORTS_COL), ...constraints);
     const snap = await getDocs(q);
     return snap.docs.map(d => ({ id: d.id, ...d.data() as AgentFinancialReport }));
   },

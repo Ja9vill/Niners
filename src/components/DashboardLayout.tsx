@@ -300,8 +300,7 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
         created_by_role: authState.role || 'Admin',
         created_by_id: authState.poppo_id || 'SystemAdmin',
         visibility: 'All',
-        participants: [req.poppoId],
-        participantIds: [req.poppoId],
+        participant_ids: [req.poppoId],
         timestamp: new Date().toISOString()
       };
       await setDoc(doc(db, 'calendar', eventId), newEvent);
@@ -791,38 +790,23 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
         ]
       });
 
-      links.push({
-        id: 'dropdown-reporting',
-        isDropdown: true,
-        label: 'Reporting',
-        icon: BarChart,
-        subLinks: [
-          { path: '/reporting/events', label: 'Events Log', icon: Calendar },
-          { path: '/reporting/attendance', label: 'Attendance Log', icon: ClipboardList },
-          { path: '/reporting/pk-performance', label: 'PK Performance', icon: Activity },
-          { path: '/reporting/fanbase-health', label: 'Fanbase Health', icon: Users }
-        ]
-      });
+      links.push({ path: '/reporting-logs', label: 'Reporting Logs', icon: BarChart });
 
       if (role === 'director') {
         links.push({ isDivider: true, id: 'div-2' });
         links.push({ isTitle: true, label: "Directors Access", id: 'title-access' });
-        links.push({ path: '/notifications-control', label: 'Notification Center', icon: Bell });
-
         links.push({
           id: 'dropdown-database',
           isDropdown: true,
           label: 'Database',
           icon: Database,
           subLinks: [
-            { path: '/profiles', label: 'Roster Management', icon: Users },
             { path: '/financial-data', label: 'Financial Data', icon: DollarSign },
             { path: '/cms/livehouse', label: 'Livehouse Data', icon: Calendar },
-            { path: '/collections-log', label: 'Collections Log', icon: Database },
-            { path: '/data-vault', label: 'Data Vault', icon: Shield },
             { path: '/provision-user', label: 'Provision User', icon: Plus }
           ]
         });
+        links.push({ path: '/command-center', label: 'Command Center', icon: Shield });
       }
     } else if (role === 'manager' || role === 'agent') {
       links.push({ isDivider: true, id: 'div-manager' });
@@ -896,10 +880,18 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
         <main className="flex-1 flex flex-col relative overflow-hidden bg-transparent">
           {/* Desktop Header */}
           <header className="hidden md:flex items-center justify-between px-8 py-4 bg-[#140E0A] border-b border-[#D4AF37]/10 shrink-0 z-20 h-16 animate-fadeIn">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                className="p-2 text-[#A09E9A] hover:text-[#D4AF37] hover:scale-105 rounded-xl transition-all cursor-pointer flex items-center justify-center"
+                title="Toggle Menu"
+                type="button"
+              >
+                {isSidebarOpen ? <X size={18} /> : <Menu size={18} />}
+              </button>
               <span className="text-[10px] font-black uppercase tracking-[0.2em] text-[#D4AF37]">Niners Portal Dashboard</span>
             </div>
-            
+
             <div className="flex items-center gap-4">
               {renderNotificationCenter()}
             </div>
