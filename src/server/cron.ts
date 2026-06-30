@@ -231,7 +231,7 @@ export async function runAutoSyncLivehouseData(ignoreLock = false) {
 }
 
 // Helper to parse Manila time to UTC
-function parseManilaTimeToUTC(dateStr: string, timeStr: string): number {
+export function parseManilaTimeToUTC(dateStr: string, timeStr: string): number {
   try {
     const timeMatch = timeStr.match(/(\d{1,2}):(\d{2})\s+(AM|PM)/i);
     if (!timeMatch) return 0;

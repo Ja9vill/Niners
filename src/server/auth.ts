@@ -167,7 +167,7 @@ async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T
  * Supports both bcrypt hashes (new, secure) and legacy plaintext passwords
  * (backward compat â€” will be replaced when user resets their password).
  */
-async function verifyPassword(inputPassword: string, storedPassword: string): Promise<boolean> {
+export async function verifyPassword(inputPassword: string, storedPassword: string): Promise<boolean> {
   // Detect bcrypt hash by its prefix ($2b$ or $2a$)
   if (storedPassword.startsWith("$2b$") || storedPassword.startsWith("$2a$")) {
     return bcrypt.compare(inputPassword, storedPassword);
@@ -178,7 +178,7 @@ async function verifyPassword(inputPassword: string, storedPassword: string): Pr
   return storedPassword === inputPassword || (cleanStored !== "" && cleanStored === cleanInput);
 }
 
-function getRoleLevel(role: string): number {
+export function getRoleLevel(role: string): number {
   const r = String(role || "").toLowerCase();
   if (r === "director") return 5;
   if (r === "head admin") return 4;
@@ -187,7 +187,7 @@ function getRoleLevel(role: string): number {
   return 1;
 }
 
-function buildUserPayload(hostData: any) {
+export function buildUserPayload(hostData: any) {
   const role = String(hostData.role || "host").toLowerCase();
   const level = getRoleLevel(role);
   return {
