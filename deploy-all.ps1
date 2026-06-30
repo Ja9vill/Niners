@@ -232,6 +232,22 @@ if ($LASTEXITCODE -ne 0) {
 }
 Write-Success "Pushed to origin/main"
 
+# 3e. Create a deploy tag for build preservation
+$tagName = "deploy/$(Get-Date -Format 'yyyy-MM-dd-HHmm')"
+Write-Info "Creating deploy tag: $tagName"
+$tagOutput = & git tag -a $tagName -m "Deploy $timestamp (HEAD: $currentHead)" 2>&1
+if ($LASTEXITCODE -eq 0) {
+    & git push origin $tagName 2>&1 | Out-Null
+    if ($LASTEXITCODE -eq 0) {
+        Write-Success "Tag created and pushed: $tagName"
+        Write-Info "To rollback to this build later: git checkout $tagName"
+    } else {
+        Write-Warning "Tag created locally but push failed — push manually: git push origin $tagName"
+    }
+} else {
+    Write-Warning "Failed to create deploy tag — continuing anyway"
+}
+
 # ============================================================
 # PHASE 4: FIREBASE DEPLOY — HOSTING
 # ============================================================
@@ -278,7 +294,13 @@ Write-Host "  Elapsed time: $elapsedStr seconds" -ForegroundColor Cyan
 Write-Host "  Timestamp:    $timestamp" -ForegroundColor Cyan
 Write-Host "  HEAD commit:  $currentHead" -ForegroundColor Gray
 Write-Host "  Branch:       $branch" -ForegroundColor Gray
+Write-Host "  Deploy tag:   $tagName" -ForegroundColor Gray
 Write-Host ("=" * 55) -ForegroundColor Green
-Write-Host "`n  To revert the last commit if needed:" -ForegroundColor Yellow
+Write-Host "`n  To rollback to this exact build:" -ForegroundColor Yellow
+Write-Host "    git checkout $tagName" -ForegroundColor Yellow
+Write-Host "    npm run build" -ForegroundColor Yellow
+Write-Host "    firebase deploy --only hosting" -ForegroundColor Yellow
+Write-Host "    gcloud run deploy nine-dashboard --source . --port 8080 --region us-central1" -ForegroundColor Yellow
+Write-Host "`n  To revert the last commit without rolling back:" -ForegroundColor Yellow
 Write-Host "    git revert HEAD" -ForegroundColor Yellow
 Write-Host "`n"

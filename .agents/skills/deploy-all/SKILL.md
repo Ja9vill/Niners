@@ -15,8 +15,86 @@ This skill automates the full deployment pipeline for the Nine Dashboard project
 2. **_TypeScript type-check_** — `tsc --noEmit`
 3. **_Build_** — `npm run build` (Vite frontend + esbuild backend)
 4. **_Git save_** — `git add -A` → `git commit` (auto timestamp) → `git pull --rebase` → `git push`
-5. **_Deploy Firebase Hosting_** — `firebase deploy --only hosting`
-6. **_Deploy Cloud Run_** — `gcloud run deploy nine-dashboard ...`
+5. **_Auto-tag_** — creates an annotated git tag (`deploy/YYYY-MM-DD-HHmm`) to permanently snapshot the exact deployed commit
+6. **_Deploy Firebase Hosting_** — `firebase deploy --only hosting`
+7. **_Deploy Cloud Run_** — `gcloud run deploy nine-dashboard ...`
+
+## Build Preservation — Auto-Tagging
+
+Every deploy automatically creates a **permanent, immutable git tag** at the deployed commit. This is your safety net.
+
+**Tag format:** `deploy/YYYY-MM-DD-HHmm`
+
+```powershell
+# Example tag created during deploy
+deploy/2026-06-30-1422
+
+# List all deployments ever made
+git tag -l "deploy/*"
+
+# See exactly what was in a specific deploy
+git log deploy/2026-06-30-1422 --oneline
+
+# Compare two deploys
+git diff deploy/2026-06-30-1422 deploy/2026-06-29-1000 --stat
+```
+
+## Rollback — How to Restore a Previous Build
+
+If a deployment breaks the live site, rollback is a 3-step process:
+
+```powershell
+# 1. Check out the last known-good tag
+git checkout deploy/2026-06-29-1000
+
+# 2. Rebuild and redeploy from that exact state
+npm run build
+firebase deploy --only hosting
+gcloud run deploy nine-dashboard --source . --port 8080 --region us-central1
+
+# 3. (Optional) Create a hotfix branch from the tag
+git checkout -b fix/rollback-restore
+```
+
+**Cloud Run also keeps the last 100 revisions.** You can rollback via the GCP Console without touching git:
+
+```
+Cloud Run → nine-dashboard → Revisions → select previous → "Deploy"
+```
+
+## Complete Development Lifecycle
+
+### BEFORE coding
+```powershell
+git checkout main
+git pull origin main
+git fetch --all --prune
+git checkout -b feat/what-youre-building
+```
+
+### DURING coding
+```powershell
+npm run dev                          # live preview
+npm run lint                         # tsc --noEmit (type-check often)
+git add -A && git commit -m "type: message"   # commit frequently
+git fetch origin && git rebase origin/main    # stay up to date
+```
+
+### AFTER coding (before deploy)
+```powershell
+npm run lint                         # must pass
+npm run test                         # must pass
+npm run build                        # must succeed
+git checkout main
+git pull origin main
+git merge feat/what-youre-building
+git push origin main
+git branch -d feat/what-youre-building
+git push origin --delete feat/what-youre-building
+```
+Then run `deploy-all.ps1` from main.
+
+---
 
 ## CRITICAL: Build-before-deploy rule
 
