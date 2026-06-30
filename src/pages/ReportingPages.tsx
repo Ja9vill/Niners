@@ -3,6 +3,7 @@ import { collection, query, getDocs, doc, deleteDoc, setDoc, onSnapshot, orderBy
 import { db } from '../lib/firebase';
 import { Storage } from '../lib/storage';
 import { BarChart, Search, Trash2, Edit2, X, Save, AlertTriangle } from 'lucide-react';
+import { isDirector as checkIsDirector } from '../lib/roleUtils';
 
 interface ReportingPagesProps {
   collectionName: string;
@@ -18,7 +19,7 @@ export const ReportingPages: React.FC<ReportingPagesProps> = ({ collectionName, 
   const [editingDoc, setEditingDoc] = useState<any>(null);
   
   const authState = Storage.getAuthState();
-  const isDirector = String(authState.role).toLowerCase() === 'director';
+  const isDirector = checkIsDirector(authState.role);
 
   useEffect(() => {
     const q = query(collection(db, collectionName));

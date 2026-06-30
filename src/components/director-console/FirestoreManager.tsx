@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Folder, FileJson, ChevronRight, Plus, RefreshCw, Trash2, ArrowLeft } from 'lucide-react';
-import { Storage } from '../../lib/storage';
+import { apiGet, apiDelete } from '../../lib/apiClient';
 
 export function FirestoreManager() {
   const [search, setSearch] = useState('');
@@ -13,12 +13,8 @@ export function FirestoreManager() {
   const fetchCollections = async () => {
     setLoading(true);
     try {
-      const authState = Storage.getAuthState();
-      const res = await fetch('/api/admin/firestore/collections', {
-        headers: { 'Authorization': `Bearer ${authState.token || ''}` }
-      });
-      const data = await res.json();
-      if (data.collections) setCollections(data.collections);
+      const res = await apiGet<{ collections?: string[] }>('/api/admin/firestore/collections');
+      if (res.data.collections) setCollections(res.data.collections);
     } catch (err) {
       console.error(err);
     } finally {
@@ -29,13 +25,9 @@ export function FirestoreManager() {
   const fetchDocuments = async (collectionId: string) => {
     setLoading(true);
     try {
-      const authState = Storage.getAuthState();
-      const res = await fetch(`/api/admin/firestore/documents/${collectionId}`, {
-        headers: { 'Authorization': `Bearer ${authState.token || ''}` }
-      });
-      const data = await res.json();
-      if (data.documents) {
-        setDocuments(data.documents);
+      const res = await apiGet<{ documents?: any[] }>(`/api/admin/firestore/documents/${collectionId}`);
+      if (res.data.documents) {
+        setDocuments(res.data.documents);
         setSelectedCollection(collectionId);
       }
     } catch (err) {
@@ -50,11 +42,7 @@ export function FirestoreManager() {
     if (!window.confirm("Are you sure you want to delete this document? This cannot be undone.")) return;
     
     try {
-      const authState = Storage.getAuthState();
-      const res = await fetch(`/api/admin/firestore/documents/${selectedCollection}/${docId}`, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${authState.token || ''}` }
-      });
+      const res = await apiDelete(`/api/admin/firestore/documents/${selectedCollection}/${docId}`);
       if (res.ok) {
         fetchDocuments(selectedCollection);
       }

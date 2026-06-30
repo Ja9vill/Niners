@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Users, Search, UserX, KeyRound, Clock, Mail, RefreshCw } from 'lucide-react';
-import { Storage } from '../../lib/storage';
+import { apiGet, apiPatch } from '../../lib/apiClient';
 
 export function AuthManager() {
   const [search, setSearch] = useState('');
@@ -10,15 +10,9 @@ export function AuthManager() {
   const fetchUsers = async () => {
     setLoading(true);
     try {
-      const authState = Storage.getAuthState();
-      const res = await fetch('/api/admin/auth/users', {
-        headers: {
-          'Authorization': `Bearer ${authState.token || ''}`
-        }
-      });
-      const data = await res.json();
-      if (data.users) {
-        setUsers(data.users);
+      const res = await apiGet<{ users?: any[] }>('/api/admin/auth/users');
+      if (res.data.users) {
+        setUsers(res.data.users);
       }
     } catch (err) {
       console.error("Failed to fetch auth users", err);
@@ -33,17 +27,9 @@ export function AuthManager() {
 
   const toggleUserStatus = async (uid: string, currentStatus: boolean) => {
     try {
-      const authState = Storage.getAuthState();
-      const res = await fetch(`/api/admin/auth/users/${uid}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${authState.token || ''}`
-        },
-        body: JSON.stringify({ disabled: !currentStatus })
-      });
+      const res = await apiPatch(`/api/admin/auth/users/${uid}`, { disabled: !currentStatus });
       if (res.ok) {
-        fetchUsers(); // Refresh list
+        fetchUsers();
       }
     } catch (err) {
       console.error("Failed to toggle user status", err);

@@ -6,6 +6,7 @@ import { db } from '../lib/firebase';
 import { collection, addDoc, doc, setDoc, query, where, getDocs, deleteDoc, orderBy } from 'firebase/firestore';
 import { FirebaseService } from '../lib/firebaseService';
 import { cn } from '../lib/utils';
+import { isHost as checkIsHost, isDirector as checkIsDirector, normalizeRole } from '../lib/roleUtils';
 
 type StreamTab = 'rpk' | 'stream' | 'fanbase';
 type StreamSubTab = 'daily' | 'weekly' | 'monthly';
@@ -89,8 +90,8 @@ const displayFullDate = (dateStr: string): string => {
 
 export const StreamsPage = () => {
   const authState = Storage.getAuthState();
-  const isHost = String(authState.role || '').toLowerCase() === 'host' || String(authState.role || '').toLowerCase() === 'talent';
-  const isDirector = String(authState.role || '').toLowerCase() === 'director';
+  const isHost = checkIsHost(authState.role);
+  const isDirector = checkIsDirector(authState.role);
 
   const [activeTab, setActiveTab] = useState<StreamTab>('rpk');
 
@@ -638,7 +639,7 @@ export const StreamsPage = () => {
     if (!fanbaseFormData.from_date || !fanbaseFormData.to_date) { setFanbaseError('From Date and To Date are required'); return; }
     setIsSubmittingFanbase(true); setFanbaseError(''); setFanbaseSuccess('');
     try {
-      const roleLower = String(authState.role || '').toLowerCase();
+      const roleLower = normalizeRole(authState.role);
       const isElevatedStaff = ['admin', 'head admin', 'head_admin', 'director'].includes(roleLower);
       const reportData = {
         reporter_id: authState.poppo_id || "Unknown",
