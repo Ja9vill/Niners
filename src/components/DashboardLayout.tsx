@@ -880,10 +880,18 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
         <main className="flex-1 flex flex-col relative overflow-hidden bg-transparent">
           {/* Desktop Header */}
           <header className="hidden md:flex items-center justify-between px-8 py-4 bg-[#140E0A] border-b border-[#D4AF37]/10 shrink-0 z-20 h-16 animate-fadeIn">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                className="p-2 text-[#A09E9A] hover:text-[#D4AF37] hover:scale-105 rounded-xl transition-all cursor-pointer flex items-center justify-center"
+                title="Toggle Menu"
+                type="button"
+              >
+                {isSidebarOpen ? <X size={18} /> : <Menu size={18} />}
+              </button>
               <span className="text-[10px] font-black uppercase tracking-[0.2em] text-[#D4AF37]">Niners Portal Dashboard</span>
             </div>
-            
+
             <div className="flex items-center gap-4">
               {renderNotificationCenter()}
             </div>

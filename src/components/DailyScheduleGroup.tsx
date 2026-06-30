@@ -62,19 +62,19 @@ export const DailyScheduleGroup: React.FC<DailyScheduleGroupProps> = ({
       </div>
 
       {/* Scheduled Events Panel */}
-      <div className="bg-gradient-to-br from-[#0F1117] to-[#12141A] rounded-3xl border border-[#D4AF37]/40 p-5 space-y-4 shadow-[0_0_15px_rgba(212,175,55,0.15)] relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-tr from-purple-500/5 via-transparent to-indigo-500/5 pointer-events-none" />
+      <div className="bg-gradient-to-br from-[#0a0806]/90 to-[#080502]/90 rounded-3xl border border-[#D4AF37]/40 p-5 space-y-4 shadow-[0_0_15px_rgba(212,175,55,0.15)] relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-tr from-[#D4AF37]/5 via-transparent to-[#FF8C00]/5 pointer-events-none" />
 
         <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-[#D4AF37]/20 pb-4 gap-4">
           <div className="flex items-center gap-3">
-            <div className="w-2.5 h-2.5 rounded-full bg-purple-400 shadow-[0_0_8px_rgba(168,85,247,0.8)]" />
+            <div className="w-2.5 h-2.5 rounded-full bg-[#D4AF37] shadow-[0_0_8px_rgba(212,175,55,0.8)]" />
             <h3 className="text-xs font-black uppercase tracking-widest text-white/90">
               Scheduled Events
             </h3>
           </div>
 
           <div className="flex items-center gap-2">
-            <Globe size={14} className="text-purple-400" />
+            <Globe size={14} className="text-[#D4AF37]" />
             <span className="text-[10px] font-bold text-white/50 tracking-widest uppercase">
               {localTimezoneMode ? localTzAbbr : 'UTC+8'}
             </span>

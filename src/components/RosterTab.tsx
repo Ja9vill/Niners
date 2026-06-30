@@ -317,7 +317,7 @@ export const RosterTab: React.FC<RosterTabProps> = ({ isReadOnly = false }) => {
   }
 
   return (
-    <div ref={containerRef} className="space-y-6 relative">
+    <div ref={containerRef} className="space-y-6 relative max-w-3xl mx-auto w-full">
       {/* FILTER MENU BLOCKS */}
       <div className="global-block-1 relative z-10 flex flex-col gap-2.5 overflow-hidden p-4">
         {/* Subtle background glow for the filter section */}

@@ -16,6 +16,7 @@ import { LivehouseCalendar } from './LivehouseCalendar';
 import { LivehouseBookingModal } from './LivehouseBookingModal';
 import { CalendarHeaderGroup } from './CalendarHeaderGroup';
 import { DailyScheduleGroup } from './DailyScheduleGroup';
+import { useCalendarEngine } from '../hooks/useCalendarEngine';
 import { formatLocalTime, getLocalTimezoneAbbreviation, parseTimeStringToHourMin } from '../lib/timezoneUtils';
 
 
@@ -48,10 +49,30 @@ const TIMESLOT_BLOCKS = [
   }
 ];
 
-export const getTargetDisplayDate = (event: CalendarEvent, mode: 'Manila' | 'Local'): string => {
+export function formatTimezoneLabel(tz: string): string {
+  try {
+    const now = new Date();
+    const longParts = new Intl.DateTimeFormat('en-US', { timeZone: tz, timeZoneName: 'long' }).formatToParts(now);
+    const shortParts = new Intl.DateTimeFormat('en-US', { timeZone: tz, timeZoneName: 'short' }).formatToParts(now);
+    const offsetParts = new Intl.DateTimeFormat('en-US', { timeZone: tz, timeZoneName: 'longOffset' }).formatToParts(now);
+
+    const abbr = shortParts.find(p => p.type === 'timeZoneName')?.value || '';
+    const fullName = longParts.find(p => p.type === 'timeZoneName')?.value || '';
+    const offset = offsetParts.find(p => p.type === 'timeZoneName')?.value || '';
+
+    if (abbr && fullName) {
+      return `${abbr} (${fullName}): ${offset}`;
+    }
+    return tz;
+  } catch {
+    return tz;
+  }
+}
+
+export const getTargetDisplayDate = (event: CalendarEvent, mode: string): string => {
   const rawDate = event.date || event.event_date || '';
   if (!rawDate) return '';
-  if (mode === 'Manila') return rawDate;
+  if (mode === 'Asia/Manila') return rawDate;
 
   const timeStr = event.time || event.description || '';
   const firstTimePart = timeStr === '00:00' ? '00:00' : timeStr.split('-')[0].trim();
@@ -64,7 +85,11 @@ export const getTargetDisplayDate = (event: CalendarEvent, mode: 'Manila' | 'Loc
 
   if (isNaN(dateObj.getTime())) return rawDate;
 
-  return format(dateObj, 'yyyy-MM-dd');
+  try {
+    return dateObj.toLocaleDateString('en-CA', { timeZone: mode });
+  } catch {
+    return format(dateObj, 'yyyy-MM-dd');
+  }
 };
 
 
@@ -77,7 +102,6 @@ interface CalendarTabProps {
 export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, hosts = [] }) => {
   const [isInitializing, setIsInitializing] = useState(true);
   const [viewMode, setViewMode] = useState<'week' | 'month'>('month');
-  const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [events, setEvents] = useState<CalendarEvent[]>(() => {
     try {
@@ -92,22 +116,15 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
   console.log('[CalendarTab] Rendering, isReadOnly:', isReadOnly);
   console.log('[CalendarTab] Events count:', events.length);
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
-  const [timeDisplayMode, setTimeDisplayMode] = useState<'Manila' | 'Local'>('Manila');
-
-  const localTzAbbr = useMemo(() => {
-    try {
-      const shortCode = new Intl.DateTimeFormat('en-US', { timeZoneName: 'short' })
-        .formatToParts(new Date())
-        .find(p => p.type === 'timeZoneName')?.value;
-
-      if (shortCode) {
-        return shortCode;
-      }
-      return 'LOCAL';
-    } catch {
-      return 'LOCAL';
-    }
+  const userTz = useMemo(() => {
+    try { return Intl.DateTimeFormat().resolvedOptions().timeZone; } catch { return 'UTC'; }
   }, []);
+  const [timeDisplayMode, setTimeDisplayMode] = useState<string>('Asia/Manila');
+
+  const otherTzLabel = useMemo(() => {
+    const other = timeDisplayMode === 'Asia/Manila' ? userTz : 'Asia/Manila';
+    return formatTimezoneLabel(other);
+  }, [timeDisplayMode, userTz]);
 
   // Modals States
   const [isAdding, setIsAdding] = useState(false);
@@ -526,16 +543,28 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
     loadData();
   }, []);
 
+  const engine = useCalendarEngine({
+    events,
+    livehouseSchedule: [],
+    loggedInPoppoId: auth?.poppo_id || ''
+  });
+
+  const currentDate = useMemo(() => {
+    if (engine.days.length === 0) return new Date();
+    return new Date(engine.days[0].date + 'T00:00:00');
+  }, [engine.days]);
+
+  const handleMonthChange = (date: Date) => {
+    if (date.getTime() < currentDate.getTime()) {
+      engine.goPrevMonth();
+    } else {
+      engine.goNextMonth();
+    }
+  };
+
   const filteredEvents = useMemo(() => {
     return events;
   }, [events]);
-
-  const weekDays = useMemo(() => {
-    return eachDayOfInterval({
-      start: startOfWeek(currentDate, { weekStartsOn: 1 }),
-      end: endOfWeek(currentDate, { weekStartsOn: 1 })
-    });
-  }, [currentDate]);
 
   const getEventsForDay = (day: Date) => {
     const formattedStr = format(day, 'yyyy-MM-dd');
@@ -547,35 +576,9 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
 
   const handleDateClick = (day: Date) => {
     setSelectedDate(day);
+    engine.setSelectedDate(format(day, 'yyyy-MM-dd'));
     setSelectedEventId(null);
   };
-
-  const goToPreviousWeek = () => {
-    setCurrentDate(prev => subWeeks(prev, 1));
-    setSelectedEventId(null);
-  };
-
-  const goToNextWeek = () => {
-    setCurrentDate(prev => addWeeks(prev, 1));
-    setSelectedEventId(null);
-  };
-
-  const goToPreviousMonth = () => {
-    setCurrentDate(prev => subMonths(prev, 1));
-    setSelectedEventId(null);
-  };
-
-  const goToNextMonth = () => {
-    setCurrentDate(prev => addMonths(prev, 1));
-    setSelectedEventId(null);
-  };
-
-  const monthDays = useMemo(() => {
-    return eachDayOfInterval({
-      start: startOfWeek(startOfMonth(currentDate), { weekStartsOn: 1 }),
-      end: endOfWeek(endOfMonth(currentDate), { weekStartsOn: 1 })
-    });
-  }, [currentDate]);
   // Livehouse Reservation availability checker
   // Prefers live data from the Google Apps Script matrix; falls back to local counts.
   const getTimeslotAvailability = (targetDate: string) => {
@@ -1416,21 +1419,32 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
   }
 
   return (
-    <div className="space-y-6 calendar-container">
+    <div data-theme={activeTab === 'LIVEHOUSE' ? 'livehouse' : 'agency'} className="space-y-6 calendar-container w-full md:max-w-3xl xl:max-w-5xl 2xl:max-w-6xl mx-auto px-2 sm:px-4">
       <style>{`
-        /* Force 60% black background for the entire calendar page elements to let global gradients show */
         body,
         .app-bg,
         main {
           background-color: rgba(0, 0, 0, 0.6) !important;
         }
-        /* Scoped style overrides for Calendar and its subcomponents (like AddEventForm) to match the global gold & charcoal brand theme */
+      `}</style>
+
+      <style>{`
         .calendar-container select,
         .calendar-container input,
         .calendar-container textarea {
           background-color: rgba(0, 0, 0, 0.6) !important;
-          border-color: rgba(212, 175, 55, 0.25) !important;
           color: #f0efe8 !important;
+        }
+        .calendar-container select option {
+          background-color: #000000 !important;
+          color: #f0efe8 !important;
+        }
+
+        /* ===== AGENCY - GOLD THEME (default) ===== */
+        .calendar-container select,
+        .calendar-container input,
+        .calendar-container textarea {
+          border-color: rgba(212, 175, 55, 0.25) !important;
         }
         .calendar-container select:focus,
         .calendar-container input:focus,
@@ -1438,11 +1452,6 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
           border-color: rgba(212, 175, 55, 0.6) !important;
           box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.08) !important;
         }
-        .calendar-container select option {
-          background-color: #000000 !important;
-          color: #f0efe8 !important;
-        }
-        /* Override bg classes to 60% black */
         .calendar-container .bg-black\\/85,
         .calendar-container .bg-\\[\\#0D0D14\\],
         .calendar-container .bg-\\[\\#0A0B0E\\],
@@ -1459,14 +1468,117 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
         .calendar-container .bg-\\[\\#12151D\\]:hover {
           background-color: #090605 !important;
         }
-        /* Override border colors */
+
+        /* ===== LIVEHOUSE - CRIMSON THEME ===== */
+        .calendar-container[data-theme="crimson"] select,
+        .calendar-container[data-theme="crimson"] input,
+        .calendar-container[data-theme="crimson"] textarea {
+          border-color: rgba(178, 34, 34, 0.3) !important;
+        }
+        .calendar-container[data-theme="crimson"] select:focus,
+        .calendar-container[data-theme="crimson"] input:focus,
+        .calendar-container[data-theme="crimson"] textarea:focus {
+          border-color: rgba(178, 34, 34, 0.6) !important;
+          box-shadow: 0 0 0 3px rgba(178, 34, 34, 0.08) !important;
+        }
+
+        /* CalendarHeaderGroup - container */
+        .calendar-container[data-theme="crimson"] [class*="border-\\[\\#D4AF37\\]"],
+        .calendar-container[data-theme="crimson"] [class*="border-\\[#D4AF37\\]"] {
+          border-color: rgba(178, 34, 34, var(--tw-border-opacity, 0.2)) !important;
+        }
+        .calendar-container[data-theme="crimson"] [class*="text-\\[\\#D4AF37\\]"],
+        .calendar-container[data-theme="crimson"] [class*="text-\\[#D4AF37\\]"] {
+          color: #B22222 !important;
+        }
+        .calendar-container[data-theme="crimson"] [class*="bg-\\[\\#D4AF37\\]"] {
+          background-color: rgba(178, 34, 34, var(--tw-bg-opacity, 0.2)) !important;
+        }
+        .calendar-container[data-theme="crimson"] [class*="hover\\:text-\\[\\#D4AF37\\]"]:hover {
+          color: #B22222 !important;
+        }
+        .calendar-container[data-theme="crimson"] [class*="hover\\:bg-\\[\\#D4AF37\\]"]:hover {
+          background-color: rgba(178, 34, 34, 0.2) !important;
+        }
+        .calendar-container[data-theme="crimson"] [class*="from-\\[\\#FFF0B3\\]"],
+        .calendar-container[data-theme="crimson"] [class*="from-\\[#FFF0B3\\]"] {
+          --tw-gradient-from: #FF6B6B !important;
+        }
+        .calendar-container[data-theme="crimson"] [class*="to-\\[\\#D4AF37\\]"],
+        .calendar-container[data-theme="crimson"] [class*="to-\\[#D4AF37\\]"],
+        .calendar-container[data-theme="crimson"] [class*="to-\\[\\#b8960c\\]"] {
+          --tw-gradient-to: #B22222 !important;
+        }
+        .calendar-container[data-theme="crimson"] [style*="background: linear-gradient(135deg, #d4af37, #b8960c)"] {
+          background: linear-gradient(135deg, #B22222, #8B0000) !important;
+          color: #fff !important;
+        }
+        .calendar-container[data-theme="crimson"] .shadow-\\[0_0_15px_rgba\\(212\\,175\\,55\\,0\\.2\\)\\] {
+          box-shadow: 0 0 15px rgba(178, 34, 34, 0.2) !important;
+        }
+        .calendar-container[data-theme="crimson"] [class*="shadow-\\[0_0_15px_rgba\\(212"] {
+          box-shadow: 0 0 15px rgba(178, 34, 34, 0.2) !important;
+        }
+        .calendar-container[data-theme="crimson"] .shadow-\\[0_0_30px_rgba\\(212\\,175\\,55\\,0\\.05\\)\\] {
+          box-shadow: 0 0 30px rgba(178, 34, 34, 0.08) !important;
+        }
+        .calendar-container[data-theme="crimson"] .border-\\[\\#FFD700\\]\\/50,
+        .calendar-container[data-theme="crimson"] [class*="border-\\[#FFD700\\]"] {
+          border-color: rgba(220, 20, 60, 0.5) !important;
+        }
+        .calendar-container[data-theme="crimson"] .border-\\[\\#FF8C00\\]\\/50,
+        .calendar-container[data-theme="crimson"] [class*="border-\\[#FF8C00\\]"] {
+          border-color: rgba(255, 68, 68, 0.5) !important;
+        }
+        .calendar-container[data-theme="crimson"] .from-\\[\\#D4AF37\\]\\/15 {
+          --tw-gradient-from: rgba(178, 34, 34, 0.15) !important;
+        }
+        .calendar-container[data-theme="crimson"] .to-\\[\\#FF8C00\\]\\/15 {
+          --tw-gradient-to: rgba(255, 68, 68, 0.15) !important;
+        }
+        .calendar-container[data-theme="crimson"] .from-\\[\\#FF8C00\\]\\/15 {
+          --tw-gradient-from: rgba(255, 68, 68, 0.15) !important;
+        }
+        .calendar-container[data-theme="crimson"] .to-\\[\\#FF4500\\]\\/15 {
+          --tw-gradient-to: rgba(139, 0, 0, 0.15) !important;
+        }
+        .calendar-container[data-theme="crimson"] .from-\\[\\#FFF0B3\\] {
+          --tw-gradient-from: #FF6B6B !important;
+        }
+        .calendar-container[data-theme="crimson"] .to-\\[\\#D4AF37\\] {
+          --tw-gradient-to: #B22222 !important;
+        }
+        .calendar-container[data-theme="crimson"] .from-\\[\\#FFD700\\] {
+          --tw-gradient-from: #DC143C !important;
+        }
+        .calendar-container[data-theme="crimson"] .to-\\[\\#FF8C00\\] {
+          --tw-gradient-to: #FF4444 !important;
+        }
+        .calendar-container[data-theme="crimson"] .text-\\[\\#D4AF37\\]\\/60 {
+          color: rgba(178, 34, 34, 0.6) !important;
+        }
+        .calendar-container[data-theme="crimson"] .text-\\[\\#D4AF37\\]\\/70 {
+          color: rgba(178, 34, 34, 0.7) !important;
+        }
+        .calendar-container[data-theme="crimson"] .shadow-\\[0_0_20px_rgba\\(212\\,175\\,55\\,0\\.15\\),inset_0_0_15px_rgba\\(212\\,175\\,55\\,0\\.1\\)\\] {
+          box-shadow: 0 0 20px rgba(178, 34, 34, 0.15), inset 0 0 15px rgba(178, 34, 34, 0.1) !important;
+        }
+        .calendar-container[data-theme="crimson"] .shadow-\\[0_0_20px_rgba\\(255\\,140\\,0\\,0\\.15\\),inset_0_0_15px_rgba\\(255\\,140\\,0\\,0\\.1\\)\\] {
+          box-shadow: 0 0 20px rgba(255, 68, 68, 0.15), inset 0 0 15px rgba(255, 68, 68, 0.1) !important;
+        }
+        .calendar-container[data-theme="crimson"] .shadow-md {
+          --tw-shadow-color: rgba(178, 34, 34, 0.2) !important;
+        }
+        .calendar-container[data-theme="crimson"] .shadow-\\[0_0_4px_rgba\\(212\\,175\\,55\\,0\\.6\\)\\] {
+          box-shadow: 0 0 4px rgba(178, 34, 34, 0.6) !important;
+        }
+        /* Remove dark blue tones */
         .calendar-container .border-purple-500\\/10,
         .calendar-container .border-purple-500\\/20,
         .calendar-container .border-purple-500\\/30,
         .calendar-container .border-purple-500\\/50 {
           border-color: rgba(212, 175, 55, 0.15) !important;
         }
-        /* Override purple/indigo text & backgrounds to brand gold */
         .calendar-container .text-purple-400,
         .calendar-container .text-purple-300 {
           color: #D4AF37 !important;
@@ -1482,61 +1594,66 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
         .calendar-container .border-purple-500\\/50 {
           border-color: rgba(212, 175, 55, 0.3) !important;
         }
+        .calendar-container[data-theme="crimson"] .text-purple-400,
+        .calendar-container[data-theme="crimson"] .text-purple-300 {
+          color: #B22222 !important;
+        }
+        .calendar-container[data-theme="crimson"] .border-purple-500\\/50,
+        .calendar-container[data-theme="crimson"] .border-purple-500\\/10,
+        .calendar-container[data-theme="crimson"] .border-purple-500\\/20,
+        .calendar-container[data-theme="crimson"] .border-purple-500\\/30 {
+          border-color: rgba(178, 34, 34, 0.2) !important;
+        }
+        .calendar-container[data-theme="crimson"] .bg-purple-500\\/20 {
+          background-color: rgba(178, 34, 34, 0.1) !important;
+          border-color: rgba(178, 34, 34, 0.2) !important;
+        }
       `}</style>
 
-      {/* Combined Calendar Block */}
-      <div className="space-y-6 calendar-container">
-        <style>{`
-          .calendar-container .bg-gradient-to-r.from-purple-600.to-indigo-600 {
-            background: linear-gradient(135deg, #d4af37, #b8960c) !important;
-            color: #0c0806 !important;
-          }
-          .calendar-container .border-purple-500\\/50 {
-            border-color: rgba(212, 175, 55, 0.3) !important;
-          }
-        `}</style>
+      {/* Shared Calendar Header (both tabs) */}
+      <CalendarHeaderGroup
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        currentDate={currentDate}
+        onDateChange={handleMonthChange}
+        selectedDate={selectedDate}
+        onDateSelect={handleDateClick}
+        events={events}
+        engineDays={engine.days}
+        onAddEvent={() => setIsAdding(true)}
+        isReadOnly={isReadOnly}
+        showAddButton={auth.level > 0}
+        onTimezoneToggle={() => setTimeDisplayMode(prev => prev === 'Asia/Manila' ? userTz : 'Asia/Manila')}
+        timezoneLabel={otherTzLabel}
+      />
 
-        {activeTab === 'LIVEHOUSE' ? (
-          <LivehouseCalendar
-            allUsers={allUsers}
-            events={events}
-            onOpenBookingModal={(date, timeslot) => {
-              setReserveDate(date);
-              setReserveTimeslot(timeslot);
-              setIsReservingLivehouse(true);
-            }}
-          />
-        ) : (
-          <div className="space-y-6">
-            {/* Calendar Header Group */}
-            <CalendarHeaderGroup
-              activeTab="AGENCY"
-              onTabChange={setActiveTab}
-              currentDate={currentDate}
-              onDateChange={setCurrentDate}
-              selectedDate={selectedDate}
-              onDateSelect={handleDateClick}
-              events={events}
-              onAddEvent={() => setIsAdding(true)}
-              isReadOnly={isReadOnly}
-              showAddButton={auth.level > 0}
-            />
-
-            {/* Daily Schedule Group */}
-            <DailyScheduleGroup
-              selectedDate={selectedDate}
-              events={events}
-              onAddEvent={() => setIsAdding(true)}
-              isReadOnly={isReadOnly}
-              localTimezoneMode={timeDisplayMode === 'Local'}
-              allUsers={allUsers}
-              attendanceRecords={attendanceRecords}
-              onEventClick={handleSpotlightClick}
-              auth={auth}
-            />
-          </div>
-        )}
-      </div>
+      {/* Conditional content based on tab */}
+      {activeTab === 'AGENCY' ? (
+        <DailyScheduleGroup
+          selectedDate={selectedDate}
+          events={events}
+          onAddEvent={() => setIsAdding(true)}
+          isReadOnly={isReadOnly}
+          localTimezoneMode={timeDisplayMode !== 'Asia/Manila'}
+          allUsers={allUsers}
+          attendanceRecords={attendanceRecords}
+          onEventClick={handleSpotlightClick}
+          auth={auth}
+        />
+      ) : (
+        <LivehouseCalendar
+          allUsers={allUsers}
+          events={events}
+          selectedDateStr={engine.selectedDate}
+          onOpenBookingModal={(date, timeslot) => {
+            setReserveDate(date);
+            setReserveTimeslot(timeslot);
+            setIsReservingLivehouse(true);
+          }}
+          timeDisplayMode={timeDisplayMode}
+          userTz={userTz}
+        />
+      )}
 
       {/* Create Event Modal */}
       <AnimatePresence>
