@@ -9,7 +9,7 @@ $startTime = Get-Date
 $adcKey = "$env:USERPROFILE\firebase-adminsdk-key.json"
 if (Test-Path $adcKey) {
     $env:GOOGLE_APPLICATION_CREDENTIALS = $adcKey
-    Write-Host "  ... GOOGLE_APPLICATION_CREDENTIALS set to $adcKey" -ForegroundColor Gray
+    Write-Info "GOOGLE_APPLICATION_CREDENTIALS set to $adcKey"
 }
 
 $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm"
@@ -129,7 +129,7 @@ if (-not $Force) {
             exit 0
         }
     } catch {
-        Write-Host "  Non-interactive mode Gï¿½ï¿½ proceeding automatically." -ForegroundColor Green
+        Write-Host "  Non-interactive mode GÇö proceeding automatically." -ForegroundColor Green
     }
 }
 
@@ -181,7 +181,7 @@ if ($LASTEXITCODE -ne 0) {
 Write-Success "Build completed"
 
 # ============================================================
-# PHASE 3: GIT Gï¿½ï¿½ STAGE, COMMIT, PULL, PUSH
+# PHASE 3: GIT GÇö STAGE, COMMIT, PULL, PUSH
 # ============================================================
 Write-Step "PHASE 3: Git operations"
 
@@ -200,7 +200,7 @@ $commitOutput = & git commit -m "deploy: $timestamp" 2>&1
 if ($LASTEXITCODE -eq 0) {
     Write-Success "Committed successfully"
 } elseif ($LASTEXITCODE -eq 1 -and $commitOutput -match "nothing to commit") {
-    Write-Warning "Nothing to commit Gï¿½ï¿½ working tree clean"
+    Write-Warning "Nothing to commit GÇö working tree clean"
 } else {
     Write-ErrorMsg "Commit failed:"
     Write-Host $commitOutput -ForegroundColor Red
@@ -215,7 +215,7 @@ Write-Info "Current HEAD: $currentHead"
 Write-Info "Pulling latest from origin/main (with rebase)"
 $pullOutput = & git pull origin main --rebase 2>&1
 if ($LASTEXITCODE -ne 0) {
-    Write-ErrorMsg "Pull/rebase failed Gï¿½ï¿½ possible conflicts:"
+    Write-ErrorMsg "Pull/rebase failed GÇö possible conflicts:"
     Write-Host $pullOutput -ForegroundColor Red
     Write-Host "`n  Resolve conflicts manually, then run the remaining deploy steps." -ForegroundColor Yellow
     exit 1
@@ -242,14 +242,14 @@ if ($LASTEXITCODE -eq 0) {
         Write-Success "Tag created and pushed: $tagName"
         Write-Info "To rollback to this build later: git checkout $tagName"
     } else {
-        Write-Warning "Tag created locally but push failed Gï¿½ï¿½ push manually: git push origin $tagName"
+        Write-Warning "Tag created locally but push failed GÇö push manually: git push origin $tagName"
     }
 } else {
-    Write-Warning "Failed to create deploy tag Gï¿½ï¿½ continuing anyway"
+    Write-Warning "Failed to create deploy tag GÇö continuing anyway"
 }
 
 # ============================================================
-# PHASE 4: FIREBASE DEPLOY Gï¿½ï¿½ HOSTING
+# PHASE 4: FIREBASE DEPLOY GÇö HOSTING
 # ============================================================
 Write-Step "PHASE 4: Deploy Firebase Hosting"
 
