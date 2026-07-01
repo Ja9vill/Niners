@@ -47,7 +47,8 @@ export const CalendarHeaderGroup: React.FC<CalendarHeaderGroupProps> = ({
       weekday: format(d, 'EEE'),
       isToday: isSameDay(d, new Date()),
       goldDot: false,
-      firebrickDot: false,
+      orangeDot: false,
+      isPadding: false,
       events: [],
       timeslots: []
     })) as CalendarDayData[];
@@ -70,7 +71,7 @@ export const CalendarHeaderGroup: React.FC<CalendarHeaderGroupProps> = ({
       ...day,
       events: dayEvents,
       goldDot: dayEvents.length > 0 && !hasLivehouse,
-      firebrickDot: hasLivehouse
+      orangeDot: hasLivehouse
     };
   };
 
@@ -166,27 +167,31 @@ export const CalendarHeaderGroup: React.FC<CalendarHeaderGroupProps> = ({
           }
 
           const hasGold = dayData.goldDot;
-          const hasFirebrick = dayData.firebrickDot;
+          const hasOrange = dayData.orangeDot;
+          const isPadding = dayData.isPadding;
 
           return (
             <button
               key={day.date}
-              onClick={() => handleDateClick(day)}
+              onClick={() => { if (!isPadding) handleDateClick(day); }}
               className={cn(
-                "aspect-square rounded-xl sm:rounded-2xl flex flex-col items-center justify-center border transition-all cursor-pointer relative group hover:border-[#D4AF37]/30",
+                "aspect-square rounded-xl sm:rounded-2xl flex flex-col items-center justify-center border transition-all relative group",
+                !isPadding ? "cursor-pointer hover:border-[#D4AF37]/30" : "cursor-default",
                 bgClass, borderClass
               )}
             >
               <span className={cn(
-                "text-sm sm:text-xl font-black drop-shadow-md leading-none transition-transform group-hover:scale-105",
-                textClass
+                "text-sm sm:text-xl font-black drop-shadow-md leading-none transition-transform",
+                !isPadding && "group-hover:scale-105",
+                textClass,
+                isPadding && "opacity-40"
               )}>
                 {dayNum}
               </span>
-              {(hasGold || hasFirebrick) && (
-                <div className="absolute bottom-1.5 flex gap-0.5">
+              {(hasGold || hasOrange) && (
+                <div className={cn("absolute bottom-1.5 flex gap-0.5", isPadding && "opacity-30")}>
                   {hasGold && <div className="w-1 h-1 sm:w-1.5 sm:h-1.5 rounded-full bg-gradient-to-br from-[#D4AF37] to-[#b8960c] shadow-[0_0_4px_rgba(212,175,55,0.6)]" />}
-                  {hasFirebrick && <div className="w-1 h-1 sm:w-1.5 sm:h-1.5 rounded-full bg-gradient-to-br from-[#B22222] to-[#8B0000] shadow-[0_0_4px_rgba(178,34,34,0.6)]" />}
+                  {hasOrange && <div className="w-1 h-1 sm:w-1.5 sm:h-1.5 rounded-full bg-gradient-to-br from-[#FF8C00] to-[#FF4500] shadow-[0_0_4px_rgba(255,140,0,0.6)]" />}
                 </div>
               )}
             </button>

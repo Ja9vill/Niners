@@ -1,11 +1,11 @@
 import { useState, useMemo, useCallback } from 'react';
 import {
   startOfMonth, endOfMonth, eachDayOfInterval, getDay, format,
-  isSameDay, addMonths, subMonths
+  startOfWeek, endOfWeek
 } from 'date-fns';
 import { CalendarEvent } from '../types';
 import { LivehouseDataRow, LivehouseSlot } from '../types/livehouse';
-import { formatLocalTime, getLocalTimezoneAbbreviation } from '../lib/timezoneUtils';
+import { getLocalTimezoneAbbreviation } from '../lib/timezoneUtils';
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -38,8 +38,9 @@ export interface CalendarDayData {
   date: string;
   weekday: string;
   isToday: boolean;
+  isPadding: boolean;
   goldDot: boolean;
-  firebrickDot: boolean;
+  orangeDot: boolean;
   events: CalendarEvent[];
   timeslots: {
     label: string;
@@ -51,7 +52,7 @@ export interface CalendarDayData {
 export interface CalendarEngineResult {
   month: string;
   year: number;
-  days: CalendarDayData[];
+  days: (CalendarDayData | null)[];
   weeks: CalendarDayData[][];
   selectedDate: string;
   setSelectedDate: (d: string) => void;
@@ -98,6 +99,40 @@ function buildTimeslotsForDay(
   });
 }
 
+function buildDayData(
+  dateObj: Date,
+  events: CalendarEvent[],
+  livehouseSchedule: LivehouseDataRow[],
+  loggedInPoppoId: string,
+  todayStr: string,
+  isPadding: boolean
+): CalendarDayData {
+  const dateStr = format(dateObj, 'yyyy-MM-dd');
+  const weekday = WEEKDAYS[getDay(dateObj)];
+  const isToday = dateStr === todayStr;
+
+  const dayEvents = events.filter(ev => {
+    const evDate = ev.event_date || ev.date || '';
+    return evDate === dateStr;
+  });
+
+  const liveEv = dayEvents.filter(isLivehouseEvent);
+  const nonLiveEv = dayEvents.filter(ev => !isLivehouseEvent(ev));
+
+  const timeslots = buildTimeslotsForDay(dateStr, livehouseSchedule, loggedInPoppoId);
+
+  return {
+    date: dateStr,
+    weekday,
+    isToday,
+    isPadding,
+    goldDot: nonLiveEv.length > 0,
+    orangeDot: liveEv.length > 0 || timeslots.some(t => t.slot1 !== 'available' || t.slot2 !== 'available'),
+    events: dayEvents,
+    timeslots
+  };
+}
+
 export function useCalendarEngine({
   events,
   livehouseSchedule,
@@ -136,57 +171,33 @@ export function useCalendarEngine({
   );
 
   const days = useMemo(() => {
-    const start = startOfMonth(new Date(cursor.year, cursor.month));
-    const end = endOfMonth(new Date(cursor.year, cursor.month));
-    const allDays = eachDayOfInterval({ start, end });
+    const monthStart = new Date(cursor.year, cursor.month, 1);
+    const monthEnd = endOfMonth(monthStart);
 
-    const dayData = allDays.map((dateObj): CalendarDayData => {
+    // Full 6-week range that starts on Monday
+    const gridStart = startOfWeek(startOfMonth(monthStart), { weekStartsOn: 1 });
+    const gridEnd = endOfWeek(endOfMonth(monthStart), { weekStartsOn: 1 });
+    const allGridDays = eachDayOfInterval({ start: gridStart, end: gridEnd });
+
+    const monthStr = format(monthStart, 'yyyy-MM');
+
+    return allGridDays.map((dateObj): CalendarDayData => {
       const dateStr = format(dateObj, 'yyyy-MM-dd');
-      const weekday = WEEKDAYS[getDay(dateObj)];
-      const isToday = dateStr === todayStr;
-
-      const dayEvents = events.filter(ev => {
-        const evDate = ev.event_date || ev.date || '';
-        return evDate === dateStr;
-      });
-
-      const liveEv = dayEvents.filter(isLivehouseEvent);
-      const nonLiveEv = dayEvents.filter(ev => !isLivehouseEvent(ev));
-
-      const timeslots = buildTimeslotsForDay(dateStr, livehouseSchedule, loggedInPoppoId);
-
-      return {
-        date: dateStr,
-        weekday,
-        isToday,
-        goldDot: nonLiveEv.length > 0,
-        firebrickDot: liveEv.length > 0 || timeslots.some(t => t.slot1 !== 'available' || t.slot2 !== 'available'),
-        events: dayEvents,
-        timeslots
-      };
+      const isPadding = !dateStr.startsWith(monthStr);
+      return buildDayData(dateObj, events, livehouseSchedule, loggedInPoppoId, todayStr, isPadding);
     });
-
-    // Pad with nulls so day 1 aligns with the correct weekday column
-    const startDow = getDay(start);
-    const padded: (CalendarDayData | null)[] = Array(startDow).fill(null);
-    padded.push(...dayData);
-    return padded;
   }, [cursor, events, livehouseSchedule, loggedInPoppoId, todayStr]);
 
   const weeks = useMemo(() => {
-    const padded: (CalendarDayData | null)[] = [...days];
-    while (padded.length % 7 !== 0) padded.push(null);
-
     const result: CalendarDayData[][] = [];
-    for (let i = 0; i < padded.length; i += 7) {
-      const row = padded.slice(i, i + 7).filter(Boolean) as CalendarDayData[];
-      if (row.length > 0) result.push(row);
+    for (let i = 0; i < days.length; i += 7) {
+      result.push(days.slice(i, i + 7));
     }
     return result;
   }, [days]);
 
   const selectedDay = useMemo(
-    () => (days.filter(Boolean) as CalendarDayData[]).find(d => d.date === selectedDate),
+    () => days.find(d => d.date === selectedDate),
     [days, selectedDate]
   );
 
