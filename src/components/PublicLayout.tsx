@@ -14,6 +14,10 @@ export const PublicLayout = ({ children }: { children?: React.ReactNode }) => {
 
   return (
     <div className="fixed inset-0 w-full h-[100dvh] flex flex-col overflow-hidden bg-transparent text-[#F0EFE8] font-sans selection:bg-[#D4AF37]/30 selection:text-white">
+      {/* Background Orbs (from homepage) */}
+      <div className="fixed top-1/4 left-1/4 w-96 h-96 bg-[#D4AF37]/20 rounded-full blur-[120px] pointer-events-none z-0" />
+      <div className="fixed bottom-1/4 right-1/4 w-96 h-96 bg-white/5 rounded-full blur-[120px] pointer-events-none z-0" />
+      <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full bg-[#D4AF37]/10 rounded-full blur-[150px] pointer-events-none z-0" />
       {/* Mobile Top Bar (Matching Dashboard Mobile Header) */}
       <header className="global-block-1 !overflow-visible md:hidden flex items-center justify-between p-4 shrink-0 z-50">
         <div className="flex items-center gap-3">

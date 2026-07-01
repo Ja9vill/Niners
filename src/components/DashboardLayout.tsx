@@ -832,6 +832,10 @@ export const DashboardLayout = ({ children }: { children?: React.ReactNode }) =>
 
   return (
     <div className="flex flex-col h-[100dvh] bg-transparent text-[#F0EFE8] overflow-hidden selection:bg-[#D4AF37]/30 selection:text-white">
+      {/* Background Orbs (from homepage) */}
+      <div className="fixed top-1/4 left-1/4 w-96 h-96 bg-[#D4AF37]/20 rounded-full blur-[120px] pointer-events-none z-0" />
+      <div className="fixed bottom-1/4 right-1/4 w-96 h-96 bg-white/5 rounded-full blur-[120px] pointer-events-none z-0" />
+      <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full bg-[#D4AF37]/10 rounded-full blur-[150px] pointer-events-none z-0" />
       {authState.mockRole && (
         <div className="w-full bg-indigo-600 text-white text-xs font-bold py-2 flex items-center justify-center gap-4 z-[9999] shrink-0 sticky top-0 shadow-lg px-4 text-center">
           <span>
