@@ -126,12 +126,33 @@ export const DailyScheduleGroup: React.FC<DailyScheduleGroupProps> = ({
                   // Determine if the event is "upcoming" or "past/ongoing"
                   const isUpcoming = eventDateObj > new Date();
 
-                  // Find host profile data
+                  // Find participant data from participant_ids
+                  const participantIds = e.participant_ids || [];
+                  const participantUsers = participantIds.map((pid: string) => {
+                    const user = allUsers.find(u => (u.poppo_id || u.poppoId || u.id) === pid);
+                    const name = user ? (user.nickname || user.name) : pid;
+                    const photo = user ? (user.photoUrl || user.profilePhotoUrl || user.photoURL) : null;
+                    return {
+                      id: pid,
+                      name,
+                      photoUrl: photo,
+                      avatarUrl: photo || `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0a0806&color=D4AF37`
+                    };
+                  });
+
+                  // Fallback to host if no participants
                   const hostPoppoId = e.poppo_id || e.created_by_id;
                   const hostUser = allUsers.find(u => (u.poppo_id || u.poppoId || u.id) === hostPoppoId);
                   const hostName = hostUser ? (hostUser.nickname || hostUser.name) : (e.created_by_name || 'Niner');
-                  const hostPhoto = hostUser ? (hostUser.photoUrl || hostUser.profilePhotoUrl || hostUser.photoURL) : null;
-                  const avatarUrl = hostPhoto || `https://ui-avatars.com/api/?name=${encodeURIComponent(hostName)}&background=0a0806&color=D4AF37`;
+                  const displayUsers = participantUsers.length > 0 ? participantUsers : (() => {
+                    const hostPhoto = hostUser ? (hostUser.photoUrl || hostUser.profilePhotoUrl || hostUser.photoURL) : null;
+                    return [{
+                      id: hostPoppoId || '',
+                      name: hostName,
+                      photoUrl: hostPhoto,
+                      avatarUrl: hostPhoto || `https://ui-avatars.com/api/?name=${encodeURIComponent(hostName)}&background=0a0806&color=D4AF37`
+                    }];
+                  })();
 
                   const eventAttendance = attendanceRecords.find(r => r.event_id === e.event_id || r.eventId === e.event_id);
                   const displayAttendees = eventAttendance ? (eventAttendance.attendees || eventAttendance.attendeeIds || eventAttendance.actualParticipants || []) : [];
@@ -146,13 +167,28 @@ export const DailyScheduleGroup: React.FC<DailyScheduleGroupProps> = ({
                           : "bg-gradient-to-r from-black/80 to-black/60 border-white/5 hover:border-[#D4AF37]/20"
                       )}
                     >
-                      {/* Profile Column */}
+                      {/* Participants Column */}
                       <div className="flex flex-col items-center gap-1.5 shrink-0">
-                        <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full border border-[#D4AF37]/50 p-0.5 bg-[#0a0806]">
-                          <img src={avatarUrl} alt="Profile" className="w-full h-full rounded-full object-cover" />
-                        </div>
+                        {displayUsers.length === 1 ? (
+                          <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full border border-[#D4AF37]/50 p-0.5 bg-[#0a0806]">
+                            <img src={displayUsers[0].avatarUrl} alt={displayUsers[0].name} className="w-full h-full rounded-full object-cover" />
+                          </div>
+                        ) : (
+                          <div className="flex -space-x-2 sm:-space-x-3">
+                            {displayUsers.slice(0, 4).map((p, i) => (
+                              <div key={i} className="w-8 h-8 sm:w-10 sm:h-10 rounded-full border border-[#D4AF37]/50 p-0.5 bg-[#0a0806]" title={p.name}>
+                                <img src={p.avatarUrl} alt={p.name} className="w-full h-full rounded-full object-cover" />
+                              </div>
+                            ))}
+                            {displayUsers.length > 4 && (
+                              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full border border-[#D4AF37]/50 bg-[#0a0806] flex items-center justify-center text-[8px] font-black text-[#D4AF37]">
+                                +{displayUsers.length - 4}
+                              </div>
+                            )}
+                          </div>
+                        )}
                         <span className="text-[8px] sm:text-[9px] text-white/50 uppercase tracking-widest bg-white/5 px-1 py-0.5 rounded border border-white/5 whitespace-nowrap">
-                          ID: {hostPoppoId || 'N/A'}
+                          {displayUsers.length > 1 ? `${displayUsers.length} people` : (displayUsers[0]?.id || 'N/A')}
                         </span>
                       </div>
 
@@ -160,13 +196,18 @@ export const DailyScheduleGroup: React.FC<DailyScheduleGroupProps> = ({
                       <div className="flex flex-col min-w-0 flex-1 justify-center">
                         <div className="flex items-start justify-between w-full">
                           <h4 className="text-sm sm:text-base font-black text-transparent bg-clip-text bg-gradient-to-r from-[#FFF0B3] to-[#FFD700] uppercase tracking-widest truncate mb-1">
-                            {hostName}
+                            {e.event_title || e.title || hostName}
                           </h4>
                         </div>
-                        <div className="flex flex-wrap items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                           <span className={cn("text-[8px] sm:text-[9px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded border whitespace-nowrap", colorConfig.text, "border-current/20 bg-current/5")}>
                             {e.type || 'Event'}
                           </span>
+                          {displayUsers.length > 1 && displayUsers.length <= 4 && (
+                            <span className="text-[8px] text-white/40 truncate max-w-[120px]">
+                              {displayUsers.map(p => p.name).join(', ')}
+                            </span>
+                          )}
                           <span className="text-[9px] sm:text-[10px] font-black text-[#FF8C00] tracking-widest bg-[#FF8C00]/10 border border-[#FF8C00]/20 px-1.5 py-0.5 rounded-md flex items-center gap-1">
                             {localTimezoneMode ? formatLocalTime(displayTime, e.date) : displayTime}
                           </span>

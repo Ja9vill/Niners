@@ -73,27 +73,27 @@ const formatXAxisLabel = (label: string): string => {
   return label;
 };
 
+// Duration conversion helper (HH:MM:SS → minutes)
+const durationToMinutes = (duration: string): number => {
+  if (!duration) return 0;
+  const parts = duration.split(':').map(Number);
+  return parts[0] * 60 + (parts[1] || 0) + Math.round((parts[2] || 0) / 60);
+};
+
 // Flexible field reader — tries multiple field name variants
 function f(r: any, ...keys: string[]): number {
   for (const k of keys) {
-    const v = r?.earningsBreakdown?.[k] ?? r?.[k];
+    const v = r?.[k];
     if (v !== undefined && v !== null && v !== '') return Number(v);
   }
   return 0;
 }
 
-const getLiveDuration  = (r: any) => f(r, 'liveDurationMinutes','liveDuration','live_duration','live_hours','Live Duration','live duration');
-const getPoints        = (r: any) => f(r, 'totalEarningsOfPoints','total_earnings_of_points','totalPoints','total_points','points','Total Earnings Of Points','total earnings of points');
-const getAgentComm     = (r: any) => f(r, 'agentCommission','agent_commission','agentComm','commission','Commission','Agent Commission');
-const getLiveEarnings  = (r: any) => f(r, 'liveEarnings','live_earnings','Live Earnings','liveearnings');
-const getPartyEarnings = (r: any) => f(r, 'partyEarnings','party_earnings','Party Earnings','partyearnings');
-const getPrivateChat   = (r: any) => f(r, 'privateChatEarnings','private_chat_earnings','privateChat','Private Chat','private chat','Private Chat Earnings');
-const getTips          = (r: any) => f(r, 'tips','Tips','tip');
-const getPlatformReward = (r: any) => f(r, 'platformReward','platform_reward','Platform Reward','platformreward');
-const getOtherEarnings = (r: any) => f(r, 'otherEarnings','other_earnings','Other Earnings','otherearnings');
-const getPlatformHourly = (r: any) => f(r, 'platformHourlySalary','platform_hourly_salary','Platform Hourly Salary','platformhourlysalary','platformHourly');
-const getSuperSalary   = (r: any) => f(r, 'superSalary','super_salary','Super Salary','supersalary');
-const getSuperRank     = (r: any) => f(r, 'superRank','super_rank','Super Rank','superrank');
+const getLiveDuration  = (r: any) => r.total_duration ? durationToMinutes(r.total_duration) : f(r, 'liveDurationMinutes','live_duration','live_hours','Live Duration');
+const getPoints        = (r: any) => f(r, 'total_points','total_earnings_of_points','totalPoints','points','totalEarningsOfPoints');
+const getAgentComm     = (r: any) => f(r, 'agent_commission','agentCommission','commission','Agent Commission');
+const getSuperSalary   = (r: any) => f(r, 'super_salary','superSalary','Super Salary');
+const getSuperRank     = (r: any) => f(r, 'super_rank','superRank','Super Rank');
 
 const GlassDropdown = ({ value, onChange, options, title }: any) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -199,38 +199,22 @@ export const Overview = () => {
         }
         setAgentOverviewId(useAgentId || '19381364');
 
-        const [fetchedHosts, fetchedCommissions, fetchedReports, newReports] = await Promise.all([
+        const [fetchedHosts, fetchedCommissions, newReports] = await Promise.all([
           FirebaseService.getAllHosts(),
           FirebaseService.getAllCommissions(),
-          FirebaseService.getAllPerformanceReports(),
           IngestionService.getReportsForOverview(useAgentId),
         ]);
         setHosts(fetchedHosts);
         setCommissions(fetchedCommissions);
 
-        // Combine old reports + new agent_financial_reports
-        const oldReports = fetchedReports.filter(r => r.docId !== '_schema_template' && r.poppoId);
-        const parseNum = (v: any): number => Number(String(v ?? '0').replace(/,/g, '')) || 0;
-        const durToMin = (d: string): number => {
-          const p = d.split(':').map(Number);
-          return p[0] * 60 + (p[1] || 0) + Math.round((p[2] || 0) / 60);
-        };
-        const transformedNew = newReports.map((r: any) => ({
+        const transformedReports = newReports.map((r: any) => ({
           ...r,
           poppoId: r.poppo_id,
           hostName: r.nickname,
           monthName: new Date(r.from_date).toLocaleString('default', { month: 'long' }),
           year: new Date(r.from_date).getFullYear().toString(),
-          earningsBreakdown: {
-            totalEarningsOfPoints: parseNum(r.total_points || r.total_point),
-            liveDurationMinutes: durToMin(r.total_duration || '0'),
-            agentCommission: parseNum(r.agent_commission),
-            superSalary: parseNum(r.super_salary),
-            superRank: parseNum(r.super_rank),
-          },
-          owner_role: r.agent_id === '19381364' ? 'Agency' : 'Agent',
         }));
-        setReports([...oldReports, ...transformedNew]);
+        setReports(transformedReports);
 
         // One-time automatic database relations backfill for director / head admin
         const isDirectorOrHeadAdmin = ['director', 'head admin', 'head_admin'].includes(roleLower);
@@ -307,7 +291,7 @@ export const Overview = () => {
   const availableYears = useMemo(() => {
     const years = new Set<string>();
     reports.forEach(r => {
-      if (r.report_type === 'weekly') return;
+      if (r.type !== 'monthly') return;
       const norm = normalizeMonthYear(r.monthName, r.year);
       if (norm) {
         years.add(norm.year);
@@ -319,7 +303,7 @@ export const Overview = () => {
   // Filtered reports
   const filteredReports = useMemo(() => {
     return reports.filter(r => {
-      if (r.report_type === 'weekly') return false; // Prevent duplicating weekly into monthly totals
+      if (r.type !== 'monthly') return false;
       const norm = normalizeMonthYear(r.monthName, r.year);
       if (!norm) return false;
       if (selectedYear !== 'all' && norm.year !== selectedYear) return false;
@@ -331,7 +315,7 @@ export const Overview = () => {
   // Leaderboard specific filtered reports
   const lbReports = useMemo(() => {
     return reports.filter(r => {
-      if (r.report_type === 'weekly') return false; // Prevent duplicating weekly into monthly totals
+      if (r.type !== 'monthly') return false;
       if (lbPeriod !== 'all') {
         const norm = normalizeMonthYear(r.monthName, r.year);
         if (!norm || norm.key !== lbPeriod) return false;
@@ -344,7 +328,7 @@ export const Overview = () => {
   const lbPeriodOptions = useMemo(() => {
     const periods = new Set<string>();
     reports.forEach(r => {
-      if (r.report_type === 'weekly') return;
+      if (r.type !== 'monthly') return;
       const norm = normalizeMonthYear(r.monthName, r.year);
       if (norm) {
         periods.add(norm.key);
@@ -408,23 +392,23 @@ export const Overview = () => {
   }, [lbReports, hostLookup]);
 
   const lbTotalPeriodCommission = useMemo(() => {
-    return lbReports.reduce((sum, r) => sum + (r.owner_role !== 'Agent' ? getAgentComm(r) : 0), 0);
+    return lbReports.reduce((sum, r) => sum + (String(r.agent_id) === '19381364' ? getAgentComm(r) : 0), 0);
   }, [lbReports]);
 
   // Splits for top KPI row
   const totalAgencyCommission = useMemo(() => {
-    return filteredReports.reduce((sum, r) => sum + (r.owner_role !== 'Agent' ? getAgentComm(r) : 0), 0);
+    return filteredReports.reduce((sum, r) => sum + (String(r.agent_id) === '19381364' ? getAgentComm(r) : 0), 0);
   }, [filteredReports]);
 
   const totalAgentCommission = useMemo(() => {
-    return filteredReports.reduce((sum, r) => sum + (r.owner_role === 'Agent' ? getAgentComm(r) : 0), 0);
+    return filteredReports.reduce((sum, r) => sum + (r.agent_id && String(r.agent_id) !== '19381364' ? getAgentComm(r) : 0), 0);
   }, [filteredReports]);
 
   // Monthly trend data
   const monthlyTrend = useMemo(() => {
     const grouped: Record<string, number> = {};
     reports.forEach(r => {
-      if (r.report_type === 'weekly') return;
+      if (r.type !== 'monthly') return;
       const norm = normalizeMonthYear(r.monthName, r.year);
       if (!norm) return;
       if (selectedYear !== 'all' && norm.year !== selectedYear) return;
@@ -445,7 +429,7 @@ export const Overview = () => {
   const monthlyTotalCommission = useMemo(() => {
     const map = new Map<string, number>();
     reports.forEach(r => {
-      if (r.report_type === 'weekly') return;
+      if (r.type !== 'monthly') return;
       const norm = normalizeMonthYear(r.monthName, r.year);
       if (!norm) return;
       const key = norm.key;

@@ -24,16 +24,16 @@ const getApiKey = () => {
   }
 };
 
-const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID;
+const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID || "gen-lang-client-0222945352";
 const storageBucket = import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || (projectId ? `${projectId}.appspot.com` : undefined);
 
 const firebaseConfig = {
   apiKey: getApiKey(),
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || `${projectId}.firebaseapp.com`,
   projectId,
   storageBucket,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "580294245942",
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:580294245942:web:1e0ef2e84b551e2b5f77be",
 };
 
 const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
