@@ -250,6 +250,36 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
         } catch (e) { /* permission denied or not found */ }
       }
 
+      // 3. Fallback: match by eventDate + timeslot/title in local cache
+      if (!data) {
+        const dateMatch = event.event_date || event.date;
+        const timeMatch = event.from_time || event.time;
+        const titleMatch = event.event_title || event.title || '';
+        if (dateMatch) {
+          const fallbackMatch = attendanceRecords.find(r =>
+            r.eventDate === dateMatch && (
+              (timeMatch && r.timeslot === timeMatch) ||
+              (titleMatch && r.eventTitle === titleMatch)
+            )
+          );
+          if (fallbackMatch) data = { ...fallbackMatch };
+        }
+      }
+
+      // 4. Fallback: query Firestore by eventDate
+      if (!data) {
+        const dateMatch = event.event_date || event.date;
+        if (dateMatch) {
+          try {
+            const q3 = query(collection(db, 'attendance'), where('eventDate', '==', dateMatch));
+            const qs3 = await getDocs(q3);
+            if (!qs3.empty) {
+              data = { ...qs3.docs[0].data(), id: qs3.docs[0].id };
+            }
+          } catch (e) { /* permission denied or not found */ }
+        }
+      }
+
       if (data) {
         setAttendanceRecord(data);
 
@@ -341,6 +371,36 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
         } catch (e) { /* permission denied or not found */ }
       }
 
+      // 3. Fallback: match by eventDate + timeslot/title in local cache
+      if (!data) {
+        const dateMatch = event.event_date || event.date;
+        const timeMatch = event.from_time || event.time;
+        const titleMatch = event.event_title || event.title || '';
+        if (dateMatch) {
+          const fallbackMatch = attendanceRecords.find(r =>
+            r.eventDate === dateMatch && (
+              (timeMatch && r.timeslot === timeMatch) ||
+              (titleMatch && r.eventTitle === titleMatch)
+            )
+          );
+          if (fallbackMatch) data = { ...fallbackMatch };
+        }
+      }
+
+      // 4. Fallback: query Firestore by eventDate
+      if (!data) {
+        const dateMatch = event.event_date || event.date;
+        if (dateMatch) {
+          try {
+            const q3 = query(collection(db, 'attendance'), where('eventDate', '==', dateMatch));
+            const qs3 = await getDocs(q3);
+            if (!qs3.empty) {
+              data = { ...qs3.docs[0].data(), id: qs3.docs[0].id };
+            }
+          } catch (e) { /* permission denied or not found */ }
+        }
+      }
+
       if (data) {
 
         // Map any available schema to the attAttendees format
@@ -391,6 +451,15 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
     try {
       const currentAuth = Storage.getAuthState();
       const existing = attendanceRecords.find(r => r.event_id === attendanceModalEvent.event_id || r.eventId === attendanceModalEvent.event_id);
+
+      // Role-based guard: manager/agent cannot update existing attendance records
+      const userRole = String(currentAuth?.role || '').toLowerCase();
+      const canUpdate = ['admin', 'head admin', 'head_admin', 'director'].includes(userRole);
+      if (existing && !canUpdate) {
+        setAttErrors(['You do not have permission to update attendance records.']);
+        setIsAttProcessing(false);
+        return;
+      }
       const attendanceId = existing?.attendanceId || (crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 15));
       const docId = existing?.attendanceId ? existing.attendanceId : generateSubmissionId(currentAuth?.poppo_id || '', currentAuth?.role || '', currentAuth?.name || currentAuth?.nickname || '');
 
@@ -1732,6 +1801,8 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                   const loggedInUserRole = String(auth?.role || '').toLowerCase();
                   const isStrictDirectorOrHeadAdmin = loggedInUserRole === 'director' || loggedInUserRole === 'head admin' || loggedInUserRole === 'head_admin';
                   const isDirectorOrHeadAdmin = isStrictDirectorOrHeadAdmin || loggedInUserRole === 'admin';
+                  const canSubmitAttendance = isDirectorOrHeadAdmin || loggedInUserRole === 'manager' || loggedInUserRole === 'agent';
+                  const canUpdateAttendance = isDirectorOrHeadAdmin;
                   const isCreator = String(auth?.poppo_id || auth?.id) === String(selectedEvent.created_by_id || hostPoppoId);
 
                   let canEdit = isUpcoming && (isDirectorOrHeadAdmin || isCreator);
@@ -1741,18 +1812,26 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
 
                   return (
                     <div className="p-5 sm:p-8 flex flex-col gap-6 relative">
-                      {/* Submit/Update Attendance button (past events only) */}
-                      {(!isUpcoming || eventDateObj <= new Date()) && isDirectorOrHeadAdmin && (
+                      {/* Submit/Update Attendance button (past/ongoing events only) */}
+                      {(!isUpcoming || eventDateObj <= new Date()) && canSubmitAttendance && (
                         <div className="absolute top-4 right-4 z-20">
                           <button
                             onClick={(clickEvent) => {
                               clickEvent.stopPropagation();
                               handleOpenAttendanceModal(clickEvent, selectedEvent);
                             }}
-                            className="px-3 py-1.5 bg-gradient-to-r from-[#FF8C00]/20 to-[#D4AF37]/20 hover:from-[#FF8C00]/30 hover:to-[#D4AF37]/30 border border-[#D4AF37]/50 text-[#FFD700] font-black text-[10px] uppercase tracking-wider rounded-lg transition-all shadow-[0_0_15px_rgba(255,140,0,0.2)] flex items-center gap-1.5"
+                            disabled={!!attendanceRecord && !canUpdateAttendance}
+                            className={cn(
+                              "px-3 py-1.5 border font-black text-[10px] uppercase tracking-wider rounded-lg transition-all flex items-center gap-1.5",
+                              attendanceRecord && !canUpdateAttendance
+                                ? "bg-white/5 border-white/10 text-white/30 cursor-not-allowed"
+                                : "bg-gradient-to-r from-[#FF8C00]/20 to-[#D4AF37]/20 hover:from-[#FF8C00]/30 hover:to-[#D4AF37]/30 border-[#D4AF37]/50 text-[#FFD700] shadow-[0_0_15px_rgba(255,140,0,0.2)]"
+                            )}
                           >
                             <CheckCircle2 size={12} />
-                            {attendanceRecord ? 'Update Attendance' : 'Submit Attendance'}
+                            {attendanceRecord
+                              ? (canUpdateAttendance ? 'Update Attendance' : 'Attendance Recorded')
+                              : 'Submit Attendance'}
                           </button>
                         </div>
                       )}

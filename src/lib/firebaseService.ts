@@ -1292,7 +1292,7 @@ export const FirebaseService = {
           id: eventId,
           event_id: eventId,
           event_type: raw.event_type || raw.type || '',
-          event_title: raw.event_title || raw.title || '',
+          event_title: raw.event_title || raw.title || raw.event_tittle || '',
           event_description: raw.event_description || raw.description || '',
           event_date: raw.event_date || raw.date || '',
           from_time: raw.from_time || '',
@@ -1310,7 +1310,7 @@ export const FirebaseService = {
           notifiedStart: raw.notifiedStart ?? false,
           // Backward-compat aliases for legacy consumers
           date: raw.event_date || raw.date || '',
-          title: raw.event_title || raw.title || '',
+          title: raw.event_title || raw.title || raw.event_tittle || '',
           type: raw.event_type || raw.type || '',
           time: raw.from_time && raw.to_time ? `${raw.from_time} - ${raw.to_time}` : (raw.time || ''),
           poppo_id: raw.event_host_id || raw.poppo_id || '',
