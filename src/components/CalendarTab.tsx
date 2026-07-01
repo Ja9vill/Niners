@@ -199,6 +199,8 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
     setIsAttendanceExpanded(false);
     setIsEditExpanded(false);
     setAttendanceRecord(null);
+    setAttAttendees([]);
+    setAttFeedback('');
     setAttErrors([]);
     setAttSuccessMsg('');
     setAttSearch('');
@@ -471,10 +473,10 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
     const loadData = async () => {
       try {
         const firestoreEvents = await FirebaseService.getCalendarEvents();
-        // Deduplicate by event_id or (title+date+from_time) composite key
+        // Deduplicate by (date+from_time+to_time+host) composite key to catch duplicates
         const seen = new Set<string>();
         const deduped = (firestoreEvents || []).filter(e => {
-          const key = e.event_id || `${e.title || ''}_${e.date || e.event_date || ''}_${e.from_time || e.time || ''}`;
+          const key = `${e.date || e.event_date || ''}_${e.from_time || ''}_${e.to_time || ''}_${e.event_host_id || e.poppo_id || ''}_${e.event_host_name || ''}`;
           if (seen.has(key)) return false;
           seen.add(key);
           return true;
@@ -531,8 +533,9 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
   });
 
   const currentDate = useMemo(() => {
-    if (engine.days.length === 0) return new Date();
-    return new Date(engine.days[0].date + 'T00:00:00');
+    const first = engine.days.find(Boolean);
+    if (!first || !first.date) return new Date();
+    return new Date(first.date + 'T00:00:00');
   }, [engine.days]);
 
   const handlePrevMonth = () => engine.goPrevMonth();
@@ -1737,25 +1740,22 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                   }
 
                   return (
-                    <div className="p-5 sm:p-8 flex flex-col gap-6">
-                      {/* Header/Close */}
-                      <div className="w-full flex flex-col items-end gap-2 absolute top-4 right-4 z-20">
-                        <button
-                          title="Close"
-                          onClick={() => setSelectedEventId(null)} className="text-white/30 hover:text-[#D4AF37] transition-colors p-1 bg-white/5 hover:bg-white/10 rounded-full">
-                          <X size={20} />
-                        </button>
-
-                        {(!isUpcoming || eventDateObj <= new Date()) && isDirectorOrHeadAdmin && (
+                    <div className="p-5 sm:p-8 flex flex-col gap-6 relative">
+                      {/* Submit/Update Attendance button (past events only) */}
+                      {(!isUpcoming || eventDateObj <= new Date()) && isDirectorOrHeadAdmin && (
+                        <div className="absolute top-4 right-4 z-20">
                           <button
-                            onClick={(clickEvent) => handleOpenAttendanceModal(clickEvent, selectedEvent)}
-                            className="px-3 py-1.5 bg-gradient-to-r from-[#FF8C00]/20 to-[#D4AF37]/20 hover:from-[#FF8C00]/30 hover:to-[#D4AF37]/30 border border-[#D4AF37]/50 text-[#FFD700] font-black text-[10px] uppercase tracking-wider rounded-lg transition-all shadow-[0_0_15px_rgba(255,140,0,0.2)] flex items-center gap-1.5 mt-1"
+                            onClick={(clickEvent) => {
+                              clickEvent.stopPropagation();
+                              handleOpenAttendanceModal(clickEvent, selectedEvent);
+                            }}
+                            className="px-3 py-1.5 bg-gradient-to-r from-[#FF8C00]/20 to-[#D4AF37]/20 hover:from-[#FF8C00]/30 hover:to-[#D4AF37]/30 border border-[#D4AF37]/50 text-[#FFD700] font-black text-[10px] uppercase tracking-wider rounded-lg transition-all shadow-[0_0_15px_rgba(255,140,0,0.2)] flex items-center gap-1.5"
                           >
                             <CheckCircle2 size={12} />
                             {attendanceRecord ? 'Update Attendance' : 'Submit Attendance'}
                           </button>
-                        )}
-                      </div>
+                        </div>
+                      )}
 
                       {/* Profile Info Row */}
                       <div className="flex flex-row items-center w-full gap-5 sm:gap-6 mt-[-10px]">
@@ -1884,7 +1884,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
                     })()}
 
                       {/* Attendance Section */}
-                      {(attendanceRecord || isUpcoming === false) && (
+                      {(attendanceRecord || attAttendees.length > 0 || !isUpcoming) && (
                           <div className="mt-4">
                             <h5 className="text-[9px] font-black text-[#D4AF37] uppercase tracking-widest mb-3 border-b border-white/5 pb-2">Attendance</h5>
                             <div className="flex flex-col gap-2">
@@ -1943,7 +1943,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ isReadOnly = false, ho
       {/* Attendance Modal */}
       <AnimatePresence>
         {attendanceModalOpen && attendanceModalEvent && (
-          <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 sm:p-6">
+          <div className="fixed inset-0 z-[1200] flex items-center justify-center p-4 sm:p-6">
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setAttendanceModalOpen(false)} className="absolute inset-0 bg-black/80 backdrop-blur-sm" />
             <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="relative glass-card w-full max-w-2xl rounded-3xl overflow-hidden z-10 max-h-[90vh] overflow-y-auto custom-scrollbar p-0">
               <div className="p-6 border-b border-[#D4AF37]/20 font-black text-white uppercase tracking-widest text-[10px]">Attendance Report</div>

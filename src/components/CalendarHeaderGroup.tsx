@@ -145,7 +145,8 @@ export const CalendarHeaderGroup: React.FC<CalendarHeaderGroupProps> = ({
 
       {/* Calendar Grid */}
       <div className="grid grid-cols-7 gap-1 sm:gap-2 mb-2">
-        {monthDays.map((day) => {
+        {monthDays.map((day, idx) => {
+          if (!day) return <div key={`pad-${idx}`} />;
           const dayData = getDayData(day);
           const dayNum = parseInt(day.date.split('-')[2], 10);
           const isCurrentMonth = day.date.split('-')[1] === format(currentDate, 'MM');

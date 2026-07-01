@@ -140,7 +140,7 @@ export function useCalendarEngine({
     const end = endOfMonth(new Date(cursor.year, cursor.month));
     const allDays = eachDayOfInterval({ start, end });
 
-    return allDays.map((dateObj): CalendarDayData => {
+    const dayData = allDays.map((dateObj): CalendarDayData => {
       const dateStr = format(dateObj, 'yyyy-MM-dd');
       const weekday = WEEKDAYS[getDay(dateObj)];
       const isToday = dateStr === todayStr;
@@ -165,13 +165,16 @@ export function useCalendarEngine({
         timeslots
       };
     });
+
+    // Pad with nulls so day 1 aligns with the correct weekday column
+    const startDow = getDay(start);
+    const padded: (CalendarDayData | null)[] = Array(startDow).fill(null);
+    padded.push(...dayData);
+    return padded;
   }, [cursor, events, livehouseSchedule, loggedInPoppoId, todayStr]);
 
   const weeks = useMemo(() => {
-    const start = startOfMonth(new Date(cursor.year, cursor.month));
-    const startDow = getDay(start);
-    const padded: (CalendarDayData | null)[] = Array(startDow).fill(null);
-    padded.push(...days);
+    const padded: (CalendarDayData | null)[] = [...days];
     while (padded.length % 7 !== 0) padded.push(null);
 
     const result: CalendarDayData[][] = [];
@@ -180,10 +183,10 @@ export function useCalendarEngine({
       if (row.length > 0) result.push(row);
     }
     return result;
-  }, [cursor, days]);
+  }, [days]);
 
   const selectedDay = useMemo(
-    () => days.find(d => d.date === selectedDate),
+    () => (days.filter(Boolean) as CalendarDayData[]).find(d => d.date === selectedDate),
     [days, selectedDate]
   );
 
